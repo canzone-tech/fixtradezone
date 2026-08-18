@@ -9,6 +9,7 @@
 - The GitHub repository and `docs/` are the persistent source of truth across sessions.
 - Avoid unnecessary detours, duplicated services/databases, or time-wasting commands.
 - Prefer cohesive multi-file milestones when several directly related files can be reviewed and delivered together.
+- Locked delivery flow: local feature branch -> automated checks -> relevant Postman/API verification -> push -> pull request -> green CI -> review -> merge.
 
 ## Locked Product Rules
 - Users do not perform real trades in FixTradeZone.

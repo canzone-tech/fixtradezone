@@ -35,3 +35,6 @@ LOCKED. Security, architecture, integrity, scalability, maintainability and audi
 
 ## ADR-012 — Template-based frontend/admin
 LOCKED. Public landing page and admin UI use reusable templates/components and configuration rather than one-off hardcoded layouts.
+
+## ADR-013 — Local-first delivery gate
+LOCKED. Feature work is completed on a local feature branch. Relevant automated checks and Postman/manual API verification must pass before a pull request is opened against `main`. Pull requests require green CI and review before merge.

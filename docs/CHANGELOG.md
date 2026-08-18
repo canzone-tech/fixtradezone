@@ -15,7 +15,18 @@
 - `/health` explicitly public.
 - Argon2, Passport/JWT, class-validator and class-transformer dependencies added.
 - Initial RBAC/auth Prisma schema drafted.
-- Initial migration generated and reviewed but not applied.
+- Initial migration generated and reviewed.
+- Applied and verified `0001_foundation_auth_rbac` in the local development database using `prisma migrate deploy` after a database backup.
+- Verified all Auth/RBAC tables, migration history, foreign keys, and referential actions.
+- Added Register, Login, RefreshToken, and Logout DTOs with normalization and bounded validation.
+- Added a global fail-closed `ValidationPipe` that rejects unknown fields and suppresses submitted values in validation errors.
+- Added focused Auth DTO unit tests.
+- Applied and verified the local-first delivery gate before opening the final pull request.
+- Added OWASP-minimum Argon2id password hashing and verification.
+- Added an idempotent default USER role bootstrap.
+- Added transactional public registration with safe response projection, default role assignment, and an audit event.
+- Added duplicate-identifier conflict handling and registration service tests.
+- Verified registration through Postman and direct SQL inspection.
 - Investigated 3 high npm audit findings; confirmed they originate from Prisma 7.9.1 -> `@prisma/config` 7.9.1 -> `deepmerge-ts` 7.1.5.
 - Rejected `npm audit --force` because it proposes a breaking Prisma 6.12.0 downgrade.
 - Rejected an unverified `deepmerge-ts` 8.x override.
