@@ -17,3 +17,7 @@
 - Initial RBAC/auth Prisma schema drafted.
 - Initial migration generated and reviewed but not applied.
 - Latest dependency installation produced 3 high npm audit findings; investigation is required before continuing auth implementation.
+
+- Investigated 3 high npm audit findings; confirmed they originate from Prisma 7.9.1 -> @prisma/config 7.9.1 -> deepmerge-ts 7.1.5.
+- Rejected npm audit --force because it proposes a breaking Prisma 6.12.0 downgrade.
+- Rejected an unverified deepmerge-ts 8.x override.

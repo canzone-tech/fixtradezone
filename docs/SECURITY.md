@@ -43,3 +43,19 @@
 - Do not blindly run `npm audit fix --force`.
 - Investigate advisories and compatibility first.
 - Review install-script approval warnings before approving.
+## Known Dependency Advisory
+
+As of 2026-08-18, `npm audit` reports 3 high-severity findings for
+`deepmerge-ts@7.1.5`, pulled transitively by `@prisma/config@7.9.1`.
+
+Prisma 7.9.1 declares `deepmerge-ts` version `7.1.5`. Installing
+`deepmerge-ts@8.0.1` directly does not replace Prisma's nested dependency.
+
+Do not run `npm audit fix --force`, because npm proposes a breaking downgrade
+to Prisma 6.12.0.
+
+Do not add an unverified npm override for `deepmerge-ts` 8.x.
+
+The advisory is tracked and will be reassessed when Prisma publishes a
+compatible security update or an officially supported remediation becomes
+available.
