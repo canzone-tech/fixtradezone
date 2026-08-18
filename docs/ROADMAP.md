@@ -30,14 +30,15 @@ Completed:
 - Auth module skeleton
 - Argon2 dependency
 - class-validator / class-transformer dependencies
+- Prisma transitive dependency advisory investigated and documented
+- Repository README, environment template, CI, dependency updates, and PR checklist prepared
 
 Current:
-- Inspect and safely resolve 3 high npm audit findings
+- Review and apply the initial auth/RBAC schema to the existing `fixtradezone` database
 - Finish Register/Login/Auth lifecycle
 - Access + refresh token lifecycle
 - Token revocation/logout
 - RBAC
-- Initial single-database migration apply
 
 Pending in Phase 3:
 - Auth DTOs
@@ -64,3 +65,4 @@ Pending in Phase 3:
 14. Notifications / Reports
 15. QA / Security / Bug Fixing
 16. Production Deployment
+
