@@ -12,6 +12,18 @@
 - Hash passwords with Argon2.
 - Never store plaintext passwords.
 - Never return password hashes.
+- Registration passwords must contain 12–128 characters.
+- Password input is never trimmed or normalized; every submitted character is significant.
+- Login accepts any non-empty password up to 128 characters so authentication does not expose registration-policy details.
+
+## Request Validation
+- A global NestJS `ValidationPipe` validates concrete DTO classes.
+- Unknown request fields are rejected instead of silently accepted.
+- Implicit primitive conversion is disabled.
+- Validation errors must not echo the original object or submitted value.
+- Email addresses and usernames are trimmed and normalized to lowercase.
+- Optional phone numbers use E.164 format.
+- Refresh and logout tokens must be JWT-shaped strings and are cryptographically verified by the authentication service before use.
 
 ## Authorization
 - Authentication establishes identity.
@@ -43,6 +55,7 @@
 - Do not blindly run `npm audit fix --force`.
 - Investigate advisories and compatibility first.
 - Review install-script approval warnings before approving.
+
 ## Known Dependency Advisory
 
 As of 2026-08-18, `npm audit` reports 3 high-severity findings for
