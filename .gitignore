@@ -1,0 +1,50 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.env.save
+*.secret
+*.secrets
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime / temporary
+.tmp/
+.temp/
+*.pid
+*.pid.lock
+
+# OS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+
+# Generated Prisma client
+**/src/generated/prisma/
+
+# Local database / tooling artifacts
+*.db
+*.sqlite
+*.sqlite3
