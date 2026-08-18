@@ -30,7 +30,8 @@ Do not create additional application databases.
 - Secrets via env/secret manager
 - Important admin/financial actions audited
 
-## Initial Auth/RBAC Schema (drafted, not yet applied)
+## Initial Auth/RBAC Schema
+
 Models:
 - User
 - Role
@@ -65,8 +66,17 @@ CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, SUSPEND, ACTIVATE, BLOCK
 - audit actor -> user: SET NULL
 
 ## Migration State
-`prisma/migrations/0001_foundation_auth_rbac/migration.sql` exists, was generated with `prisma migrate diff --from-empty --to-schema ... --script`, and reviewed.
 
-It has NOT been applied.
+`prisma/migrations/0001_foundation_auth_rbac/migration.sql` was generated with `prisma migrate diff --from-empty --to-schema ... --script` and reviewed before application.
 
-Do NOT use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue with a single-database baseline/apply strategy.
+On 2026-08-18 it was applied with `prisma migrate deploy` to the local development MySQL `fixtradezone` database after a pre-apply database dump.
+
+Verification confirmed:
+- Prisma reports the database schema is up to date.
+- `_prisma_migrations` records `0001_foundation_auth_rbac` as finished, not rolled back, with one applied step.
+- `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, and `audit_logs` exist.
+- All five reviewed foreign keys and their delete/update rules match the migration.
+
+This verification applies only to the local development database. It does not imply that staging or production has been migrated.
+
+Do not use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue using reviewed migrations and `prisma migrate deploy` for authorized environments.
