@@ -8,7 +8,6 @@ export interface JwtPayload {
   email: string;
   type: 'access';
 }
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly configService: ConfigService) {
@@ -36,4 +35,3 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     };
   }
 }
-
