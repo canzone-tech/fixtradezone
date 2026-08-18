@@ -1,10 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import type { ClassConstructor } from 'class-transformer';
 import { validate } from 'class-validator';
-import type {
-  ValidationError,
-  ValidatorOptions,
-} from 'class-validator';
+import type { ValidationError, ValidatorOptions } from 'class-validator';
 import { LoginDto } from './login.dto';
 import { LogoutDto } from './logout.dto';
 import { RefreshTokenDto } from './refresh-token.dto';
@@ -99,6 +96,8 @@ describe('Auth DTOs', () => {
       refreshToken: 'not-a-jwt',
     });
 
-    expect(errors.some((error) => error.property === 'refreshToken')).toBe(true);
+    expect(errors.some((error) => error.property === 'refreshToken')).toBe(
+      true,
+    );
   });
 });

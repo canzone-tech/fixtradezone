@@ -79,4 +79,15 @@ Verification confirmed:
 
 This verification applies only to the local development database. It does not imply that staging or production has been migrated.
 
+## RBAC Bootstrap and Registration Verification
+
+The API idempotently upserts the default `USER` role as an active system invariant. Registration also ensures that role inside the same transaction used to create the user and audit event.
+
+Local Postman and SQL verification confirmed:
+- a new user is created with `PENDING` status;
+- the password is stored as an Argon2id hash;
+- the `USER` role is assigned through `user_roles`;
+- a `CREATE` audit event with source `SELF_REGISTRATION` is recorded;
+- duplicate registration returns HTTP 409 without a second user or audit event.
+
 Do not use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue using reviewed migrations and `prisma migrate deploy` for authorized environments.

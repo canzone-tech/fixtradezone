@@ -22,13 +22,13 @@ Expected shape:
 Protected endpoints use:
 `Authorization: Bearer {{accessToken}}`
 
-## Planned Auth Endpoints
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
+## Auth Endpoint Status
+- `POST /auth/register` — implemented and locally verified
+- `POST /auth/login` — planned
+- `POST /auth/refresh` — planned
+- `POST /auth/logout` — planned
 
-The request DTO layer is implemented. The endpoint handlers remain pending.
+The request DTO layer is implemented for the planned authentication lifecycle.
 
 ## Auth Request Validation
 
@@ -55,6 +55,10 @@ All DTO-backed request bodies reject unknown fields.
 | `phone` | No | E.164 format |
 | `firstName` | No | Trimmed string, 1–100 characters |
 | `lastName` | No | Trimmed string, 1–100 characters |
+
+A successful registration returns HTTP 201 with a safe user projection, `PENDING` status, and the assigned `USER` role. Passwords and password hashes are never returned.
+
+Duplicate email, username, or phone identifiers return HTTP 409. Invalid or unknown fields return HTTP 400. User creation, role assignment, and the registration audit event are committed in one database transaction.
 
 ### Login
 

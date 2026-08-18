@@ -32,20 +32,25 @@ Completed:
 - class-validator / class-transformer dependencies
 - Prisma transitive dependency advisory investigated and documented
 - Repository README, environment template, CI, dependency updates, and PR checklist prepared
+- Initial Auth/RBAC migration applied and verified in local development
+- Global fail-closed request validation
+- Register, Login, RefreshToken, and Logout DTOs
+- Transactional public registration with Argon2id hashing
+- Idempotent default USER role bootstrap and assignment
+- Registration audit event
+- Registration Postman and database verification
 
 Current:
-- Review and apply the initial auth/RBAC schema to the existing `fixtradezone` database
-- Finish Register/Login/Auth lifecycle
+- Implement Login and safe JWT issuance
 - Access + refresh token lifecycle
 - Token revocation/logout
-- RBAC
+- Database user/status lookup in the JWT strategy
+- RBAC guards and permissions
 
 Pending in Phase 3:
-- Auth DTOs
-- AuthService
-- User creation/login
-- Default USER role assignment
-- Audit integration
+- Login and safe token issuance
+- Refresh-token rotation and revocation
+- Broader auth audit integration
 - Postman token automation
 - MongoDB connection/module
 - Redis connection/module

@@ -21,6 +21,10 @@ Focus: Authentication + secure API foundation.
 - Initial Auth/RBAC migration applied and verified in local development
 - Global DTO request validation configured
 - Auth DTO validation covered by focused unit tests
+- Transactional registration with Argon2id hashing
+- Idempotent default USER role bootstrap and assignment
+- Registration audit event
+- Registration verified through Postman and direct SQL checks
 - Prisma transitive dependency advisory investigated and documented
 
 ## Current Areas
@@ -48,16 +52,28 @@ Implemented:
 - Registration password, username, phone, and name constraints
 - Refresh/logout JWT-shape validation
 - DTO unit tests
+- Public Register controller and service
+- Argon2id password hashing service
+- Transactional user, USER role, and audit creation
+- Duplicate-identifier conflict handling
+- Registration service, RBAC bootstrap, and password service tests
 
 Not implemented:
-- Register handler/service
 - Login handler/service
 - Refresh handler/service
 - Logout/revocation
 - Database user lookup in strategy
 - Role/permission enforcement
-- Auth audit events
+- Login, logout, token-lifecycle, and authorization audit events
 - Postman token scripts
+
+## Manual API Verification
+- `GET /health` returns HTTP 200 with MySQL up.
+- `POST /auth/register` returns HTTP 201 with a safe user projection.
+- Repeating the same registration returns HTTP 409.
+- Invalid email, short password, and injected `role` return HTTP 400.
+- `GET /` returns HTTP 404 because no root route is registered; no protected business endpoint exists yet for a manual 401 check.
+- SQL verification confirmed Argon2id, PENDING status, USER role assignment, and the registration audit event.
 
 ## Database Environment Status
 - Local development: migration `0001_foundation_auth_rbac` applied and verified.
@@ -70,11 +86,11 @@ Not implemented:
 - The advisory remains tracked in `SECURITY.md`; reassess when Prisma publishes a compatible remediation.
 
 ## Immediate Next Actions
-1. Add an idempotent RBAC bootstrap for the default USER role.
-2. Implement Register transactionally with Argon2 and default USER assignment.
-3. Implement Login and safe JWT issuance.
-4. Implement refresh token rotation/revocation.
-5. Integrate audit logging.
+1. Implement Login with generic credential errors and status enforcement.
+2. Issue short-lived access tokens and rotating refresh tokens safely.
+3. Add refresh-token persistence, rotation, revocation, and logout.
+4. Load the current user and status in the JWT strategy.
+5. Expand auth audit logging.
 6. Configure Postman token automation.
 7. Add RBAC guards/permissions.
 8. Add MongoDB/Redis modules after auth baseline.
