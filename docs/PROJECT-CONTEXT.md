@@ -4,8 +4,11 @@
 - Assistant role: Chief Architect (CA).
 - Production-ready code is the default standard.
 - Never sacrifice architecture, security, data integrity, scalability, maintainability, validation, auditability, or financial safety for speed.
-- Development is step-by-step and milestone-based. Codex is intentionally not being used for now.
+- Development is step-by-step and milestone-based.
+- ChatGPT Work with the connected GitHub repository is approved for inspection and controlled repository changes.
+- The GitHub repository and `docs/` are the persistent source of truth across sessions.
 - Avoid unnecessary detours, duplicated services/databases, or time-wasting commands.
+- Prefer cohesive multi-file milestones when several directly related files can be reviewed and delivered together.
 
 ## Locked Product Rules
 - Users do not perform real trades in FixTradeZone.
@@ -34,3 +37,4 @@
 - Internal target: 12 weeks.
 - Client-facing committed timeline: 14 weeks including contingency.
 - Major milestones require client review/approval.
+

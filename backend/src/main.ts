@@ -8,9 +8,7 @@ async function bootstrap() {
 
   const reflector = app.get(Reflector);
 
-  app.useGlobalGuards(
-    new JwtAuthGuard(reflector),
-  );
+  app.useGlobalGuards(new JwtAuthGuard(reflector));
 
   await app.listen(process.env.PORT ?? 3000);
 }

@@ -16,8 +16,11 @@
 - Argon2, Passport/JWT, class-validator and class-transformer dependencies added.
 - Initial RBAC/auth Prisma schema drafted.
 - Initial migration generated and reviewed but not applied.
-- Latest dependency installation produced 3 high npm audit findings; investigation is required before continuing auth implementation.
-
-- Investigated 3 high npm audit findings; confirmed they originate from Prisma 7.9.1 -> @prisma/config 7.9.1 -> deepmerge-ts 7.1.5.
-- Rejected npm audit --force because it proposes a breaking Prisma 6.12.0 downgrade.
-- Rejected an unverified deepmerge-ts 8.x override.
+- Investigated 3 high npm audit findings; confirmed they originate from Prisma 7.9.1 -> `@prisma/config` 7.9.1 -> `deepmerge-ts` 7.1.5.
+- Rejected `npm audit --force` because it proposes a breaking Prisma 6.12.0 downgrade.
+- Rejected an unverified `deepmerge-ts` 8.x override.
+- Prepared repository configuration: root README, safe environment template, backend CI, Dependabot, and pull-request checklist.
+- Added non-mutating lint and Prisma generation scripts for local and CI validation.
+- Removed the unused required shadow database URL from Prisma CLI configuration; `prisma migrate dev` remains prohibited without explicit approval.
+- Replaced the generated NestJS backend README with FixTradeZone-specific setup and safety guidance.
+- Updated project context and roadmap to record the GitHub-connected Work workflow and resolved advisory investigation.
