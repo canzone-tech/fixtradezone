@@ -18,6 +18,7 @@ Focus: Authentication + secure API foundation.
 - Postman installed and health tested
 - JWT strategy compiles
 - Global JWT guard compiles
+- Prisma transitive dependency advisory investigated and documented
 
 ## Current Areas
 - `src/config/`
@@ -48,18 +49,21 @@ Not implemented:
 - Auth audit events
 - Postman token scripts
 
+## Dependency Security Status
+- The 3 high findings originate from Prisma 7.9.1's transitive `deepmerge-ts@7.1.5` dependency.
+- A forced Prisma downgrade and an unverified dependency override were rejected.
+- The advisory remains tracked in `SECURITY.md`; reassess when Prisma publishes a compatible remediation.
+
 ## Immediate Next Actions
-1. Run `npm audit` and investigate the 3 high findings from the latest dependency install.
-2. Fix safely; do not use `npm audit fix --force` blindly.
-3. Apply initial auth/RBAC schema using the existing `fixtradezone` database only.
-4. Implement Auth DTOs.
-5. Implement Register with Argon2 and default USER role.
-6. Implement Login and safe JWT issuance.
-7. Implement refresh token rotation/revocation.
-8. Integrate audit logging.
-9. Configure Postman token automation.
-10. Add RBAC guards/permissions.
-11. Add MongoDB/Redis modules after auth baseline.
+1. Review and apply the initial auth/RBAC schema using the existing `fixtradezone` database only.
+2. Implement Auth DTOs.
+3. Implement Register with Argon2 and default USER role.
+4. Implement Login and safe JWT issuance.
+5. Implement refresh token rotation/revocation.
+6. Integrate audit logging.
+7. Configure Postman token automation.
+8. Add RBAC guards/permissions.
+9. Add MongoDB/Redis modules after auth baseline.
 
 ## Constraints
 - Never create extra application databases.
@@ -67,3 +71,4 @@ Not implemented:
 - Never expose secrets.
 - Never represent simulated trades as real.
 - Never auto-credit deposits from TXID submission.
+
