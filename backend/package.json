@@ -86,5 +86,8 @@
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
   }
 }
