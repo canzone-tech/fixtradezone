@@ -7,7 +7,7 @@ import { PrismaService } from '../database/prisma.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 
 @Injectable()
-export class FounderAdminBootstrapService {
+export class FounderSuperAdminBootstrapService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly rbacBootstrapService: RbacBootstrapService,
@@ -18,20 +18,21 @@ export class FounderAdminBootstrapService {
 
     return this.prisma.$transaction(
       async (transaction) => {
-        const adminRole =
-          await this.rbacBootstrapService.ensureAdminRole(transaction);
-        const existingAdmin = await transaction.userRole.findFirst({
+        const superAdminRole =
+          await this.rbacBootstrapService.ensureSuperAdminRole(transaction);
+
+        const existingFounder = await transaction.userRole.findFirst({
           where: {
-            roleId: adminRole.id,
+            roleId: superAdminRole.id,
           },
           select: {
             userId: true,
           },
         });
 
-        if (existingAdmin) {
+        if (existingFounder) {
           throw new ConflictException(
-            'An administrator already exists; use the audited RBAC workflow for further assignments.',
+            'A founder SUPER_ADMIN already exists.',
           );
         }
 
@@ -48,23 +49,17 @@ export class FounderAdminBootstrapService {
 
         if (!user) {
           throw new NotFoundException(
-            'The requested bootstrap user was not found.',
+            'The requested founder bootstrap user was not found.',
           );
         }
 
-        await transaction.userRole.upsert({
-          where: {
-            userId_roleId: {
-              userId: user.id,
-              roleId: adminRole.id,
-            },
-          },
-          create: {
+        await transaction.userRole.create({
+          data: {
             userId: user.id,
-            roleId: adminRole.id,
+            roleId: superAdminRole.id,
           },
-          update: {},
         });
+
         await transaction.user.update({
           where: {
             id: user.id,
@@ -73,16 +68,17 @@ export class FounderAdminBootstrapService {
             status: 'ACTIVE',
           },
         });
+
         await transaction.auditLog.create({
           data: {
             actorUserId: null,
             action: 'ROLE_CHANGE',
             entityType: 'User',
             entityId: user.id,
-            description: 'Initial founder administrator role assigned.',
+            description: 'Initial founder SUPER_ADMIN role assigned.',
             metadata: {
-              source: 'FOUNDER_ADMIN_BOOTSTRAP_CLI',
-              role: adminRole.name,
+              source: 'FOUNDER_SUPER_ADMIN_BOOTSTRAP_CLI',
+              role: superAdminRole.name,
             },
           },
         });
@@ -94,9 +90,9 @@ export class FounderAdminBootstrapService {
               action: 'ACTIVATE',
               entityType: 'User',
               entityId: user.id,
-              description: 'Initial founder administrator account activated.',
+              description: 'Initial founder account activated.',
               metadata: {
-                source: 'FOUNDER_ADMIN_BOOTSTRAP_CLI',
+                source: 'FOUNDER_SUPER_ADMIN_BOOTSTRAP_CLI',
                 previousStatus: user.status,
               },
             },
@@ -107,7 +103,7 @@ export class FounderAdminBootstrapService {
           id: user.id,
           email: user.email,
           status: 'ACTIVE' as const,
-          roles: [adminRole.name],
+          assignedRole: superAdminRole.name,
         };
       },
       {

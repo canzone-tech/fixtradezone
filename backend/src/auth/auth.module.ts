@@ -3,7 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { FounderAdminBootstrapService } from './founder-admin-bootstrap.service';
+import { FounderSuperAdminBootstrapService } from './founder-super-admin-bootstrap.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
@@ -19,12 +19,12 @@ import { TokenService } from './token.service';
   controllers: [AuthController],
   providers: [
     AuthService,
-    FounderAdminBootstrapService,
+    FounderSuperAdminBootstrapService,
     JwtStrategy,
     PasswordService,
     RbacBootstrapService,
     TokenService,
   ],
-  exports: [AuthService, FounderAdminBootstrapService],
+  exports: [AuthService, FounderSuperAdminBootstrapService],
 })
 export class AuthModule {}
