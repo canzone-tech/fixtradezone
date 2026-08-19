@@ -1,6 +1,9 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
+  SYSTEM_PERMISSIONS,
+} from '../rbac/rbac.constants';
+import {
   ADMIN_ROLE_DESCRIPTION,
   ADMIN_ROLE_NAME,
   DEFAULT_USER_ROLE_DESCRIPTION,
@@ -9,7 +12,7 @@ import {
   SUPER_ADMIN_ROLE_NAME,
 } from './auth.constants';
 
-type RoleWriter = Pick<PrismaService, 'role'>;
+type RbacWriter = Pick<PrismaService, 'role' | 'permission'>;
 
 @Injectable()
 export class RbacBootstrapService implements OnApplicationBootstrap {
@@ -20,14 +23,18 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
       this.ensureDefaultUserRole(),
       this.ensureAdminRole(),
       this.ensureSuperAdminRole(),
+      ...SYSTEM_PERMISSIONS.map((permission) =>
+        this.ensurePermission(
+          permission.code,
+          permission.description,
+        ),
+      ),
     ]);
   }
 
-  ensureDefaultUserRole(client: RoleWriter = this.prisma) {
+  ensureDefaultUserRole(client: RbacWriter = this.prisma) {
     return client.role.upsert({
-      where: {
-        name: DEFAULT_USER_ROLE_NAME,
-      },
+      where: { name: DEFAULT_USER_ROLE_NAME },
       create: {
         name: DEFAULT_USER_ROLE_NAME,
         description: DEFAULT_USER_ROLE_DESCRIPTION,
@@ -40,11 +47,9 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
     });
   }
 
-  ensureAdminRole(client: RoleWriter = this.prisma) {
+  ensureAdminRole(client: RbacWriter = this.prisma) {
     return client.role.upsert({
-      where: {
-        name: ADMIN_ROLE_NAME,
-      },
+      where: { name: ADMIN_ROLE_NAME },
       create: {
         name: ADMIN_ROLE_NAME,
         description: ADMIN_ROLE_DESCRIPTION,
@@ -57,11 +62,9 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
     });
   }
 
-  ensureSuperAdminRole(client: RoleWriter = this.prisma) {
+  ensureSuperAdminRole(client: RbacWriter = this.prisma) {
     return client.role.upsert({
-      where: {
-        name: SUPER_ADMIN_ROLE_NAME,
-      },
+      where: { name: SUPER_ADMIN_ROLE_NAME },
       create: {
         name: SUPER_ADMIN_ROLE_NAME,
         description: SUPER_ADMIN_ROLE_DESCRIPTION,
@@ -70,6 +73,23 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
       update: {
         description: SUPER_ADMIN_ROLE_DESCRIPTION,
         status: 'ACTIVE',
+      },
+    });
+  }
+
+  ensurePermission(
+    code: string,
+    description: string,
+    client: RbacWriter = this.prisma,
+  ) {
+    return client.permission.upsert({
+      where: { code },
+      create: {
+        code,
+        description,
+      },
+      update: {
+        description,
       },
     });
   }
