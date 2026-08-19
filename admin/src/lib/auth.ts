@@ -68,7 +68,10 @@ export function isAuthResponse(payload: unknown): payload is AuthResponse {
 }
 
 export function isAdministrator(user: AdminUser): boolean {
-  return user.status === "ACTIVE" && user.roles.includes("ADMIN");
+  return (
+    user.status === "ACTIVE" &&
+    (user.roles.includes("SUPER_ADMIN") || user.roles.includes("ADMIN"))
+  );
 }
 
 export function isCrossSiteRequest(request: NextRequest): boolean {
