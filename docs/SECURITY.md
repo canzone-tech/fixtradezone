@@ -2,11 +2,18 @@
 
 ## Authentication
 - JWT access + refresh token architecture.
+- Access tokens expire after 15 minutes.
+- Refresh tokens expire after 7 days and rotate on every successful refresh.
+- Only SHA-256 refresh-token hashes are stored in MySQL.
+- Logout revokes the persisted refresh session; refresh-token reuse revokes all active sessions for the user.
 - APIs are deny-by-default.
 - Only intentionally public endpoints may use explicit `@Public()`.
 - `/health` is intentionally public for monitoring.
 - All user/admin/business APIs require JWT.
 - Bearer format: `Authorization: Bearer <accessToken>`.
+- Access and refresh JWTs are restricted to HS256 and verify explicit issuer/audience values.
+- The JWT strategy reloads the active session plus the user's current status, roles, and permissions from MySQL for protected requests.
+- Revoking a persisted session immediately invalidates access JWTs bound to that session.
 
 ## Passwords
 - Hash passwords with Argon2id using at least 19 MiB memory, 2 iterations, and parallelism 1.
@@ -38,6 +45,15 @@
 - RBAC establishes role membership.
 - Permissions protect privileged/admin operations.
 - Financial approval actions are authorization-protected and audited.
+- The admin UI rejects non-ADMIN accounts, but every future admin data endpoint must also enforce RBAC in NestJS.
+
+## Admin Browser Session
+- The browser submits credentials only to same-origin Next.js route handlers.
+- The Next.js server exchanges credentials and refresh tokens with NestJS.
+- Access and refresh tokens use HttpOnly, Secure-in-production, SameSite=Strict cookies.
+- Tokens are never returned to admin client-side JavaScript or stored in localStorage/sessionStorage.
+- BFF auth routes reject browser requests explicitly marked as cross-site and validate successful API response shapes before setting cookies.
+- CSP, HSTS in production, framing, MIME, cross-origin, referrer, and browser-permission headers are configured.
 
 ## Financial Security
 - TXID submission does not auto-credit balance.

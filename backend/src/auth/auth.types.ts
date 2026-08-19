@@ -1,15 +1,18 @@
+export interface RequestContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 export interface AccessTokenPayload {
   sub: string;
   email: string;
   type: 'access';
+  sid: string;
 }
 
-export interface AuthenticatedUser {
-  id: string;
+export interface RefreshTokenPayload {
+  sub: string;
   email: string;
-  username: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  status: 'ACTIVE';
-  roles: string[];
+  type: 'refresh';
+  jti: string;
 }

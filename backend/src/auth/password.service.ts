@@ -32,9 +32,17 @@ export class PasswordService implements OnModuleInit {
     password: string,
   ): Promise<boolean> {
     const hashToVerify = passwordHash ?? (await this.getDummyHash());
-    const matches = await this.verify(hashToVerify, password);
 
-    return passwordHash !== null && matches;
+    try {
+      const matches = await this.verify(hashToVerify, password);
+      return passwordHash !== null && matches;
+    } catch {
+      if (passwordHash !== null) {
+        await this.verify(await this.getDummyHash(), password);
+      }
+
+      return false;
+    }
   }
 
   private getDummyHash(): Promise<string> {

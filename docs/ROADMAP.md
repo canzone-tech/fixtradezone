@@ -41,33 +41,31 @@ Completed:
 - Registration Postman and database verification
 
 Current:
-- Implement Login and safe JWT issuance
-- Access + refresh token lifecycle
-- Token revocation/logout
-- Database user/status lookup in the JWT strategy
+- Validate Login and safe JWT issuance locally
+- Validate access + refresh token lifecycle and revocation locally
+- Validate database user/status lookup in the JWT strategy
+- Validate the minimal Next.js admin auth shell
 - RBAC guards and permissions
 
 Pending in Phase 3:
-- Login and safe token issuance
-- Refresh-token rotation and revocation
+- Local migration and Postman validation for auth sessions
+- Admin dependency lockfile, lint, and production build
 - Broader auth audit integration
-- Postman token automation
 - MongoDB connection/module
 - Redis connection/module
 - Rate limiting and security baseline
 
 ## Later Phases
 4. Authentication & Authorization
-5. Admin Foundation
+5. Admin Foundation (auth shell started alongside Phase 3 API work)
 6. Packages + AI Agents
 7. Deposits / USDT TRC20
 8. Wallet/Ledger + Payments/Subscriptions
 9. Referral / Commission / Rewards
 10. Simulated Trade Activity
-11. Template-based Landing Page CMS
-12. Template-based Admin UI
+11. Minimal v1 landing content controls; full configurable CMS moves to v2
+12. Template-based Admin UI expansion
 13. User Frontend / Dashboard
 14. Notifications / Reports
 15. QA / Security / Bug Fixing
 16. Production Deployment
-

@@ -38,4 +38,10 @@ describe('PasswordService', () => {
       service.verifyForAuthentication(null, 'SecurePassword123!'),
     ).resolves.toBe(false);
   });
+
+  it('rejects a corrupted stored hash without exposing an internal error', async () => {
+    await expect(
+      service.verifyForAuthentication('not-an-argon2-hash', 'password'),
+    ).resolves.toBe(false);
+  });
 });

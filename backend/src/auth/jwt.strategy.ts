@@ -3,8 +3,17 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../database/prisma.service';
-import { JWT_ACCESS_AUDIENCE, JWT_ACCESS_ISSUER } from './auth.constants';
-import type { AccessTokenPayload, AuthenticatedUser } from './auth.types';
+import {
+  GENERIC_SESSION_ERROR,
+  JWT_ACCESS_AUDIENCE,
+  JWT_ACCESS_ISSUER,
+} from './auth.constants';
+import {
+  AUTH_USER_SELECT,
+  type AuthenticatedUser,
+  toAuthenticatedUser,
+} from './auth-user';
+import type { AccessTokenPayload } from './auth.types';
 
 function isAccessTokenPayload(payload: unknown): payload is AccessTokenPayload {
   if (typeof payload !== 'object' || payload === null) {
@@ -18,7 +27,9 @@ function isAccessTokenPayload(payload: unknown): payload is AccessTokenPayload {
     candidate.sub.length > 0 &&
     typeof candidate.email === 'string' &&
     candidate.email.length > 0 &&
-    candidate.type === 'access'
+    candidate.type === 'access' &&
+    typeof candidate.sid === 'string' &&
+    candidate.sid.length > 0
   );
 }
 
@@ -37,56 +48,43 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: secret,
+      ignoreExpiration: false,
       algorithms: ['HS256'],
       audience: JWT_ACCESS_AUDIENCE,
       issuer: JWT_ACCESS_ISSUER,
-      ignoreExpiration: false,
     });
   }
 
   async validate(payload: unknown): Promise<AuthenticatedUser> {
     if (!isAccessTokenPayload(payload)) {
-      throw new UnauthorizedException('Invalid access token.');
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 
-    const user = await this.prisma.user.findUnique({
+    const session = await this.prisma.authSession.findUnique({
       where: {
-        id: payload.sub,
+        id: payload.sid,
       },
       select: {
-        id: true,
-        email: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        status: true,
-        roles: {
-          select: {
-            role: {
-              select: {
-                name: true,
-                status: true,
-              },
-            },
-          },
+        userId: true,
+        expiresAt: true,
+        revokedAt: true,
+        user: {
+          select: AUTH_USER_SELECT,
         },
       },
     });
 
-    if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Invalid or inactive access token.');
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.revokedAt !== null ||
+      session.expiresAt <= new Date() ||
+      session.user.status !== 'ACTIVE' ||
+      session.user.email !== payload.email
+    ) {
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      status: user.status,
-      roles: user.roles
-        .filter((userRole) => userRole.role.status === 'ACTIVE')
-        .map((userRole) => userRole.role.name),
-    };
+    return toAuthenticatedUser(session.user);
   }
 }

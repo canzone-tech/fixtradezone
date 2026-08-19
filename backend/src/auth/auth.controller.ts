@@ -2,36 +2,59 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
-  HttpStatus,
   Post,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
-import type { AuthenticatedUser } from './auth.types';
+import type { AuthenticatedUser } from './auth-user';
 import { CurrentUser } from './current-user.decorator';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+import { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
 import { Public } from './public.decorator';
+import { getRequestContext } from './request-context';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Header('Cache-Control', 'no-store')
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() dto: RegisterDto, @Req() request: Request) {
+    return this.authService.register(dto, getRequestContext(request));
   }
 
   @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
   @Post('login')
-  @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() request: Request) {
+    return this.authService.login(dto, getRequestContext(request));
   }
 
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('refresh')
+  refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
+    return this.authService.refresh(dto, getRequestContext(request));
+  }
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('logout')
+  logout(@Body() dto: LogoutDto, @Req() request: Request) {
+    return this.authService.logout(dto, getRequestContext(request));
+  }
+
+  @Header('Cache-Control', 'no-store')
   @Get('me')
-  getCurrentUser(@CurrentUser() user: AuthenticatedUser) {
-    return { user };
+  me(@CurrentUser() user: AuthenticatedUser) {
+    return {
+      user,
+    };
   }
 }

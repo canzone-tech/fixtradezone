@@ -1,6 +1,8 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
+  ADMIN_ROLE_DESCRIPTION,
+  ADMIN_ROLE_NAME,
   DEFAULT_USER_ROLE_DESCRIPTION,
   DEFAULT_USER_ROLE_NAME,
 } from './auth.constants';
@@ -12,7 +14,7 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
   constructor(private readonly prisma: PrismaService) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.ensureDefaultUserRole();
+    await Promise.all([this.ensureDefaultUserRole(), this.ensureAdminRole()]);
   }
 
   ensureDefaultUserRole(client: RoleWriter = this.prisma) {
@@ -28,6 +30,22 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
       update: {
         description: DEFAULT_USER_ROLE_DESCRIPTION,
         status: 'ACTIVE',
+      },
+    });
+  }
+
+  ensureAdminRole(client: RoleWriter = this.prisma) {
+    return client.role.upsert({
+      where: {
+        name: ADMIN_ROLE_NAME,
+      },
+      create: {
+        name: ADMIN_ROLE_NAME,
+        description: ADMIN_ROLE_DESCRIPTION,
+        status: 'ACTIVE',
+      },
+      update: {
+        description: ADMIN_ROLE_DESCRIPTION,
       },
     });
   }

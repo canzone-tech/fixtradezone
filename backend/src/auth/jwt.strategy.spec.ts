@@ -5,119 +5,167 @@ import { JwtStrategy } from './jwt.strategy';
 
 describe('JwtStrategy', () => {
   const configService = {
-    get: jest.fn().mockReturnValue('a'.repeat(64)),
+    get: jest.fn().mockReturnValue('access-secret-with-at-least-32-characters'),
   };
-
   const prisma = {
-    user: {
+    authSession: {
       findUnique: jest.fn(),
     },
+  };
+  const activeUser = {
+    id: 'user-id',
+    email: 'user@example.com',
+    username: null,
+    phone: null,
+    firstName: 'Prashant',
+    lastName: 'Shukla',
+    status: 'ACTIVE' as const,
+    createdAt: new Date('2026-08-18T00:00:00.000Z'),
+    lastLoginAt: null,
+    roles: [
+      {
+        role: {
+          name: 'ADMIN',
+          status: 'ACTIVE' as const,
+          permissions: [],
+        },
+      },
+    ],
   };
 
   let strategy: JwtStrategy;
 
   beforeEach(() => {
     jest.clearAllMocks();
-
     strategy = new JwtStrategy(
       configService as unknown as ConfigService,
       prisma as unknown as PrismaService,
     );
   });
 
-  it('returns the current active user and active roles', async () => {
-    prisma.user.findUnique.mockResolvedValue({
-      id: 'user-id',
-      email: 'current@example.com',
-      username: 'current.user',
-      firstName: 'Current',
-      lastName: 'User',
-      status: 'ACTIVE',
-      roles: [
-        { role: { name: 'USER', status: 'ACTIVE' } },
-        { role: { name: 'OLD_ROLE', status: 'INACTIVE' } },
-      ],
+  it('loads and returns the current active user from the database', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: activeUser.id,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      user: activeUser,
     });
 
     await expect(
       strategy.validate({
-        sub: 'user-id',
-        email: 'issued@example.com',
+        sub: activeUser.id,
+        email: activeUser.email,
         type: 'access',
+        sid: 'session-id',
       }),
-    ).resolves.toEqual({
-      id: 'user-id',
-      email: 'current@example.com',
-      username: 'current.user',
-      firstName: 'Current',
-      lastName: 'User',
-      status: 'ACTIVE',
-      roles: ['USER'],
+    ).resolves.toMatchObject({
+      id: activeUser.id,
+      roles: ['ADMIN'],
+      permissions: [],
+    });
+  });
+
+  it('rejects access tokens when the user is no longer active', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: activeUser.id,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      user: {
+        ...activeUser,
+        status: 'BLOCKED',
+      },
     });
 
-    expect(prisma.user.findUnique).toHaveBeenCalledWith({
-      where: {
-        id: 'user-id',
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        firstName: true,
-        lastName: true,
-        status: true,
-        roles: {
-          select: {
-            role: {
-              select: {
-                name: true,
-                status: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    await expect(
+      strategy.validate({
+        sub: activeUser.id,
+        email: activeUser.email,
+        type: 'access',
+        sid: 'session-id',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('rejects malformed or non-access payloads before querying the database', async () => {
     await expect(
       strategy.validate({
-        sub: 'user-id',
-        email: 'user@example.com',
+        sub: activeUser.id,
+        email: activeUser.email,
         type: 'refresh',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    expect(prisma.authSession.findUnique).not.toHaveBeenCalled();
   });
 
-  it.each(['PENDING', 'SUSPENDED', 'BLOCKED'])(
-    'rejects a user with %s status',
-    async (status) => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: 'user-id',
-        status,
-      });
-
-      await expect(
-        strategy.validate({
-          sub: 'user-id',
-          email: 'user@example.com',
-          type: 'access',
-        }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
-    },
-  );
-
-  it('rejects a token whose subject no longer exists', async () => {
-    prisma.user.findUnique.mockResolvedValue(null);
+  it('rejects a token when the account email no longer matches', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: activeUser.id,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      user: activeUser,
+    });
 
     await expect(
       strategy.validate({
-        sub: 'missing-user',
-        email: 'missing@example.com',
+        sub: activeUser.id,
+        email: 'stale@example.com',
         type: 'access',
+        sid: 'session-id',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects access tokens for revoked sessions', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: activeUser.id,
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: new Date(),
+      user: activeUser,
+    });
+
+    await expect(
+      strategy.validate({
+        sub: activeUser.id,
+        email: activeUser.email,
+        type: 'access',
+        sid: 'session-id',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects access tokens for expired sessions', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: activeUser.id,
+      expiresAt: new Date(Date.now() - 1),
+      revokedAt: null,
+      user: activeUser,
+    });
+
+    await expect(
+      strategy.validate({
+        sub: activeUser.id,
+        email: activeUser.email,
+        type: 'access',
+        sid: 'session-id',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('rejects access tokens whose session belongs to another user', async () => {
+    prisma.authSession.findUnique.mockResolvedValue({
+      userId: 'different-user-id',
+      expiresAt: new Date(Date.now() + 60_000),
+      revokedAt: null,
+      user: activeUser,
+    });
+
+    await expect(
+      strategy.validate({
+        sub: activeUser.id,
+        email: activeUser.email,
+        type: 'access',
+        sid: 'session-id',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
