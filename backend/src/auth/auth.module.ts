@@ -25,6 +25,11 @@ import { TokenService } from './token.service';
     RbacBootstrapService,
     TokenService,
   ],
-  exports: [AuthService, FounderSuperAdminBootstrapService],
+  exports: [
+    AuthService,
+    FounderSuperAdminBootstrapService,
+    PasswordService,
+    RbacBootstrapService,
+  ],
 })
 export class AuthModule {}

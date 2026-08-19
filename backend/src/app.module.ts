@@ -6,6 +6,7 @@ import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RbacModule } from './rbac/rbac.module';
     PrismaModule,
     AuthModule,
     RbacModule,
+    UsersModule,
     HealthModule,
   ],
 })
