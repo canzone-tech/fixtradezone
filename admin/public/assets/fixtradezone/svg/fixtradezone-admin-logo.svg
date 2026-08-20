@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 620 110">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22f2df"/>
+      <stop offset=".55" stop-color="#35b8ff"/>
+      <stop offset="1" stop-color="#8b55ff"/>
+    </linearGradient>
+
+    <filter id="logoGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g transform="translate(10 10)"
+     fill="none"
+     stroke="url(#brand)"
+     stroke-width="5"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     filter="url(#logoGlow)">
+    <path d="M45 4
+             L82 25
+             V66
+             L45 87
+             L8 66
+             V25Z"/>
+    <path d="M25 28H65"/>
+    <path d="M25 28V67"/>
+    <path d="M25 47H56"/>
+    <path d="M60 47L76 31"/>
+    <path d="M60 47L76 63"/>
+  </g>
+
+  <text x="118"
+        y="53"
+        fill="#f1fbff"
+        font-family="Arial,Helvetica,sans-serif"
+        font-size="38"
+        font-weight="800"
+        letter-spacing="1">
+    FIXTRADEZONE
+  </text>
+
+  <text x="120"
+        y="82"
+        fill="#65e9dc"
+        font-family="Arial,Helvetica,sans-serif"
+        font-size="17"
+        font-weight="600"
+        letter-spacing="4">
+    ADMIN PORTAL
+  </text>
+</svg>

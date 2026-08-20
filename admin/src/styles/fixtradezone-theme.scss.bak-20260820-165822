@@ -1,0 +1,3586 @@
+/*
+ * FixTradeZone Dark Neo — MASTER THEME
+ * Single global theme authority for:
+ * Admin / SUPER_ADMIN / User backend / Auth.
+ */
+
+
+/* ===== migrated from fixtradezone-admin.scss ===== */
+
+:root {
+  --ftz-bg: #020817;
+  --ftz-bg-2: #050c1f;
+  --ftz-panel: rgba(6, 18, 42, 0.88);
+  --ftz-panel-2: rgba(8, 23, 53, 0.93);
+  --ftz-line: rgba(74, 129, 206, 0.28);
+  --ftz-line-bright: rgba(53, 238, 255, 0.48);
+  --ftz-text: #f5f8ff;
+  --ftz-muted: #8797b5;
+  --ftz-cyan: #16e5e0;
+  --ftz-green: #14e59a;
+  --ftz-blue: #3478ff;
+  --ftz-purple: #9d42ff;
+  --ftz-magenta: #f03adf;
+  --ftz-orange: #ff9e00;
+  --ftz-red: #ff5c72;
+  --ftz-sidebar: 264px;
+  --ftz-topbar: 75px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--ftz-bg);
+}
+
+body {
+  margin: 0;
+  color: var(--ftz-text);
+  background:
+    radial-gradient(circle at 78% 2%, rgba(23, 48, 123, 0.16), transparent 26rem),
+    radial-gradient(circle at 34% 70%, rgba(37, 20, 135, 0.10), transparent 30rem),
+    #020817;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.ftz-admin-app {
+  min-height: 100vh;
+}
+
+.ftz-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 1040;
+  display: flex;
+  width: var(--ftz-sidebar);
+  flex-direction: column;
+  border-right: 1px solid rgba(98, 133, 204, 0.18);
+  background:
+    linear-gradient(180deg, rgba(2, 8, 25, .97), rgba(1, 7, 22, .98)),
+    #020817;
+  box-shadow: 24px 0 55px rgba(0, 0, 0, .22);
+  overflow: hidden;
+}
+
+.ftz-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 70px 0 0 165px;
+  width: 150px;
+  opacity: .72;
+  background:
+    url("/assets/fixtradezone/neo/sidebar-bg.png") center / 150px 620px repeat-y;
+  filter: saturate(1.25) brightness(1.15);
+  pointer-events: none;
+}
+
+.ftz-logo {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 82px;
+  align-items: center;
+  padding: 0 18px;
+  text-decoration: none;
+}
+
+.ftz-logo img {
+  width: 200px;
+  height: auto;
+}
+
+.ftz-sidebar-nav {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  padding: 10px 13px 24px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.ftz-sidebar-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.ftz-nav-section + .ftz-nav-section {
+  margin-top: 28px;
+}
+
+.ftz-nav-label {
+  margin: 0 6px 10px;
+  color: #b4c0d7;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.ftz-nav-link {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  gap: 13px;
+  margin: 3px 0;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: #e4eaf6;
+  text-decoration: none;
+  font-size: 14px;
+  transition: .18s ease;
+}
+
+.ftz-nav-link i {
+  width: 21px;
+  color: #d9e3f4;
+  font-size: 20px;
+}
+
+.ftz-nav-link:hover:not(.is-disabled) {
+  color: #fff;
+  border-color: rgba(40, 205, 230, .22);
+  background: rgba(14, 55, 83, .46);
+  transform: translateX(2px);
+}
+
+.ftz-nav-link.is-active {
+  color: #25fff0;
+  border-color: #11d7cb;
+  background:
+    linear-gradient(90deg, rgba(3, 119, 130, .52), rgba(26, 233, 202, .22)),
+    rgba(7, 46, 68, .72);
+  box-shadow:
+    inset 0 0 23px rgba(16, 224, 218, .12),
+    0 0 20px rgba(13, 221, 213, .17);
+}
+
+.ftz-nav-link.is-active i {
+  color: #29fff0;
+}
+
+.ftz-nav-link.is-disabled {
+  color: rgba(220, 229, 245, .85);
+  cursor: default;
+}
+
+.ftz-sidebar-profile {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px;
+  padding: 14px;
+  border: 1px solid rgba(43, 132, 238, .38);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(8, 31, 69, .93), rgba(4, 13, 36, .96));
+  box-shadow: inset 0 0 24px rgba(0, 112, 255, .06);
+}
+
+.ftz-sidebar-profile strong,
+.ftz-sidebar-profile small {
+  display: block;
+}
+
+.ftz-sidebar-profile strong {
+  font-size: 12px;
+}
+
+.ftz-sidebar-profile small {
+  margin-top: 3px;
+  color: var(--ftz-green);
+  font-size: 11px;
+}
+
+.ftz-profile-shield {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 11px;
+  color: #1ffff0;
+  background: linear-gradient(145deg, rgba(13, 230, 187, .32), rgba(9, 64, 113, .25));
+  box-shadow: 0 0 16px rgba(11, 235, 204, .18);
+}
+
+.ftz-sidebar-overlay {
+  display: none;
+}
+
+.ftz-topbar {
+  position: fixed;
+  inset: 0 0 auto var(--ftz-sidebar);
+  z-index: 1030;
+  display: flex;
+  min-height: var(--ftz-topbar);
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 0 28px 0 22px;
+  border-bottom: 1px solid rgba(80, 122, 189, .26);
+  background: rgba(2, 8, 24, .88);
+  backdrop-filter: blur(18px);
+}
+
+.ftz-topbar-title,
+.ftz-topbar-actions,
+.ftz-topbar-profile {
+  display: flex;
+  align-items: center;
+}
+
+.ftz-topbar-title {
+  gap: 15px;
+}
+
+.ftz-topbar-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.ftz-topbar-title p {
+  margin: 3px 0 0;
+  color: #a8b5cb;
+  font-size: 12px;
+}
+
+.ftz-topbar-actions {
+  gap: 10px;
+}
+
+.ftz-icon-button {
+  position: relative;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid rgba(85, 124, 185, .34);
+  border-radius: 50%;
+  color: #e9f2ff;
+  background: rgba(6, 16, 39, .74);
+  transition: .16s ease;
+}
+
+.ftz-icon-button:hover {
+  color: #1ffff0;
+  border-color: rgba(29, 239, 227, .55);
+  background: rgba(7, 42, 58, .82);
+  box-shadow: 0 0 20px rgba(24, 231, 219, .12);
+}
+
+.ftz-notification span {
+  position: absolute;
+  top: -4px;
+  right: -2px;
+  display: grid;
+  min-width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: #ff424f;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.ftz-search {
+  position: relative;
+  display: flex;
+  width: clamp(310px, 28vw, 430px);
+  height: 43px;
+  align-items: center;
+}
+
+.ftz-search > i {
+  position: absolute;
+  left: 15px;
+  color: #dce7f6;
+  font-size: 19px;
+}
+
+.ftz-search input {
+  width: 100%;
+  height: 100%;
+  padding: 0 78px 0 43px;
+  border: 1px solid rgba(97, 130, 188, .34);
+  border-radius: 10px;
+  outline: 0;
+  color: #eef4ff;
+  background: rgba(2, 10, 29, .66);
+  font-size: 12px;
+  transition: .16s ease;
+}
+
+.ftz-search input::placeholder {
+  color: #8895aa;
+}
+
+.ftz-search input:focus {
+  border-color: rgba(22, 229, 224, .72);
+  box-shadow: 0 0 0 3px rgba(22, 229, 224, .08);
+}
+
+.ftz-search kbd {
+  position: absolute;
+  right: 9px;
+  padding: 4px 8px;
+  border: 1px solid rgba(125, 146, 185, .28);
+  border-radius: 6px;
+  color: #b7c2d5;
+  background: rgba(255, 255, 255, .03);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.ftz-topbar-profile {
+  gap: 10px;
+  margin-left: 4px;
+}
+
+.ftz-avatar {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid #4ae5f7;
+  border-radius: 50%;
+  color: #bafff6;
+  background: radial-gradient(circle at 32% 25%, #174f72, #07162f 70%);
+  box-shadow: 0 0 18px rgba(42, 211, 236, .12);
+  font-size: 15px;
+}
+
+.ftz-topbar-profile-copy strong,
+.ftz-topbar-profile-copy small {
+  display: block;
+}
+
+.ftz-topbar-profile-copy strong {
+  font-size: 12px;
+}
+
+.ftz-topbar-profile-copy small {
+  margin-top: 2px;
+  color: #a5b3c9;
+  font-size: 10px;
+}
+
+.ftz-profile-menu {
+  border: 0;
+  color: #e7effd;
+  background: transparent;
+}
+
+.ftz-main {
+  min-height: 100vh;
+  margin-left: var(--ftz-sidebar);
+  padding-top: var(--ftz-topbar);
+}
+
+.ftz-dashboard {
+  position: relative;
+  min-height: calc(100vh - var(--ftz-topbar));
+  padding: 0 16px 16px;
+  background:
+    radial-gradient(circle at 45% 25%, rgba(18, 53, 124, .10), transparent 25rem),
+    linear-gradient(180deg, rgba(2, 8, 24, .5), rgba(2, 7, 20, .75));
+}
+
+.ftz-dashboard::before {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  opacity: .12;
+  background:
+    radial-gradient(circle at 10% 75%, rgba(46, 34, 255, .55), transparent 18rem),
+    radial-gradient(circle at 44% 18%, rgba(0, 195, 255, .26), transparent 20rem),
+    radial-gradient(circle at 86% 78%, rgba(186, 30, 255, .22), transparent 22rem);
+  pointer-events: none;
+}
+
+.ftz-market-ticker {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 0;
+  margin: 0 -16px 14px;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(73, 119, 189, .22);
+  background: rgba(3, 10, 28, .58);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ftz-market-ticker::-webkit-scrollbar {
+  display: none;
+}
+
+.ftz-market-item {
+  display: flex;
+  min-width: 204px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 15px;
+  border-right: 1px solid rgba(72, 103, 157, .28);
+}
+
+.ftz-market-item > div {
+  min-width: 74px;
+}
+
+.ftz-market-item strong,
+.ftz-market-item small {
+  display: block;
+}
+
+.ftz-market-item strong {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ftz-market-item small {
+  margin-top: 1px;
+  color: #e9edf6;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ftz-market-item > b {
+  color: var(--ftz-green);
+  font-size: 10px;
+}
+
+.ftz-coin,
+.ftz-mini-coin {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 800;
+}
+
+.ftz-coin {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+.ftz-mini-coin {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  background: #f49e00;
+  font-size: 8px;
+}
+
+.ftz-coin-orange,
+.ftz-coin-gold {
+  background: #f7931a;
+}
+
+.ftz-coin-blue {
+  background: #4269d7;
+}
+
+.ftz-coin-purple {
+  background: linear-gradient(#1fe0bd, #7b34ff);
+}
+
+.ftz-coin-dark {
+  background: #05070b;
+  border: 1px solid #5f6b80;
+}
+
+.ftz-spark {
+  width: 50px;
+  height: 24px;
+  overflow: visible;
+}
+
+.ftz-spark polyline {
+  stroke-width: 1.2;
+}
+
+.ftz-spark-green polyline { stroke: #12e5a4; }
+.ftz-spark-blue polyline { stroke: #3577ff; }
+.ftz-spark-orange polyline { stroke: #ff9e00; }
+.ftz-spark-purple polyline { stroke: #e241dd; }
+.ftz-spark-cyan polyline { stroke: #18e7e3; }
+
+.ftz-dashboard-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  max-width: 1460px;
+  margin: 0 auto;
+}
+
+.ftz-dashboard-primary {
+  min-width: 0;
+}
+
+.ftz-hero {
+  position: relative;
+  display: flex;
+  min-height: 150px;
+  overflow: hidden;
+  border: 1px solid rgba(39, 222, 221, .72);
+  border-radius: 11px;
+  background:
+    linear-gradient(90deg, rgba(0, 43, 61, .92) 0%, rgba(4, 35, 71, .78) 43%, rgba(4, 10, 32, .52) 68%),
+    #06102a;
+  box-shadow: inset 0 0 42px rgba(0, 229, 211, .08);
+}
+
+.ftz-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, #11e6d1, transparent 70%);
+}
+
+.ftz-hero-copy {
+  position: relative;
+  z-index: 2;
+  width: 56%;
+  padding: 18px 25px;
+}
+
+.ftz-hero-copy h2 {
+  margin: 8px 0 5px;
+  font-size: clamp(20px, 2vw, 26px);
+  font-weight: 760;
+}
+
+.ftz-hero-copy p {
+  margin: 0;
+  color: #d8e3f6;
+  font-size: 12px;
+}
+
+.ftz-secure-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #19f0bd;
+  background: rgba(10, 109, 92, .28);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.ftz-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.ftz-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid rgba(76, 139, 184, .28);
+  border-radius: 7px;
+  color: #e4edf9;
+  background: rgba(0, 14, 36, .48);
+  font-size: 9px;
+}
+
+.ftz-hero-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 64%;
+  background:
+    linear-gradient(90deg, rgba(0, 44, 60, 1) 0%, rgba(0, 44, 60, .14) 23%, rgba(0, 0, 0, 0) 48%),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") right center / cover no-repeat;
+  filter: saturate(1.05);
+}
+
+.ftz-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ftz-metric-card,
+.ftz-panel {
+  border: 1px solid var(--ftz-line);
+  border-radius: 11px;
+  background:
+    linear-gradient(145deg, rgba(9, 27, 60, .94), rgba(3, 14, 35, .96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .018);
+}
+
+.ftz-metric-card {
+  position: relative;
+  display: grid;
+  min-height: 104px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  overflow: hidden;
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+.ftz-metric-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(33, 225, 224, .42);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .20), 0 0 22px rgba(0, 206, 220, .06);
+}
+
+.ftz-metric-icon {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  place-items: center;
+  border-radius: 11px;
+  font-size: 22px;
+}
+
+.ftz-metric-card.is-cyan .ftz-metric-icon {
+  color: #1bfff0;
+  background: rgba(0, 226, 214, .16);
+  box-shadow: 0 0 18px rgba(0, 226, 214, .10);
+}
+
+.ftz-metric-card.is-blue .ftz-metric-icon {
+  color: #4d75ff;
+  background: rgba(61, 92, 255, .16);
+}
+
+.ftz-metric-card.is-orange .ftz-metric-icon {
+  color: #ffae00;
+  background: rgba(255, 157, 0, .15);
+}
+
+.ftz-metric-card.is-purple .ftz-metric-icon {
+  color: #f24be5;
+  background: rgba(213, 44, 224, .15);
+}
+
+.ftz-metric-copy small,
+.ftz-metric-copy strong,
+.ftz-metric-copy span {
+  display: block;
+}
+
+.ftz-metric-copy small {
+  color: #c1cce0;
+  font-size: 10px;
+}
+
+.ftz-metric-copy strong {
+  margin-top: 3px;
+  white-space: nowrap;
+  font-size: 18px;
+}
+
+.ftz-metric-copy span {
+  margin-top: 12px;
+  white-space: nowrap;
+  color: #9aa9c1;
+  font-size: 8px;
+}
+
+.ftz-metric-copy span b {
+  color: var(--ftz-green);
+  font-weight: 700;
+}
+
+.ftz-mid-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.38fr) minmax(300px, .92fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ftz-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.ftz-panel {
+  padding: 14px;
+}
+
+.ftz-panel h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ftz-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ftz-panel-heading button {
+  padding: 6px 10px;
+  border: 1px solid rgba(91, 125, 180, .35);
+  border-radius: 7px;
+  color: #dce6f5;
+  background: rgba(4, 14, 35, .64);
+  font-size: 9px;
+}
+
+.ftz-legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  color: #aab8cd;
+  font-size: 9px;
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
+
+.dot.green { background: var(--ftz-green); }
+.dot.purple { background: var(--ftz-purple); }
+.dot.blue { background: var(--ftz-blue); }
+
+.ftz-chart-wrap {
+  position: relative;
+  height: 224px;
+  margin-top: 13px;
+}
+
+.ftz-trading-chart {
+  width: 100%;
+  height: 180px;
+  overflow: visible;
+  cursor: crosshair;
+}
+
+.ftz-chart-grid {
+  stroke: rgba(112, 143, 193, .16);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.ftz-chart-line {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px rgba(30, 220, 225, .12));
+}
+
+.ftz-chart-line.is-green { stroke: #15e6a3; }
+.ftz-chart-line.is-purple { stroke: #9f45ff; }
+.ftz-chart-line.is-blue { stroke: #367cff; }
+
+.ftz-chart-crosshair {
+  stroke: rgba(124, 169, 231, .46);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.ftz-chart-tooltip {
+  position: absolute;
+  top: 10px;
+  z-index: 2;
+  display: grid;
+  min-width: 155px;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid rgba(75, 119, 181, .34);
+  border-radius: 7px;
+  background: rgba(4, 14, 34, .94);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .24);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.ftz-chart-tooltip strong {
+  font-size: 9px;
+}
+
+.ftz-chart-tooltip span {
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  align-items: center;
+  color: #dce6f5;
+  font-size: 8px;
+}
+
+.ftz-chart-tooltip b {
+  color: #fff;
+}
+
+.ftz-chart-months {
+  display: flex;
+  justify-content: space-between;
+  color: #9ba9be;
+  font-size: 8px;
+}
+
+.ftz-chart-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 10px;
+  border-top: 1px solid rgba(76, 111, 169, .22);
+}
+
+.ftz-chart-stats > div {
+  padding: 12px 11px 0;
+  border-right: 1px solid rgba(76, 111, 169, .17);
+}
+
+.ftz-chart-stats > div:last-child {
+  border-right: 0;
+}
+
+.ftz-chart-stats small,
+.ftz-chart-stats strong {
+  display: block;
+}
+
+.ftz-chart-stats small {
+  color: #9ba9c0;
+  font-size: 8px;
+}
+
+.ftz-chart-stats strong {
+  margin-top: 3px;
+  font-size: 15px;
+}
+
+.ftz-chart-stats span {
+  display: inline-block;
+  margin-left: 4px;
+  color: var(--ftz-green);
+  font-size: 8px;
+}
+
+.ftz-chart-stats span.purple { color: #d950dd; }
+.ftz-chart-stats span.orange { color: #ffb000; }
+
+.ftz-deposit-body {
+  display: grid;
+  grid-template-columns: 145px 1fr;
+  align-items: center;
+  gap: 18px;
+  min-height: 154px;
+}
+
+.ftz-donut {
+  display: grid;
+  width: 130px;
+  height: 130px;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, #07142e 0 43%, transparent 44%),
+    conic-gradient(
+      #ff9d00 0 35.8%,
+      #10cba5 35.8% 64.2%,
+      #2a78f6 64.2% 82.9%,
+      #ffba00 82.9% 92.7%,
+      #755cff 92.7% 100%
+    );
+  box-shadow: 0 0 24px rgba(60, 74, 255, .10);
+  transition: transform .2s ease;
+}
+
+.ftz-donut:hover {
+  transform: rotate(2deg) scale(1.03);
+}
+
+.ftz-donut div {
+  text-align: center;
+}
+
+.ftz-donut strong,
+.ftz-donut small {
+  display: block;
+}
+
+.ftz-donut strong {
+  font-size: 12px;
+}
+
+.ftz-donut small {
+  margin-top: 2px;
+  color: #9cadc5;
+  font-size: 7px;
+}
+
+.ftz-deposit-legend {
+  display: grid;
+  gap: 8px;
+}
+
+.ftz-deposit-legend span {
+  display: grid;
+  grid-template-columns: 9px 1fr auto auto;
+  gap: 7px;
+  align-items: center;
+  color: #e8eef7;
+  font-size: 8px;
+}
+
+.ftz-deposit-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.ftz-deposit-legend .btc { background: #ff9d00; }
+.ftz-deposit-legend .usdt { background: #13c8a2; }
+.ftz-deposit-legend .eth { background: #377af8; }
+.ftz-deposit-legend .bnb { background: #ffb600; }
+.ftz-deposit-legend .other { background: #7560ff; }
+
+.ftz-deposit-legend b {
+  color: #9ca9bc;
+  font-weight: 500;
+}
+
+.ftz-deposit-legend em {
+  min-width: 62px;
+  text-align: right;
+  font-style: normal;
+}
+
+.ftz-users-package {
+  min-height: 116px;
+}
+
+.ftz-users-package-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 10px;
+}
+
+.ftz-users-package-grid > div {
+  padding-right: 12px;
+  border-right: 1px solid rgba(70, 107, 165, .20);
+}
+
+.ftz-users-package-grid > div + div {
+  padding-left: 12px;
+  border-right: 0;
+}
+
+.ftz-users-package-grid small,
+.ftz-users-package-grid strong {
+  display: block;
+}
+
+.ftz-users-package-grid small {
+  color: #9cabbd;
+  font-size: 8px;
+}
+
+.ftz-users-package-grid strong {
+  font-size: 18px;
+}
+
+.ftz-users-package-grid span {
+  margin-left: 5px;
+  color: var(--ftz-green);
+  font-size: 8px;
+}
+
+.ftz-popular-package {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(70, 107, 165, .18);
+}
+
+.ftz-popular-package > i {
+  color: #ff9d00;
+  font-size: 28px;
+}
+
+.ftz-popular-package small,
+.ftz-popular-package strong,
+.ftz-popular-package span {
+  display: block;
+}
+
+.ftz-popular-package small,
+.ftz-popular-package span {
+  color: #9aa9bd;
+  font-size: 8px;
+}
+
+.ftz-popular-package strong {
+  font-size: 10px;
+}
+
+.ftz-transactions-panel {
+  margin-top: 12px;
+}
+
+.ftz-table-wrap {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.ftz-table-wrap table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+}
+
+.ftz-table-wrap th {
+  padding: 7px 5px;
+  color: #8fa0ba;
+  font-size: 8px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ftz-table-wrap td {
+  padding: 7px 5px;
+  border-top: 1px solid rgba(72, 104, 160, .13);
+  color: #e7eef9;
+  font-size: 8px;
+}
+
+.ftz-table-wrap tbody tr {
+  transition: background .15s ease;
+}
+
+.ftz-table-wrap tbody tr:hover {
+  background: rgba(20, 87, 119, .16);
+}
+
+.ftz-table-wrap td.positive {
+  color: #19e8b0;
+}
+
+.ftz-table-wrap td.muted {
+  color: #9ba9bd;
+}
+
+.ftz-status {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 7px;
+}
+
+.ftz-status.complete {
+  color: #16f0ae;
+  background: rgba(9, 125, 87, .35);
+}
+
+.ftz-status.pending {
+  color: #ffc21d;
+  background: rgba(140, 102, 0, .32);
+}
+
+.ftz-dashboard-side {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.ftz-referral-card {
+  min-height: 225px;
+}
+
+.ftz-referral-top {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 14px;
+}
+
+.ftz-referral-icon {
+  display: grid;
+  width: 70px;
+  height: 70px;
+  place-items: center;
+  color: #1affbf;
+  font-size: 42px;
+  filter: drop-shadow(0 0 9px rgba(22, 238, 183, .5));
+}
+
+.ftz-referral-top small,
+.ftz-referral-top strong,
+.ftz-referral-top span {
+  display: block;
+}
+
+.ftz-referral-top small {
+  color: #a5b4ca;
+  font-size: 9px;
+}
+
+.ftz-referral-top strong {
+  margin-top: 3px;
+  font-size: 22px;
+}
+
+.ftz-referral-top span,
+.ftz-referral-split span {
+  margin-top: 3px;
+  color: var(--ftz-green);
+  font-size: 8px;
+}
+
+.ftz-referral-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 17px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(76, 111, 166, .20);
+}
+
+.ftz-referral-split > div + div {
+  padding-left: 14px;
+  border-left: 1px solid rgba(76, 111, 166, .20);
+}
+
+.ftz-referral-split small,
+.ftz-referral-split strong {
+  display: block;
+}
+
+.ftz-referral-split small {
+  color: #adb9cb;
+  font-size: 8px;
+}
+
+.ftz-referral-split strong {
+  margin-top: 4px;
+  font-size: 15px;
+}
+
+.ftz-activity-list {
+  margin-top: 10px;
+}
+
+.ftz-activity-row {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 52px;
+  border-top: 1px solid rgba(67, 104, 165, .13);
+}
+
+.ftz-activity-row:first-child {
+  border-top: 0;
+}
+
+.ftz-activity-row strong,
+.ftz-activity-row small {
+  display: block;
+}
+
+.ftz-activity-row strong {
+  font-size: 9px;
+}
+
+.ftz-activity-row small {
+  margin-top: 3px;
+  color: #9dabc0;
+  font-size: 8px;
+}
+
+.ftz-activity-row time {
+  color: #9aa8bc;
+  font-size: 8px;
+}
+
+.ftz-activity-icon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.ftz-activity-icon.is-cyan,
+.ftz-activity-icon.is-green {
+  color: #1ff2be;
+  background: rgba(0, 197, 163, .18);
+}
+
+.ftz-activity-icon.is-blue {
+  color: #58a3ff;
+  background: rgba(33, 100, 255, .18);
+}
+
+.ftz-activity-icon.is-orange {
+  color: #ff9c00;
+  background: rgba(255, 145, 0, .16);
+}
+
+.ftz-activity-icon.is-purple {
+  color: #dd62ff;
+  background: rgba(173, 51, 255, .16);
+}
+
+.ftz-grow-card {
+  position: relative;
+  display: grid;
+  min-height: 170px;
+  grid-template-columns: 1fr 130px;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid rgba(110, 50, 245, .55);
+  border-radius: 11px;
+  background:
+    radial-gradient(circle at 80% 30%, rgba(106, 32, 225, .35), transparent 12rem),
+    linear-gradient(135deg, #14104a, #07092b 55%, #1d0752);
+}
+
+.ftz-grow-card h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.ftz-grow-card p {
+  max-width: 180px;
+  color: #d3dbeb;
+  font-size: 10px;
+}
+
+.ftz-grow-card button {
+  padding: 10px 14px;
+  border: 1px solid rgba(25, 245, 205, .36);
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(90deg, #008d86, #11bb82);
+  font-size: 9px;
+  box-shadow: 0 0 20px rgba(15, 204, 162, .16);
+}
+
+.ftz-grow-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: #f247ff;
+}
+
+.ftz-grow-art i {
+  font-size: 82px;
+  transform: rotate(13deg);
+  filter: drop-shadow(0 0 13px rgba(85, 83, 255, .45));
+}
+
+.ftz-grow-art span {
+  position: absolute;
+  left: 0;
+  bottom: 17px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffb300;
+  background: #57105f;
+  font-size: 20px;
+}
+
+.ftz-demo-note {
+  max-width: 1460px;
+  margin: 10px auto 0;
+  color: #667794;
+  font-size: 8px;
+  text-align: right;
+}
+
+.ftz-dashboard-loading {
+  display: grid;
+  min-height: calc(100vh - var(--ftz-topbar));
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+}
+
+.ftz-dashboard-loading span {
+  width: 35px;
+  height: 35px;
+  border: 2px solid rgba(20, 230, 205, .18);
+  border-top-color: #16e5d9;
+  border-radius: 50%;
+  animation: ftz-spin .7s linear infinite;
+}
+
+.ftz-dashboard-loading p {
+  color: #8493aa;
+  font-size: 11px;
+}
+
+@keyframes ftz-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1350px) {
+  :root {
+    --ftz-sidebar: 232px;
+  }
+
+  .ftz-logo img {
+    width: 180px;
+  }
+
+  .ftz-dashboard-layout {
+    grid-template-columns: minmax(0, 1fr) 270px;
+  }
+
+  .ftz-metric-card {
+    padding: 11px;
+  }
+
+  .ftz-metric-icon {
+    width: 38px;
+    height: 38px;
+  }
+
+  .ftz-metric-copy strong {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .ftz-search {
+    width: 290px;
+  }
+
+  .ftz-topbar-profile-copy {
+    display: none;
+  }
+
+  .ftz-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ftz-dashboard-side {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ftz-referral-card,
+  .ftz-activity-panel,
+  .ftz-grow-card {
+    min-height: 100%;
+  }
+
+  .ftz-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 991px) {
+  :root {
+    --ftz-sidebar: 255px;
+  }
+
+  .ftz-sidebar {
+    transform: translateX(-100%);
+    transition: transform .22s ease;
+  }
+
+  .ftz-nav-open .ftz-sidebar {
+    transform: translateX(0);
+  }
+
+  .ftz-sidebar-overlay {
+    position: fixed;
+    z-index: 1035;
+    inset: 0;
+    display: block;
+    border: 0;
+    opacity: 0;
+    visibility: hidden;
+    background: rgba(0, 3, 13, .66);
+    transition: .2s ease;
+  }
+
+  .ftz-nav-open .ftz-sidebar-overlay {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .ftz-topbar {
+    left: 0;
+  }
+
+  .ftz-main {
+    margin-left: 0;
+  }
+
+  .ftz-mid-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ftz-stack {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --ftz-topbar: 66px;
+  }
+
+  .ftz-topbar {
+    padding: 0 12px;
+  }
+
+  .ftz-topbar-title h1 {
+    font-size: 15px;
+  }
+
+  .ftz-topbar-title p,
+  .ftz-search,
+  .ftz-icon-button:not(.ftz-menu-toggle),
+  .ftz-topbar-profile-copy {
+    display: none;
+  }
+
+  .ftz-dashboard {
+    padding: 0 10px 12px;
+  }
+
+  .ftz-market-ticker {
+    margin-right: -10px;
+    margin-left: -10px;
+    padding-left: 7px;
+  }
+
+  .ftz-hero {
+    min-height: 190px;
+  }
+
+  .ftz-hero-copy {
+    width: 78%;
+    padding: 17px;
+  }
+
+  .ftz-hero-art {
+    width: 78%;
+    opacity: .72;
+  }
+
+  .ftz-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ftz-stack,
+  .ftz-dashboard-side {
+    grid-template-columns: 1fr;
+  }
+
+  .ftz-chart-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ftz-deposit-body {
+    grid-template-columns: 130px 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .ftz-topbar-profile {
+    gap: 4px;
+  }
+
+  .ftz-avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .ftz-market-item {
+    min-width: 190px;
+  }
+
+  .ftz-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ftz-metric-card {
+    min-height: 92px;
+  }
+
+  .ftz-hero-copy {
+    width: 100%;
+  }
+
+  .ftz-hero-art {
+    width: 100%;
+    opacity: .5;
+  }
+
+  .ftz-hero-meta {
+    display: grid;
+    justify-items: start;
+  }
+
+  .ftz-deposit-body {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .ftz-deposit-legend {
+    width: 100%;
+  }
+
+  .ftz-users-package-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .ftz-users-package-grid > div,
+  .ftz-users-package-grid > div + div {
+    padding: 0;
+    border: 0;
+  }
+
+  .ftz-grow-card {
+    grid-template-columns: 1fr 90px;
+  }
+
+  .ftz-grow-art i {
+    font-size: 58px;
+  }
+}
+
+
+/* ==========================================================
+   FIXTRADEZONE PRODUCTION SVG ART SYSTEM
+   Locked dark-neon visual system.
+   ========================================================== */
+
+.ftz-sidebar {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(2, 8, 23, .82),
+      rgba(2, 7, 20, .92)
+    ),
+    url("/assets/fixtradezone/neo/sidebar-bg.png")
+      center top / cover no-repeat;
+  isolation: isolate;
+}
+
+.ftz-sidebar::before {
+  inset: 0;
+  opacity: .62;
+  background:
+    url("/assets/fixtradezone/neo/sidebar-bg.png")
+      center top / cover no-repeat;
+  pointer-events: none;
+}
+
+.ftz-sidebar-nav,
+.ftz-sidebar-profile {
+  position: relative;
+  z-index: 2;
+}
+
+.ftz-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(2, 17, 35, .94) 0%,
+      rgba(3, 27, 43, .76) 42%,
+      rgba(4, 11, 31, .26) 68%,
+      rgba(4, 9, 28, .08) 100%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+      center / cover no-repeat;
+}
+
+.ftz-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(6, 238, 214, .08),
+      transparent 34%
+    );
+}
+
+.ftz-hero-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.ftz-hero-art {
+  position: relative;
+  z-index: 1;
+  background: none !important;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .ftz-hero {
+    background-position: 62% center;
+  }
+}
+
+@media (max-width: 640px) {
+  .ftz-hero {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 16, 35, .96),
+        rgba(4, 20, 39, .88)
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        69% center / cover no-repeat;
+  }
+}
+
+
+/* ==========================================================
+   FIXTRADEZONE DARK NEO — PRODUCTION TYPOGRAPHY SCALE
+   Shared across every admin/backend screen.
+   ========================================================== */
+
+.ftz-admin-shell {
+  font-size: 15px;
+}
+
+/* Sidebar */
+.ftz-sidebar {
+  font-size: 15px;
+}
+
+.ftz-sidebar-nav a,
+.ftz-sidebar-nav button {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.ftz-sidebar-nav small,
+.ftz-sidebar-nav .nav-label,
+.ftz-sidebar-nav [class*="section"] {
+  font-size: 12px;
+  letter-spacing: .08em;
+}
+
+.ftz-sidebar-profile strong {
+  font-size: 14px;
+}
+
+.ftz-sidebar-profile small {
+  font-size: 12px;
+}
+
+/* Topbar */
+.ftz-topbar {
+  font-size: 14px;
+}
+
+.ftz-topbar strong {
+  font-size: 14px;
+}
+
+.ftz-topbar small {
+  font-size: 12px;
+}
+
+/* Dashboard headings */
+.ftz-dashboard h1,
+.ftz-dashboard h2 {
+  line-height: 1.2;
+}
+
+.ftz-dashboard h2 {
+  font-size: clamp(24px, 2vw, 32px);
+}
+
+.ftz-dashboard h3,
+.ftz-panel h3 {
+  font-size: 17px;
+  line-height: 1.3;
+}
+
+/* Hero */
+.ftz-hero-copy p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ftz-hero-meta {
+  font-size: 12px;
+}
+
+.ftz-secure-pill {
+  font-size: 11px;
+}
+
+/* Metric cards */
+.ftz-metric-copy small {
+  font-size: 12px;
+}
+
+.ftz-metric-copy strong {
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.ftz-metric-copy span {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* Panels / legends */
+.ftz-panel {
+  font-size: 14px;
+}
+
+.ftz-legend,
+.ftz-deposit-legend,
+.ftz-chart-months {
+  font-size: 11px;
+}
+
+.ftz-deposit-legend span {
+  font-size: 11px;
+}
+
+.ftz-deposit-legend b,
+.ftz-deposit-legend em {
+  font-size: 11px;
+}
+
+/* Dashboard side cards */
+.ftz-referral-card small,
+.ftz-users-package small {
+  font-size: 11px;
+}
+
+.ftz-referral-card strong,
+.ftz-users-package strong {
+  font-size: 18px;
+}
+
+.ftz-activity-row strong {
+  font-size: 12px;
+}
+
+.ftz-activity-row small,
+.ftz-activity-row time {
+  font-size: 10.5px;
+}
+
+/* Tables — important readability fix */
+.ftz-table-wrap table {
+  font-size: 12px;
+}
+
+.ftz-table-wrap th {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.ftz-table-wrap td {
+  font-size: 12px;
+  line-height: 1.5;
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.ftz-status {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 5px 9px;
+}
+
+/* Chart */
+.ftz-chart-tooltip {
+  font-size: 11px;
+}
+
+.ftz-chart-tooltip strong {
+  font-size: 11px;
+}
+
+.ftz-chart-stats small {
+  font-size: 10.5px;
+}
+
+.ftz-chart-stats strong {
+  font-size: 17px;
+}
+
+/* Form controls shared by Users/RBAC/etc */
+.ftz-admin-shell input,
+.ftz-admin-shell select,
+.ftz-admin-shell textarea,
+.ftz-admin-shell button {
+  font-size: 14px;
+}
+
+/* Prevent unreadably tiny text anywhere in backend content */
+.ftz-admin-shell main small {
+  line-height: 1.45;
+}
+
+/* Desktop high-resolution screens */
+@media (min-width: 1440px) {
+  .ftz-admin-shell {
+    font-size: 16px;
+  }
+
+  .ftz-table-wrap table {
+    font-size: 13px;
+  }
+
+  .ftz-table-wrap td {
+    font-size: 13px;
+  }
+
+  .ftz-panel h3 {
+    font-size: 18px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .ftz-sidebar-nav a,
+  .ftz-sidebar-nav button {
+    font-size: 15px;
+  }
+
+  .ftz-table-wrap table {
+    font-size: 12px;
+  }
+
+  .ftz-dashboard h2 {
+    font-size: 23px;
+  }
+}
+
+
+/* =========================================================
+   FIXTRADEZONE DARK NEO — FINAL VISUAL LOCK
+   Sidebar + Hero
+   ========================================================= */
+
+/* SIDEBAR — one full-width seamless vector layer */
+.ftz-sidebar {
+  isolation: isolate !important;
+  overflow: hidden !important;
+
+  background-color: #020817 !important;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(1, 7, 20, .05),
+      rgba(2, 6, 18, .23)
+    ),
+    url("/assets/fixtradezone/neo/sidebar-bg.png") !important;
+
+  background-repeat:
+    no-repeat,
+    no-repeat !important;
+
+  background-position:
+    center,
+    center top !important;
+
+  background-size:
+    100% 100%,
+    cover !important;
+}
+
+/* kill old narrow plasma-strip layer */
+.ftz-sidebar::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(12, 218, 206, .035),
+      transparent 42%,
+      rgba(111, 57, 255, .04)
+    ) !important;
+
+  opacity: 1 !important;
+  pointer-events: none !important;
+}
+
+.ftz-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* HERO — actual bull vector, never cropped */
+.ftz-hero {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+
+  background-color: #03142b !important;
+
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(2, 24, 39, .98) 0%,
+      rgba(3, 31, 47, .91) 36%,
+      rgba(4, 22, 47, .72) 57%,
+      rgba(6, 12, 38, .42) 100%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png"),
+    repeating-linear-gradient(
+      90deg,
+      rgba(40, 140, 190, .035) 0,
+      rgba(40, 140, 190, .035) 1px,
+      transparent 1px,
+      transparent 46px
+    ) !important;
+
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    repeat !important;
+
+  background-position:
+    center,
+    96% 48%,
+    center !important;
+
+  background-size:
+    100% 100%,
+    auto 145%,
+    100% 100% !important;
+
+  border-color: rgba(24, 234, 220, .68) !important;
+}
+
+/* remove obsolete art box completely */
+.ftz-hero-art {
+  display: none !important;
+}
+
+.ftz-hero-copy {
+  position: relative !important;
+  z-index: 3 !important;
+  width: min(61%, 720px) !important;
+  max-width: 720px !important;
+}
+
+.ftz-hero::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+
+  background:
+    radial-gradient(
+      circle at 78% 50%,
+      rgba(23, 239, 218, .08),
+      transparent 29%
+    ),
+    radial-gradient(
+      circle at 94% 50%,
+      rgba(111, 65, 255, .13),
+      transparent 33%
+    ) !important;
+
+  pointer-events: none !important;
+}
+
+/* responsive hero */
+@media (max-width: 1100px) {
+  .ftz-hero {
+    background-position:
+      center,
+      108% 52%,
+      center !important;
+
+    background-size:
+      100% 100%,
+      auto 132%,
+      100% 100% !important;
+  }
+
+  .ftz-hero-copy {
+    width: 64% !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ftz-hero {
+    min-height: 250px;
+
+    background-image:
+      linear-gradient(
+        90deg,
+        rgba(2, 18, 37, .98) 0%,
+        rgba(3, 21, 42, .94) 56%,
+        rgba(3, 13, 37, .60) 100%
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png") !important;
+
+    background-position:
+      center,
+      140% 50% !important;
+
+    background-size:
+      100% 100%,
+      auto 118% !important;
+  }
+
+  .ftz-hero-copy {
+    width: 75% !important;
+  }
+}
+
+
+/* ===== migrated from fixtradezone-auth.scss ===== */
+
+.ftz-auth-page {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  grid-template-columns: minmax(0, 1.25fr) minmax(420px, .75fr);
+  overflow: hidden;
+  color: var(--ftz-text);
+  background:
+    radial-gradient(circle at 14% 18%, rgba(0, 224, 220, .08), transparent 24rem),
+    radial-gradient(circle at 60% 70%, rgba(88, 36, 255, .16), transparent 28rem),
+    #020817;
+}
+
+.ftz-auth-visual {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 30px 42px 34px;
+  border-right: 1px solid rgba(69, 115, 190, .18);
+  background:
+    linear-gradient(90deg, rgba(2, 8, 24, .45), rgba(2, 8, 24, .10)),
+    radial-gradient(circle at 70% 45%, rgba(33, 39, 169, .17), transparent 27rem);
+}
+
+.ftz-auth-visual::before,
+.ftz-auth-visual::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.ftz-auth-visual::before {
+  inset: 0;
+  opacity: .7;
+  background:
+    radial-gradient(ellipse at 22% 76%, rgba(31, 65, 255, .24), transparent 19%),
+    radial-gradient(ellipse at 42% 72%, rgba(72, 22, 255, .20), transparent 27%),
+    radial-gradient(ellipse at 32% 80%, rgba(0, 148, 255, .10), transparent 42%);
+  filter: blur(8px);
+}
+
+.ftz-auth-visual::after {
+  right: -16%;
+  bottom: -28%;
+  width: 80%;
+  height: 75%;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(
+      ellipse at center,
+      rgba(62, 88, 255, .15) 0 1px,
+      transparent 2px 18px
+    );
+  transform: rotate(-14deg);
+  opacity: .42;
+}
+
+.ftz-auth-plasma {
+  position: absolute;
+  inset: auto auto -10% -18%;
+  width: 75%;
+  height: 62%;
+  opacity: .9;
+  background:
+    radial-gradient(ellipse at 52% 54%, rgba(17, 49, 255, .48), transparent 24%),
+    radial-gradient(ellipse at 72% 44%, rgba(141, 33, 255, .38), transparent 28%),
+    radial-gradient(ellipse at 42% 68%, rgba(0, 208, 255, .22), transparent 30%);
+  filter: blur(20px);
+  transform: rotate(-18deg);
+  pointer-events: none;
+}
+
+.ftz-auth-plasma::after {
+  content: "";
+  position: absolute;
+  inset: 25% -25% 8% 0;
+  border-radius: 50%;
+  border-top: 2px solid rgba(69, 84, 255, .55);
+  border-bottom: 1px solid rgba(180, 31, 255, .38);
+  box-shadow:
+    0 -8px 22px rgba(12, 108, 255, .16),
+    0 8px 22px rgba(133, 34, 255, .18);
+  transform: skewX(-24deg) rotate(-7deg);
+}
+
+.ftz-auth-brand {
+  position: relative;
+  z-index: 3;
+}
+
+.ftz-auth-brand img {
+  width: 210px;
+  height: auto;
+}
+
+.ftz-auth-story {
+  position: relative;
+  z-index: 3;
+  max-width: 590px;
+  margin: auto 0;
+  padding: 80px 0 70px;
+}
+
+.ftz-auth-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid rgba(23, 235, 212, .28);
+  border-radius: 999px;
+  color: #21f3c3;
+  background: rgba(4, 87, 78, .20);
+  box-shadow: 0 0 18px rgba(17, 229, 202, .07);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+
+.ftz-auth-story h1 {
+  max-width: 620px;
+  margin: 20px 0 14px;
+  color: #f8fbff;
+  font-size: clamp(42px, 4.4vw, 70px);
+  font-weight: 780;
+  line-height: .99;
+  letter-spacing: -.045em;
+}
+
+.ftz-auth-story h1 span {
+  display: block;
+  color: transparent;
+  background: linear-gradient(90deg, #1cf4dd, #48a9ff 47%, #a755ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.ftz-auth-story > p {
+  max-width: 505px;
+  margin: 0;
+  color: #9eacc4;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.ftz-auth-market-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.ftz-auth-market-row > div {
+  display: grid;
+  min-width: 145px;
+  grid-template-columns: 28px 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 1px 8px;
+  align-items: center;
+  padding: 9px 11px;
+  border: 1px solid rgba(71, 113, 181, .22);
+  border-radius: 10px;
+  background: rgba(4, 15, 38, .62);
+  backdrop-filter: blur(10px);
+  transition: .18s ease;
+}
+
+.ftz-auth-market-row > div:hover {
+  border-color: rgba(25, 231, 217, .42);
+  background: rgba(6, 29, 53, .75);
+  transform: translateY(-2px);
+}
+
+.ftz-auth-market-row small {
+  color: #aeb9cb;
+  font-size: 8px;
+}
+
+.ftz-auth-market-row strong {
+  color: #fff;
+  font-size: 10px;
+}
+
+.ftz-auth-market-row b {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: #1fe3a2;
+  font-size: 9px;
+}
+
+.ftz-auth-coin {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  grid-row: 1 / span 2;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ftz-auth-coin.bitcoin { background: #f7931a; }
+.ftz-auth-coin.ethereum { background: #496ee3; }
+.ftz-auth-coin.solana { background: linear-gradient(145deg, #22e8bc, #7c37ff); }
+
+.ftz-auth-bull {
+  position: absolute;
+  z-index: 2;
+  right: -5%;
+  bottom: 7%;
+  width: 64%;
+  height: 56%;
+  opacity: .24;
+  background:
+    linear-gradient(90deg, #020817 0%, rgba(2, 8, 23, .58) 23%, transparent 55%),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") right center / cover no-repeat;
+  filter: saturate(1.2) contrast(1.08);
+  mask-image: linear-gradient(to top, transparent 0%, #000 14%, #000 88%, transparent 100%);
+  pointer-events: none;
+}
+
+.ftz-auth-trust {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  color: #9caac0;
+  font-size: 9px;
+}
+
+.ftz-auth-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ftz-auth-trust i {
+  color: #17d9b1;
+  font-size: 14px;
+}
+
+.ftz-auth-panel {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  padding: 30px;
+  background:
+    radial-gradient(circle at 55% 35%, rgba(27, 78, 134, .08), transparent 24rem),
+    rgba(2, 8, 23, .95);
+}
+
+.ftz-auth-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .18;
+  background-image:
+    linear-gradient(rgba(53, 91, 146, .07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 91, 146, .07) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(circle at center, #000, transparent 72%);
+  pointer-events: none;
+}
+
+.ftz-auth-mobile-brand {
+  display: none;
+}
+
+.ftz-login-card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 430px);
+  padding: 34px;
+  border: 1px solid rgba(67, 112, 181, .30);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(8, 26, 55, .94), rgba(3, 13, 33, .96));
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, .38),
+    inset 0 1px 0 rgba(255, 255, 255, .025);
+  backdrop-filter: blur(18px);
+}
+
+.ftz-login-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: .30;
+  background: linear-gradient(135deg, #18eadc, transparent 24%, transparent 72%, #6b40ff);
+  filter: blur(6px);
+}
+
+.ftz-login-head > span {
+  color: #19e6d3;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.ftz-login-head h2 {
+  margin: 8px 0 5px;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 760;
+  letter-spacing: -.025em;
+}
+
+.ftz-login-head p {
+  margin: 0 0 26px;
+  color: #8d9db5;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.ftz-login-form label {
+  display: block;
+  margin: 0 0 7px;
+  color: #c7d2e4;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ftz-auth-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 17px;
+}
+
+.ftz-auth-label-row label {
+  margin-bottom: 7px;
+}
+
+.ftz-auth-label-row small {
+  margin-bottom: 7px;
+  color: #647590;
+  font-size: 8px;
+}
+
+.ftz-auth-input {
+  position: relative;
+  display: flex;
+  height: 47px;
+  align-items: center;
+}
+
+.ftz-auth-input > i {
+  position: absolute;
+  left: 14px;
+  z-index: 1;
+  color: #7e91ae;
+  font-size: 18px;
+  transition: .16s ease;
+}
+
+.ftz-auth-input input {
+  width: 100%;
+  height: 100%;
+  padding: 0 44px 0 43px;
+  border: 1px solid rgba(83, 119, 176, .30);
+  border-radius: 10px;
+  outline: 0;
+  color: #f5f8ff;
+  background: rgba(1, 9, 25, .70);
+  font-size: 11px;
+  transition: .16s ease;
+}
+
+.ftz-auth-input input::placeholder {
+  color: #5e6f89;
+}
+
+.ftz-auth-input:focus-within input {
+  border-color: rgba(23, 233, 220, .72);
+  box-shadow: 0 0 0 3px rgba(23, 233, 220, .07), 0 0 18px rgba(23, 233, 220, .05);
+}
+
+.ftz-auth-input:focus-within > i {
+  color: #22efe0;
+}
+
+.ftz-password-toggle {
+  position: absolute;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: #8191aa;
+  background: transparent;
+}
+
+.ftz-password-toggle:hover {
+  color: #1fe6da;
+  background: rgba(17, 218, 205, .07);
+}
+
+.ftz-auth-error {
+  min-height: 33px;
+  padding-top: 9px;
+  color: transparent;
+  font-size: 9px;
+}
+
+.ftz-auth-error.is-visible {
+  color: #ff7185;
+}
+
+.ftz-auth-submit {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  border: 1px solid rgba(31, 255, 226, .34);
+  border-radius: 10px;
+  color: #fff;
+  background: linear-gradient(90deg, #078a88, #0bbb8e 52%, #0fc997);
+  box-shadow: 0 10px 28px rgba(8, 194, 159, .17), inset 0 1px 0 rgba(255, 255, 255, .14);
+  font-size: 11px;
+  font-weight: 700;
+  transition: .17s ease;
+}
+
+.ftz-auth-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 36px rgba(8, 219, 178, .24), 0 0 20px rgba(8, 219, 178, .10);
+}
+
+.ftz-auth-submit:disabled {
+  cursor: wait;
+  opacity: .68;
+}
+
+.ftz-auth-security-note {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 13px;
+  border: 1px solid rgba(31, 194, 160, .15);
+  border-radius: 10px;
+  background: rgba(8, 70, 64, .10);
+}
+
+.ftz-auth-security-note > i {
+  margin-top: 1px;
+  color: #18e9b7;
+  font-size: 18px;
+}
+
+.ftz-auth-security-note strong,
+.ftz-auth-security-note small {
+  display: block;
+}
+
+.ftz-auth-security-note strong {
+  color: #dbe6f3;
+  font-size: 9px;
+}
+
+.ftz-auth-security-note small {
+  margin-top: 3px;
+  color: #74859e;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.ftz-auth-footer {
+  position: relative;
+  z-index: 2;
+  margin: 18px 0 0;
+  color: #53647e;
+  font-size: 8px;
+}
+
+@media (max-width: 1080px) {
+  .ftz-auth-page {
+    grid-template-columns: 1fr 430px;
+  }
+
+  .ftz-auth-visual {
+    padding: 28px;
+  }
+
+  .ftz-auth-story h1 {
+    font-size: clamp(36px, 4.8vw, 56px);
+  }
+
+  .ftz-auth-market-row > div:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (max-width: 820px) {
+  .ftz-auth-page {
+    display: block;
+    min-height: 100vh;
+  }
+
+  .ftz-auth-visual {
+    display: none;
+  }
+
+  .ftz-auth-panel {
+    min-height: 100vh;
+    padding: 24px 18px;
+    background:
+      radial-gradient(circle at 10% 92%, rgba(36, 40, 255, .20), transparent 18rem),
+      radial-gradient(circle at 90% 12%, rgba(0, 216, 197, .10), transparent 18rem),
+      #020817;
+  }
+
+  .ftz-auth-mobile-brand {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: min(100%, 430px);
+    margin-bottom: 22px;
+  }
+
+  .ftz-auth-mobile-brand img {
+    width: 190px;
+    height: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .ftz-auth-panel {
+    justify-content: flex-start;
+    padding-top: 25px;
+  }
+
+  .ftz-login-card {
+    padding: 25px 20px;
+    border-radius: 15px;
+  }
+
+  .ftz-login-head h2 {
+    font-size: 26px;
+  }
+}
+
+
+/* FixTradeZone production vector artwork */
+.ftz-auth-bull {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(1, 10, 28, .12),
+      rgba(1, 10, 28, .02)
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+      66% center / cover no-repeat;
+}
+
+
+/* =========================================================
+   FIXTRADEZONE DARK NEO — LOGIN BULL FINAL LOCK
+   Same master bull used by dashboard.
+   ========================================================= */
+
+.ftz-auth-bull {
+  position: relative !important;
+
+  background-color: transparent !important;
+
+  background-image:
+    radial-gradient(
+      circle at 66% 50%,
+      rgba(13, 224, 211, .13),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 82% 52%,
+      rgba(112, 57, 255, .16),
+      transparent 37%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") !important;
+
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat !important;
+
+  background-position:
+    center,
+    center,
+    70% 50% !important;
+
+  background-size:
+    100% 100%,
+    100% 100%,
+    contain !important;
+}
+
+/* ensure no wide-banner crop behavior survives */
+.ftz-auth-bull::before,
+.ftz-auth-bull::after {
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .ftz-auth-bull {
+    background-position:
+      center,
+      center,
+      center 48% !important;
+
+    background-size:
+      100% 100%,
+      100% 100%,
+      82% auto !important;
+  }
+}
+
+
+/* ===== migrated from fixtradezone-neo-lock.scss ===== */
+
+/* ==========================================================================
+   FIXTRADEZONE DARK NEO — IMMUTABLE VISUAL CONTRACT
+   --------------------------------------------------------------------------
+   This file is imported LAST and is the final authority for shared admin UI.
+   Approved production artwork:
+     - sidebar-bg.png
+     - dashboard-bull-banner.png
+     - login-bull.png
+   ========================================================================== */
+
+:root {
+  --ftz-neo-bg: #020817;
+  --ftz-neo-bg-2: #031027;
+  --ftz-neo-panel: rgba(5, 20, 48, .94);
+  --ftz-neo-panel-soft: rgba(4, 15, 38, .82);
+  --ftz-neo-border: rgba(67, 142, 207, .26);
+  --ftz-neo-border-hot: rgba(24, 234, 220, .58);
+  --ftz-neo-text: #edfaff;
+  --ftz-neo-muted: #8fa8be;
+  --ftz-neo-cyan: #18eadc;
+  --ftz-neo-blue: #4c8dff;
+  --ftz-neo-purple: #9a55ff;
+  --ftz-neo-green: #19dba3;
+}
+
+html,
+body,
+#body {
+  min-height: 100%;
+  background: var(--ftz-neo-bg);
+  color: var(--ftz-neo-text);
+}
+
+/* --------------------------------------------------------------------------
+   SHARED ADMIN SHELL
+   Sidebar + topbar are global shell primitives, not page-local UI.
+   -------------------------------------------------------------------------- */
+
+.ftz-sidebar {
+  isolation: isolate !important;
+  overflow: hidden !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(1, 6, 18, .08),
+      rgba(2, 6, 18, .18)
+    ),
+    url("/assets/fixtradezone/neo/sidebar-bg.png")
+      center top / cover no-repeat !important;
+}
+
+/* Kill every legacy narrow-strip/pseudo-image experiment. */
+.ftz-sidebar::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  opacity: 1 !important;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(10, 225, 209, .018),
+      transparent 48%,
+      rgba(113, 63, 255, .025)
+    ) !important;
+  pointer-events: none !important;
+}
+
+.ftz-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ftz-sidebar-nav {
+  background: transparent !important;
+}
+
+.ftz-sidebar-nav a,
+.ftz-sidebar-nav button {
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+}
+
+.ftz-sidebar-profile {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(5, 30, 57, .90),
+      rgba(4, 12, 36, .95)
+    ) !important;
+  backdrop-filter: blur(10px);
+}
+
+.ftz-topbar {
+  background: rgba(2, 8, 24, .92) !important;
+  border-color: rgba(62, 126, 183, .23) !important;
+  backdrop-filter: blur(14px);
+}
+
+/* --------------------------------------------------------------------------
+   DASHBOARD HERO
+   Exact approved 3:1 banner. Bull remains untouched and uncropped.
+   -------------------------------------------------------------------------- */
+
+.ftz-hero {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  min-height: 210px;
+
+  border-color: var(--ftz-neo-border-hot) !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(2, 23, 39, .98) 0%,
+      rgba(3, 25, 44, .91) 39%,
+      rgba(4, 17, 40, .42) 66%,
+      rgba(3, 11, 32, .12) 100%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+      right center / auto 100% no-repeat,
+    #03142b !important;
+}
+
+.ftz-hero::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(2, 16, 32, .38),
+      transparent 48%
+    ) !important;
+}
+
+.ftz-hero-copy {
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(58%, 720px) !important;
+  max-width: 720px !important;
+}
+
+.ftz-hero-art {
+  display: none !important;
+}
+
+.ftz-hero-copy h2 {
+  font-size: clamp(27px, 2.2vw, 36px) !important;
+  line-height: 1.14 !important;
+}
+
+.ftz-hero-copy p {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
+/* --------------------------------------------------------------------------
+   AUTH / LOGIN
+   Exact approved portrait bull. No cover crop.
+   -------------------------------------------------------------------------- */
+
+.ftz-auth-bull {
+  background:
+    radial-gradient(
+      circle at 70% 47%,
+      rgba(15, 220, 207, .08),
+      transparent 34%
+    ),
+    url("/assets/fixtradezone/svg/login-bull-approved.svg")
+      center center / contain no-repeat !important;
+}
+
+.ftz-auth-bull::before,
+.ftz-auth-bull::after {
+  pointer-events: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   READABILITY — global backend baseline
+   -------------------------------------------------------------------------- */
+
+.ftz-admin-shell,
+.ftz-dashboard {
+  font-size: 15px;
+}
+
+.ftz-panel h3 {
+  font-size: 17px !important;
+}
+
+.ftz-table-wrap table {
+  font-size: 13px !important;
+}
+
+.ftz-table-wrap th {
+  font-size: 11px !important;
+}
+
+.ftz-table-wrap td {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.ftz-admin-shell input,
+.ftz-admin-shell select,
+.ftz-admin-shell textarea,
+.ftz-admin-shell button {
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE CONTRACT
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .ftz-hero {
+    min-height: 220px;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 21, 38, .98),
+        rgba(3, 20, 42, .86) 55%,
+        rgba(4, 12, 34, .25)
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        112% center / auto 100% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 62% !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ftz-sidebar {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(1, 6, 18, .08),
+        rgba(2, 6, 18, .18)
+      ),
+      url("/assets/fixtradezone/neo/sidebar-bg.png")
+        center top / cover no-repeat !important;
+  }
+
+  .ftz-hero {
+    min-height: 250px;
+
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 18, 36, .98) 0%,
+        rgba(3, 18, 40, .92) 63%,
+        rgba(4, 12, 35, .32) 100%
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        128% center / auto 100% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 72% !important;
+  }
+
+  .ftz-hero-copy h2 {
+    font-size: 25px !important;
+  }
+
+  .ftz-auth-bull {
+    background:
+      radial-gradient(
+        circle at 50% 46%,
+        rgba(15, 220, 207, .07),
+        transparent 34%
+      ),
+      url("/assets/fixtradezone/svg/login-bull-approved.svg")
+        center center / min(86%, 620px) auto no-repeat !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .ftz-hero {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 17, 35, .99),
+        rgba(3, 17, 38, .96) 70%,
+        rgba(4, 11, 32, .48)
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        155% center / auto 92% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 78% !important;
+  }
+}
+
+/* FTZ LOGIN FINAL OVERRIDE */
+
+/* Exact approved login bull artwork.
+   Dashboard and sidebar are intentionally untouched. */
+.ftz-auth-bull {
+  background-image:
+    radial-gradient(
+      circle at 50% 46%,
+      rgba(24, 234, 220, .07),
+      transparent 38%
+    ),
+    url("/assets/fixtradezone/svg/login-bull-approved.svg") !important;
+
+  background-repeat:
+    no-repeat,
+    no-repeat !important;
+
+  background-position:
+    center,
+    center 48% !important;
+
+  background-size:
+    100% 100%,
+    auto min(70vh, 620px) !important;
+}
+
+
+/* Password eye */
+.ftz-password-control {
+  position: relative;
+  width: 100%;
+}
+
+.ftz-password-control input {
+  width: 100%;
+  padding-right: 56px !important;
+}
+
+.ftz-password-toggle {
+  position: absolute !important;
+  top: 50% !important;
+  right: 8px !important;
+  z-index: 20 !important;
+
+  display: grid !important;
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+
+  place-items: center;
+
+  transform: translateY(-50%) !important;
+
+  border:
+    1px solid rgba(53, 231, 219, .38) !important;
+
+  border-radius: 10px !important;
+
+  color: #73fff2 !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(7, 56, 68, .96),
+      rgba(5, 18, 47, .98)
+    ) !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+
+  cursor: pointer !important;
+  pointer-events: auto !important;
+
+  box-shadow:
+    0 0 15px rgba(24, 234, 220, .10);
+}
+
+.ftz-password-toggle:hover {
+  color: #fff !important;
+  border-color: rgba(90, 255, 240, .8) !important;
+
+  box-shadow:
+    0 0 18px rgba(24, 234, 220, .20);
+}
+
+.ftz-password-toggle:focus-visible {
+  outline: 2px solid #18eadc !important;
+  outline-offset: 2px !important;
+}
+
+.ftz-password-toggle svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+  color: inherit !important;
+}
+
+
+/* Laptop */
+@media (max-width: 1200px) {
+  .ftz-auth-bull {
+    background-size:
+      100% 100%,
+      auto min(62vh, 540px) !important;
+  }
+}
+
+
+/* Tablet */
+@media (max-width: 900px) {
+  .ftz-auth-bull {
+    background-position:
+      center,
+      center 47% !important;
+
+    background-size:
+      100% 100%,
+      min(72vw, 420px) auto !important;
+  }
+}
+
+
+/* Mobile */
+@media (max-width: 560px) {
+  .ftz-auth-bull {
+    background-size:
+      100% 100%,
+      min(80vw, 350px) auto !important;
+  }
+
+  .ftz-password-toggle {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
+
+
+
+/* ==========================================================
+   FIXTRADEZONE DARK NEO — FINAL MASTER OVERRIDES
+   ========================================================== */
+
+:root {
+  --ftz-bg: #020817;
+  --ftz-panel: #06142f;
+  --ftz-panel-soft: rgba(5, 20, 48, .92);
+  --ftz-border: rgba(64, 139, 205, .28);
+  --ftz-cyan: #18eadc;
+  --ftz-blue: #4c8dff;
+  --ftz-purple: #9557ff;
+  --ftz-green: #19dba3;
+  --ftz-text: #edfaff;
+  --ftz-muted: #8fa8be;
+}
+
+html,
+body,
+#body {
+  min-height: 100%;
+  background: var(--ftz-bg);
+  color: var(--ftz-text);
+}
+
+/*
+ * Same master bull everywhere.
+ * No PNG bull artwork.
+ */
+.ftz-auth-bull {
+  background-image:
+    radial-gradient(
+      circle at 50% 48%,
+      rgba(24, 234, 220, .10),
+      transparent 39%
+    ),
+    radial-gradient(
+      circle at 58% 50%,
+      rgba(116, 67, 255, .11),
+      transparent 42%
+    ),
+    url("/assets/fixtradezone/svg/login-bull-approved.svg")
+      !important;
+
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat !important;
+
+  background-position:
+    center,
+    center,
+    center !important;
+
+  background-size:
+    100% 100%,
+    100% 100%,
+    min(72%, 690px) auto !important;
+}
+
+
+/* Login desktop */
+@media (min-width: 1101px) {
+  .ftz-auth-bull {
+    background-size:
+      100% 100%,
+      100% 100%,
+      min(68%, 650px) auto !important;
+  }
+}
+
+
+/* Tablet */
+@media (max-width: 1100px) {
+  .ftz-auth-bull {
+    background-size:
+      100% 100%,
+      100% 100%,
+      min(74%, 560px) auto !important;
+  }
+}
+
+
+/* Mobile */
+@media (max-width: 700px) {
+  .ftz-auth-bull {
+    background-size:
+      100% 100%,
+      100% 100%,
+      min(82vw, 390px) auto !important;
+  }
+}
+
+
+/* Password input */
+.ftz-password-control {
+  position: relative;
+  width: 100%;
+}
+
+.ftz-password-control input {
+  width: 100%;
+  padding-right: 56px !important;
+}
+
+.ftz-password-toggle {
+  position: absolute !important;
+  top: 50% !important;
+  right: 8px !important;
+  z-index: 30 !important;
+
+  display: grid !important;
+  width: 38px !important;
+  height: 38px !important;
+  padding: 0 !important;
+
+  place-items: center;
+
+  transform: translateY(-50%) !important;
+
+  color: #75fff2 !important;
+
+  border:
+    1px solid rgba(51, 230, 218, .42) !important;
+
+  border-radius: 10px !important;
+
+  background:
+    linear-gradient(
+      145deg,
+      rgba(7, 58, 70, .98),
+      rgba(5, 18, 47, .98)
+    ) !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.ftz-password-toggle svg {
+  display: block !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.ftz-password-toggle:hover {
+  color: #fff !important;
+  border-color: #31eadc !important;
+}
+
+.ftz-password-toggle:focus-visible {
+  outline: 2px solid #18eadc !important;
+  outline-offset: 2px;
+}
+
+/* ===== LOGIN BULL SIZE + DEPTH FINAL LOCK ===== */
+
+/*
+ * Exact approved SVG.
+ * Login only.
+ * Dashboard / sidebar remain untouched.
+ */
+
+.ftz-auth-bull {
+  position: relative !important;
+  z-index: 5 !important;
+  isolation: isolate !important;
+
+  opacity: 1 !important;
+  visibility: visible !important;
+
+  background-image:
+    url("/assets/fixtradezone/svg/login-bull-approved.svg")
+    !important;
+
+  background-repeat:
+    no-repeat !important;
+
+  background-position:
+    center 50% !important;
+
+  /* larger bull */
+  background-size:
+    min(92%, 820px) auto !important;
+
+  /* remove dull appearance */
+  filter:
+    brightness(1.16)
+    contrast(1.10)
+    saturate(1.18)
+    drop-shadow(
+      0 0 22px rgba(24, 234, 220, .18)
+    )
+    drop-shadow(
+      0 0 34px rgba(122, 70, 255, .14)
+    ) !important;
+
+  mix-blend-mode: normal !important;
+}
+
+
+/*
+ * Prevent old overlays from sitting above bull.
+ */
+.ftz-auth-bull::before,
+.ftz-auth-bull::after {
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+
+/* Large desktop */
+@media (min-width: 1500px) {
+  .ftz-auth-bull {
+    background-size:
+      min(94%, 900px) auto !important;
+  }
+}
+
+
+/* Standard desktop / laptop */
+@media (max-width: 1499px) {
+  .ftz-auth-bull {
+    background-size:
+      min(90%, 760px) auto !important;
+  }
+}
+
+
+/* Tablet */
+@media (max-width: 1000px) {
+  .ftz-auth-bull {
+    background-position:
+      center 48% !important;
+
+    background-size:
+      min(88%, 590px) auto !important;
+  }
+}
+
+
+/* Mobile */
+@media (max-width: 700px) {
+  .ftz-auth-bull {
+    background-position:
+      center 46% !important;
+
+    background-size:
+      min(92vw, 430px) auto !important;
+
+    filter:
+      brightness(1.13)
+      contrast(1.08)
+      saturate(1.15)
+      drop-shadow(
+        0 0 18px rgba(24, 234, 220, .16)
+      ) !important;
+  }
+}
+
+/* ===== LOGIN BULL EDGE + ZINDEX FINAL LOCK ===== */
+
+/*
+ * Exact approved SVG.
+ * Size stays locked.
+ * Fixes:
+ * - hard rectangular left/right edges
+ * - bull appearing below decorative lines
+ * - dull visual depth
+ */
+
+.ftz-auth-bull {
+  position: relative !important;
+  z-index: 20 !important;
+  isolation: isolate !important;
+
+  overflow: visible !important;
+
+  /* Bull is now rendered by ::before */
+  background-image: none !important;
+
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+
+/* Soft glow BEHIND bull */
+.ftz-auth-bull::after {
+  content: "" !important;
+
+  position: absolute !important;
+  inset: 14% 8% 10% 8% !important;
+
+  z-index: 0 !important;
+
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(16, 225, 215, .18) 0%,
+      rgba(69, 82, 255, .12) 42%,
+      rgba(120, 52, 255, .09) 58%,
+      transparent 76%
+    ) !important;
+
+  filter: blur(28px) !important;
+
+  opacity: .9 !important;
+
+  pointer-events: none !important;
+}
+
+
+/* Approved bull artwork ABOVE all decorative lines */
+.ftz-auth-bull::before {
+  content: "" !important;
+
+  position: absolute !important;
+
+  /*
+   * Keeps the current approved size.
+   * Slight overflow avoids visible box boundaries.
+   */
+  inset:
+    -4%
+    -8%
+    -4%
+    -8% !important;
+
+  z-index: 5 !important;
+
+  background:
+    url("/assets/fixtradezone/svg/login-bull-approved.svg")
+    center center / contain no-repeat !important;
+
+  opacity: 1 !important;
+
+  /*
+   * Feather the rectangular artwork edges
+   * so no vertical left/right lines are visible.
+   */
+  -webkit-mask-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0,0,0,.35) 5%,
+      #000 13%,
+      #000 87%,
+      rgba(0,0,0,.35) 95%,
+      transparent 100%
+    ) !important;
+
+  mask-image:
+    linear-gradient(
+      to right,
+      transparent 0%,
+      rgba(0,0,0,.35) 5%,
+      #000 13%,
+      #000 87%,
+      rgba(0,0,0,.35) 95%,
+      transparent 100%
+    ) !important;
+
+  filter:
+    brightness(1.13)
+    contrast(1.08)
+    saturate(1.14)
+    drop-shadow(
+      0 0 18px rgba(19, 229, 216, .20)
+    )
+    drop-shadow(
+      0 0 30px rgba(107, 65, 255, .16)
+    ) !important;
+
+  pointer-events: none !important;
+}
+
+
+/* Ensure any auth background decoration remains behind artwork */
+.ftz-auth-plasma,
+.ftz-auth-plasma::before,
+.ftz-auth-plasma::after {
+  z-index: 0 !important;
+}
+
+
+/* Desktop */
+@media (min-width: 1200px) {
+  .ftz-auth-bull::before {
+    inset:
+      -5%
+      -10%
+      -5%
+      -10% !important;
+  }
+}
+
+
+/* Tablet */
+@media (max-width: 900px) {
+  .ftz-auth-bull::before {
+    inset:
+      -2%
+      -6%
+      -2%
+      -6% !important;
+
+    -webkit-mask-image:
+      linear-gradient(
+        to right,
+        transparent 0%,
+        #000 10%,
+        #000 90%,
+        transparent 100%
+      ) !important;
+
+    mask-image:
+      linear-gradient(
+        to right,
+        transparent 0%,
+        #000 10%,
+        #000 90%,
+        transparent 100%
+      ) !important;
+  }
+}
+
+
+/* Mobile */
+@media (max-width: 560px) {
+  .ftz-auth-bull::before {
+    inset:
+      0
+      -3%
+      0
+      -3% !important;
+  }
+}

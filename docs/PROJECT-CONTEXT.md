@@ -28,7 +28,7 @@
 
 ## Landing Page / CMS
 - Ronel React is the public landing visual reference and must be ported to Next.js; its Vite dependencies and template backend are not production sources.
-- Rizz Node.js is the admin/user dashboard visual reference only; its Express/EJS/Gulp backend is not reused.
+- FixTradeZone uses its own locked dark neon design system for admin and user dashboards; no third-party dashboard template is used.
 - Third-party template license provenance must be resolved before production asset reuse.
 - Landing page is template-based.
 - Template and content/configuration are separate.

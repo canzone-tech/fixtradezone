@@ -8,7 +8,7 @@
 - Added ADMIN role bootstrap and a one-time audited founder bootstrap CLI.
 - Added focused login, rotation, logout, token, strategy, and founder-bootstrap tests.
 - Added a safe Postman collection/environment that automatically stores and rotates test tokens.
-- Added a minimal Next.js 16 admin application with original Rizz-informed styling.
+- Added a Next.js 16 admin application using the FixTradeZone dark neon design system.
 - Added a same-origin admin BFF that keeps access and refresh tokens in HttpOnly cookies and enforces ADMIN access.
 - Kept unimplemented modules visibly queued instead of displaying fake data or metrics.
 - Recorded the fast-v1 scope: launch-critical controls now, fully configurable CMS in v2.

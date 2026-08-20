@@ -47,7 +47,7 @@ Focus: Authentication session lifecycle + minimal admin foundation.
 - Minimal Next.js admin login and protected dashboard shell
 - HttpOnly admin cookies managed by a same-origin Next.js BFF layer
 - Admin CSP/security headers, cross-site request rejection, and backend-response validation
-- Original admin UI based on the approved Rizz visual direction; no template backend reused
+- Admin UI uses the locked dark neon FixTradeZone design system with no third-party dashboard theme dependency
 
 ## Current Areas
 - `src/config/`

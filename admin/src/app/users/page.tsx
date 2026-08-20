@@ -5,9 +5,9 @@ import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
 } from "@/lib/auth";
-import DashboardClient from "./dashboard-client";
+import UsersClient from "./users-client";
 
-export default async function DashboardPage() {
+export default async function UsersPage() {
   const cookieStore = await cookies();
 
   const hasSession =
@@ -20,7 +20,7 @@ export default async function DashboardPage() {
 
   return (
     <AdminShell>
-      <DashboardClient />
+      <UsersClient />
     </AdminShell>
   );
 }

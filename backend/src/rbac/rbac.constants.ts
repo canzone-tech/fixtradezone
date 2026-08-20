@@ -1,4 +1,5 @@
 export const PERMISSIONS = {
+  DASHBOARD_READ: 'dashboard.read',
   USERS_READ: 'users.read',
   USERS_CREATE: 'users.create',
   USERS_STATUS_MANAGE: 'users.status.manage',
@@ -8,6 +9,10 @@ export const PERMISSIONS = {
 } as const;
 
 export const SYSTEM_PERMISSIONS = [
+  {
+    code: PERMISSIONS.DASHBOARD_READ,
+    description: 'View administration dashboard and market data',
+  },
   {
     code: PERMISSIONS.USERS_READ,
     description: 'View users and user details',

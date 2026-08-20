@@ -10,7 +10,7 @@ Minimal Next.js admin foundation for the fast v1 rollout.
 - protected dashboard shell with ADMIN-role enforcement
 - logout with server-side refresh-session revocation
 - strict HttpOnly cookies, response-shape validation, cross-site request rejection, and security headers
-- original operations UI informed by the approved Rizz visual direction
+- FixTradeZone admin UI uses the locked dark neon FixTradeZone design system
 
 No business metrics are mocked. Users, packages, deposits, audit views, and CMS controls remain disabled until their API slices are implemented and locally verified.
 
