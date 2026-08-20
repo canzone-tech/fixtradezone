@@ -7,7 +7,7 @@
                +--------------+--------------+
                |                             |
           Public Frontend                 Admin Panel
-             Next.js                       Next.js
+             Next.js                  Next.js UI + BFF
                |                             |
                +--------------+--------------+
                               |
@@ -51,3 +51,5 @@ Cache, queues, sessions/temporary state, rate limiting, and background-job coord
 - Financial values use DECIMAL, never FLOAT/DOUBLE.
 - Ledger records are immutable where appropriate.
 - Do not directly manipulate financial balances through unsafe updates.
+- Admin access/refresh tokens remain in HttpOnly cookies at the Next.js BFF boundary; NestJS remains the identity and RBAC authority.
+- Persist only refresh-token hashes in MySQL. Redis is not the source of truth for durable authentication revocation.

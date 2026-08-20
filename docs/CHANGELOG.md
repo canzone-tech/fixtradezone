@@ -1,5 +1,23 @@
 # FixTradeZone — Changelog
 
+## 2026-08-19
+- Started the focused auth-session + admin-shell vertical slice on `agent/auth-session-admin-foundation`.
+- Added Login with generic credential errors, Argon2 verification, ACTIVE-status enforcement, short-lived access tokens, persisted refresh sessions, last-login update, and audit logging.
+- Added rotating refresh tokens, concurrent/reused-token response, logout revocation, and protected `GET /auth/me` with a fresh MySQL user/status/RBAC lookup.
+- Added the reviewed-source draft `0002_auth_sessions` migration; it has not yet been applied to any environment.
+- Added ADMIN role bootstrap and a one-time audited founder bootstrap CLI.
+- Added focused login, rotation, logout, token, strategy, and founder-bootstrap tests.
+- Added a safe Postman collection/environment that automatically stores and rotates test tokens.
+- Added a Next.js 16 admin application using the FixTradeZone dark neon design system.
+- Added a same-origin admin BFF that keeps access and refresh tokens in HttpOnly cookies and enforces ADMIN access.
+- Kept unimplemented modules visibly queued instead of displaying fake data or metrics.
+- Recorded the fast-v1 scope: launch-critical controls now, fully configurable CMS in v2.
+- Rebased the slice onto the locally verified Login/Me milestone and resolved the overlapping auth implementation without overwriting it.
+- Bound access JWTs to active persisted sessions and retained HS256 issuer/audience verification.
+- Preserved timing-safe dummy password verification and added corrupted-hash fallback handling.
+- Added serializable one-time founder bootstrap protection and system-attributed audit events.
+- Generated the admin lockfile; backend lint/build and 36 tests pass, while admin lint/build and production dependency audit pass.
+
 ## 2026-08-18
 - Added persistent project documentation under `docs/`.
 - Established repository documentation as the project source of truth for cross-chat continuity.

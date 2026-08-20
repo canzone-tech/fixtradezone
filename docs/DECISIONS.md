@@ -38,3 +38,12 @@ LOCKED. Public landing page and admin UI use reusable templates/components and c
 
 ## ADR-013 — Local-first delivery gate
 LOCKED. Feature work is completed on a local feature branch. Relevant automated checks and Postman/manual API verification must pass before a pull request is opened against `main`. Pull requests require green CI and review before merge.
+
+## ADR-014 — API and admin vertical slices ship together
+LOCKED. After the authentication foundation, each module is delivered as a focused vertical slice: database/API contract, NestJS implementation and tests, Postman verification, minimal Next.js admin screen, integration states, automated checks, founder approval, then pull request.
+
+## ADR-015 — Fast v1 scope
+LOCKED. V1 contains only launch-critical workflows. A fully configurable CMS, broad reporting, decorative dashboards, and nonessential customization move to v2. Security, validation, RBAC, auditability, ledger integrity, idempotency, duplicate-TXID prevention, and manual financial approvals are never deferred.
+
+## ADR-016 — Admin session boundary
+LOCKED. The admin browser authenticates through same-origin Next.js route handlers. Access and refresh tokens are stored in Secure/HttpOnly/SameSite cookies and are not exposed to client-side JavaScript. NestJS remains the authentication and authorization source of truth.

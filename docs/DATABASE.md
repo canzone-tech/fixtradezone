@@ -39,6 +39,7 @@ Models:
 - UserRole
 - RolePermission
 - AuditLog
+- AuthSession
 
 ### User
 id, email unique, username optional unique, phone optional unique, passwordHash, firstName, lastName, status (ACTIVE/SUSPENDED/BLOCKED/PENDING), emailVerifiedAt, lastLoginAt, createdAt, updatedAt.
@@ -59,11 +60,15 @@ Composite primary key roleId + permissionId.
 actorUserId nullable, action enum:
 CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, SUSPEND, ACTIVATE, BLOCK, UNBLOCK, PASSWORD_CHANGE, ROLE_CHANGE, PERMISSION_CHANGE; plus entityType, entityId, description, metadata JSON, IP, userAgent, createdAt.
 
+### AuthSession
+id (also used as refresh JWT `jti`), userId, SHA-256 refreshTokenHash unique, expiresAt, revokedAt, revocationReason, rotatedToSessionId, createdAt, updatedAt. Raw refresh tokens are never stored.
+
 ### FK behaviors
 - user -> user_roles: CASCADE
 - user_roles -> role: RESTRICT
 - role_permissions -> role/permission: CASCADE
 - audit actor -> user: SET NULL
+- user -> auth_sessions: CASCADE
 
 ## Migration State
 
@@ -79,6 +84,8 @@ Verification confirmed:
 
 This verification applies only to the local development database. It does not imply that staging or production has been migrated.
 
+`prisma/migrations/0002_auth_sessions/migration.sql` adds the database-backed refresh-session lifecycle. It is additive and has been source-reviewed. It must still be backed up, applied with `prisma migrate deploy`, and verified locally before a pull request, merge, or deployment.
+
 ## RBAC Bootstrap and Registration Verification
 
 The API idempotently upserts the default `USER` role as an active system invariant. Registration also ensures that role inside the same transaction used to create the user and audit event.
@@ -91,3 +98,7 @@ Local Postman and SQL verification confirmed:
 - duplicate registration returns HTTP 409 without a second user or audit event.
 
 Do not use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue using reviewed migrations and `prisma migrate deploy` for authorized environments.
+
+## Founder Administrator Bootstrap
+
+The API idempotently ensures both `USER` and `ADMIN` roles exist. The one-time `admin:bootstrap` CLI uses a serializable transaction to activate one registered founder account and assign its ADMIN role. It refuses to run after any ADMIN assignment exists and records system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role assignments require the normal audited RBAC workflow.

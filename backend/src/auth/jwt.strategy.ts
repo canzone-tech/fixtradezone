@@ -2,15 +2,43 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { PrismaService } from '../database/prisma.service';
+import {
+  GENERIC_SESSION_ERROR,
+  JWT_ACCESS_AUDIENCE,
+  JWT_ACCESS_ISSUER,
+} from './auth.constants';
+import {
+  AUTH_USER_SELECT,
+  type AuthenticatedUser,
+  toAuthenticatedUser,
+} from './auth-user';
+import type { AccessTokenPayload } from './auth.types';
 
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  type: 'access';
+function isAccessTokenPayload(payload: unknown): payload is AccessTokenPayload {
+  if (typeof payload !== 'object' || payload === null) {
+    return false;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+
+  return (
+    typeof candidate.sub === 'string' &&
+    candidate.sub.length > 0 &&
+    typeof candidate.email === 'string' &&
+    candidate.email.length > 0 &&
+    candidate.type === 'access' &&
+    typeof candidate.sid === 'string' &&
+    candidate.sid.length > 0
+  );
 }
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     const secret = configService.get<string>('JWT_ACCESS_SECRET');
 
     if (!secret) {
@@ -21,17 +49,42 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       secretOrKey: secret,
       ignoreExpiration: false,
+      algorithms: ['HS256'],
+      audience: JWT_ACCESS_AUDIENCE,
+      issuer: JWT_ACCESS_ISSUER,
     });
   }
 
-  validate(payload: JwtPayload) {
-    if (payload.type !== 'access') {
-      throw new UnauthorizedException('Invalid token type.');
+  async validate(payload: unknown): Promise<AuthenticatedUser> {
+    if (!isAccessTokenPayload(payload)) {
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 
-    return {
-      userId: payload.sub,
-      email: payload.email,
-    };
+    const session = await this.prisma.authSession.findUnique({
+      where: {
+        id: payload.sid,
+      },
+      select: {
+        userId: true,
+        expiresAt: true,
+        revokedAt: true,
+        user: {
+          select: AUTH_USER_SELECT,
+        },
+      },
+    });
+
+    if (
+      !session ||
+      session.userId !== payload.sub ||
+      session.revokedAt !== null ||
+      session.expiresAt <= new Date() ||
+      session.user.status !== 'ACTIVE' ||
+      session.user.email !== payload.email
+    ) {
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+    }
+
+    return toAuthenticatedUser(session.user);
   }
 }

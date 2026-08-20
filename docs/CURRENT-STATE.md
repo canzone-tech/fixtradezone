@@ -1,9 +1,9 @@
 # FixTradeZone — Current State
 
 ## Snapshot
-Date: 2026-08-18
+Date: 2026-08-19
 Phase: 3 — Backend Foundation
-Focus: Authentication + secure API foundation.
+Focus: Authentication session lifecycle + minimal admin foundation.
 
 ## Verified Working
 - Docker functional
@@ -26,6 +26,28 @@ Focus: Authentication + secure API foundation.
 - Registration audit event
 - Registration verified through Postman and direct SQL checks
 - Prisma transitive dependency advisory investigated and documented
+- Auth-session branch rebased onto the verified Login/Me commit
+- Prisma Client generated successfully for the AuthSession schema
+- Backend lint and production build pass
+- Backend unit tests pass: 8 suites, 36 tests
+- Admin lockfile generated; admin lint and production build pass
+- Admin production dependency audit reports zero vulnerabilities
+
+## Implemented on Current Feature Branch — Local DB/API/Browser Validation Pending
+- Public Login, Refresh, and Logout handlers
+- Generic login/session errors and ACTIVE-user enforcement
+- 15-minute access token and 7-day rotating refresh token issuance
+- Hashed refresh-token persistence, revocation, rotation, and reuse response
+- Database-backed active-session and current-user/RBAC lookup for protected requests
+- Protected `GET /auth/me`
+- Login, refresh, logout, and session-security audit events
+- Postman collection/environment with automatic access/refresh token rotation
+- Idempotent ADMIN role bootstrap plus one-time audited founder bootstrap CLI
+- Auth-session migration `0002_auth_sessions` drafted for review
+- Minimal Next.js admin login and protected dashboard shell
+- HttpOnly admin cookies managed by a same-origin Next.js BFF layer
+- Admin CSP/security headers, cross-site request rejection, and backend-response validation
+- Admin UI uses the locked dark neon FixTradeZone design system with no third-party dashboard theme dependency
 
 ## Current Areas
 - `src/config/`
@@ -57,15 +79,15 @@ Implemented:
 - Transactional user, USER role, and audit creation
 - Duplicate-identifier conflict handling
 - Registration service, RBAC bootstrap, and password service tests
+- Login, refresh, logout, and current-user source implementation
+- Refresh-session persistence and rotation model
+- Founder ADMIN bootstrap source implementation
+- Focused auth-session unit tests
 
 Not implemented:
-- Login handler/service
-- Refresh handler/service
-- Logout/revocation
-- Database user lookup in strategy
 - Role/permission enforcement
-- Login, logout, token-lifecycle, and authorization audit events
-- Postman token scripts
+- Authentication rate limiting
+- General administrator assignment API
 
 ## Manual API Verification
 - `GET /health` returns HTTP 200 with MySQL up.
@@ -77,6 +99,7 @@ Not implemented:
 
 ## Database Environment Status
 - Local development: migration `0001_foundation_auth_rbac` applied and verified.
+- Migration `0002_auth_sessions`: generated, reviewed as additive, and not yet applied to any environment.
 - Staging: not applied.
 - Production: not applied.
 
@@ -86,14 +109,13 @@ Not implemented:
 - The advisory remains tracked in `SECURITY.md`; reassess when Prisma publishes a compatible remediation.
 
 ## Immediate Next Actions
-1. Implement Login with generic credential errors and status enforcement.
-2. Issue short-lived access tokens and rotating refresh tokens safely.
-3. Add refresh-token persistence, rotation, revocation, and logout.
-4. Load the current user and status in the JWT strategy.
-5. Expand auth audit logging.
-6. Configure Postman token automation.
-7. Add RBAC guards/permissions.
-8. Add MongoDB/Redis modules after auth baseline.
+1. Pull the reviewed feature branch and rerun the automated gate locally.
+2. Back up the existing database, then apply and verify `0002_auth_sessions` with `prisma migrate deploy`.
+3. Register the founder account and run the one-time ADMIN bootstrap CLI.
+4. Verify Login, Me, Refresh rotation, old-token rejection, and Logout in Postman.
+5. Verify admin login, refresh continuity, ADMIN rejection, and logout in the browser.
+6. Add backend RBAC guards/permissions with the Users & RBAC admin screen.
+7. Add deployment-level authentication rate limiting before public launch.
 
 ## Constraints
 - Never create extra application databases.

@@ -31,7 +31,7 @@ The repository and the documents under [`docs/`](docs/README.md) are the canonic
 ## Repository layout
 
 ```text
-admin/       Next.js admin application (planned/in progress)
+admin/       Next.js admin application (authentication shell in progress)
 backend/     NestJS API and Prisma schema
 docs/        Persistent project context and decisions
 frontend/    Next.js public/user application (planned/in progress)
@@ -61,6 +61,22 @@ Health check:
 
 ```bash
 curl http://localhost:3000/health
+```
+
+After the reviewed auth-session migration is applied and a founder account is registered, the first administrator can be bootstrapped once:
+
+```bash
+cd backend
+npm run admin:bootstrap -- founder@example.com
+```
+
+Start the admin application on port 3001:
+
+```bash
+cd admin
+cp .env.example .env.local
+npm install
+npm run dev -- --port 3001
 ```
 
 ## Database safety
@@ -94,4 +110,3 @@ npm run build
 - Work on focused branches and open draft pull requests into `main`.
 - Keep architecture, security, API, database, current-state, and changelog documentation synchronized with material changes.
 - Do not weaken validation, data integrity, financial controls, auditability, or maintainability for speed.
-

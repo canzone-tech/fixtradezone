@@ -1,0 +1,303 @@
+/* ==========================================================================
+   FIXTRADEZONE DARK NEO — IMMUTABLE VISUAL CONTRACT
+   --------------------------------------------------------------------------
+   This file is imported LAST and is the final authority for shared admin UI.
+   Approved production artwork:
+     - sidebar-bg.png
+     - dashboard-bull-banner.png
+     - login-bull.png
+   ========================================================================== */
+
+:root {
+  --ftz-neo-bg: #020817;
+  --ftz-neo-bg-2: #031027;
+  --ftz-neo-panel: rgba(5, 20, 48, .94);
+  --ftz-neo-panel-soft: rgba(4, 15, 38, .82);
+  --ftz-neo-border: rgba(67, 142, 207, .26);
+  --ftz-neo-border-hot: rgba(24, 234, 220, .58);
+  --ftz-neo-text: #edfaff;
+  --ftz-neo-muted: #8fa8be;
+  --ftz-neo-cyan: #18eadc;
+  --ftz-neo-blue: #4c8dff;
+  --ftz-neo-purple: #9a55ff;
+  --ftz-neo-green: #19dba3;
+}
+
+html,
+body,
+#body {
+  min-height: 100%;
+  background: var(--ftz-neo-bg);
+  color: var(--ftz-neo-text);
+}
+
+/* --------------------------------------------------------------------------
+   SHARED ADMIN SHELL
+   Sidebar + topbar are global shell primitives, not page-local UI.
+   -------------------------------------------------------------------------- */
+
+.ftz-sidebar {
+  isolation: isolate !important;
+  overflow: hidden !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(1, 6, 18, .08),
+      rgba(2, 6, 18, .18)
+    ),
+    url("/assets/fixtradezone/neo/sidebar-bg.png")
+      center top / cover no-repeat !important;
+}
+
+/* Kill every legacy narrow-strip/pseudo-image experiment. */
+.ftz-sidebar::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  opacity: 1 !important;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(10, 225, 209, .018),
+      transparent 48%,
+      rgba(113, 63, 255, .025)
+    ) !important;
+  pointer-events: none !important;
+}
+
+.ftz-sidebar > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ftz-sidebar-nav {
+  background: transparent !important;
+}
+
+.ftz-sidebar-nav a,
+.ftz-sidebar-nav button {
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+}
+
+.ftz-sidebar-profile {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(5, 30, 57, .90),
+      rgba(4, 12, 36, .95)
+    ) !important;
+  backdrop-filter: blur(10px);
+}
+
+.ftz-topbar {
+  background: rgba(2, 8, 24, .92) !important;
+  border-color: rgba(62, 126, 183, .23) !important;
+  backdrop-filter: blur(14px);
+}
+
+/* --------------------------------------------------------------------------
+   DASHBOARD HERO
+   Exact approved 3:1 banner. Bull remains untouched and uncropped.
+   -------------------------------------------------------------------------- */
+
+.ftz-hero {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  min-height: 210px;
+
+  border-color: var(--ftz-neo-border-hot) !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(2, 23, 39, .98) 0%,
+      rgba(3, 25, 44, .91) 39%,
+      rgba(4, 17, 40, .42) 66%,
+      rgba(3, 11, 32, .12) 100%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+      right center / auto 100% no-repeat,
+    #03142b !important;
+}
+
+.ftz-hero::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(2, 16, 32, .38),
+      transparent 48%
+    ) !important;
+}
+
+.ftz-hero-copy {
+  position: relative !important;
+  z-index: 2 !important;
+  width: min(58%, 720px) !important;
+  max-width: 720px !important;
+}
+
+.ftz-hero-art {
+  display: none !important;
+}
+
+.ftz-hero-copy h2 {
+  font-size: clamp(27px, 2.2vw, 36px) !important;
+  line-height: 1.14 !important;
+}
+
+.ftz-hero-copy p {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
+/* --------------------------------------------------------------------------
+   AUTH / LOGIN
+   Exact approved portrait bull. No cover crop.
+   -------------------------------------------------------------------------- */
+
+.ftz-auth-bull {
+  background:
+    radial-gradient(
+      circle at 70% 47%,
+      rgba(15, 220, 207, .08),
+      transparent 34%
+    ),
+    url("/assets/fixtradezone/neo/login-bull.png")
+      center center / contain no-repeat !important;
+}
+
+.ftz-auth-bull::before,
+.ftz-auth-bull::after {
+  pointer-events: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   READABILITY — global backend baseline
+   -------------------------------------------------------------------------- */
+
+.ftz-admin-shell,
+.ftz-dashboard {
+  font-size: 15px;
+}
+
+.ftz-panel h3 {
+  font-size: 17px !important;
+}
+
+.ftz-table-wrap table {
+  font-size: 13px !important;
+}
+
+.ftz-table-wrap th {
+  font-size: 11px !important;
+}
+
+.ftz-table-wrap td {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+.ftz-admin-shell input,
+.ftz-admin-shell select,
+.ftz-admin-shell textarea,
+.ftz-admin-shell button {
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE CONTRACT
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .ftz-hero {
+    min-height: 220px;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 21, 38, .98),
+        rgba(3, 20, 42, .86) 55%,
+        rgba(4, 12, 34, .25)
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        112% center / auto 100% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 62% !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .ftz-sidebar {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(1, 6, 18, .08),
+        rgba(2, 6, 18, .18)
+      ),
+      url("/assets/fixtradezone/neo/sidebar-bg.png")
+        center top / cover no-repeat !important;
+  }
+
+  .ftz-hero {
+    min-height: 250px;
+
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 18, 36, .98) 0%,
+        rgba(3, 18, 40, .92) 63%,
+        rgba(4, 12, 35, .32) 100%
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        128% center / auto 100% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 72% !important;
+  }
+
+  .ftz-hero-copy h2 {
+    font-size: 25px !important;
+  }
+
+  .ftz-auth-bull {
+    background:
+      radial-gradient(
+        circle at 50% 46%,
+        rgba(15, 220, 207, .07),
+        transparent 34%
+      ),
+      url("/assets/fixtradezone/neo/login-bull.png")
+        center center / min(86%, 620px) auto no-repeat !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .ftz-hero {
+    background:
+      linear-gradient(
+        90deg,
+        rgba(2, 17, 35, .99),
+        rgba(3, 17, 38, .96) 70%,
+        rgba(4, 11, 32, .48)
+      ),
+      url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
+        155% center / auto 92% no-repeat,
+      #03142b !important;
+  }
+
+  .ftz-hero-copy {
+    width: 78% !important;
+  }
+}
