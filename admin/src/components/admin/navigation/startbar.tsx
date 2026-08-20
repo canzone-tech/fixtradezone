@@ -3,11 +3,14 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import type { AdminUser } from "@/lib/auth";
 
 type NavItem = {
   href: string;
   label: string;
   icon: string;
+  permission?: string;
   enabled?: boolean;
 };
 
@@ -22,18 +25,22 @@ const sections: Array<{
         href: "/dashboard",
         label: "Dashboard",
         icon: "iconoir-home-simple",
+        permission: "dashboard.read",
         enabled: true,
       },
       {
         href: "/users",
         label: "Users",
         icon: "iconoir-user",
+        permission: "users.read",
         enabled: true,
       },
       {
         href: "/rbac",
         label: "Roles & Permissions",
         icon: "iconoir-lock",
+        permission: "rbac.read",
+        enabled: true,
       },
     ],
   },
@@ -92,14 +99,65 @@ const sections: Array<{
 export default function Startbar() {
   const pathname = usePathname();
 
+  const [user, setUser] =
+    useState<AdminUser | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadSession() {
+      const response = await fetch(
+        "/api/auth/session",
+        {
+          cache: "no-store",
+        },
+      );
+
+      const payload = (
+        await response
+          .json()
+          .catch(() => ({}))
+      ) as {
+        user?: AdminUser;
+      };
+
+      if (
+        mounted &&
+        response.ok &&
+        payload.user
+      ) {
+        setUser(payload.user);
+      }
+    }
+
+    void loadSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const isSuperAdmin =
+    user?.roles.includes("SUPER_ADMIN") ??
+    false;
+
   const close = () => {
-    document.body.classList.remove("ftz-nav-open");
+    document.body.classList.remove(
+      "ftz-nav-open",
+    );
   };
 
   return (
     <>
-      <aside className="ftz-sidebar" aria-label="Admin navigation">
-        <Link href="/dashboard" className="ftz-logo" onClick={close}>
+      <aside
+        className="ftz-sidebar"
+        aria-label="Admin navigation"
+      >
+        <Link
+          href="/dashboard"
+          className="ftz-logo"
+          onClick={close}
+        >
           <Image
             src="/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
             alt="FixTradeZone Admin Portal"
@@ -110,52 +168,120 @@ export default function Startbar() {
         </Link>
 
         <nav className="ftz-sidebar-nav">
-          {sections.map((section) => (
-            <div className="ftz-nav-section" key={section.label}>
-              <div className="ftz-nav-label">{section.label}</div>
+          {sections.map((section) => {
+            const visibleItems =
+              user
+                ? section.items.filter(
+                    (item) => {
+                      if (isSuperAdmin) {
+                        return true;
+                      }
 
-              {section.items.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  pathname.startsWith(`${item.href}/`);
+                      if (!item.enabled) {
+                        return false;
+                      }
 
-                if (!item.enabled) {
-                  return (
-                    <span
-                      className="ftz-nav-link is-disabled"
-                      aria-disabled="true"
-                      key={item.href}
-                    >
-                      <i className={item.icon} />
-                      <span>{item.label}</span>
-                    </span>
-                  );
-                }
+                      if (!item.permission) {
+                        return false;
+                      }
 
-                return (
-                  <Link
-                    href={item.href}
-                    className={`ftz-nav-link ${active ? "is-active" : ""}`}
-                    onClick={close}
-                    key={item.href}
-                  >
-                    <i className={item.icon} />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+                      return user.permissions.includes(
+                        item.permission,
+                      );
+                    },
+                  )
+                : [];
+
+            if (
+              visibleItems.length === 0
+            ) {
+              return null;
+            }
+
+            return (
+              <div
+                className="ftz-nav-section"
+                key={section.label}
+              >
+                <div className="ftz-nav-label">
+                  {section.label}
+                </div>
+
+                {visibleItems.map(
+                  (item) => {
+                    const active =
+                      pathname ===
+                        item.href ||
+                      pathname.startsWith(
+                        `${item.href}/`,
+                      );
+
+                    if (!item.enabled) {
+                      return (
+                        <span
+                          className="ftz-nav-link is-disabled"
+                          aria-disabled="true"
+                          key={item.href}
+                        >
+                          <i
+                            className={
+                              item.icon
+                            }
+                          />
+                          <span>
+                            {item.label}
+                          </span>
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <Link
+                        href={item.href}
+                        className={`ftz-nav-link ${
+                          active
+                            ? "is-active"
+                            : ""
+                        }`}
+                        onClick={close}
+                        key={item.href}
+                      >
+                        <i
+                          className={
+                            item.icon
+                          }
+                        />
+                        <span>
+                          {item.label}
+                        </span>
+                      </Link>
+                    );
+                  },
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="ftz-sidebar-profile">
           <div className="ftz-profile-shield">
             <i className="iconoir-shield-check" />
           </div>
+
           <div>
-            <strong>SUPER ADMIN</strong>
-            <small>All Access</small>
+            <strong>
+              {isSuperAdmin
+                ? "SUPER ADMIN"
+                : "ADMIN"}
+            </strong>
+
+            <small>
+              {isSuperAdmin
+                ? "All Access"
+                : "RBAC Access"}
+            </small>
           </div>
+
           <i className="iconoir-nav-arrow-down ms-auto" />
         </div>
       </aside>

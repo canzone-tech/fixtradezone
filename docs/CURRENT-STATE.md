@@ -1,5 +1,23 @@
 # FixTradeZone — Current State
 
+## Latest Verified Checkpoint — 2026-08-20
+- PR #8 merged into `main` at merge commit `1d485c3`.
+- FixTradeZone Dark Neo admin foundation is approved and locked.
+- Shared `AdminShell`, Startbar and Topbar are the protected-page shell.
+- Dashboard design is approved and locked; future changes are module-specific.
+- Users administration is implemented and responsive.
+- Universal mobile responsive rules are established, including internal horizontal scrolling for wide tables.
+- `/rbac` Roles & Permissions console is implemented and founder-approved.
+- Existing RBAC APIs are reused; no duplicate RBAC backend was created.
+- SUPER_ADMIN permissions remain implicit/protected.
+- Base USER role permission scope remains protected.
+- Only SUPER_ADMIN may modify the ADMIN permission scope.
+- Administrator navigation is permission-aware; menu visibility follows effective RBAC scope while backend guards remain authoritative.
+- Admin lint passes.
+- Next.js production build passes with `/rbac` registered as a dynamic route.
+- Current development branch: `agent/rbac-admin-console`.
+- Immediate next functional module after this milestone: Packages.
+
 ## Snapshot
 Date: 2026-08-19
 Phase: 3 — Backend Foundation

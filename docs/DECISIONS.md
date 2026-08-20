@@ -47,3 +47,16 @@ LOCKED. V1 contains only launch-critical workflows. A fully configurable CMS, br
 
 ## ADR-016 — Admin session boundary
 LOCKED. The admin browser authenticates through same-origin Next.js route handlers. Access and refresh tokens are stored in Secure/HttpOnly/SameSite cookies and are not exposed to client-side JavaScript. NestJS remains the authentication and authorization source of truth.
+
+## ADR-017 — Single Dark Neo admin design system
+LOCKED. All FixTradeZone admin and protected user/backend pages use the single FixTradeZone Dark Neo design system and shared master theme. The approved dashboard/global shell is not redesigned globally; visual changes are limited to the specific module being developed unless explicitly approved otherwise.
+
+## ADR-018 — Universal responsive backend contract
+LOCKED. Protected pages must remain within the viewport on mobile. Forms stack responsively, cards cannot force viewport overflow, and wide tables/matrices use internal horizontal scrolling instead of shrinking the entire page.
+
+## ADR-019 — Permission-aware administrator navigation
+LOCKED. Sidebar visibility follows authenticated RBAC permissions. SUPER_ADMIN retains full platform navigation authority. ADMIN users see only implemented modules for which their effective permission scope grants access. Hiding navigation is a UX rule only; NestJS permission guards remain the authoritative security boundary.
+
+## ADR-020 — Shared protected application shell
+LOCKED. Protected admin/backend pages reuse the shared AdminShell, Startbar and Topbar. Pages must not create independent sidebar/topbar implementations.
+
