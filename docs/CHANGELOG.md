@@ -1,5 +1,15 @@
 # FixTradeZone — Changelog
 
+## 2026-08-20
+- Merged PR #8, establishing the secure Dark Neo admin console foundation.
+- Locked the approved dashboard/global admin design and shared protected application shell.
+- Added and approved the `/rbac` Roles & Permissions console.
+- Reused the existing RBAC read/manage APIs and permission contracts.
+- Preserved SUPER_ADMIN founder protection and base USER role protection.
+- Added permission-aware sidebar visibility for administrator accounts.
+- Locked the universal responsive backend contract for future admin/user modules.
+- Verified admin lint and Next.js production build with the RBAC route.
+
 ## 2026-08-19
 - Started the focused auth-session + admin-shell vertical slice on `agent/auth-session-admin-foundation`.
 - Added Login with generic credential errors, Argon2 verification, ACTIVE-status enforcement, short-lived access tokens, persisted refresh sessions, last-login update, and audit logging.
