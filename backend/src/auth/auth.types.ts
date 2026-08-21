@@ -16,3 +16,12 @@ export interface RefreshTokenPayload {
   type: 'refresh';
   jti: string;
 }
+
+export interface ImpersonationTokenPayload {
+  sub: string;
+  email: string;
+  type: 'impersonation';
+  iid: string;
+  act: string;
+  asid: string;
+}

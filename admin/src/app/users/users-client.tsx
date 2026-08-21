@@ -31,6 +31,13 @@ interface MutationPayload {
   user?: AdminUser;
 }
 
+interface ImpersonationMutationPayload {
+  message?: string;
+  impersonation?: {
+    subject?: AdminUser;
+  };
+}
+
 interface CreateUserForm {
   email: string;
   password: string;
@@ -528,6 +535,71 @@ export default function UsersClient() {
     }
   }
 
+  async function startImpersonation(
+    user: AdminUser,
+  ) {
+    if (
+      !window.confirm(
+        `Login as ${user.email}? This audited support session will use the user's live account identity.`,
+      )
+    ) {
+      return;
+    }
+
+    setWorkingUserId(user.id);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await fetch(
+        `/api/admin/users/${encodeURIComponent(user.id)}/impersonation`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (response.status === 401) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      const payload =
+        await readPayload<ImpersonationMutationPayload>(
+          response,
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          getMessage(
+            payload,
+            "Unable to start user impersonation.",
+          ),
+        );
+      }
+
+      if (
+        payload?.impersonation?.subject?.id !==
+        user.id
+      ) {
+        throw new Error(
+          "Impersonation service returned an invalid user.",
+        );
+      }
+
+      router.push("/user/impersonation");
+      router.refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to start user impersonation.",
+      );
+    } finally {
+      setWorkingUserId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className={styles.loading}>
@@ -694,6 +766,16 @@ export default function UsersClient() {
                         workingUserId ===
                         user.id;
 
+                      const canImpersonateUser =
+                        can("users.impersonate") &&
+                        user.status === "ACTIVE" &&
+                        user.roles.includes("USER") &&
+                        !user.roles.includes(
+                          "ADMIN",
+                        ) &&
+                        !founder &&
+                        !self;
+
                       return (
                         <tr key={user.id}>
                           <td>
@@ -779,6 +861,25 @@ export default function UsersClient() {
                                   styles.actions
                                 }
                               >
+                                {canImpersonateUser ? (
+                                  <button
+                                    type="button"
+                                    className={
+                                      styles.impersonateButton
+                                    }
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void startImpersonation(
+                                        user,
+                                      )
+                                    }
+                                  >
+                                    {busy
+                                      ? "Opening…"
+                                      : "Login as User"}
+                                  </button>
+                                ) : null}
+
                                 {can(
                                   "users.status.manage",
                                 ) ? (
@@ -864,7 +965,8 @@ export default function UsersClient() {
                                 ) &&
                                 !can(
                                   "users.roles.manage",
-                                ) ? (
+                                ) &&
+                                !canImpersonateUser ? (
                                   <small
                                     className={
                                       styles.protectedText

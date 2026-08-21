@@ -35,6 +35,8 @@ enum AuditAction {
   PASSWORD_CHANGE
   ROLE_CHANGE
   PERMISSION_CHANGE
+  IMPERSONATION_START
+  IMPERSONATION_STOP
 }
 
 model User {
@@ -51,9 +53,13 @@ model User {
   createdAt       DateTime   @default(now()) @db.DateTime(3)
   updatedAt       DateTime   @updatedAt @db.DateTime(3)
 
-  roles     UserRole[]
-  auditLogs AuditLog[] @relation("AuditActor")
-  sessions  AuthSession[]
+  roles                   UserRole[]
+  auditLogs               AuditLog[]             @relation("AuditActor")
+  sessions                AuthSession[]
+  impersonationsAsActor   ImpersonationSession[] @relation("ImpersonationActor")
+  impersonationsAsSubject ImpersonationSession[] @relation("ImpersonationSubject")
+
+  securityConfigUpdates SystemSecurityConfig[] @relation("SecurityConfigUpdater")
 
   @@index([status])
   @@index([createdAt])
@@ -71,11 +77,35 @@ model AuthSession {
   createdAt          DateTime  @default(now()) @db.DateTime(3)
   updatedAt          DateTime  @updatedAt @db.DateTime(3)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonations ImpersonationSession[]
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("auth_sessions")
+}
+
+model ImpersonationSession {
+  id             String    @id @default(uuid()) @db.Char(36)
+  actorUserId    String    @db.Char(36)
+  subjectUserId  String    @db.Char(36)
+  actorSessionId String    @db.Char(36)
+  activeKey      String?   @unique @db.Char(36)
+  expiresAt      DateTime  @db.DateTime(3)
+  endedAt        DateTime? @db.DateTime(3)
+  endReason      String?   @db.VarChar(100)
+  createdAt      DateTime  @default(now()) @db.DateTime(3)
+  updatedAt      DateTime  @updatedAt @db.DateTime(3)
+
+  actor        User        @relation("ImpersonationActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  subject      User        @relation("ImpersonationSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  actorSession AuthSession @relation(fields: [actorSessionId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId, endedAt])
+  @@index([subjectUserId, endedAt])
+  @@index([actorSessionId, endedAt])
+  @@index([expiresAt])
+  @@map("impersonation_sessions")
 }
 
 model Role {
@@ -149,4 +179,18 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model SystemSecurityConfig {
+  id                           Int      @id @default(1)
+  fullUserImpersonationEnabled Boolean  @default(false)
+  idleLockMinutes              Int      @default(5)
+  updatedByUserId              String?  @db.Char(36)
+  createdAt                    DateTime @default(now()) @db.DateTime(3)
+  updatedAt                    DateTime @updatedAt @db.DateTime(3)
+
+  updatedByUser User? @relation("SecurityConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([updatedByUserId])
+  @@map("system_security_config")
 }

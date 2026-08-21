@@ -5,13 +5,20 @@ import { JwtService } from '@nestjs/jwt';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   GENERIC_SESSION_ERROR,
+  IMPERSONATION_TOKEN_TTL_SECONDS,
   JWT_ACCESS_AUDIENCE,
   JWT_ACCESS_ISSUER,
+  JWT_IMPERSONATION_AUDIENCE,
+  JWT_IMPERSONATION_ISSUER,
   JWT_REFRESH_AUDIENCE,
   JWT_REFRESH_ISSUER,
   REFRESH_TOKEN_TTL_SECONDS,
 } from './auth.constants';
-import type { AccessTokenPayload, RefreshTokenPayload } from './auth.types';
+import type {
+  AccessTokenPayload,
+  ImpersonationTokenPayload,
+  RefreshTokenPayload,
+} from './auth.types';
 
 interface TokenUser {
   id: string;
@@ -24,6 +31,12 @@ export interface IssuedTokenPair {
   refreshTokenHash: string;
   refreshTokenExpiresAt: Date;
   sessionId: string;
+}
+
+export interface IssuedImpersonationToken {
+  impersonationToken: string;
+  expiresAt: Date;
+  expiresIn: number;
 }
 
 @Injectable()
@@ -88,6 +101,36 @@ export class TokenService {
         Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000,
       ),
       sessionId,
+    };
+  }
+
+  async issueImpersonationToken(
+    subject: TokenUser,
+    actorUserId: string,
+    actorSessionId: string,
+    impersonationId: string,
+  ): Promise<IssuedImpersonationToken> {
+    const payload: ImpersonationTokenPayload = {
+      sub: subject.id,
+      email: subject.email,
+      type: 'impersonation',
+      iid: impersonationId,
+      act: actorUserId,
+      asid: actorSessionId,
+    };
+
+    const impersonationToken = await this.jwtService.signAsync(payload, {
+      secret: this.accessSecret,
+      algorithm: 'HS256',
+      audience: JWT_IMPERSONATION_AUDIENCE,
+      expiresIn: IMPERSONATION_TOKEN_TTL_SECONDS,
+      issuer: JWT_IMPERSONATION_ISSUER,
+    });
+
+    return {
+      impersonationToken,
+      expiresAt: new Date(Date.now() + IMPERSONATION_TOKEN_TTL_SECONDS * 1000),
+      expiresIn: IMPERSONATION_TOKEN_TTL_SECONDS,
     };
   }
 

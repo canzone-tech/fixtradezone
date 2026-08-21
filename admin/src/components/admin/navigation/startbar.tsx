@@ -282,7 +282,17 @@ export default function Startbar() {
             </small>
           </div>
 
-          <i className="iconoir-nav-arrow-down ms-auto" />
+          {isSuperAdmin ? (
+            <Link
+              href="/settings/security"
+              className="ftz-sidebar-security-link"
+              aria-label="Security configuration"
+              title="Security configuration"
+              onClick={close}
+            >
+              <i className="iconoir-settings" />
+            </Link>
+          ) : null}
         </div>
       </aside>
 

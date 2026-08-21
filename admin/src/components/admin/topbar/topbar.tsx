@@ -142,7 +142,7 @@ export default function Topbar() {
             aria-label="Sign out"
             title="Sign out"
           >
-            <i className="iconoir-nav-arrow-down" />
+            <i className="iconoir-log-out" />
           </button>
         </div>
       </div>

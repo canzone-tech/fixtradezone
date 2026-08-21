@@ -4,6 +4,7 @@ import {
   isCrossSiteRequest,
   REFRESH_COOKIE,
 } from "@/lib/auth";
+import { clearImpersonationCookies } from "@/lib/admin-impersonation";
 import { backendFetch } from "@/lib/backend";
 
 export async function POST(request: NextRequest) {
@@ -24,7 +25,12 @@ export async function POST(request: NextRequest) {
     }).catch(() => undefined);
   }
 
-  const response = NextResponse.json({ message: "Logout successful." });
+  const response = NextResponse.json({
+    message: "Logout successful.",
+  });
+
+  clearImpersonationCookies(response);
   clearAuthCookies(response);
+
   return response;
 }

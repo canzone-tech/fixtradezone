@@ -1,3 +1,5 @@
+export const AUTH_SESSION_ID: unique symbol = Symbol('AUTH_SESSION_ID');
+
 export const AUTH_USER_SELECT = {
   id: true,
   email: true,
@@ -64,6 +66,25 @@ export interface AuthenticatedUser {
   lastLoginAt: Date | null;
   roles: string[];
   permissions: string[];
+  [AUTH_SESSION_ID]?: string;
+}
+
+export function attachAuthSessionId(
+  user: AuthenticatedUser,
+  sessionId: string,
+): AuthenticatedUser {
+  Object.defineProperty(user, AUTH_SESSION_ID, {
+    value: sessionId,
+    enumerable: false,
+    configurable: false,
+    writable: false,
+  });
+
+  return user;
+}
+
+export function getAuthSessionId(user: AuthenticatedUser): string | undefined {
+  return user[AUTH_SESSION_ID];
 }
 
 export function toAuthenticatedUser(user: AuthUserRecord): AuthenticatedUser {

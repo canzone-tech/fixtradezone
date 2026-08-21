@@ -55,6 +55,44 @@
 - BFF auth routes reject browser requests explicitly marked as cross-site and validate successful API response shapes before setting cookies.
 - CSP, HSTS in production, framing, MIME, cross-origin, referrer, and browser-permission headers are configured.
 
+## User Impersonation Security
+
+- User impersonation requires the `users.impersonate` permission.
+- Eligible subjects are ordinary ACTIVE USER accounts only.
+- Administrator, SUPER_ADMIN, self, and otherwise ineligible subjects cannot be impersonated.
+- Impersonation uses a dedicated JWT audience and session boundary separate from normal administrator access tokens.
+- The normal JWT strategy rejects impersonation tokens.
+- Impersonation session validation reloads live actor session/authority and subject state from MySQL.
+- Impersonation tokens cannot authenticate against `/admin/*` APIs.
+- Original actor identity and selected USER identity are retained independently for authorization and audit.
+- Impersonation start and stop actions are audited.
+- Return-to-Admin remains safe even when `users.impersonate` is later revoked from the actor.
+- The browser stores the impersonation token only in a server-managed HttpOnly/SameSite cookie.
+- Administrator privileges must never be inherited by the selected USER authorization context.
+
+## Full Impersonation Security
+
+- `fullUserImpersonationEnabled` is controlled only by SUPER_ADMIN.
+- LIMITED mode is the safe support boundary.
+- FULL mode enables full USER-side authorization only for implemented USER APIs that explicitly support the full impersonation boundary.
+- FULL mode never grants ADMIN or SUPER_ADMIN authority to the impersonated USER.
+- The effective FULL/LIMITED state is evaluated live from the database rather than permanently encoded into the impersonation token.
+- Sensitive/full USER endpoints must enforce the server-side full-impersonation guard; UI visibility alone is never an authorization boundary.
+
+## Security Configuration and Idle Lock
+
+- System security configuration is a singleton MySQL record.
+- Only SUPER_ADMIN may read/change privileged security configuration.
+- Idle-lock duration defaults to 5 minutes and is restricted to 1–120 minutes.
+- The allowed range is enforced by database constraints, DTO validation, and service validation.
+- `GET /auth/session-policy` exposes only the safe idle-lock duration to authenticated sessions.
+- Password reauthentication is required to unlock an idle-locked browser session.
+- Idle lock does not log the session out and preserves the current route/UI state.
+- During impersonation, unlock verifies the original ADMIN/SUPER_ADMIN actor password rather than the selected USER password.
+- Successful reauthentication is audited.
+- Wrong password, missing user, inactive user, and equivalent invalid reauthentication cases return a generic unauthorized response.
+- Browser reauthentication is performed through the same-origin BFF and preserved administrator HttpOnly cookies.
+
 ## Financial Security
 - TXID submission does not auto-credit balance.
 - Deposit is PENDING until authorized admin approval.

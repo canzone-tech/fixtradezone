@@ -1,5 +1,23 @@
 # FixTradeZone — Changelog
 
+## 2026-08-21
+- Started the secure user-impersonation vertical slice on `agent/user-impersonation`.
+- Added `users.impersonate` RBAC authority and eligible ordinary-USER impersonation controls.
+- Added migration `0003_user_impersonation` with persisted/audited impersonation sessions and start/stop audit actions.
+- Added a dedicated impersonation JWT/session strategy isolated from normal administrator authentication.
+- Prevented impersonation tokens from authenticating against administrator APIs.
+- Added safe Return-to-Admin behavior and same-origin Next.js BFF impersonation cookies/routes.
+- Added migration `0004_security_configuration` with SUPER_ADMIN-controlled Full Impersonation mode and 1–120 minute idle-lock policy.
+- Added live LIMITED/FULL impersonation evaluation and server-side full-impersonation authorization guard.
+- Added protected password reauthentication and safe authenticated session-policy API.
+- Added the SUPER_ADMIN Security Configuration Dark Neo UI and sidebar shortcut.
+- Replaced the temporary shell-less USER proof page with the approved USER shell using the same master Dark Neo sidebar/topbar visual system.
+- Added persistent Viewing-as / Return-to-Admin context to the USER impersonation experience.
+- Added the shared inactivity lock overlay for administrator and impersonated USER sessions.
+- Verified that impersonated-session unlock requires the original administrator actor password and preserves the same page/session.
+- Corrected `/users` desktop table sizing to consume the full available content width while preserving internal responsive table scrolling.
+- Verified backend tests/build, Postman security/session flows, admin lint/build, browser UI behavior, and whitespace checks locally.
+
 ## 2026-08-20
 - Merged PR #8, establishing the secure Dark Neo admin console foundation.
 - Locked the approved dashboard/global admin design and shared protected application shell.

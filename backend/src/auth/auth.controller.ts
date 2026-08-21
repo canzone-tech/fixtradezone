@@ -11,13 +11,23 @@ import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import type { AuthenticatedUser } from './auth-user';
 import { CurrentUser } from './current-user.decorator';
-import { LoginDto, LogoutDto, RefreshTokenDto, RegisterDto } from './dto';
+import {
+  LoginDto,
+  LogoutDto,
+  ReauthenticateDto,
+  RefreshTokenDto,
+  RegisterDto,
+} from './dto';
 import { Public } from './public.decorator';
+import { ReauthenticationService } from './reauthentication.service';
 import { getRequestContext } from './request-context';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly reauthenticationService: ReauthenticationService,
+  ) {}
 
   @Public()
   @Header('Cache-Control', 'no-store')
@@ -48,6 +58,21 @@ export class AuthController {
   @Post('logout')
   logout(@Body() dto: LogoutDto, @Req() request: Request) {
     return this.authService.logout(dto, getRequestContext(request));
+  }
+
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('reauthenticate')
+  reauthenticate(
+    @Body() dto: ReauthenticateDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.reauthenticationService.reauthenticate(
+      user,
+      dto,
+      getRequestContext(request),
+    );
   }
 
   @Header('Cache-Control', 'no-store')
