@@ -34,12 +34,11 @@
   border: 1px solid rgba(24, 234, 220, 0.55);
   border-radius: 18px;
   color: #eaffff;
-  background:
-    linear-gradient(
-      145deg,
-      rgba(24, 234, 220, 0.24),
-      rgba(87, 71, 255, 0.24)
-    );
+  background: linear-gradient(
+    145deg,
+    rgba(24, 234, 220, 0.24),
+    rgba(87, 71, 255, 0.24)
+  );
   box-shadow:
     0 0 28px rgba(24, 234, 220, 0.14),
     inset 0 0 22px rgba(76, 141, 255, 0.1);
@@ -61,11 +60,7 @@
       rgba(89, 60, 255, 0.13),
       transparent 34%
     ),
-    linear-gradient(
-      135deg,
-      rgba(3, 22, 46, 0.94),
-      rgba(3, 11, 31, 0.82)
-    );
+    linear-gradient(135deg, rgba(3, 22, 46, 0.94), rgba(3, 11, 31, 0.82));
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
 }
 
@@ -134,12 +129,11 @@
   padding: 24px;
   border: 1px solid var(--users-border);
   border-radius: 16px;
-  background:
-    linear-gradient(
-      145deg,
-      rgba(5, 21, 48, 0.94),
-      rgba(3, 13, 34, 0.9)
-    );
+  background: linear-gradient(
+    145deg,
+    rgba(5, 21, 48, 0.94),
+    rgba(3, 13, 34, 0.9)
+  );
   box-shadow:
     0 16px 38px rgba(0, 0, 0, 0.15),
     inset 0 1px rgba(255, 255, 255, 0.015);
@@ -241,12 +235,11 @@
   border: 1px solid rgba(24, 234, 220, 0.38);
   border-radius: 9px;
   color: #eaffff;
-  background:
-    linear-gradient(
-      90deg,
-      rgba(5, 137, 139, 0.88),
-      rgba(12, 180, 144, 0.88)
-    );
+  background: linear-gradient(
+    90deg,
+    rgba(5, 137, 139, 0.88),
+    rgba(12, 180, 144, 0.88)
+  );
   cursor: pointer;
   font-size: 12px;
   font-weight: 780;
@@ -517,7 +510,6 @@
   overflow: hidden;
 }
 
-
 /* Filters must never force viewport width */
 .filters {
   width: 100%;
@@ -537,7 +529,6 @@
   min-width: 0;
   box-sizing: border-box;
 }
-
 
 /*
  * KEY FIX:
@@ -559,9 +550,7 @@
   touch-action: pan-x pan-y;
 
   scrollbar-width: thin;
-  scrollbar-color:
-    rgba(89, 129, 166, .68)
-    rgba(1, 9, 26, .45);
+  scrollbar-color: rgba(89, 129, 166, 0.68) rgba(1, 9, 26, 0.45);
 }
 
 .tableWrap::-webkit-scrollbar {
@@ -569,19 +558,19 @@
 }
 
 .tableWrap::-webkit-scrollbar-track {
-  background: rgba(1, 9, 26, .45);
+  background: rgba(1, 9, 26, 0.45);
 }
 
 .tableWrap::-webkit-scrollbar-thumb {
   border-radius: 30px;
-  background: rgba(89, 129, 166, .68);
+  background: rgba(89, 129, 166, 0.68);
 }
 
 .table {
-  width: max-content !important;
-  min-width: 920px !important;
+  width: 100% !important;
+  min-width: 1000px !important;
+  table-layout: auto;
 }
-
 
 /* Creation form */
 .createGrid {
@@ -601,13 +590,11 @@
   box-sizing: border-box;
 }
 
-
 /* ----------------------------------------------------------
    MOBILE
    ---------------------------------------------------------- */
 
 @media (max-width: 760px) {
-
   .page {
     width: 100%;
     min-width: 0;
@@ -628,10 +615,7 @@
 
   .content {
     gap: 14px;
-    padding:
-      14px
-      12px
-      34px;
+    padding: 14px 12px 34px;
   }
 
   .card {
@@ -640,8 +624,7 @@
   }
 
   .filters {
-    grid-template-columns:
-      minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) !important;
 
     gap: 9px;
   }
@@ -651,7 +634,6 @@
   .filters button {
     min-height: 44px;
   }
-
 
   /*
    * Table intentionally remains desktop-width.
@@ -674,8 +656,7 @@
   }
 
   .createGrid {
-    grid-template-columns:
-      minmax(0, 1fr) !important;
+    grid-template-columns: minmax(0, 1fr) !important;
 
     gap: 12px;
   }
@@ -687,5 +668,43 @@
   .pagination {
     justify-content: space-between;
     width: 100%;
+  }
+}
+
+/* ===== USER IMPERSONATION ACTION ===== */
+
+.actions .impersonateButton {
+  color: #eaffff !important;
+  border-color: rgba(24, 234, 220, 0.52) !important;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 137, 139, 0.9),
+    rgba(12, 180, 144, 0.9)
+  ) !important;
+}
+
+/* ===== USERS DESKTOP WIDTH LOCK ===== */
+
+@media (min-width: 992px) {
+  .page {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .content {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .card,
+  .tableWrap {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    justify-self: stretch;
   }
 }

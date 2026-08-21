@@ -1,7 +1,8 @@
 import { ForbiddenException } from '@nestjs/common';
-import type { AuthenticatedUser } from '../auth/auth-user';
+import { attachAuthSessionId, type AuthenticatedUser } from '../auth/auth-user';
 import { PasswordService } from '../auth/password.service';
 import { RbacBootstrapService } from '../auth/rbac-bootstrap.service';
+import { TokenService } from '../auth/token.service';
 import { PrismaService } from '../database/prisma.service';
 import { UsersService } from './users.service';
 
@@ -9,6 +10,10 @@ describe('UsersService security boundaries', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(),
+    },
+    impersonationSession: {
+      findFirst: jest.fn(),
+      updateMany: jest.fn(),
     },
     $transaction: jest.fn(),
   };
@@ -21,18 +26,25 @@ describe('UsersService security boundaries', () => {
     ensureDefaultUserRole: jest.fn(),
   };
 
-  const actor: AuthenticatedUser = {
-    id: 'actor-id',
-    email: 'superadmin@fixtradezone.com',
-    username: 'superadmin',
-    phone: null,
-    firstName: 'FixTradeZone',
-    lastName: 'Founder',
-    status: 'ACTIVE',
-    createdAt: new Date(),
-    lastLoginAt: null,
-    roles: ['SUPER_ADMIN', 'USER'],
-    permissions: [],
+  const actor: AuthenticatedUser = attachAuthSessionId(
+    {
+      id: 'actor-id',
+      email: 'superadmin@fixtradezone.com',
+      username: 'superadmin',
+      phone: null,
+      firstName: 'FixTradeZone',
+      lastName: 'Founder',
+      status: 'ACTIVE',
+      createdAt: new Date(),
+      lastLoginAt: null,
+      roles: ['SUPER_ADMIN', 'USER'],
+      permissions: [],
+    },
+    'actor-session-id',
+  );
+
+  const tokenService = {
+    issueImpersonationToken: jest.fn(),
   };
 
   let service: UsersService;
@@ -44,6 +56,7 @@ describe('UsersService security boundaries', () => {
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
       rbacBootstrapService as unknown as RbacBootstrapService,
+      tokenService as unknown as TokenService,
     );
   });
 
@@ -61,11 +74,7 @@ describe('UsersService security boundaries', () => {
     });
 
     await expect(
-      service.updateStatus(
-        'founder-id',
-        { status: 'BLOCKED' },
-        actor,
-      ),
+      service.updateStatus('founder-id', { status: 'BLOCKED' }, actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();

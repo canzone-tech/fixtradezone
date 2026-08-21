@@ -26,10 +26,12 @@ Access JWTs use HS256, the `fixtradezone-api` issuer, the `fixtradezone-clients`
 
 ## Auth Endpoint Status
 - `POST /auth/register` — implemented and locally verified
-- `POST /auth/login` — implemented on feature branch; local verification pending
-- `POST /auth/refresh` — implemented on feature branch; local verification pending
-- `POST /auth/logout` — implemented on feature branch; local verification pending
-- `GET /auth/me` — implemented on feature branch; local verification pending
+- `POST /auth/login` — implemented and locally verified
+- `POST /auth/refresh` — implemented and locally verified
+- `POST /auth/logout` — implemented and locally verified
+- `GET /auth/me` — implemented and locally verified
+- `POST /auth/reauthenticate` — implemented and locally verified
+- `GET /auth/session-policy` — implemented and locally verified
 
 The request DTO layer is implemented for the planned authentication lifecycle.
 
@@ -151,6 +153,59 @@ Successful response:
   }
 }
 ```
+
+## User Impersonation and Security Configuration
+
+### Start User Impersonation
+
+`POST /admin/users/:userId/impersonation`
+
+Requires effective `users.impersonate` authority and an eligible ACTIVE ordinary USER target.
+
+Impersonation uses a dedicated persisted session and dedicated JWT boundary. The browser receives it only through the same-origin Next.js BFF using HttpOnly cookies.
+
+### Return to Administrator
+
+`DELETE /admin/users/impersonation`
+
+Ends the active impersonation for the current administrator authentication session. Return-to-Admin remains available even if the actor later loses `users.impersonate`.
+
+### Current Impersonated USER Session
+
+`GET /user/impersonation/session`
+
+Requires the dedicated impersonation token and returns the selected USER identity, original administrator actor, live FULL/LIMITED mode, and idle-lock policy.
+
+Impersonation tokens cannot authenticate against the administrator JWT boundary.
+
+### Security Configuration
+
+`GET /admin/settings/security`
+
+`PATCH /admin/settings/security`
+
+SUPER_ADMIN-only.
+
+Configuration fields:
+
+- `fullUserImpersonationEnabled`
+- `idleLockMinutes` — integer from 1 through 120
+
+FULL/LIMITED mode is evaluated live and therefore does not require impersonation-token reissue.
+
+### Session Policy
+
+`GET /auth/session-policy`
+
+Requires normal authenticated access and returns the safe idle-lock policy.
+
+### Password Reauthentication
+
+`POST /auth/reauthenticate`
+
+Requires normal authenticated access and verifies the submitted password against the current authenticated actor.
+
+During USER impersonation, idle-lock unlock reauthenticates the preserved original ADMIN/SUPER_ADMIN actor session rather than the selected USER.
 
 ## Planned Core Areas
 Users, Admin, Packages, AI Agents, Deposits, Wallet/Ledger, Referrals, Commissions, Rewards, Simulated Trades, CMS.

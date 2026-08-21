@@ -57,6 +57,17 @@ LOCKED. Protected pages must remain within the viewport on mobile. Forms stack r
 ## ADR-019 — Permission-aware administrator navigation
 LOCKED. Sidebar visibility follows authenticated RBAC permissions. SUPER_ADMIN retains full platform navigation authority. ADMIN users see only implemented modules for which their effective permission scope grants access. Hiding navigation is a UX rule only; NestJS permission guards remain the authoritative security boundary.
 
-## ADR-020 — Shared protected application shell
-LOCKED. Protected admin/backend pages reuse the shared AdminShell, Startbar and Topbar. Pages must not create independent sidebar/topbar implementations.
+## ADR-020 — Shared protected application shell contract
+LOCKED. Every protected application page has a sidebar and topbar unless the Founder explicitly approves an exception. Administrator pages use AdminShell/Startbar/Topbar. USER pages use the USER shell while reusing the same approved FixTradeZone Dark Neo master sidebar/topbar visual system.
 
+## ADR-021 — User impersonation is an isolated authentication boundary
+LOCKED. Impersonation uses a dedicated session/token boundary retaining both the original administrator actor and selected USER identity. Impersonation tokens cannot authenticate against administrator APIs, and administrator authority never transfers into the selected USER authorization context.
+
+## ADR-022 — FULL/LIMITED impersonation is evaluated live
+LOCKED. SUPER_ADMIN controls the global Full Impersonation setting. LIMITED is the safe support boundary. FULL permits only implemented USER-side capabilities of the selected USER and never ADMIN/SUPER_ADMIN authority. Existing impersonation sessions use the current server configuration without token reissue.
+
+## ADR-023 — Idle lock preserves authenticated application state
+LOCKED. Idle timeout locks the UI without logout or navigation. Password reauthentication unlocks the same page and state. During impersonation, reauthentication uses the original ADMIN/SUPER_ADMIN actor password rather than the selected USER password.
+
+## ADR-024 — Security configuration is SUPER_ADMIN-only
+LOCKED. Privileged security configuration is stored as a validated and audited singleton. Full Impersonation and idle-lock duration are configurable only by SUPER_ADMIN. Idle duration defaults to 5 minutes and is constrained to 1–120 minutes.

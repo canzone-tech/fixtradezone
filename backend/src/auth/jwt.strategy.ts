@@ -10,6 +10,7 @@ import {
 } from './auth.constants';
 import {
   AUTH_USER_SELECT,
+  attachAuthSessionId,
   type AuthenticatedUser,
   toAuthenticatedUser,
 } from './auth-user';
@@ -85,6 +86,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 
-    return toAuthenticatedUser(session.user);
+    return attachAuthSessionId(toAuthenticatedUser(session.user), payload.sid);
   }
 }

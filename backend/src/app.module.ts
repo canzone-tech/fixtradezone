@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { UsersModule } from './users/users.module';
+import { SecurityConfigModule } from './security-config/security-config.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AuthModule,
     RbacModule,
     UsersModule,
+    SecurityConfigModule,
     DashboardModule,
     HealthModule,
   ],

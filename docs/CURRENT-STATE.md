@@ -1,143 +1,143 @@
 # FixTradeZone — Current State
 
-## Latest Verified Checkpoint — 2026-08-20
-- PR #8 merged into `main` at merge commit `1d485c3`.
-- FixTradeZone Dark Neo admin foundation is approved and locked.
-- Shared `AdminShell`, Startbar and Topbar are the protected-page shell.
-- Dashboard design is approved and locked; future changes are module-specific.
-- Users administration is implemented and responsive.
-- Universal mobile responsive rules are established, including internal horizontal scrolling for wide tables.
-- `/rbac` Roles & Permissions console is implemented and founder-approved.
-- Existing RBAC APIs are reused; no duplicate RBAC backend was created.
-- SUPER_ADMIN permissions remain implicit/protected.
-- Base USER role permission scope remains protected.
-- Only SUPER_ADMIN may modify the ADMIN permission scope.
-- Administrator navigation is permission-aware; menu visibility follows effective RBAC scope while backend guards remain authoritative.
-- Admin lint passes.
-- Next.js production build passes with `/rbac` registered as a dynamic route.
-- Current development branch: `agent/rbac-admin-console`.
-- Immediate next functional module after this milestone: Packages.
+## Latest Verified Checkpoint — 2026-08-21
 
-## Snapshot
-Date: 2026-08-19
-Phase: 3 — Backend Foundation
-Focus: Authentication session lifecycle + minimal admin foundation.
+- PR #9 is merged into `main` at merge commit `c398986`.
+- Current feature branch: `agent/user-impersonation`.
+- Current branch contains the locally verified User Impersonation, Security Configuration, Session Reauthentication, Idle Lock, User Shell, and Users UI completion milestone.
+- FixTradeZone Dark Neo remains the single approved protected-application design system.
+- Dashboard design remains locked and was not redesigned by this milestone.
+- Protected administrator pages use the shared AdminShell/Startbar/Topbar.
+- Protected USER impersonation pages use the USER shell while reusing the same approved master sidebar/topbar visual system.
+- Application pages must retain sidebar + topbar unless the Founder explicitly approves an exception.
+- `/users` now uses the full available desktop content width while wide tables retain internal horizontal scrolling on smaller screens.
 
-## Verified Working
-- Docker functional
-- MySQL 8.0.46 host service functional
-- `fixtradezone` DB accessible by `fixtradezone` user
-- MongoDB 8 healthy
-- Redis 7 healthy
-- NestJS builds
-- Prisma 7.9.1 client generated
-- Prisma runtime connection to MySQL works
-- `GET /health` returns MySQL up
-- Postman installed and health tested
-- JWT strategy compiles
-- Global JWT guard compiles
-- Initial Auth/RBAC migration applied and verified in local development
-- Global DTO request validation configured
-- Auth DTO validation covered by focused unit tests
-- Transactional registration with Argon2id hashing
-- Idempotent default USER role bootstrap and assignment
-- Registration audit event
-- Registration verified through Postman and direct SQL checks
-- Prisma transitive dependency advisory investigated and documented
-- Auth-session branch rebased onto the verified Login/Me commit
-- Prisma Client generated successfully for the AuthSession schema
-- Backend lint and production build pass
-- Backend unit tests pass: 8 suites, 36 tests
-- Admin lockfile generated; admin lint and production build pass
-- Admin production dependency audit reports zero vulnerabilities
+## User Impersonation
 
-## Implemented on Current Feature Branch — Local DB/API/Browser Validation Pending
-- Public Login, Refresh, and Logout handlers
-- Generic login/session errors and ACTIVE-user enforcement
-- 15-minute access token and 7-day rotating refresh token issuance
-- Hashed refresh-token persistence, revocation, rotation, and reuse response
-- Database-backed active-session and current-user/RBAC lookup for protected requests
-- Protected `GET /auth/me`
-- Login, refresh, logout, and session-security audit events
-- Postman collection/environment with automatic access/refresh token rotation
-- Idempotent ADMIN role bootstrap plus one-time audited founder bootstrap CLI
-- Auth-session migration `0002_auth_sessions` drafted for review
-- Minimal Next.js admin login and protected dashboard shell
-- HttpOnly admin cookies managed by a same-origin Next.js BFF layer
-- Admin CSP/security headers, cross-site request rejection, and backend-response validation
-- Admin UI uses the locked dark neon FixTradeZone design system with no third-party dashboard theme dependency
+Implemented and locally verified:
 
-## Current Areas
-- `src/config/`
-- `src/database/prisma.service.ts`
-- `src/database/prisma.module.ts`
-- `src/health/`
-- `src/auth/`
-- `src/auth/dto/`
-- `prisma/schema.prisma`
-- `prisma.config.ts`
-- `prisma/migrations/0001_foundation_auth_rbac/migration.sql`
+- `users.impersonate` is an RBAC permission.
+- SUPER_ADMIN may impersonate eligible ordinary USER accounts.
+- ADMIN may impersonate only when `users.impersonate` is present in its effective permission scope.
+- ADMIN, SUPER_ADMIN, self, non-USER, and non-ACTIVE subjects are not eligible impersonation targets.
+- Impersonation uses a dedicated JWT/session boundary and not the normal administrator JWT boundary.
+- Impersonation tokens cannot authenticate against administrator APIs.
+- Impersonation sessions retain both original actor identity and selected USER identity.
+- One active impersonation is allowed per administrator authentication session.
+- Impersonation start/stop is audited.
+- Return-to-Admin remains available even if the actor's impersonation permission changes after session start.
+- The browser receives impersonation state through same-origin Next.js BFF routes and HttpOnly cookies.
+- `/user/impersonation` resolves the selected live USER account from the backend.
+- The USER shell displays the selected USER identity and persistent Return-to-Admin controls.
+- Administrator permissions are never inherited by the impersonated USER identity.
 
-## Auth Status
+## Full vs Limited Impersonation
 
-Implemented:
-- Public decorator
-- Global JWT guard
-- JWT strategy
-- Auth module skeleton
-- Argon2 dependency
-- Global `ValidationPipe` with unknown-field rejection
-- Register, Login, RefreshToken, and Logout DTOs
-- Email and username normalization
-- Registration password, username, phone, and name constraints
-- Refresh/logout JWT-shape validation
-- DTO unit tests
-- Public Register controller and service
-- Argon2id password hashing service
-- Transactional user, USER role, and audit creation
-- Duplicate-identifier conflict handling
-- Registration service, RBAC bootstrap, and password service tests
-- Login, refresh, logout, and current-user source implementation
-- Refresh-session persistence and rotation model
-- Founder ADMIN bootstrap source implementation
-- Focused auth-session unit tests
+- SUPER_ADMIN controls `fullUserImpersonationEnabled`.
+- `LIMITED` mode is the safe support boundary.
+- `FULL` mode enables the full-user authorization boundary for implemented USER-side APIs.
+- The effective mode is evaluated live from security configuration; an existing impersonation session can move between LIMITED and FULL without token reissue.
+- Sensitive/full USER APIs must use the server-side full-impersonation authorization guard.
+- FULL impersonation does not grant administrator authority to the selected USER identity.
+- Complete USER business modules will be added as their vertical slices are implemented; the current user view is the verified live-account/session foundation.
 
-Not implemented:
-- Role/permission enforcement
-- Authentication rate limiting
-- General administrator assignment API
+## Security Configuration
 
-## Manual API Verification
-- `GET /health` returns HTTP 200 with MySQL up.
-- `POST /auth/register` returns HTTP 201 with a safe user projection.
-- Repeating the same registration returns HTTP 409.
-- Invalid email, short password, and injected `role` return HTTP 400.
-- `GET /` returns HTTP 404 because no root route is registered; no protected business endpoint exists yet for a manual 401 check.
-- SQL verification confirmed Argon2id, PENDING status, USER role assignment, and the registration audit event.
+Local migration `0004_security_configuration` is applied and verified.
 
-## Database Environment Status
-- Local development: migration `0001_foundation_auth_rbac` applied and verified.
-- Migration `0002_auth_sessions`: generated, reviewed as additive, and not yet applied to any environment.
-- Staging: not applied.
-- Production: not applied.
+The singleton configuration currently supports:
+
+- `fullUserImpersonationEnabled`
+- `idleLockMinutes`
+- `updatedByUserId`
+- audit metadata
+
+Rules:
+
+- Configuration is SUPER_ADMIN-only.
+- Default idle lock is 5 minutes.
+- Valid idle lock range is 1–120 minutes.
+- Database constraints and backend DTO/service validation enforce the allowed range.
+- `/settings/security` is available only to SUPER_ADMIN.
+- The SUPER_ADMIN sidebar profile includes a Security Configuration shortcut.
+
+## Session Reauthentication and Idle Lock
+
+Implemented and locally verified:
+
+- Protected sessions expose the configured idle-lock policy.
+- Inactivity displays a lock overlay without logging the current session out.
+- Locking preserves the current page and in-memory UI state.
+- Unlock requires password reauthentication.
+- A normal administrator session reauthenticates the current administrator.
+- During USER impersonation, unlock verifies the original ADMIN/SUPER_ADMIN actor password, not the selected USER password.
+- Wrong passwords remain rejected.
+- Correct reauthentication unlocks the same screen without redirecting or recreating the impersonation session.
+- Administrator and USER shells both use the same shared idle-lock implementation.
+
+## Database Migrations
+
+Applied and verified locally:
+
+- `0001_foundation_auth_rbac`
+- `0002_auth_sessions`
+- `0003_user_impersonation`
+- `0004_security_configuration`
+
+No additional application/shadow/test database was created.
+
+## Verification Status
+
+Backend:
+
+- Production build passes.
+- 18 test suites pass.
+- 82 tests pass.
+- Prisma schema/migrations are locally verified.
+- Postman MASTER collection impersonation/security/session-policy flows are locally green.
+
+Admin:
+
+- ESLint passes for the changed milestone files.
+- Next.js production build passes.
+- Security Configuration UI is visually approved.
+- USER impersonation shell is visually approved.
+- Idle-lock behavior is locally verified for normal administrator and impersonated USER sessions.
+- `/users` full-width desktop table behavior is visually approved.
+- `git diff --check` passes.
+
+## Security Boundaries Preserved
+
+- JWT deny-by-default remains authoritative.
+- RBAC remains backend-authoritative.
+- SUPER_ADMIN founder protections remain intact.
+- Impersonation JWTs cannot cross into administrator APIs.
+- Administrator privileges do not leak into impersonated USER authorization.
+- Tokens remain server-side/HttpOnly in the admin browser flow.
+- Password hashes, refresh-token hashes, and raw credentials are not exposed.
+- Financial rules remain unchanged.
+- Simulated activity must remain explicitly labeled as simulated.
 
 ## Dependency Security Status
-- The 3 high findings originate from Prisma 7.9.1's transitive `deepmerge-ts@7.1.5` dependency.
-- A forced Prisma downgrade and an unverified dependency override were rejected.
-- The advisory remains tracked in `SECURITY.md`; reassess when Prisma publishes a compatible remediation.
+
+The Prisma 7.9.1 transitive `deepmerge-ts@7.1.5` advisory remains tracked.
+
+Do not run `npm audit fix --force` and do not introduce an unverified dependency override.
 
 ## Immediate Next Actions
-1. Pull the reviewed feature branch and rerun the automated gate locally.
-2. Back up the existing database, then apply and verify `0002_auth_sessions` with `prisma migrate deploy`.
-3. Register the founder account and run the one-time ADMIN bootstrap CLI.
-4. Verify Login, Me, Refresh rotation, old-token rejection, and Logout in Postman.
-5. Verify admin login, refresh continuity, ADMIN rejection, and logout in the browser.
-6. Add backend RBAC guards/permissions with the Users & RBAC admin screen.
-7. Add deployment-level authentication rate limiting before public launch.
+
+1. Synchronize persistent project documentation with this verified milestone.
+2. Perform final backend/admin repository gates.
+3. Review the complete feature diff and stage only the exact milestone files.
+4. Create the local feature commit.
+5. Push/open a pull request only after explicit Founder approval.
+6. After merge, continue with the next approved vertical slice, currently Packages.
 
 ## Constraints
-- Never create extra application databases.
-- Never use Prisma `migrate dev` without explicit shadow DB approval.
-- Never expose secrets.
-- Never represent simulated trades as real.
-- Never auto-credit deposits from TXID submission.
+
+- Never create extra FixTradeZone application databases.
+- Never use Prisma `migrate dev` without explicit shadow-database approval.
+- Never expose secrets or authentication tokens.
+- Never allow impersonation to inherit administrator authority.
+- Never represent simulated trades/results as real.
+- Never auto-credit deposits solely from TXID submission.

@@ -4,6 +4,7 @@ export const PERMISSIONS = {
   USERS_CREATE: 'users.create',
   USERS_STATUS_MANAGE: 'users.status.manage',
   USERS_ROLES_MANAGE: 'users.roles.manage',
+  USERS_IMPERSONATE: 'users.impersonate',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -28,6 +29,10 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.USERS_ROLES_MANAGE,
     description: 'Assign and remove permitted user roles',
+  },
+  {
+    code: PERMISSIONS.USERS_IMPERSONATE,
+    description: 'Temporarily access an eligible user account for support',
   },
   {
     code: PERMISSIONS.RBAC_READ,
