@@ -29,6 +29,8 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+  CAPTCHA_HMAC_SECRET: Joi.string().min(32).required(),
+
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),
 
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),

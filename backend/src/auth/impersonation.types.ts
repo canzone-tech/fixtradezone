@@ -10,7 +10,7 @@ export interface ImpersonationPrincipal {
     expiresAt: Date;
     actor: {
       id: string;
-      email: string;
+      email: string | null;
     };
   };
 }

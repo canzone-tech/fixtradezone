@@ -14,6 +14,10 @@ export class PasswordService implements OnModuleInit {
     await this.getDummyHash();
   }
 
+  generateTemporaryPassword(): string {
+    return randomBytes(18).toString('base64url');
+  }
+
   hash(password: string): Promise<string> {
     return argon2.hash(password, {
       type: argon2.argon2id,
@@ -35,6 +39,7 @@ export class PasswordService implements OnModuleInit {
 
     try {
       const matches = await this.verify(hashToVerify, password);
+
       return passwordHash !== null && matches;
     } catch {
       if (passwordHash !== null) {
@@ -47,6 +52,7 @@ export class PasswordService implements OnModuleInit {
 
   private getDummyHash(): Promise<string> {
     this.dummyHashPromise ??= this.hash(randomBytes(32).toString('hex'));
+
     return this.dummyHashPromise;
   }
 }

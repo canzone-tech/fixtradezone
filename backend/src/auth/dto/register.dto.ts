@@ -16,14 +16,16 @@ import {
 
 export class RegisterDto {
   @Transform(normalizeEmail)
+  @IsOptional()
   @IsEmail()
   @MaxLength(191)
-  email!: string;
+  email?: string;
 
+  @IsOptional()
   @IsString()
   @MinLength(12)
   @MaxLength(128)
-  password!: string;
+  password?: string;
 
   @Transform(normalizeUsername)
   @IsOptional()
@@ -54,4 +56,15 @@ export class RegisterDto {
   @IsString()
   @Length(1, 100)
   lastName?: string;
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  captchaId?: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  captchaAnswer?: string;
 }

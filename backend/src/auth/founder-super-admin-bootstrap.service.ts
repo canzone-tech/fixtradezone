@@ -31,15 +31,14 @@ export class FounderSuperAdminBootstrapService {
         });
 
         if (existingFounder) {
-          throw new ConflictException(
-            'A founder SUPER_ADMIN already exists.',
-          );
+          throw new ConflictException('A founder SUPER_ADMIN already exists.');
         }
 
-        const user = await transaction.user.findUnique({
+        const users = await transaction.user.findMany({
           where: {
             email: normalizedEmail,
           },
+          take: 2,
           select: {
             id: true,
             email: true,
@@ -47,11 +46,19 @@ export class FounderSuperAdminBootstrapService {
           },
         });
 
-        if (!user) {
+        if (users.length === 0) {
           throw new NotFoundException(
             'The requested founder bootstrap user was not found.',
           );
         }
+
+        if (users.length > 1) {
+          throw new ConflictException(
+            'Founder bootstrap email is shared by multiple accounts and is ambiguous.',
+          );
+        }
+
+        const user = users[0];
 
         await transaction.userRole.create({
           data: {

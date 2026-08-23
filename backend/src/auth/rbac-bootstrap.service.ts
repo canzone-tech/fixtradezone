@@ -1,8 +1,6 @@
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import {
-  SYSTEM_PERMISSIONS,
-} from '../rbac/rbac.constants';
+import { SYSTEM_PERMISSIONS } from '../rbac/rbac.constants';
 import {
   ADMIN_ROLE_DESCRIPTION,
   ADMIN_ROLE_NAME,
@@ -24,10 +22,7 @@ export class RbacBootstrapService implements OnApplicationBootstrap {
       this.ensureAdminRole(),
       this.ensureSuperAdminRole(),
       ...SYSTEM_PERMISSIONS.map((permission) =>
-        this.ensurePermission(
-          permission.code,
-          permission.description,
-        ),
+        this.ensurePermission(permission.code, permission.description),
       ),
     ]);
   }

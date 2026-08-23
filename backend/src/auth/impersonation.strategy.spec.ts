@@ -90,7 +90,6 @@ describe('ImpersonationStrategy', () => {
 
   const payload = {
     sub: subject.id,
-    email: subject.email,
     type: 'impersonation' as const,
     iid: 'impersonation-id',
     act: actor.id,

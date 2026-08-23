@@ -243,7 +243,6 @@ describe('UsersService impersonation security', () => {
     expect(tokenService.issueImpersonationToken).toHaveBeenCalledWith(
       {
         id: 'subject-id',
-        email: 'user@example.com',
       },
       actor.id,
       ACTOR_SESSION_ID,

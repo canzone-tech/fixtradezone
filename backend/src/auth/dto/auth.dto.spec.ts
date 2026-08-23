@@ -69,14 +69,19 @@ describe('Auth DTOs', () => {
     expect(errors.some((error) => error.property === 'role')).toBe(true);
   });
 
-  it('normalizes login email without applying registration password policy', async () => {
-    const { dto, errors } = await validatePayload(LoginDto, {
-      email: ' USER@EXAMPLE.COM ',
+  it('trims login identifier without applying registration password policy', async () => {
+    const dto = plainToInstance(LoginDto, {
+      identifier: ' USER@EXAMPLE.COM ',
       password: 'x',
     });
 
+    const errors = await validate(dto, {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
     expect(errors).toHaveLength(0);
-    expect(dto.email).toBe('user@example.com');
+    expect(dto.identifier).toBe('USER@EXAMPLE.COM');
     expect(dto.password).toBe('x');
   });
 

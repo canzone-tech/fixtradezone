@@ -1,7 +1,4 @@
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { FounderSuperAdminBootstrapService } from './founder-super-admin-bootstrap.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
@@ -13,7 +10,7 @@ describe('FounderSuperAdminBootstrapService', () => {
       create: jest.fn(),
     },
     user: {
-      findUnique: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
     },
     auditLog: {
@@ -50,18 +47,36 @@ describe('FounderSuperAdminBootstrapService', () => {
     });
 
     transaction.userRole.findFirst.mockResolvedValue(null);
-    transaction.user.findUnique.mockResolvedValue({
+
+    transaction.user.findMany.mockResolvedValue([
+      {
+        id: 'founder-user-id',
+        email: 'founder@example.com',
+        status: 'PENDING',
+      },
+    ]);
+
+    transaction.userRole.create.mockResolvedValue({
+      userId: 'founder-user-id',
+      roleId: 'super-admin-role-id',
+    });
+
+    transaction.user.update.mockResolvedValue({
       id: 'founder-user-id',
-      email: 'founder@example.com',
-      status: 'PENDING',
+      status: 'ACTIVE',
+    });
+
+    transaction.auditLog.create.mockResolvedValue({
+      id: 'audit-id',
     });
 
     const result = await service.bootstrap(' Founder@Example.COM ');
 
-    expect(transaction.user.findUnique).toHaveBeenCalledWith({
+    expect(transaction.user.findMany).toHaveBeenCalledWith({
       where: {
         email: 'founder@example.com',
       },
+      take: 2,
       select: {
         id: true,
         email: true,
@@ -100,7 +115,7 @@ describe('FounderSuperAdminBootstrapService', () => {
       service.bootstrap('founder@example.com'),
     ).rejects.toBeInstanceOf(ConflictException);
 
-    expect(transaction.user.findUnique).not.toHaveBeenCalled();
+    expect(transaction.user.findMany).not.toHaveBeenCalled();
   });
 
   it('rejects bootstrap when the requested user does not exist', async () => {
@@ -110,11 +125,39 @@ describe('FounderSuperAdminBootstrapService', () => {
     });
 
     transaction.userRole.findFirst.mockResolvedValue(null);
-    transaction.user.findUnique.mockResolvedValue(null);
+    transaction.user.findMany.mockResolvedValue([]);
 
     await expect(
       service.bootstrap('missing@example.com'),
     ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(transaction.userRole.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an email shared by multiple accounts', async () => {
+    rbacBootstrapService.ensureSuperAdminRole.mockResolvedValue({
+      id: 'super-admin-role-id',
+      name: 'SUPER_ADMIN',
+    });
+
+    transaction.userRole.findFirst.mockResolvedValue(null);
+
+    transaction.user.findMany.mockResolvedValue([
+      {
+        id: 'user-1',
+        email: 'shared@example.com',
+        status: 'ACTIVE',
+      },
+      {
+        id: 'user-2',
+        email: 'shared@example.com',
+        status: 'ACTIVE',
+      },
+    ]);
+
+    await expect(
+      service.bootstrap('shared@example.com'),
+    ).rejects.toBeInstanceOf(ConflictException);
 
     expect(transaction.userRole.create).not.toHaveBeenCalled();
   });

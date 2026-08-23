@@ -212,3 +212,37 @@ Users, Admin, Packages, AI Agents, Deposits, Wallet/Ledger, Referrals, Commissio
 
 ## Postman
 Postman is installed and configured. Health and Register are verified. During local feature validation, Login must save `accessToken` and `refreshToken`, Refresh must replace both variables, the previous refresh token must fail, Me must work with the new access token, and Logout must make the latest refresh token unusable.
+
+## Configurable Authentication, Registration & CAPTCHA — 2026-08-23
+
+### CAPTCHA
+`POST /auth/captcha`
+
+Supported purposes:
+- `LOGIN`
+- `REGISTRATION`
+
+When enabled, the endpoint returns an opaque challenge ID, SVG data URI, and a 180-second expiry. CAPTCHA answers are never returned or stored in plaintext.
+
+### Login
+`POST /auth/login`
+
+Login now accepts a single `identifier` which may be username, email, or E.164 mobile according to SUPER_ADMIN configuration.
+
+At least one login method must remain enabled. Multiple-account email/mobile modes require username-only login, and ambiguous email/mobile matches are rejected.
+
+### Registration
+`POST /auth/register`
+
+Registration policy controls public/SUPER_ADMIN/ADMIN/authorized-USER registration, required identifiers, AUTO/MANUAL password mode, AUTO/MANUAL username mode, optional username prefix, and multiple-account behavior.
+
+### Required Password Change
+`POST /auth/change-required-password`
+
+Automatically generated passwords are temporary. Successful temporary-password verification returns only a short-lived password-change token and does not establish a normal session.
+
+### SUPER_ADMIN Configuration
+- `GET /admin/settings/authentication`
+- `PATCH /admin/settings/authentication`
+- `GET /admin/settings/registration`
+- `PATCH /admin/settings/registration`

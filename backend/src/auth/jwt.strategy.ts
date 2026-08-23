@@ -26,8 +26,6 @@ function isAccessTokenPayload(payload: unknown): payload is AccessTokenPayload {
   return (
     typeof candidate.sub === 'string' &&
     candidate.sub.length > 0 &&
-    typeof candidate.email === 'string' &&
-    candidate.email.length > 0 &&
     candidate.type === 'access' &&
     typeof candidate.sid === 'string' &&
     candidate.sid.length > 0
@@ -80,8 +78,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       session.userId !== payload.sub ||
       session.revokedAt !== null ||
       session.expiresAt <= new Date() ||
-      session.user.status !== 'ACTIVE' ||
-      session.user.email !== payload.email
+      session.user.status !== 'ACTIVE'
     ) {
       throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }

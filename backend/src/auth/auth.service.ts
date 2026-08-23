@@ -1,5 +1,5 @@
 import {
-  ConflictException,
+  BadRequestException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   GENERIC_LOGIN_ERROR,
+  GENERIC_PASSWORD_CHANGE_ERROR,
   GENERIC_SESSION_ERROR,
   REFRESH_TOKEN_TTL_SECONDS,
 } from './auth.constants';
@@ -16,101 +17,104 @@ import {
   toAuthenticatedUser,
 } from './auth-user';
 import type { RequestContext } from './auth.types';
+import { ChangeRequiredPasswordDto } from './dto/change-required-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { PasswordService } from './password.service';
-import { RbacBootstrapService } from './rbac-bootstrap.service';
+import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
-
-function hasPrismaErrorCode(error: unknown, code: string): boolean {
-  if (typeof error !== 'object' || error === null || !('code' in error)) {
-    return false;
-  }
-
-  return error.code === code;
-}
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
-    private readonly rbacBootstrapService: RbacBootstrapService,
+    private readonly registrationService: RegistrationService,
     private readonly tokenService: TokenService,
   ) {}
 
   async register(dto: RegisterDto, context: RequestContext = {}) {
-    const passwordHash = await this.passwordService.hash(dto.password);
-
-    try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const defaultRole =
-          await this.rbacBootstrapService.ensureDefaultUserRole(transaction);
-
-        const user = await transaction.user.create({
-          data: {
-            email: dto.email,
-            passwordHash,
-            username: dto.username,
-            phone: dto.phone,
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            roles: {
-              create: {
-                role: {
-                  connect: {
-                    id: defaultRole.id,
-                  },
-                },
-              },
-            },
-          },
-          select: AUTH_USER_SELECT,
-        });
-
-        await transaction.auditLog.create({
-          data: {
-            actorUserId: user.id,
-            action: 'CREATE',
-            entityType: 'User',
-            entityId: user.id,
-            description: 'User completed self-registration.',
-            metadata: {
-              source: 'SELF_REGISTRATION',
-            },
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-          },
-        });
-
-        return {
-          message: 'Registration successful.',
-          user: toAuthenticatedUser(user),
-        };
-      });
-    } catch (error: unknown) {
-      if (hasPrismaErrorCode(error, 'P2002')) {
-        throw new ConflictException(
-          'An account already exists with one of the supplied identifiers.',
-        );
-      }
-
-      throw error;
-    }
+    return this.registrationService.registerPublic(dto, context);
   }
 
   async login(dto: LoginDto, context: RequestContext = {}) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: dto.email,
-      },
-      select: {
-        ...AUTH_USER_SELECT,
-        passwordHash: true,
-      },
-    });
+    const identifier = dto.identifier.trim();
+
+    const [authConfig, registrationConfig] = await Promise.all([
+      this.prisma.systemAuthConfig.findUnique({
+        where: { id: 1 },
+      }),
+      this.prisma.systemRegistrationConfig.findUnique({
+        where: { id: 1 },
+      }),
+    ]);
+
+    const multipleAccountsEnabled =
+      (registrationConfig?.allowMultipleAccountsPerEmail ?? false) ||
+      (registrationConfig?.allowMultipleAccountsPerMobile ?? false);
+
+    const identifierType = /^\+[1-9]\d{7,14}$/.test(identifier)
+      ? 'MOBILE'
+      : identifier.includes('@')
+        ? 'EMAIL'
+        : 'USERNAME';
+
+    if (multipleAccountsEnabled && identifierType !== 'USERNAME') {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    const methodEnabled =
+      identifierType === 'USERNAME'
+        ? (authConfig?.loginWithUsername ?? true)
+        : identifierType === 'EMAIL'
+          ? (authConfig?.loginWithEmail ?? true)
+          : (authConfig?.loginWithMobile ?? true);
+
+    if (!methodEnabled) {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    const normalizedIdentifier =
+      identifierType === 'EMAIL' || identifierType === 'USERNAME'
+        ? identifier.toLowerCase()
+        : identifier;
+
+    const userSelect = {
+      ...AUTH_USER_SELECT,
+      passwordHash: true,
+      mustChangePassword: true,
+    } as const;
+
+    const identifierMatches =
+      identifierType === 'USERNAME'
+        ? null
+        : await this.prisma.user.findMany({
+            where:
+              identifierType === 'EMAIL'
+                ? {
+                    email: normalizedIdentifier,
+                  }
+                : {
+                    phone: normalizedIdentifier,
+                  },
+            take: 2,
+            select: userSelect,
+          });
+
+    const user =
+      identifierType === 'USERNAME'
+        ? await this.prisma.user.findUnique({
+            where: {
+              username: normalizedIdentifier,
+            },
+            select: userSelect,
+          })
+        : identifierMatches?.length === 1
+          ? identifierMatches[0]
+          : null;
+
     const passwordMatches = await this.passwordService.verifyForAuthentication(
       user?.passwordHash ?? null,
       dto.password,
@@ -120,7 +124,56 @@ export class AuthService {
       throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
     }
 
+    if (user.mustChangePassword) {
+      const passwordChange =
+        await this.tokenService.issuePasswordChangeToken(user);
+
+      const challengedAt = new Date();
+
+      await this.prisma.$transaction(async (transaction) => {
+        await transaction.authSession.updateMany({
+          where: {
+            userId: user.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: challengedAt,
+            revocationReason: 'PASSWORD_CHANGE_REQUIRED',
+          },
+        });
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: user.id,
+            action: 'LOGIN',
+            entityType: 'User',
+            entityId: user.id,
+            description:
+              'Temporary password verified; password change is required.',
+            metadata: {
+              event: 'PASSWORD_CHANGE_REQUIRED',
+              identifierType,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+      });
+
+      return {
+        message: 'Password change required.',
+        passwordChangeRequired: true,
+        passwordChangeToken: passwordChange.passwordChangeToken,
+        expiresIn: passwordChange.expiresIn,
+        user: {
+          id: user.id,
+          username: user.username,
+        },
+      };
+    }
+
     const tokens = await this.tokenService.issueTokenPair(user);
+
     const loggedInAt = new Date();
 
     await this.prisma.$transaction(async (transaction) => {
@@ -132,6 +185,7 @@ export class AuthService {
           expiresAt: tokens.refreshTokenExpiresAt,
         },
       });
+
       await transaction.user.update({
         where: {
           id: user.id,
@@ -140,6 +194,7 @@ export class AuthService {
           lastLoginAt: loggedInAt,
         },
       });
+
       await transaction.auditLog.create({
         data: {
           actorUserId: user.id,
@@ -149,6 +204,7 @@ export class AuthService {
           description: 'User login succeeded.',
           metadata: {
             event: 'SESSION_CREATED',
+            identifierType,
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -164,6 +220,101 @@ export class AuthService {
       },
       'Login successful.',
     );
+  }
+
+  async changeRequiredPassword(
+    dto: ChangeRequiredPasswordDto,
+    context: RequestContext = {},
+  ) {
+    const payload = await this.tokenService.verifyPasswordChangeToken(
+      dto.passwordChangeToken,
+    );
+
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: payload.sub,
+      },
+      select: {
+        id: true,
+        passwordHash: true,
+        mustChangePassword: true,
+        status: true,
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE' || !user.mustChangePassword) {
+      throw new UnauthorizedException(GENERIC_PASSWORD_CHANGE_ERROR);
+    }
+
+    const reusesCurrentPassword =
+      await this.passwordService.verifyForAuthentication(
+        user.passwordHash,
+        dto.newPassword,
+      );
+
+    if (reusesCurrentPassword) {
+      throw new BadRequestException(
+        'New password must be different from the current password.',
+      );
+    }
+
+    const passwordHash = await this.passwordService.hash(dto.newPassword);
+
+    const changedAt = new Date();
+
+    await this.prisma.$transaction(
+      async (transaction) => {
+        const updated = await transaction.user.updateMany({
+          where: {
+            id: user.id,
+            status: 'ACTIVE',
+            mustChangePassword: true,
+          },
+          data: {
+            passwordHash,
+            mustChangePassword: false,
+          },
+        });
+
+        if (updated.count !== 1) {
+          throw new UnauthorizedException(GENERIC_PASSWORD_CHANGE_ERROR);
+        }
+
+        const revoked = await transaction.authSession.updateMany({
+          where: {
+            userId: user.id,
+            revokedAt: null,
+          },
+          data: {
+            revokedAt: changedAt,
+            revocationReason: 'PASSWORD_CHANGED',
+          },
+        });
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: user.id,
+            action: 'UPDATE',
+            entityType: 'UserCredential',
+            entityId: user.id,
+            description: 'User completed required password change.',
+            metadata: {
+              event: 'REQUIRED_PASSWORD_CHANGED',
+              revokedSessionCount: revoked.count,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+      },
+      {
+        isolationLevel: 'Serializable',
+      },
+    );
+
+    return {
+      message: 'Password changed successfully. Please sign in again.',
+    };
   }
 
   async refresh(dto: RefreshTokenDto, context: RequestContext = {}) {
@@ -189,11 +340,7 @@ export class AuthService {
       },
     });
 
-    if (
-      !session ||
-      session.userId !== payload.sub ||
-      session.user.email !== payload.email
-    ) {
+    if (!session || session.userId !== payload.sub) {
       throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 

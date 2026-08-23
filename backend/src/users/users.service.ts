@@ -20,7 +20,7 @@ import {
   toAuthenticatedUser,
 } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
-import { PasswordService } from '../auth/password.service';
+import { RegistrationService } from '../auth/registration.service';
 import { TokenService } from '../auth/token.service';
 import { RbacBootstrapService } from '../auth/rbac-bootstrap.service';
 import { PrismaService } from '../database/prisma.service';
@@ -44,7 +44,7 @@ function hasPrismaErrorCode(error: unknown, code: string): boolean {
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly passwordService: PasswordService,
+    private readonly registrationService: RegistrationService,
     private readonly rbacBootstrapService: RbacBootstrapService,
     private readonly tokenService: TokenService,
   ) {}
@@ -127,66 +127,7 @@ export class UsersService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
-    const passwordHash = await this.passwordService.hash(dto.password);
-
-    try {
-      return await this.prisma.$transaction(async (transaction) => {
-        const defaultRole =
-          await this.rbacBootstrapService.ensureDefaultUserRole(transaction);
-
-        const user = await transaction.user.create({
-          data: {
-            email: dto.email,
-            passwordHash,
-            username: dto.username,
-            phone: dto.phone,
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            status: 'PENDING',
-            roles: {
-              create: {
-                role: {
-                  connect: {
-                    id: defaultRole.id,
-                  },
-                },
-              },
-            },
-          },
-          select: AUTH_USER_SELECT,
-        });
-
-        await transaction.auditLog.create({
-          data: {
-            actorUserId: actor.id,
-            action: 'CREATE',
-            entityType: 'User',
-            entityId: user.id,
-            description: 'Administrator created a platform user.',
-            metadata: {
-              source: 'ADMIN_API',
-              createdEmail: user.email,
-              actorRoles: actor.roles,
-            },
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-          },
-        });
-
-        return {
-          message: 'User created successfully.',
-          user: toAuthenticatedUser(user),
-        };
-      });
-    } catch (error: unknown) {
-      if (hasPrismaErrorCode(error, 'P2002')) {
-        throw new ConflictException(
-          'An account already exists with one of the supplied identifiers.',
-        );
-      }
-
-      throw error;
-    }
+    return this.registrationService.registerDashboard(dto, actor, context);
   }
 
   async updateStatus(
@@ -538,7 +479,6 @@ export class UsersService {
     const issued = await this.tokenService.issueImpersonationToken(
       {
         id: subject.id,
-        email: subject.email,
       },
       actor.id,
       actorSessionId,

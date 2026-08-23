@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CaptchaModule } from '../captcha/captcha.module';
 import { SecurityConfigModule } from '../security-config/security-config.module';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -12,11 +13,13 @@ import { ImpersonationStrategy } from './impersonation.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { ReauthenticationService } from './reauthentication.service';
+import { RegistrationService } from './registration.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 import { TokenService } from './token.service';
 
 @Module({
   imports: [
+    CaptchaModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
     }),
@@ -33,6 +36,7 @@ import { TokenService } from './token.service';
     JwtStrategy,
     PasswordService,
     ReauthenticationService,
+    RegistrationService,
     RbacBootstrapService,
     TokenService,
   ],
@@ -40,6 +44,7 @@ import { TokenService } from './token.service';
     AuthService,
     FounderSuperAdminBootstrapService,
     PasswordService,
+    RegistrationService,
     RbacBootstrapService,
     TokenService,
   ],
