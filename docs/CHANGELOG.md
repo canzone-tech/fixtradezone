@@ -1,6 +1,8 @@
 # FixTradeZone — Changelog
 
 ## 2026-08-23
+- Merged PR #11 (`feature/configurable-auth-registration`) into `main` at `0c2795d`.
+- Started `feature/foundation-freeze-checkpoint` to inventory, sanitize, freeze, and independently verify the reusable platform core before Packages.
 - Added SUPER_ADMIN-controlled configurable username/email/mobile login methods with invariant enforcement.
 - Decoupled JWT/session identity from mutable email identifiers and retained UUID/session identity as the technical authority.
 - Added configurable public, SUPER_ADMIN, ADMIN, and authorized-USER registration policy.

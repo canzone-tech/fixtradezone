@@ -52,11 +52,12 @@ Completed:
 
 Current:
 
-- Persist this milestone in project documentation.
-- Create the reviewed feature commit.
-- Push the feature branch.
-- Open/merge PR only after explicit Founder approval.
-- Complete reusable-foundation freeze/checkpoint.
+- PR #11 is merged into `main`.
+- Inventory the merged reusable platform foundation.
+- Separate reusable platform concerns from FixTradeZone-specific product/branding concerns.
+- Define and verify the reusable-core copy manifest.
+- Freeze/copy the approved foundation into `canzone-platform-core`.
+- Verify the reusable core independently before starting Packages.
 
 Before Packages:
 
