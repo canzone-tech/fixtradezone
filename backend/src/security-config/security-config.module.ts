@@ -7,6 +7,6 @@ import { SuperAdminOnlyGuard } from './super-admin-only.guard';
 @Module({
   controllers: [SecurityConfigController, SessionPolicyController],
   providers: [SecurityConfigService, SuperAdminOnlyGuard],
-  exports: [SecurityConfigService],
+  exports: [SecurityConfigService, SuperAdminOnlyGuard],
 })
 export class SecurityConfigModule {}

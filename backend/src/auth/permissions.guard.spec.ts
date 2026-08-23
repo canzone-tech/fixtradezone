@@ -1,7 +1,4 @@
-import {
-  ExecutionContext,
-  ForbiddenException,
-} from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsGuard } from './permissions.guard';
 
@@ -27,9 +24,7 @@ describe('PermissionsGuard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    guard = new PermissionsGuard(
-      reflector as unknown as Reflector,
-    );
+    guard = new PermissionsGuard(reflector as unknown as Reflector);
   });
 
   it('allows SUPER_ADMIN regardless of stored permissions', () => {
@@ -46,10 +41,7 @@ describe('PermissionsGuard', () => {
   });
 
   it('allows ADMIN when every required permission is granted', () => {
-    reflector.getAllAndOverride.mockReturnValue([
-      'rbac.read',
-      'users.read',
-    ]);
+    reflector.getAllAndOverride.mockReturnValue(['rbac.read', 'users.read']);
 
     expect(
       guard.canActivate(

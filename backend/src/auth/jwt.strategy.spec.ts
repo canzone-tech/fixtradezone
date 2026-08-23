@@ -15,7 +15,7 @@ describe('JwtStrategy', () => {
   const activeUser = {
     id: 'user-id',
     email: 'user@example.com',
-    username: null,
+    username: 'prashant',
     phone: null,
     firstName: 'Prashant',
     lastName: 'Shukla',
@@ -54,7 +54,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'access',
         sid: 'session-id',
       }),
@@ -79,7 +78,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'access',
         sid: 'session-id',
       }),
@@ -90,7 +88,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'refresh',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -98,22 +95,27 @@ describe('JwtStrategy', () => {
     expect(prisma.authSession.findUnique).not.toHaveBeenCalled();
   });
 
-  it('rejects a token when the account email no longer matches', async () => {
+  it('keeps an active session valid when profile email changes', async () => {
     prisma.authSession.findUnique.mockResolvedValue({
       userId: activeUser.id,
       expiresAt: new Date(Date.now() + 60_000),
       revokedAt: null,
-      user: activeUser,
+      user: {
+        ...activeUser,
+        email: 'changed@example.com',
+      },
     });
 
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: 'stale@example.com',
         type: 'access',
         sid: 'session-id',
       }),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    ).resolves.toMatchObject({
+      id: activeUser.id,
+      email: 'changed@example.com',
+    });
   });
 
   it('rejects access tokens for revoked sessions', async () => {
@@ -127,7 +129,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'access',
         sid: 'session-id',
       }),
@@ -145,7 +146,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'access',
         sid: 'session-id',
       }),
@@ -163,7 +163,6 @@ describe('JwtStrategy', () => {
     await expect(
       strategy.validate({
         sub: activeUser.id,
-        email: activeUser.email,
         type: 'access',
         sid: 'session-id',
       }),

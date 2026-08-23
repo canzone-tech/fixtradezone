@@ -1,5 +1,23 @@
 # FixTradeZone — Changelog
 
+## 2026-08-23
+- Added SUPER_ADMIN-controlled configurable username/email/mobile login methods with invariant enforcement.
+- Decoupled JWT/session identity from mutable email identifiers and retained UUID/session identity as the technical authority.
+- Added configurable public, SUPER_ADMIN, ADMIN, and authorized-USER registration policy.
+- Added configurable AUTO/MANUAL/AUTO_OR_MANUAL password and username creation modes.
+- Added race-safe generated usernames with a persisted system sequence and optional prefix.
+- Added nullable email/mobile identifiers plus conditional `user_identifier_claims` for single-account uniqueness.
+- Added transactional SINGLE/MULTIPLE account-mode transitions with duplicate detection and claim rebuilding.
+- Added mandatory one-purpose password-change flow for automatically generated temporary passwords.
+- Prevented temporary-password users from receiving normal access/refresh sessions before replacing the password.
+- Added migration `0005_configurable_auth_registration` and verified it in local MySQL.
+- Added reusable Redis application infrastructure using `ioredis` and verified live `PING -> PONG` connectivity.
+- Added custom LOGIN/REGISTRATION CAPTCHA with Redis TTL, HMAC-protected answer state, attempt limits, purpose binding, atomic consumption, and replay protection.
+- Added SUPER_ADMIN authentication and registration configuration APIs.
+- Verified the complete backend regression suite: 23 suites / 124 tests passing.
+- Verified NestJS production build, feature-only ESLint, and whitespace checks.
+- Verified Configurable Auth, Registration, required-password-change, and CAPTCHA flows locally through Postman.
+
 ## 2026-08-21
 - Started the secure user-impersonation vertical slice on `agent/user-impersonation`.
 - Added `users.impersonate` RBAC authority and eligible ordinary-USER impersonation controls.

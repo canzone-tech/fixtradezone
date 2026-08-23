@@ -28,8 +28,6 @@ function isImpersonationTokenPayload(
   return (
     typeof candidate.sub === 'string' &&
     candidate.sub.length > 0 &&
-    typeof candidate.email === 'string' &&
-    candidate.email.length > 0 &&
     candidate.type === 'impersonation' &&
     typeof candidate.iid === 'string' &&
     candidate.iid.length > 0 &&
@@ -138,7 +136,6 @@ export class ImpersonationStrategy extends PassportStrategy(
 
     if (
       subject.status !== 'ACTIVE' ||
-      subject.email !== payload.email ||
       !subject.roles.includes(DEFAULT_USER_ROLE_NAME) ||
       subject.roles.includes(ADMIN_ROLE_NAME) ||
       subject.roles.includes(SUPER_ADMIN_ROLE_NAME)

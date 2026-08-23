@@ -9,6 +9,8 @@ import { RbacModule } from './rbac/rbac.module';
 import { UsersModule } from './users/users.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PlatformConfigModule } from './platform-config/platform-config.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -22,10 +24,12 @@ import { DashboardModule } from './dashboard/dashboard.module';
       },
     }),
     PrismaModule,
+    RedisModule,
     AuthModule,
     RbacModule,
     UsersModule,
     SecurityConfigModule,
+    PlatformConfigModule,
     DashboardModule,
     HealthModule,
   ],

@@ -102,3 +102,89 @@ Do not use `prisma migrate dev` for this project unless a shadow database is exp
 ## Founder Administrator Bootstrap
 
 The API idempotently ensures both `USER` and `ADMIN` roles exist. The one-time `admin:bootstrap` CLI uses a serializable transaction to activate one registered founder account and assign its ADMIN role. It refuses to run after any ADMIN assignment exists and records system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role assignments require the normal audited RBAC workflow.
+
+## Configurable Auth/Registration Schema — Migration 0005
+
+Migration `0005_configurable_auth_registration` was applied and verified locally on 2026-08-23.
+
+### Updated User Identifier Rules
+
+Current `users` identifier columns:
+
+- `username` — required and unique.
+- `email` — nullable, indexed, not directly unique.
+- `phone` — nullable, indexed, not directly unique.
+- `phoneVerifiedAt` — nullable verification timestamp.
+- `mustChangePassword` — required boolean, default false.
+
+Conditional single-account uniqueness is implemented through `user_identifier_claims`, rather than permanent direct unique indexes on email/mobile.
+
+### UserIdentifierClaim
+
+Stores the normalized EMAIL or MOBILE identifier claimed by a user while that identifier type operates in single-account mode.
+
+The `(type, normalizedValue)` uniqueness constraint prevents duplicate single-account identifiers.
+
+When a configuration moves to multiple-account mode, claims for that identifier type are removed.
+
+When configuration moves back to single-account mode:
+
+1. existing users are checked for duplicates;
+2. the transition is rejected if duplicates exist;
+3. claims are rebuilt transactionally if the data is safe.
+
+### SystemAuthConfig
+
+Singleton authentication configuration containing:
+
+- loginWithUsername
+- loginWithEmail
+- loginWithMobile
+- captchaOnLoginEnabled
+- captchaOnRegistrationEnabled
+- updatedByUserId
+- createdAt
+- updatedAt
+
+### SystemRegistrationConfig
+
+Singleton registration configuration containing:
+
+- publicRegistrationEnabled
+- superAdminRegistrationEnabled
+- adminRegistrationEnabled
+- authorizedUserRegistrationEnabled
+- emailRequired
+- mobileRequired
+- passwordMode
+- usernameMode
+- usernamePrefixEnabled
+- usernamePrefix
+- allowMultipleAccountsPerEmail
+- allowMultipleAccountsPerMobile
+- updatedByUserId
+- createdAt
+- updatedAt
+
+### SystemSequence
+
+`system_sequences` provides race-safe transactional counters.
+
+Current sequence:
+
+- `username`
+- initial/verified local `nextValue`: `100001`
+
+### Local Verification
+
+Verified after migration:
+
+- migration record finished successfully and is not rolled back;
+- all new tables exist;
+- username unique index exists;
+- email and phone non-unique indexes exist;
+- configuration singleton records exist;
+- username sequence exists;
+- existing EMAIL and MOBILE claims were backfilled.
+
+CAPTCHA does not require a MySQL table or migration because challenge state is intentionally short-lived Redis state.

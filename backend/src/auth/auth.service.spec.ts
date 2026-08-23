@@ -1,10 +1,8 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { AuthService } from './auth.service';
-import { AUTH_USER_SELECT } from './auth-user';
-import { RegisterDto } from './dto/register.dto';
 import { PasswordService } from './password.service';
-import { RbacBootstrapService } from './rbac-bootstrap.service';
+import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
 
 describe('AuthService', () => {
@@ -53,6 +51,13 @@ describe('AuthService', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
+    },
+    systemAuthConfig: {
+      findUnique: jest.fn(),
+    },
+    systemRegistrationConfig: {
+      findUnique: jest.fn(),
     },
     authSession: {
       findFirst: jest.fn(),
@@ -66,8 +71,8 @@ describe('AuthService', () => {
     hash: jest.fn(),
     verifyForAuthentication: jest.fn(),
   };
-  const rbacBootstrapService = {
-    ensureDefaultUserRole: jest.fn(),
+  const registrationService = {
+    registerPublic: jest.fn(),
   };
   const tokenService = {
     issueTokenPair: jest.fn(),
@@ -81,10 +86,13 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     transaction.authSession.updateMany.mockResolvedValue({ count: 1 });
 
+    prisma.systemAuthConfig.findUnique.mockResolvedValue(null);
+    prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
+
     service = new AuthService(
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
-      rbacBootstrapService as unknown as RbacBootstrapService,
+      registrationService as unknown as RegistrationService,
       tokenService as unknown as TokenService,
     );
   });
@@ -93,8 +101,8 @@ describe('AuthService', () => {
     jest.useRealTimers();
   });
 
-  it('registers a user transactionally with the default role and audit log', async () => {
-    const dto: RegisterDto = {
+  it('delegates public registration to RegistrationService', async () => {
+    const dto = {
       email: activeUser.email,
       password: 'SecurePassword123!',
       username: activeUser.username,
@@ -102,79 +110,50 @@ describe('AuthService', () => {
       firstName: activeUser.firstName,
       lastName: activeUser.lastName,
     };
-    const pendingUser = {
-      ...activeUser,
-      status: 'PENDING' as const,
-      roles: [
-        {
-          role: {
-            name: 'USER',
-            status: 'ACTIVE' as const,
-            permissions: [],
-          },
-        },
-      ],
+
+    const registrationResult = {
+      message: 'Registration successful.',
+      user: {
+        id: activeUser.id,
+        email: activeUser.email,
+        username: activeUser.username,
+        phone: activeUser.phone,
+        firstName: activeUser.firstName,
+        lastName: activeUser.lastName,
+        status: 'PENDING',
+        roles: ['USER'],
+        permissions: [],
+      },
     };
 
-    passwordService.hash.mockResolvedValue('argon2-hash');
-    rbacBootstrapService.ensureDefaultUserRole.mockResolvedValue({
-      id: 'role-id',
-      name: 'USER',
-    });
-    transaction.user.create.mockResolvedValue(pendingUser);
+    registrationService.registerPublic.mockResolvedValue(registrationResult);
 
-    const result = await service.register(dto, {
+    const context = {
       ipAddress: '127.0.0.1',
       userAgent: 'Jest',
-    });
-
-    expect(passwordService.hash).toHaveBeenCalledWith(dto.password);
-    expect(transaction.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        select: AUTH_USER_SELECT,
-      }),
-    );
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        actorUserId: activeUser.id,
-        action: 'CREATE',
-        entityType: 'User',
-        entityId: activeUser.id,
-        description: 'User completed self-registration.',
-        metadata: {
-          source: 'SELF_REGISTRATION',
-        },
-        ipAddress: '127.0.0.1',
-        userAgent: 'Jest',
-      },
-    });
-    expect(result.user).toMatchObject({
-      email: activeUser.email,
-      status: 'PENDING',
-      roles: ['USER'],
-      permissions: [],
-    });
-    expect(JSON.stringify(result)).not.toContain('argon2-hash');
-    expect(JSON.stringify(result)).not.toContain(dto.password);
-  });
-
-  it('returns a conflict for duplicate user identifiers', async () => {
-    const dto: RegisterDto = {
-      email: activeUser.email,
-      password: 'SecurePassword123!',
     };
 
-    passwordService.hash.mockResolvedValue('argon2-hash');
-    rbacBootstrapService.ensureDefaultUserRole.mockResolvedValue({
-      id: 'role-id',
-      name: 'USER',
-    });
-    transaction.user.create.mockRejectedValue({ code: 'P2002' });
-
-    await expect(service.register(dto)).rejects.toBeInstanceOf(
-      ConflictException,
+    await expect(service.register(dto, context)).resolves.toEqual(
+      registrationResult,
     );
-    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+
+    expect(registrationService.registerPublic).toHaveBeenCalledWith(
+      dto,
+      context,
+    );
+  });
+
+  it('propagates registration errors from RegistrationService', async () => {
+    const error = new ConflictException('Duplicate identifier.');
+
+    registrationService.registerPublic.mockRejectedValue(error);
+
+    await expect(
+      service.register({
+        email: activeUser.email,
+        password: 'SecurePassword123!',
+      }),
+    ).rejects.toBe(error);
   });
 
   it('logs in an active user and persists an audited refresh session', async () => {
@@ -183,7 +162,7 @@ describe('AuthService', () => {
     tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
 
     const result = await service.login({
-      email: activeUser.email,
+      identifier: activeUser.username,
       password: 'SecurePassword123!',
     });
 
@@ -209,6 +188,7 @@ describe('AuthService', () => {
         description: 'User login succeeded.',
         metadata: {
           event: 'SESSION_CREATED',
+          identifierType: 'USERNAME',
         },
         ipAddress: undefined,
         userAgent: undefined,
@@ -239,22 +219,22 @@ describe('AuthService', () => {
 
     await expect(
       service.login({
-        email: 'missing@example.com',
+        identifier: 'missing-user',
         password: 'submitted-password',
       }),
     ).rejects.toMatchObject({
       response: {
-        message: 'Invalid email or password.',
+        message: 'Invalid login credentials.',
       },
     });
     await expect(
       service.login({
-        email: activeUser.email,
+        identifier: activeUser.username,
         password: 'submitted-password',
       }),
     ).rejects.toMatchObject({
       response: {
-        message: 'Invalid email or password.',
+        message: 'Invalid login credentials.',
       },
     });
     expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
@@ -266,12 +246,12 @@ describe('AuthService', () => {
 
     await expect(
       service.login({
-        email: activeUser.email,
+        identifier: activeUser.username,
         password: 'incorrect-password',
       }),
     ).rejects.toMatchObject({
       response: {
-        message: 'Invalid email or password.',
+        message: 'Invalid login credentials.',
       },
     });
     expect(passwordService.verifyForAuthentication).toHaveBeenCalledWith(
@@ -287,7 +267,6 @@ describe('AuthService', () => {
 
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
-      email: activeUser.email,
       type: 'refresh',
       jti: 'old-session-id',
     });
@@ -336,7 +315,6 @@ describe('AuthService', () => {
 
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
-      email: activeUser.email,
       type: 'refresh',
       jti: 'old-session-id',
     });
@@ -369,7 +347,6 @@ describe('AuthService', () => {
     jest.useFakeTimers().setSystemTime(checkedAt);
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
-      email: activeUser.email,
       type: 'refresh',
       jti: 'expired-session-id',
     });
@@ -404,7 +381,6 @@ describe('AuthService', () => {
     jest.useFakeTimers().setSystemTime(rotatedAt);
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
-      email: activeUser.email,
       type: 'refresh',
       jti: 'old-session-id',
     });
@@ -441,7 +417,6 @@ describe('AuthService', () => {
 
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
-      email: activeUser.email,
       type: 'refresh',
       jti: issuedTokens.sessionId,
     });
@@ -488,5 +463,45 @@ describe('AuthService', () => {
     });
     expect(firstResult).toEqual({ message: 'Logout successful.' });
     expect(secondResult).toEqual({ message: 'Logout successful.' });
+  });
+
+  it('logs in using an E.164 mobile identifier', async () => {
+    prisma.user.findMany.mockResolvedValue([activeUser]);
+    passwordService.verifyForAuthentication.mockResolvedValue(true);
+    tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
+
+    await service.login({
+      identifier: ` ${activeUser.phone} `,
+      password: 'SecurePassword123!',
+    });
+
+    expect(prisma.user.findMany).toHaveBeenCalledTimes(1);
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          phone: activeUser.phone,
+        },
+        take: 2,
+      }),
+    );
+
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+
+    expect(transaction.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        actorUserId: activeUser.id,
+        action: 'LOGIN',
+        entityType: 'AuthSession',
+        entityId: issuedTokens.sessionId,
+        description: 'User login succeeded.',
+        metadata: {
+          event: 'SESSION_CREATED',
+          identifierType: 'MOBILE',
+        },
+        ipAddress: undefined,
+        userAgent: undefined,
+      },
+    });
   });
 });

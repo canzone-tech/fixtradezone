@@ -1,15 +1,27 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsString, MaxLength } from 'class-validator';
-import { normalizeEmail } from './string.transformers';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { trimString } from './string.transformers';
 
 export class LoginDto {
-  @Transform(normalizeEmail)
-  @IsEmail()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
   @MaxLength(191)
-  email!: string;
+  identifier!: string;
 
   @IsString()
   @IsNotEmpty()
   @MaxLength(128)
   password!: string;
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  captchaId?: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  captchaAnswer?: string;
 }

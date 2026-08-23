@@ -19,9 +19,7 @@ describe('RbacBootstrapService', () => {
 
     return {
       prisma,
-      service: new RbacBootstrapService(
-        prisma as unknown as PrismaService,
-      ),
+      service: new RbacBootstrapService(prisma as unknown as PrismaService),
     };
   }
 

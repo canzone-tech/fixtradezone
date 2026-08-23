@@ -33,8 +33,8 @@ export const AUTH_USER_SELECT = {
 
 export interface AuthUserRecord {
   id: string;
-  email: string;
-  username: string | null;
+  email: string | null;
+  username: string;
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -56,8 +56,8 @@ export interface AuthUserRecord {
 
 export interface AuthenticatedUser {
   id: string;
-  email: string;
-  username: string | null;
+  email: string | null;
+  username: string;
   phone: string | null;
   firstName: string | null;
   lastName: string | null;

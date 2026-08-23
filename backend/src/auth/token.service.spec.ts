@@ -35,7 +35,7 @@ describe('TokenService', () => {
       .mockResolvedValueOnce('refresh-token');
 
     const result = await service.issueTokenPair(
-      { id: 'user-id', email: 'user@example.com' },
+      { id: 'user-id' },
       'session-id',
     );
 
@@ -43,7 +43,6 @@ describe('TokenService', () => {
       1,
       {
         sub: 'user-id',
-        email: 'user@example.com',
         type: 'access',
         sid: 'session-id',
       },
@@ -59,7 +58,6 @@ describe('TokenService', () => {
       2,
       {
         sub: 'user-id',
-        email: 'user@example.com',
         type: 'refresh',
         jti: 'session-id',
       },
@@ -82,7 +80,6 @@ describe('TokenService', () => {
   it('accepts only signed refresh-token payloads', async () => {
     const payload = {
       sub: 'user-id',
-      email: 'user@example.com',
       type: 'refresh' as const,
       jti: 'session-id',
     };

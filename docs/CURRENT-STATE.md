@@ -1,81 +1,130 @@
 # FixTradeZone — Current State
 
-## Latest Verified Checkpoint — 2026-08-21
+## Latest Verified Checkpoint — 2026-08-23
 
-- PR #9 is merged into `main` at merge commit `c398986`.
-- Current feature branch: `agent/user-impersonation`.
-- Current branch contains the locally verified User Impersonation, Security Configuration, Session Reauthentication, Idle Lock, User Shell, and Users UI completion milestone.
-- FixTradeZone Dark Neo remains the single approved protected-application design system.
-- Dashboard design remains locked and was not redesigned by this milestone.
-- Protected administrator pages use the shared AdminShell/Startbar/Topbar.
-- Protected USER impersonation pages use the USER shell while reusing the same approved master sidebar/topbar visual system.
-- Application pages must retain sidebar + topbar unless the Founder explicitly approves an exception.
-- `/users` now uses the full available desktop content width while wide tables retain internal horizontal scrolling on smaller screens.
+- Current feature branch: `feature/configurable-auth-registration`.
+- Base commit: `0bc78b5` (PR #10 merged into `main`).
+- Configurable authentication and registration foundation is implemented and locally verified.
+- Migration `0005_configurable_auth_registration` is applied and verified in local MySQL.
+- Redis application infrastructure is implemented and live connectivity is verified.
+- Custom server-authoritative CAPTCHA is implemented for public Login and Registration.
+- Backend regression status: 23 test suites / 124 tests pass.
+- NestJS production build passes.
+- Feature-only ESLint passes.
+- `git diff --check` passes.
+- Local Postman verification is GREEN.
+- No pull request has been opened for this feature yet.
 
-## User Impersonation
+## Configurable Authentication
 
-Implemented and locally verified:
+SUPER_ADMIN-controlled authentication settings:
 
-- `users.impersonate` is an RBAC permission.
-- SUPER_ADMIN may impersonate eligible ordinary USER accounts.
-- ADMIN may impersonate only when `users.impersonate` is present in its effective permission scope.
-- ADMIN, SUPER_ADMIN, self, non-USER, and non-ACTIVE subjects are not eligible impersonation targets.
-- Impersonation uses a dedicated JWT/session boundary and not the normal administrator JWT boundary.
-- Impersonation tokens cannot authenticate against administrator APIs.
-- Impersonation sessions retain both original actor identity and selected USER identity.
-- One active impersonation is allowed per administrator authentication session.
-- Impersonation start/stop is audited.
-- Return-to-Admin remains available even if the actor's impersonation permission changes after session start.
-- The browser receives impersonation state through same-origin Next.js BFF routes and HttpOnly cookies.
-- `/user/impersonation` resolves the selected live USER account from the backend.
-- The USER shell displays the selected USER identity and persistent Return-to-Admin controls.
-- Administrator permissions are never inherited by the impersonated USER identity.
-
-## Full vs Limited Impersonation
-
-- SUPER_ADMIN controls `fullUserImpersonationEnabled`.
-- `LIMITED` mode is the safe support boundary.
-- `FULL` mode enables the full-user authorization boundary for implemented USER-side APIs.
-- The effective mode is evaluated live from security configuration; an existing impersonation session can move between LIMITED and FULL without token reissue.
-- Sensitive/full USER APIs must use the server-side full-impersonation authorization guard.
-- FULL impersonation does not grant administrator authority to the selected USER identity.
-- Complete USER business modules will be added as their vertical slices are implemented; the current user view is the verified live-account/session foundation.
-
-## Security Configuration
-
-Local migration `0004_security_configuration` is applied and verified.
-
-The singleton configuration currently supports:
-
-- `fullUserImpersonationEnabled`
-- `idleLockMinutes`
-- `updatedByUserId`
-- audit metadata
+- Login with username.
+- Login with email.
+- Login with mobile.
+- CAPTCHA on Login.
+- CAPTCHA on Registration.
 
 Rules:
 
-- Configuration is SUPER_ADMIN-only.
-- Default idle lock is 5 minutes.
-- Valid idle lock range is 1–120 minutes.
-- Database constraints and backend DTO/service validation enforce the allowed range.
-- `/settings/security` is available only to SUPER_ADMIN.
-- The SUPER_ADMIN sidebar profile includes a Security Configuration shortcut.
+- At least one login identifier must remain enabled.
+- Username is the canonical human account handle and remains unique.
+- JWT/session identity is based on immutable user/session IDs, not email.
+- Email and mobile may be nullable.
+- When multiple accounts per email or mobile are enabled, username-only login is enforced.
+- Email/mobile login rejects ambiguous identifier matches.
+- E.164 mobile login is supported.
+- Login credential failures remain generic.
 
-## Session Reauthentication and Idle Lock
+## Configurable Registration
 
-Implemented and locally verified:
+SUPER_ADMIN-controlled registration settings:
 
-- Protected sessions expose the configured idle-lock policy.
-- Inactivity displays a lock overlay without logging the current session out.
-- Locking preserves the current page and in-memory UI state.
-- Unlock requires password reauthentication.
-- A normal administrator session reauthenticates the current administrator.
-- During USER impersonation, unlock verifies the original ADMIN/SUPER_ADMIN actor password, not the selected USER password.
-- Wrong passwords remain rejected.
-- Correct reauthentication unlocks the same screen without redirecting or recreating the impersonation session.
-- Administrator and USER shells both use the same shared idle-lock implementation.
+- Public registration.
+- SUPER_ADMIN-created registration.
+- ADMIN-created registration.
+- Authorized USER-created registration.
+- Email required.
+- Mobile required.
+- Password mode:
+  - AUTO
+  - MANUAL
+  - AUTO_OR_MANUAL
+- Username mode:
+  - AUTO
+  - MANUAL
+  - AUTO_OR_MANUAL
+- Optional generated-username prefix.
+- Multiple accounts per email.
+- Multiple accounts per mobile.
 
-## Database Migrations
+Registration sources remain independently auditable:
+
+- SELF_REGISTRATION
+- SUPER_ADMIN
+- ADMIN
+- AUTHORIZED_USER
+
+`createdBy` and future sponsor/referral relationships remain separate concepts.
+
+## Generated Username and Identifier Claims
+
+- Username is required and unique.
+- Automatic usernames use the transactional `username` system sequence.
+- Current local sequence starts from `100001`.
+- Optional username prefix affects future generated usernames only.
+- `user_identifier_claims` enforces EMAIL/MOBILE uniqueness while the related identifier is configured for single-account mode.
+- SINGLE -> MULTIPLE removes the related uniqueness claims.
+- MULTIPLE -> SINGLE rejects existing duplicate users and rebuilds claims transactionally.
+
+## Required Password Change
+
+Automatically generated passwords are temporary credentials.
+
+A user with `mustChangePassword=true`:
+
+- does not receive a normal access token;
+- does not receive a normal refresh token;
+- does not receive a normal authenticated session;
+- receives only a short-lived one-purpose `password_change` JWT;
+- must submit a different new password;
+- has active sessions revoked defensively;
+- has the flag cleared atomically after successful password replacement;
+- must sign in again after successful password change.
+
+Password-change replay and concurrent update races are rejected.
+
+## CAPTCHA
+
+Custom CAPTCHA is implemented without a third-party CAPTCHA service.
+
+Security properties:
+
+- Public challenge endpoint: `POST /auth/captcha`.
+- Purposes:
+  - LOGIN
+  - REGISTRATION
+- CAPTCHA configuration is SUPER_ADMIN-controlled.
+- Challenge state is stored in Redis.
+- Challenge TTL is 180 seconds.
+- Maximum failed attempts: 5.
+- Successful verification consumes the challenge atomically.
+- Fifth failed attempt destroys the challenge.
+- Challenge is bound to its declared purpose.
+- Redis stores only a keyed HMAC digest of the answer, never the plaintext answer.
+- Challenge IDs are cryptographically random.
+- CAPTCHA is fail-closed when enabled.
+- When disabled, existing Login/Registration behavior remains unchanged.
+
+## Redis Foundation
+
+- `ioredis` is used by the backend.
+- Redis configuration uses existing `REDIS_HOST`, `REDIS_PORT`, and `REDIS_PASSWORD`.
+- `CAPTCHA_HMAC_SECRET` is required and must contain at least 32 characters.
+- Application Redis lifecycle connection/disconnection is managed by `RedisService`.
+- Local Redis connection is verified with `PING -> PONG`.
+
+## Database Migration State
 
 Applied and verified locally:
 
@@ -83,61 +132,67 @@ Applied and verified locally:
 - `0002_auth_sessions`
 - `0003_user_impersonation`
 - `0004_security_configuration`
+- `0005_configurable_auth_registration`
 
-No additional application/shadow/test database was created.
+Migration `0005_configurable_auth_registration` verified:
 
-## Verification Status
+- `users.username` is required and unique.
+- `users.email` is nullable and indexed without a direct unique constraint.
+- `users.phone` is nullable and indexed without a direct unique constraint.
+- `users.phoneVerifiedAt` exists.
+- `users.mustChangePassword` exists.
+- `user_identifier_claims` exists.
+- `system_auth_config` exists.
+- `system_registration_config` exists.
+- `system_sequences` exists.
+- Authentication and registration singleton defaults are seeded.
+- Existing EMAIL/MOBILE claims were backfilled.
+
+No additional FixTradeZone application/shadow/test database was created.
+
+## Local Verification Status
 
 Backend:
 
-- Production build passes.
-- 18 test suites pass.
-- 82 tests pass.
-- Prisma schema/migrations are locally verified.
-- Postman MASTER collection impersonation/security/session-policy flows are locally green.
-
-Admin:
-
-- ESLint passes for the changed milestone files.
-- Next.js production build passes.
-- Security Configuration UI is visually approved.
-- USER impersonation shell is visually approved.
-- Idle-lock behavior is locally verified for normal administrator and impersonated USER sessions.
-- `/users` full-width desktop table behavior is visually approved.
+- 23 test suites pass.
+- 124 tests pass.
+- NestJS production build passes.
+- Feature-only ESLint passes.
 - `git diff --check` passes.
+- Prisma migration `0005` is locally applied and verified.
+- Redis connectivity is locally verified.
+- Postman Configurable Auth / Registration / CAPTCHA APIs are GREEN.
 
 ## Security Boundaries Preserved
 
-- JWT deny-by-default remains authoritative.
+- APIs remain deny-by-default.
+- Only explicitly public endpoints bypass the global JWT guard.
 - RBAC remains backend-authoritative.
 - SUPER_ADMIN founder protections remain intact.
-- Impersonation JWTs cannot cross into administrator APIs.
-- Administrator privileges do not leak into impersonated USER authorization.
-- Tokens remain server-side/HttpOnly in the admin browser flow.
-- Password hashes, refresh-token hashes, and raw credentials are not exposed.
-- Financial rules remain unchanged.
-- Simulated activity must remain explicitly labeled as simulated.
-
-## Dependency Security Status
-
-The Prisma 7.9.1 transitive `deepmerge-ts@7.1.5` advisory remains tracked.
-
-Do not run `npm audit fix --force` and do not introduce an unverified dependency override.
+- Configuration mutation remains SUPER_ADMIN-only.
+- JWT identity is not coupled to mutable email/mobile identifiers.
+- Plaintext passwords are never stored.
+- CAPTCHA answers are never stored in plaintext.
+- Refresh-token hashes remain non-reversible.
+- Impersonation boundaries remain isolated.
+- Financial security rules remain unchanged.
+- Simulated trade activity must remain explicitly labeled as simulated.
 
 ## Immediate Next Actions
 
 1. Synchronize persistent project documentation with this verified milestone.
-2. Perform final backend/admin repository gates.
-3. Review the complete feature diff and stage only the exact milestone files.
-4. Create the local feature commit.
-5. Push/open a pull request only after explicit Founder approval.
-6. After merge, continue with the next approved vertical slice, currently Packages.
+2. Review and stage only the exact feature files.
+3. Create the local feature commit.
+4. Push the feature branch.
+5. Open a pull request only after explicit Founder approval.
+6. Merge only after CI/review is green.
+7. Continue reusable-foundation freeze/verification before starting Packages.
 
 ## Constraints
 
 - Never create extra FixTradeZone application databases.
 - Never use Prisma `migrate dev` without explicit shadow-database approval.
-- Never expose secrets or authentication tokens.
-- Never allow impersonation to inherit administrator authority.
+- Never expose secrets, CAPTCHA HMAC secrets, tokens, or password material.
+- Never weaken JWT/RBAC/audit/security invariants through configuration.
+- Never auto-credit deposits from TXID submission alone.
 - Never represent simulated trades/results as real.
-- Never auto-credit deposits solely from TXID submission.

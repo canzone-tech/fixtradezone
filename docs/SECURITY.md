@@ -134,3 +134,19 @@ Do not add an unverified npm override for `deepmerge-ts` 8.x.
 The advisory is tracked and will be reassessed when Prisma publishes a
 compatible security update or an officially supported remediation becomes
 available.
+
+## Configurable Authentication & CAPTCHA — 2026-08-23
+
+- Authentication identity uses immutable user/session IDs rather than mutable email/mobile identifiers.
+- Username remains required and unique.
+- Multiple-account email/mobile configuration forces username-only login.
+- SUPER_ADMIN alone may mutate authentication and registration configuration.
+- Generated passwords set `mustChangePassword=true` and cannot create normal access/refresh sessions.
+- Required password replacement uses a short-lived one-purpose JWT and atomic state transition.
+- CAPTCHA state is stored temporarily in Redis.
+- CAPTCHA challenges expire after 180 seconds and allow at most 5 failed attempts.
+- Successful CAPTCHA verification consumes the challenge atomically.
+- Challenges are purpose-bound to LOGIN or REGISTRATION.
+- Redis stores only HMAC-SHA256 answer digests, never plaintext answers.
+- `CAPTCHA_HMAC_SECRET` must contain at least 32 characters and must never be committed or exposed.
+- Enabled CAPTCHA requirements fail closed.
