@@ -2,12 +2,20 @@
   position: relative;
   display: grid;
   min-height: 100vh;
-  grid-template-columns: minmax(0, 1.25fr) minmax(420px, .75fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(420px, 0.75fr);
   overflow: hidden;
   color: var(--ftz-text);
   background:
-    radial-gradient(circle at 14% 18%, rgba(0, 224, 220, .08), transparent 24rem),
-    radial-gradient(circle at 60% 70%, rgba(88, 36, 255, .16), transparent 28rem),
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(0, 224, 220, 0.08),
+      transparent 24rem
+    ),
+    radial-gradient(
+      circle at 60% 70%,
+      rgba(88, 36, 255, 0.16),
+      transparent 28rem
+    ),
     #020817;
 }
 
@@ -19,10 +27,14 @@
   justify-content: space-between;
   overflow: hidden;
   padding: 30px 42px 34px;
-  border-right: 1px solid rgba(69, 115, 190, .18);
+  border-right: 1px solid rgba(69, 115, 190, 0.18);
   background:
-    linear-gradient(90deg, rgba(2, 8, 24, .45), rgba(2, 8, 24, .10)),
-    radial-gradient(circle at 70% 45%, rgba(33, 39, 169, .17), transparent 27rem);
+    linear-gradient(90deg, rgba(2, 8, 24, 0.45), rgba(2, 8, 24, 0.1)),
+    radial-gradient(
+      circle at 70% 45%,
+      rgba(33, 39, 169, 0.17),
+      transparent 27rem
+    );
 }
 
 .ftz-auth-visual::before,
@@ -34,11 +46,19 @@
 
 .ftz-auth-visual::before {
   inset: 0;
-  opacity: .7;
+  opacity: 0.7;
   background:
-    radial-gradient(ellipse at 22% 76%, rgba(31, 65, 255, .24), transparent 19%),
-    radial-gradient(ellipse at 42% 72%, rgba(72, 22, 255, .20), transparent 27%),
-    radial-gradient(ellipse at 32% 80%, rgba(0, 148, 255, .10), transparent 42%);
+    radial-gradient(
+      ellipse at 22% 76%,
+      rgba(31, 65, 255, 0.24),
+      transparent 19%
+    ),
+    radial-gradient(
+      ellipse at 42% 72%,
+      rgba(72, 22, 255, 0.2),
+      transparent 27%
+    ),
+    radial-gradient(ellipse at 32% 80%, rgba(0, 148, 255, 0.1), transparent 42%);
   filter: blur(8px);
 }
 
@@ -48,14 +68,13 @@
   width: 80%;
   height: 75%;
   border-radius: 50%;
-  background:
-    repeating-radial-gradient(
-      ellipse at center,
-      rgba(62, 88, 255, .15) 0 1px,
-      transparent 2px 18px
-    );
+  background: repeating-radial-gradient(
+    ellipse at center,
+    rgba(62, 88, 255, 0.15) 0 1px,
+    transparent 2px 18px
+  );
   transform: rotate(-14deg);
-  opacity: .42;
+  opacity: 0.42;
 }
 
 .ftz-auth-plasma {
@@ -63,11 +82,23 @@
   inset: auto auto -10% -18%;
   width: 75%;
   height: 62%;
-  opacity: .9;
+  opacity: 0.9;
   background:
-    radial-gradient(ellipse at 52% 54%, rgba(17, 49, 255, .48), transparent 24%),
-    radial-gradient(ellipse at 72% 44%, rgba(141, 33, 255, .38), transparent 28%),
-    radial-gradient(ellipse at 42% 68%, rgba(0, 208, 255, .22), transparent 30%);
+    radial-gradient(
+      ellipse at 52% 54%,
+      rgba(17, 49, 255, 0.48),
+      transparent 24%
+    ),
+    radial-gradient(
+      ellipse at 72% 44%,
+      rgba(141, 33, 255, 0.38),
+      transparent 28%
+    ),
+    radial-gradient(
+      ellipse at 42% 68%,
+      rgba(0, 208, 255, 0.22),
+      transparent 30%
+    );
   filter: blur(20px);
   transform: rotate(-18deg);
   pointer-events: none;
@@ -78,11 +109,11 @@
   position: absolute;
   inset: 25% -25% 8% 0;
   border-radius: 50%;
-  border-top: 2px solid rgba(69, 84, 255, .55);
-  border-bottom: 1px solid rgba(180, 31, 255, .38);
+  border-top: 2px solid rgba(69, 84, 255, 0.55);
+  border-bottom: 1px solid rgba(180, 31, 255, 0.38);
   box-shadow:
-    0 -8px 22px rgba(12, 108, 255, .16),
-    0 8px 22px rgba(133, 34, 255, .18);
+    0 -8px 22px rgba(12, 108, 255, 0.16),
+    0 8px 22px rgba(133, 34, 255, 0.18);
   transform: skewX(-24deg) rotate(-7deg);
 }
 
@@ -109,14 +140,14 @@
   align-items: center;
   gap: 7px;
   padding: 7px 11px;
-  border: 1px solid rgba(23, 235, 212, .28);
+  border: 1px solid rgba(23, 235, 212, 0.28);
   border-radius: 999px;
   color: #21f3c3;
-  background: rgba(4, 87, 78, .20);
-  box-shadow: 0 0 18px rgba(17, 229, 202, .07);
+  background: rgba(4, 87, 78, 0.2);
+  box-shadow: 0 0 18px rgba(17, 229, 202, 0.07);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: .02em;
+  letter-spacing: 0.02em;
 }
 
 .ftz-auth-story h1 {
@@ -125,8 +156,8 @@
   color: #f8fbff;
   font-size: clamp(42px, 4.4vw, 70px);
   font-weight: 780;
-  line-height: .99;
-  letter-spacing: -.045em;
+  line-height: 0.99;
+  letter-spacing: -0.045em;
 }
 
 .ftz-auth-story h1 span {
@@ -160,16 +191,16 @@
   gap: 1px 8px;
   align-items: center;
   padding: 9px 11px;
-  border: 1px solid rgba(71, 113, 181, .22);
+  border: 1px solid rgba(71, 113, 181, 0.22);
   border-radius: 10px;
-  background: rgba(4, 15, 38, .62);
+  background: rgba(4, 15, 38, 0.62);
   backdrop-filter: blur(10px);
-  transition: .18s ease;
+  transition: 0.18s ease;
 }
 
 .ftz-auth-market-row > div:hover {
-  border-color: rgba(25, 231, 217, .42);
-  background: rgba(6, 29, 53, .75);
+  border-color: rgba(25, 231, 217, 0.42);
+  background: rgba(6, 29, 53, 0.75);
   transform: translateY(-2px);
 }
 
@@ -202,9 +233,15 @@
   font-weight: 800;
 }
 
-.ftz-auth-coin.bitcoin { background: #f7931a; }
-.ftz-auth-coin.ethereum { background: #496ee3; }
-.ftz-auth-coin.solana { background: linear-gradient(145deg, #22e8bc, #7c37ff); }
+.ftz-auth-coin.bitcoin {
+  background: #f7931a;
+}
+.ftz-auth-coin.ethereum {
+  background: #496ee3;
+}
+.ftz-auth-coin.solana {
+  background: linear-gradient(145deg, #22e8bc, #7c37ff);
+}
 
 .ftz-auth-bull {
   position: absolute;
@@ -213,12 +250,24 @@
   bottom: 7%;
   width: 64%;
   height: 56%;
-  opacity: .24;
+  opacity: 0.24;
   background:
-    linear-gradient(90deg, #020817 0%, rgba(2, 8, 23, .58) 23%, transparent 55%),
-    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") right center / cover no-repeat;
+    linear-gradient(
+      90deg,
+      #020817 0%,
+      rgba(2, 8, 23, 0.58) 23%,
+      transparent 55%
+    ),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") right center /
+      cover no-repeat;
   filter: saturate(1.2) contrast(1.08);
-  mask-image: linear-gradient(to top, transparent 0%, #000 14%, #000 88%, transparent 100%);
+  mask-image: linear-gradient(
+    to top,
+    transparent 0%,
+    #000 14%,
+    #000 88%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 
@@ -253,18 +302,22 @@
   flex-direction: column;
   padding: 30px;
   background:
-    radial-gradient(circle at 55% 35%, rgba(27, 78, 134, .08), transparent 24rem),
-    rgba(2, 8, 23, .95);
+    radial-gradient(
+      circle at 55% 35%,
+      rgba(27, 78, 134, 0.08),
+      transparent 24rem
+    ),
+    rgba(2, 8, 23, 0.95);
 }
 
 .ftz-auth-panel::before {
   content: "";
   position: absolute;
   inset: 0;
-  opacity: .18;
+  opacity: 0.18;
   background-image:
-    linear-gradient(rgba(53, 91, 146, .07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(53, 91, 146, .07) 1px, transparent 1px);
+    linear-gradient(rgba(53, 91, 146, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53, 91, 146, 0.07) 1px, transparent 1px);
   background-size: 42px 42px;
   mask-image: radial-gradient(circle at center, #000, transparent 72%);
   pointer-events: none;
@@ -279,13 +332,16 @@
   z-index: 2;
   width: min(100%, 430px);
   padding: 34px;
-  border: 1px solid rgba(67, 112, 181, .30);
+  border: 1px solid rgba(67, 112, 181, 0.3);
   border-radius: 18px;
-  background:
-    linear-gradient(145deg, rgba(8, 26, 55, .94), rgba(3, 13, 33, .96));
+  background: linear-gradient(
+    145deg,
+    rgba(8, 26, 55, 0.94),
+    rgba(3, 13, 33, 0.96)
+  );
   box-shadow:
-    0 28px 70px rgba(0, 0, 0, .38),
-    inset 0 1px 0 rgba(255, 255, 255, .025);
+    0 28px 70px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.025);
   backdrop-filter: blur(18px);
 }
 
@@ -295,8 +351,14 @@
   inset: -1px;
   z-index: -1;
   border-radius: inherit;
-  opacity: .30;
-  background: linear-gradient(135deg, #18eadc, transparent 24%, transparent 72%, #6b40ff);
+  opacity: 0.3;
+  background: linear-gradient(
+    135deg,
+    #18eadc,
+    transparent 24%,
+    transparent 72%,
+    #6b40ff
+  );
   filter: blur(6px);
 }
 
@@ -304,7 +366,7 @@
   color: #19e6d3;
   font-size: 9px;
   font-weight: 800;
-  letter-spacing: .14em;
+  letter-spacing: 0.14em;
 }
 
 .ftz-login-head h2 {
@@ -312,7 +374,7 @@
   color: #fff;
   font-size: 30px;
   font-weight: 760;
-  letter-spacing: -.025em;
+  letter-spacing: -0.025em;
 }
 
 .ftz-login-head p {
@@ -360,20 +422,20 @@
   z-index: 1;
   color: #7e91ae;
   font-size: 18px;
-  transition: .16s ease;
+  transition: 0.16s ease;
 }
 
 .ftz-auth-input input {
   width: 100%;
   height: 100%;
   padding: 0 44px 0 43px;
-  border: 1px solid rgba(83, 119, 176, .30);
+  border: 1px solid rgba(83, 119, 176, 0.3);
   border-radius: 10px;
   outline: 0;
   color: #f5f8ff;
-  background: rgba(1, 9, 25, .70);
+  background: rgba(1, 9, 25, 0.7);
   font-size: 11px;
-  transition: .16s ease;
+  transition: 0.16s ease;
 }
 
 .ftz-auth-input input::placeholder {
@@ -381,8 +443,10 @@
 }
 
 .ftz-auth-input:focus-within input {
-  border-color: rgba(23, 233, 220, .72);
-  box-shadow: 0 0 0 3px rgba(23, 233, 220, .07), 0 0 18px rgba(23, 233, 220, .05);
+  border-color: rgba(23, 233, 220, 0.72);
+  box-shadow:
+    0 0 0 3px rgba(23, 233, 220, 0.07),
+    0 0 18px rgba(23, 233, 220, 0.05);
 }
 
 .ftz-auth-input:focus-within > i {
@@ -405,7 +469,7 @@
 
 .ftz-password-toggle:hover {
   color: #1fe6da;
-  background: rgba(17, 218, 205, .07);
+  background: rgba(17, 218, 205, 0.07);
 }
 
 .ftz-auth-error {
@@ -426,24 +490,28 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
-  border: 1px solid rgba(31, 255, 226, .34);
+  border: 1px solid rgba(31, 255, 226, 0.34);
   border-radius: 10px;
   color: #fff;
   background: linear-gradient(90deg, #078a88, #0bbb8e 52%, #0fc997);
-  box-shadow: 0 10px 28px rgba(8, 194, 159, .17), inset 0 1px 0 rgba(255, 255, 255, .14);
+  box-shadow:
+    0 10px 28px rgba(8, 194, 159, 0.17),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
   font-size: 11px;
   font-weight: 700;
-  transition: .17s ease;
+  transition: 0.17s ease;
 }
 
 .ftz-auth-submit:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 15px 36px rgba(8, 219, 178, .24), 0 0 20px rgba(8, 219, 178, .10);
+  box-shadow:
+    0 15px 36px rgba(8, 219, 178, 0.24),
+    0 0 20px rgba(8, 219, 178, 0.1);
 }
 
 .ftz-auth-submit:disabled {
   cursor: wait;
-  opacity: .68;
+  opacity: 0.68;
 }
 
 .ftz-auth-security-note {
@@ -451,9 +519,9 @@
   gap: 10px;
   margin-top: 22px;
   padding: 13px;
-  border: 1px solid rgba(31, 194, 160, .15);
+  border: 1px solid rgba(31, 194, 160, 0.15);
   border-radius: 10px;
-  background: rgba(8, 70, 64, .10);
+  background: rgba(8, 70, 64, 0.1);
 }
 
 .ftz-auth-security-note > i {
@@ -519,8 +587,16 @@
     min-height: 100vh;
     padding: 24px 18px;
     background:
-      radial-gradient(circle at 10% 92%, rgba(36, 40, 255, .20), transparent 18rem),
-      radial-gradient(circle at 90% 12%, rgba(0, 216, 197, .10), transparent 18rem),
+      radial-gradient(
+        circle at 10% 92%,
+        rgba(36, 40, 255, 0.2),
+        transparent 18rem
+      ),
+      radial-gradient(
+        circle at 90% 12%,
+        rgba(0, 216, 197, 0.1),
+        transparent 18rem
+      ),
       #020817;
   }
 
@@ -554,19 +630,13 @@
   }
 }
 
-
 /* FixTradeZone production vector artwork */
 .ftz-auth-bull {
   background:
-    linear-gradient(
-      90deg,
-      rgba(1, 10, 28, .12),
-      rgba(1, 10, 28, .02)
-    ),
-    url("/assets/fixtradezone/neo/dashboard-bull-banner.png")
-      66% center / cover no-repeat;
+    linear-gradient(90deg, rgba(1, 10, 28, 0.12), rgba(1, 10, 28, 0.02)),
+    url("/assets/fixtradezone/neo/dashboard-bull-banner.png") 66% center / cover
+      no-repeat;
 }
-
 
 /* =========================================================
    FIXTRADEZONE DARK NEO — LOGIN BULL FINAL LOCK
@@ -581,20 +651,17 @@
   background-image:
     radial-gradient(
       circle at 66% 50%,
-      rgba(13, 224, 211, .13),
+      rgba(13, 224, 211, 0.13),
       transparent 32%
     ),
     radial-gradient(
       circle at 82% 52%,
-      rgba(112, 57, 255, .16),
+      rgba(112, 57, 255, 0.16),
       transparent 37%
     ),
     url("/assets/fixtradezone/neo/dashboard-bull-banner.png") !important;
 
-  background-repeat:
-    no-repeat,
-    no-repeat,
-    no-repeat !important;
+  background-repeat: no-repeat, no-repeat, no-repeat !important;
 
   background-position:
     center,
@@ -624,5 +691,305 @@
       100% 100%,
       100% 100%,
       82% auto !important;
+  }
+}
+
+/* Configurable authentication additions */
+
+.ftz-captcha {
+  margin-top: 18px;
+  padding: 13px;
+  border: 1px solid rgba(83, 119, 176, 0.25);
+  border-radius: 11px;
+  background: rgba(1, 9, 25, 0.46);
+}
+
+.ftz-captcha-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.ftz-captcha-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ftz-captcha-head strong {
+  color: #c7d2e4;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.ftz-captcha-head small {
+  color: #647590;
+  font-size: 8px;
+}
+
+.ftz-captcha-head button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(83, 119, 176, 0.24);
+  border-radius: 8px;
+  color: #8ea1bd;
+  background: rgba(5, 18, 41, 0.72);
+}
+
+.ftz-captcha-head button:hover:not(:disabled) {
+  border-color: rgba(23, 233, 220, 0.48);
+  color: #21eadb;
+}
+
+.ftz-captcha-image {
+  display: grid;
+  min-height: 70px;
+  margin-bottom: 12px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(75, 114, 175, 0.22);
+  border-radius: 9px;
+  background: rgba(236, 245, 255, 0.96);
+}
+
+.ftz-captcha-image img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 64px;
+}
+
+.ftz-captcha-loading,
+.ftz-captcha-error {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 9px;
+}
+
+.ftz-captcha-loading {
+  color: #8fa1bc;
+  border: 1px solid rgba(73, 110, 169, 0.2);
+  background: rgba(5, 18, 40, 0.52);
+}
+
+.ftz-captcha-error {
+  justify-content: space-between;
+  color: #ff8293;
+  border: 1px solid rgba(255, 80, 105, 0.2);
+  background: rgba(106, 19, 39, 0.12);
+}
+
+.ftz-captcha-error button {
+  border: 0;
+  color: #23e7d7;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.ftz-auth-success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(24, 221, 171, 0.22);
+  border-radius: 9px;
+  color: #42ebbd;
+  background: rgba(8, 88, 68, 0.13);
+  font-size: 9px;
+}
+
+.ftz-auth-success i {
+  font-size: 15px;
+}
+
+/* Config-driven public registration */
+
+.ftz-register-card {
+  width: min(100%, 560px);
+}
+
+.ftz-register-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 17px;
+}
+
+.ftz-register-grid label {
+  display: block;
+  color: #c7d2e4;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.ftz-register-grid label span {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.ftz-register-input {
+  width: 100%;
+  height: 47px;
+  padding: 0 13px;
+  border: 1px solid rgba(83, 119, 176, 0.3);
+  border-radius: 10px;
+  outline: 0;
+  color: #f5f8ff;
+  background: rgba(1, 9, 25, 0.7);
+  font-size: 11px;
+}
+
+.ftz-register-input:focus {
+  border-color: rgba(23, 233, 220, 0.72);
+  box-shadow: 0 0 0 3px rgba(23, 233, 220, 0.07);
+}
+
+.ftz-register-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(72, 114, 176, 0.26);
+  border-radius: 11px;
+  color: #9dafc8;
+  background: rgba(4, 16, 38, 0.64);
+  font-size: 10px;
+}
+
+.ftz-register-state.is-warning {
+  align-items: flex-start;
+  border-color: rgba(255, 165, 45, 0.26);
+  color: #e1b36f;
+  background: rgba(93, 56, 7, 0.14);
+}
+
+.ftz-register-state strong,
+.ftz-register-state span {
+  display: block;
+}
+
+.ftz-register-state span {
+  margin-top: 5px;
+  color: #8e9cb2;
+  line-height: 1.55;
+}
+
+.ftz-register-policy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 17px;
+  padding: 12px;
+  border: 1px solid rgba(22, 229, 224, 0.16);
+  border-radius: 9px;
+  color: #91a3bd;
+  background: rgba(5, 66, 77, 0.13);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.ftz-register-policy-note i {
+  flex: 0 0 auto;
+  color: #35ebde;
+  font-size: 16px;
+}
+
+.ftz-registration-success {
+  display: flex;
+  gap: 12px;
+  padding: 17px;
+  border: 1px solid rgba(24, 221, 171, 0.25);
+  border-radius: 12px;
+  color: #9db0c8;
+  background: rgba(8, 88, 68, 0.12);
+  font-size: 10px;
+}
+
+.ftz-registration-success > i {
+  flex: 0 0 auto;
+  color: #43ebbc;
+  font-size: 22px;
+}
+
+.ftz-registration-success strong,
+.ftz-registration-success span {
+  display: block;
+}
+
+.ftz-registration-success strong {
+  margin-bottom: 9px;
+  color: #4cecc0;
+  font-size: 12px;
+}
+
+.ftz-registration-success span {
+  margin-top: 4px;
+}
+
+.ftz-registration-success p {
+  color: #8fa0b8;
+  line-height: 1.6;
+}
+
+.ftz-registration-success .ftz-auth-submit {
+  margin-top: 15px;
+  text-decoration: none;
+}
+
+.ftz-temporary-password {
+  margin-top: 14px;
+  padding: 13px;
+  border: 1px solid rgba(255, 176, 45, 0.27);
+  border-radius: 10px;
+  background: rgba(98, 61, 8, 0.15);
+}
+
+.ftz-temporary-password small {
+  display: block;
+  color: #ffc05b;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.ftz-temporary-password code {
+  display: block;
+  margin: 9px 0;
+  padding: 10px;
+  overflow-wrap: anywhere;
+  border-radius: 7px;
+  color: #fff;
+  background: rgba(1, 8, 22, 0.72);
+  font-size: 12px;
+}
+
+.ftz-temporary-password button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid rgba(25, 231, 217, 0.3);
+  border-radius: 7px;
+  color: #2ce8db;
+  background: rgba(6, 77, 84, 0.2);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .ftz-register-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

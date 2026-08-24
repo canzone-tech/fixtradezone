@@ -54,6 +54,9 @@ describe('RegistrationService', () => {
   };
 
   const prisma = {
+    systemRegistrationConfig: {
+      findUnique: jest.fn(),
+    },
     $transaction: jest.fn(
       async (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -117,6 +120,7 @@ describe('RegistrationService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.user.create.mockResolvedValue(createdUser);
     transaction.user.findUnique.mockResolvedValue(null);
@@ -158,6 +162,45 @@ describe('RegistrationService', () => {
       passwordService as unknown as PasswordService,
       rbacBootstrapService as unknown as RbacBootstrapService,
     );
+  });
+
+  it('returns the safe public registration policy with configured values', async () => {
+    prisma.systemRegistrationConfig.findUnique.mockResolvedValue({
+      publicRegistrationEnabled: false,
+      emailRequired: false,
+      mobileRequired: true,
+      passwordMode: 'AUTO',
+      usernameMode: 'AUTO',
+      usernamePrefixEnabled: true,
+      usernamePrefix: 'ftz',
+      superAdminRegistrationEnabled: true,
+      adminRegistrationEnabled: true,
+      authorizedUserRegistrationEnabled: true,
+      allowMultipleAccountsPerEmail: true,
+      allowMultipleAccountsPerMobile: true,
+    });
+
+    await expect(service.getPublicRegistrationPolicy()).resolves.toEqual({
+      publicRegistrationEnabled: false,
+      emailRequired: false,
+      mobileRequired: true,
+      passwordMode: 'AUTO',
+      usernameMode: 'AUTO',
+      usernamePrefixEnabled: true,
+      usernamePrefix: 'ftz',
+    });
+  });
+
+  it('returns safe defaults when registration configuration is absent', async () => {
+    await expect(service.getPublicRegistrationPolicy()).resolves.toEqual({
+      publicRegistrationEnabled: true,
+      emailRequired: true,
+      mobileRequired: false,
+      passwordMode: 'MANUAL',
+      usernameMode: 'AUTO_OR_MANUAL',
+      usernamePrefixEnabled: false,
+      usernamePrefix: null,
+    });
   });
 
   it('registers a public user with manual credentials, identifier claims and audit', async () => {

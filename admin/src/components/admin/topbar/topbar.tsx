@@ -130,21 +130,27 @@ export default function Topbar() {
 
         <div className="ftz-topbar-profile">
           <div className="ftz-avatar">{initials}</div>
+
           <div className="ftz-topbar-profile-copy">
             <strong>{displayName}</strong>
             <small>{user?.roles.join(" · ") ?? "SUPER_ADMIN"}</small>
           </div>
-          <button
-            type="button"
-            className="ftz-profile-menu"
-            onClick={() => void logout()}
-            disabled={loggingOut}
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <i className="iconoir-log-out" />
-          </button>
         </div>
+
+        <button
+          type="button"
+          className="ftz-signout-button"
+          onClick={() => void logout()}
+          disabled={loggingOut}
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <i className="iconoir-log-out" />
+
+          <span>
+            {loggingOut ? "Signing out..." : "Sign Out"}
+          </span>
+        </button>
       </div>
     </header>
   );

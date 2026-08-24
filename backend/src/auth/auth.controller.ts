@@ -25,6 +25,7 @@ import {
 } from './dto';
 import { Public } from './public.decorator';
 import { ReauthenticationService } from './reauthentication.service';
+import { RegistrationService } from './registration.service';
 import { getRequestContext } from './request-context';
 
 @Controller('auth')
@@ -32,7 +33,15 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly reauthenticationService: ReauthenticationService,
+    private readonly registrationService: RegistrationService,
   ) {}
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @Get('registration-policy')
+  registrationPolicy() {
+    return this.registrationService.getPublicRegistrationPolicy();
+  }
 
   @Public()
   @UseGuards(CaptchaGuard)

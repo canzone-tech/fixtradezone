@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
-import styles from "./security-configuration.module.css";
+import styles from "../platform-configuration.module.css";
 
 interface SecurityConfiguration {
   fullUserImpersonationEnabled: boolean;

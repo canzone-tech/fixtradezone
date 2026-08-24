@@ -1,19 +1,28 @@
 "use client";
 
-import type { UserImpersonationSession } from "@/lib/user-session";
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import {
+  isImpersonationSession,
+  type UserPortalSession,
+} from "@/lib/user-session";
 import styles from "./user-shell.module.css";
 
 interface UserTopbarProps {
-  session: UserImpersonationSession | null;
-  returning: boolean;
-  onReturnToAdmin: () => void;
+  session: UserPortalSession | null;
+  returning?: boolean;
+  onReturnToAdmin?: () => void;
 }
 
 export default function UserTopbar({
   session,
-  returning,
+  returning = false,
   onReturnToAdmin,
 }: UserTopbarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const toggleSidebar = () => {
     document.body.classList.toggle("ftz-nav-open");
   };
@@ -23,7 +32,8 @@ export default function UserTopbar({
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
       user.username ||
-      user.email
+      user.email ||
+      "User Account"
     : "User Account";
 
   const initials = displayName
@@ -33,9 +43,41 @@ export default function UserTopbar({
     .slice(0, 2)
     .toUpperCase();
 
-  const accessMode = session?.impersonation.accessMode ?? "LIMITED";
+  const impersonated =
+    session !== null && isImpersonationSession(session);
 
-  const idleMinutes = session?.sessionPolicy.idleLockMinutes ?? 5;
+  const idleMinutes = session?.sessionPolicy.idleLockMinutes;
+
+  const title = pathname === "/user/profile" ? "My Profile" : "User Dashboard";
+
+  const subtitle =
+    pathname === "/user/profile"
+      ? "Account identity, security and session"
+      : "Overview of your FixTradeZone account";
+
+  async function logout() {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+
+    try {
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        setLoggingOut(false);
+        return;
+      }
+
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <header className="ftz-topbar">
@@ -50,53 +92,86 @@ export default function UserTopbar({
         </button>
 
         <div>
-          <h1>User Account</h1>
-          <p>Secure account overview and session</p>
+          <h1>{title}</h1>
+          <p>{subtitle}</p>
         </div>
       </div>
 
       <div className="ftz-topbar-actions">
-        <span
-          className={
-            accessMode === "FULL" ? styles.fullMode : styles.limitedMode
-          }
-        >
-          <i
-            className={
-              accessMode === "FULL"
-                ? "iconoir-warning-triangle"
-                : "iconoir-shield-check"
-            }
-          />
+        {session ? (
+          <>
+            <span
+              className={
+                impersonated &&
+                session.impersonation.accessMode === "FULL"
+                  ? styles.fullMode
+                  : styles.limitedMode
+              }
+            >
+              <i
+                className={
+                  impersonated &&
+                  session.impersonation.accessMode === "FULL"
+                    ? "iconoir-warning-triangle"
+                    : "iconoir-shield-check"
+                }
+              />
 
-          {accessMode}
-        </span>
+              {impersonated
+                ? session.impersonation.accessMode
+                : "SECURE"}
+            </span>
 
-        <span className={styles.policyBadge}>
-          <i className="iconoir-timer" />
-          {idleMinutes} min
-        </span>
+            <span className={styles.policyBadge}>
+              <i className="iconoir-timer" />
+              {idleMinutes} min
+            </span>
 
-        <div className="ftz-topbar-profile">
-          <div className="ftz-avatar">{initials}</div>
+            <div className="ftz-topbar-profile">
+              <div className="ftz-avatar">{initials}</div>
 
-          <div className="ftz-topbar-profile-copy">
-            <strong>{displayName}</strong>
-            <small>USER</small>
-          </div>
-        </div>
+              <div className="ftz-topbar-profile-copy">
+                <strong>{displayName}</strong>
+                <small>USER</small>
+              </div>
+            </div>
 
-        <button
-          type="button"
-          className={styles.returnButton}
-          disabled={returning}
-          onClick={onReturnToAdmin}
-          title="Return to Admin"
-        >
-          <i className="iconoir-log-out" />
+            {impersonated && onReturnToAdmin ? (
+              <button
+                type="button"
+                className={styles.returnButton}
+                disabled={returning}
+                onClick={onReturnToAdmin}
+                title="Return to Admin"
+              >
+                <i className="iconoir-log-out" />
 
-          <span>{returning ? "Returning..." : "Return to Admin"}</span>
-        </button>
+                <span>
+                  {returning ? "Returning..." : "Return to Admin"}
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="ftz-signout-button"
+                disabled={loggingOut}
+                onClick={() => void logout()}
+                title="Sign out"
+              >
+                <i className="iconoir-log-out" />
+
+                <span>
+                  {loggingOut ? "Signing out..." : "Sign Out"}
+                </span>
+              </button>
+            )}
+          </>
+        ) : (
+          <span className={styles.policyBadge}>
+            <i className="iconoir-shield-check" />
+            Validating
+          </span>
+        )}
       </div>
     </header>
   );

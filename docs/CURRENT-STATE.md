@@ -196,3 +196,48 @@ Backend:
 - Never weaken JWT/RBAC/audit/security invariants through configuration.
 - Never auto-credit deposits from TXID submission alone.
 - Never represent simulated trades/results as real.
+
+## Foundation Completion Checkpoint — 2026-08-24
+
+FixTradeZone platform foundation is COMPLETE and locally verified.
+
+### Authentication and account foundation
+- JWT access + rotating refresh sessions operational.
+- Secure Next.js BFF session boundary with HttpOnly/SameSite cookies.
+- Login supports configured identifier modes.
+- Public registration and configurable registration policy operational.
+- Required-password-change flow operational.
+- Custom CAPTCHA foundation operational.
+- SUPER_ADMIN, ADMIN and USER role-aware authentication operational.
+
+### Administration foundation
+- SUPER_ADMIN founder authority operational.
+- ADMIN role and permission-aware navigation operational.
+- Users administration operational.
+- RBAC roles and permissions console operational.
+- Security configuration, idle lock and reauthentication operational.
+- Secure USER impersonation with isolated authentication boundary operational.
+
+### Protected frontend foundation
+- Approved FixTradeZone Dark Neo design system shared by ADMIN and USER portals.
+- ADMIN dashboard operational.
+- Native USER dashboard operational at /user/dashboard.
+- USER profile operational at /user/profile.
+- ADMIN/SUPER_ADMIN login routes to /dashboard.
+- Standard USER login routes to /user/dashboard.
+- Dedicated /api/user/session rejects administrator identities.
+- Admin session boundary rejects standard USER identities.
+- Canonical FixTradeZone hex/cube logo locked project-wide.
+- Shared authenticated Sign Out action locked for ADMIN and USER portals.
+
+### Verification
+- Postman MASTER v10 role-aware USER/admin flow: GREEN.
+- Browser ADMIN and USER login/routing verification: GREEN.
+- Admin ESLint: GREEN.
+- Next.js 16.3.1 production build: GREEN.
+- Backend Jest: 23/23 suites, 126/126 tests passed.
+- NestJS production build: GREEN.
+- git diff --check: GREEN.
+
+### Next development phase
+Foundation work is frozen after merge. The next business-domain phase is MLM / Referral development, beginning with referral/sponsor relationship integrity before commissions or wallet credits.

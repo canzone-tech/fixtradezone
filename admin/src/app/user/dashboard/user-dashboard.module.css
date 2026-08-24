@@ -1,0 +1,206 @@
+.stripValue {
+  margin-left: auto;
+  color: #42ebbb !important;
+  font-size: 8px !important;
+  white-space: nowrap;
+}
+
+.pendingBadge {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(22, 229, 224, 0.18);
+  border-radius: 7px;
+  color: #46d9d2;
+  background: rgba(6, 50, 70, 0.28);
+  font-size: 7px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.chartEmpty {
+  display: flex;
+  min-height: 260px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  text-align: center;
+  background:
+    linear-gradient(rgba(19, 75, 103, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 75, 103, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.chartEmpty strong {
+  margin-top: 13px;
+  color: #eaf5ff;
+  font-size: 13px;
+}
+
+.chartEmpty p {
+  max-width: 430px;
+  margin: 7px 0 0;
+  color: #60738e;
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid rgba(22, 229, 224, 0.22);
+  border-radius: 14px;
+  color: #36e5d9;
+  background: rgba(7, 124, 139, 0.12);
+  box-shadow: 0 0 30px rgba(22, 229, 224, 0.06);
+}
+
+.emptyIcon i {
+  font-size: 24px;
+}
+
+.compactEmpty {
+  display: flex;
+  min-height: 140px;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+}
+
+.compactEmpty > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border: 1px solid rgba(22, 229, 224, 0.18);
+  border-radius: 13px;
+  color: #45e4dc;
+  background: rgba(7, 124, 139, 0.1);
+}
+
+.compactEmpty > span i {
+  font-size: 22px;
+}
+
+.compactEmpty strong {
+  color: #e5f0ff;
+  font-size: 11px;
+}
+
+.compactEmpty p {
+  margin: 5px 0 0;
+  color: #5d718b;
+  font-size: 8px;
+  line-height: 1.65;
+}
+
+.tableEmpty {
+  display: flex;
+  min-height: 96px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #5f738e;
+}
+
+.tableEmpty i {
+  color: #36d8d2;
+  font-size: 21px;
+}
+
+.tableEmpty strong,
+.tableEmpty span {
+  display: block;
+}
+
+.tableEmpty strong {
+  color: #b9c9dc;
+  font-size: 9px;
+}
+
+.tableEmpty span {
+  margin-top: 4px;
+  font-size: 8px;
+}
+
+.truthPanel {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(22, 229, 224, 0.13);
+  border-radius: 13px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(5, 38, 55, 0.72),
+      rgba(4, 14, 32, 0.82)
+    );
+}
+
+.truthIcon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border: 1px solid rgba(22, 229, 224, 0.2);
+  border-radius: 10px;
+  color: #3de1d9;
+  background: rgba(7, 124, 139, 0.1);
+}
+
+.truthPanel strong {
+  color: #dcecff;
+  font-size: 10px;
+}
+
+.truthPanel p {
+  margin: 5px 0 0;
+  color: #63758d;
+  font-size: 8px;
+  line-height: 1.65;
+}
+
+.errorState {
+  margin: 24px;
+  padding: 24px;
+  border: 1px solid rgba(255, 100, 100, 0.24);
+  border-radius: 15px;
+  color: #ffb0b0;
+  background: rgba(80, 15, 28, 0.2);
+}
+
+.errorState i,
+.errorState strong,
+.errorState p {
+  display: block;
+}
+
+.errorState i {
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.errorState strong {
+  font-size: 13px;
+}
+
+.errorState p {
+  margin: 6px 0 0;
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .stripValue {
+    font-size: 7px !important;
+  }
+
+  .chartEmpty {
+    min-height: 210px;
+  }
+}

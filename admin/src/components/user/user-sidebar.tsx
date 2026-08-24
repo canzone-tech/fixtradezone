@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { UserImpersonationSession } from "@/lib/user-session";
+import FixTradeZoneBrand from "@/components/brand/fixtradezone-brand";
+import {
+  isImpersonationSession,
+  type UserPortalSession,
+} from "@/lib/user-session";
 import styles from "./user-shell.module.css";
 
 interface UserSidebarProps {
-  session: UserImpersonationSession | null;
+  session: UserPortalSession | null;
 }
 
 export default function UserSidebar({ session }: UserSidebarProps) {
@@ -16,12 +20,18 @@ export default function UserSidebar({ session }: UserSidebarProps) {
     document.body.classList.remove("ftz-nav-open");
   };
 
+  const impersonated =
+    session !== null
+      ? isImpersonationSession(session)
+      : pathname.startsWith("/user/impersonation");
+
   const user = session?.user;
 
   const displayName = user
     ? [user.firstName, user.lastName].filter(Boolean).join(" ") ||
       user.username ||
-      user.email
+      user.email ||
+      "USER"
     : "USER";
 
   const initials = displayName
@@ -31,43 +41,131 @@ export default function UserSidebar({ session }: UserSidebarProps) {
     .slice(0, 2)
     .toUpperCase();
 
+  const isActive = (href: string) => pathname === href;
+
   return (
     <>
       <aside className="ftz-sidebar" aria-label="User navigation">
-        <Link href="/user/impersonation" className="ftz-logo" onClick={close}>
-          <div className={styles.brandMark}>FTZ</div>
-
-          <div className={styles.brandCopy}>
-            <strong>FIXTRADEZONE</strong>
-            <small>USER PORTAL</small>
-          </div>
+        <Link
+          href={impersonated ? "/user/impersonation" : "/user/dashboard"}
+          className="ftz-logo"
+          onClick={close}
+        >
+          <FixTradeZoneBrand
+            portalLabel="USER PORTAL"
+            className="ftz-brand-logo"
+          />
         </Link>
 
         <nav className="ftz-sidebar-nav">
           <div className="ftz-nav-section">
-            <div className="ftz-nav-label">USER MENU</div>
+            <div className="ftz-nav-label">MAIN MENU</div>
 
-            <Link
-              href="/user/impersonation"
-              className={`ftz-nav-link ${
-                pathname === "/user/impersonation" ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-home-simple" />
-              <span>Overview</span>
-            </Link>
+            {impersonated ? (
+              <>
+                <Link
+                  href="/user/impersonation"
+                  className={`ftz-nav-link ${
+                    isActive("/user/impersonation") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-home-simple" />
+                  <span>Overview</span>
+                </Link>
 
-            <a href="#account-details" className="ftz-nav-link" onClick={close}>
-              <i className="iconoir-user" />
-              <span>Account Details</span>
-            </a>
+                <Link
+                  href="/user/impersonation#account-details"
+                  className="ftz-nav-link"
+                  onClick={close}
+                >
+                  <i className="iconoir-user" />
+                  <span>Account Details</span>
+                </Link>
 
-            <a href="#session-status" className="ftz-nav-link" onClick={close}>
-              <i className="iconoir-shield-check" />
-              <span>Session Status</span>
-            </a>
+                <Link
+                  href="/user/impersonation#session-status"
+                  className="ftz-nav-link"
+                  onClick={close}
+                >
+                  <i className="iconoir-shield-check" />
+                  <span>Session Status</span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/user/dashboard"
+                  className={`ftz-nav-link ${
+                    isActive("/user/dashboard") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-home-simple" />
+                  <span>Dashboard</span>
+                </Link>
+
+                <Link
+                  href="/user/profile"
+                  className={`ftz-nav-link ${
+                    isActive("/user/profile") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-user" />
+                  <span>My Profile</span>
+                </Link>
+              </>
+            )}
           </div>
+
+          {!impersonated ? (
+            <>
+              <div className="ftz-nav-section">
+                <div className="ftz-nav-label">TRADING & FINANCE</div>
+
+                <span
+                  className={`ftz-nav-link ${styles.disabledNav}`}
+                  aria-disabled="true"
+                >
+                  <i className="iconoir-box" />
+                  <span>Packages</span>
+                </span>
+
+                <span
+                  className={`ftz-nav-link ${styles.disabledNav}`}
+                  aria-disabled="true"
+                >
+                  <i className="iconoir-wallet" />
+                  <span>Deposits</span>
+                </span>
+
+                <span
+                  className={`ftz-nav-link ${styles.disabledNav}`}
+                  aria-disabled="true"
+                >
+                  <i className="iconoir-coins-swap" />
+                  <span>Payouts</span>
+                </span>
+
+                <span
+                  className={`ftz-nav-link ${styles.disabledNav}`}
+                  aria-disabled="true"
+                >
+                  <i className="iconoir-community" />
+                  <span>Referrals</span>
+                </span>
+
+                <span
+                  className={`ftz-nav-link ${styles.disabledNav}`}
+                  aria-disabled="true"
+                >
+                  <i className="iconoir-graph-up" />
+                  <span>Simulated Trade Activity</span>
+                </span>
+              </div>
+            </>
+          ) : null}
         </nav>
 
         <div className="ftz-sidebar-profile">
@@ -77,9 +175,9 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             <strong>{displayName}</strong>
 
             <small>
-              {session
+              {session && isImpersonationSession(session)
                 ? `${session.impersonation.accessMode} USER ACCESS`
-                : "USER SESSION"}
+                : "AUTHENTICATED USER"}
             </small>
           </div>
 

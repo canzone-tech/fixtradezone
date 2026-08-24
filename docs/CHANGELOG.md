@@ -101,3 +101,16 @@
 - Removed the unused required shadow database URL from Prisma CLI configuration; `prisma migrate dev` remains prohibited without explicit approval.
 - Replaced the generated NestJS backend README with FixTradeZone-specific setup and safety guidance.
 - Updated project context and roadmap to record the GitHub-connected Work workflow and resolved advisory investigation.
+
+## 2026-08-24 — Platform foundation completed
+
+- Completed configurable authentication and registration frontend integration.
+- Completed role-aware login for SUPER_ADMIN, ADMIN and standard USER accounts.
+- Added native USER session BFF boundary.
+- Added premium USER dashboard and USER profile.
+- Preserved secure ADMIN/USER impersonation isolation.
+- Unified protected application visual identity under the Dark Neo design system.
+- Locked the canonical FixTradeZone project logo and shared authenticated Sign Out UX.
+- Verified Postman MASTER v10 role-aware flow.
+- Verified frontend lint/build and backend tests/build.
+- Foundation phase approved for merge before MLM development.
