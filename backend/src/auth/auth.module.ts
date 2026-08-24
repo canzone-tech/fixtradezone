@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CaptchaModule } from '../captcha/captcha.module';
+import { ReferralsModule } from '../referrals/referrals.module';
 import { SecurityConfigModule } from '../security-config/security-config.module';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -20,6 +21,7 @@ import { TokenService } from './token.service';
 @Module({
   imports: [
     CaptchaModule,
+    ReferralsModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
     }),
