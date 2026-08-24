@@ -25,10 +25,7 @@ const USERNAME_SEQUENCE_START = 100001n;
 const AUTO_USERNAME_ATTEMPTS = 100;
 
 type RegistrationSource =
-  | 'SELF_REGISTRATION'
-  | 'SUPER_ADMIN'
-  | 'ADMIN'
-  | 'AUTHORIZED_USER';
+  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;

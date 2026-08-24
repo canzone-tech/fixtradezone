@@ -182,14 +182,20 @@ export class ReferralsService {
             select: { assignmentStatus: true },
           });
 
-          if (!defaultProfile || defaultProfile.assignmentStatus === 'UNASSIGNED') {
+          if (
+            !defaultProfile ||
+            defaultProfile.assignmentStatus === 'UNASSIGNED'
+          ) {
             throw new BadRequestException(
               'Default sponsor must already be enrolled in the referral tree.',
             );
           }
         }
 
-        if (enrollmentEnabled && (!primaryRootUserId || !defaultSponsorUserId)) {
+        if (
+          enrollmentEnabled &&
+          (!primaryRootUserId || !defaultSponsorUserId)
+        ) {
           throw new BadRequestException(
             'Primary root and default sponsor must be configured before referral enrollment can be enabled.',
           );
@@ -280,7 +286,10 @@ export class ReferralsService {
           select: { userId: true, assignmentStatus: true },
         });
 
-        if (!sponsorProfile || sponsorProfile.assignmentStatus === 'UNASSIGNED') {
+        if (
+          !sponsorProfile ||
+          sponsorProfile.assignmentStatus === 'UNASSIGNED'
+        ) {
           throw new BadRequestException(
             'The selected sponsor is not enrolled in the referral tree.',
           );
@@ -430,7 +439,11 @@ export class ReferralsService {
       }
     }
 
-    const referralCode = await this.generateReferralCode(transaction, user.id, user.username);
+    const referralCode = await this.generateReferralCode(
+      transaction,
+      user.id,
+      user.username,
+    );
 
     await transaction.referralProfile.create({
       data: {
@@ -561,10 +574,11 @@ export class ReferralsService {
 
       visited.add(currentUserId);
 
-      const profile = await transaction.referralProfile.findUnique({
-        where: { userId: currentUserId },
-        select: { sponsorUserId: true },
-      });
+      const profile: { sponsorUserId: string | null } | null =
+        await transaction.referralProfile.findUnique({
+          where: { userId: currentUserId },
+          select: { sponsorUserId: true },
+        });
 
       currentUserId = profile?.sponsorUserId ?? null;
     }
@@ -627,7 +641,9 @@ export class ReferralsService {
     }
 
     for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
-      const random = randomBytes(RANDOM_CODE_BYTES).toString('hex').toUpperCase();
+      const random = randomBytes(RANDOM_CODE_BYTES)
+        .toString('hex')
+        .toUpperCase();
       const code = `${prefix ?? ''}${random}`;
 
       if (code.length > 64) {
@@ -650,26 +666,24 @@ export class ReferralsService {
   }
 
   private toConfigSnapshot(
-    row:
-      | {
-          enrollmentEnabled: boolean;
-          existingUserMigrationMode:
-            | 'ASSIGN_DEFAULT_SPONSOR'
-            | 'LEAVE_UNASSIGNED_FOR_REVIEW'
-            | 'REQUIRE_EXPLICIT_MAPPING';
-          referralCodeMode:
-            | 'SYSTEM_RANDOM'
-            | 'USERNAME'
-            | 'CUSTOM_PREFIX_RANDOM'
-            | 'CUSTOM_PATTERN';
-          referralCodePrefix: string | null;
-          referralCodePattern: string | null;
-          adminSponsorChangeEnabled: boolean;
-          primaryRootUserId: string | null;
-          defaultSponsorUserId: string | null;
-          updatedAt: Date;
-        }
-      | null,
+    row: {
+      enrollmentEnabled: boolean;
+      existingUserMigrationMode:
+        | 'ASSIGN_DEFAULT_SPONSOR'
+        | 'LEAVE_UNASSIGNED_FOR_REVIEW'
+        | 'REQUIRE_EXPLICIT_MAPPING';
+      referralCodeMode:
+        | 'SYSTEM_RANDOM'
+        | 'USERNAME'
+        | 'CUSTOM_PREFIX_RANDOM'
+        | 'CUSTOM_PATTERN';
+      referralCodePrefix: string | null;
+      referralCodePattern: string | null;
+      adminSponsorChangeEnabled: boolean;
+      primaryRootUserId: string | null;
+      defaultSponsorUserId: string | null;
+      updatedAt: Date;
+    } | null,
   ) {
     return {
       enrollmentEnabled: row?.enrollmentEnabled ?? false,
