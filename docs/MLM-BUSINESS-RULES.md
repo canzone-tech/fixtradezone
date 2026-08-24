@@ -826,6 +826,60 @@ This repository document is the canonical development reference. Chat decisions 
 
 ---
 
+
+## Q32. Existing Users — Referral Tree Migration Strategy
+
+**Context**
+
+The MLM referral foundation is being introduced after users may already exist in the database. Existing records do not contain historical sponsor/referral information, so the system must not invent relationships.
+
+**Options**
+- **A. ASSIGN_DEFAULT_SPONSOR:** all existing non-root users are automatically attached to the configured default sponsor.
+- **B. LEAVE_UNASSIGNED_FOR_REVIEW:** existing users remain without an MLM sponsor until ADMIN/SUPER_ADMIN reviews and assigns the correct sponsor.
+- **C. REQUIRE_EXPLICIT_MAPPING:** MLM activation is blocked until an explicit user-to-sponsor mapping is provided.
+- **D. Configurable migration strategy**
+
+Supported modes:
+```text
+EXISTING_USER_MIGRATION_MODE =
+- ASSIGN_DEFAULT_SPONSOR
+- LEAVE_UNASSIGNED_FOR_REVIEW
+- REQUIRE_EXPLICIT_MAPPING
+```
+
+**Example**
+```text
+Existing database before MLM:
+
+Founder
+User A
+User B
+User C
+
+No historical sponsor data exists.
+
+LEAVE_UNASSIGNED_FOR_REVIEW:
+Founder → ROOT
+User A → sponsor pending
+User B → sponsor pending
+User C → sponsor pending
+
+An authorized ADMIN/SUPER_ADMIN later assigns the verified sponsor.
+```
+
+**LOCKED:** **D — Existing-user migration strategy is configurable.**
+
+**Initial FixTradeZone rollout:** **B — `LEAVE_UNASSIGNED_FOR_REVIEW`.**
+
+Implementation implications:
+- migration must not guess or manufacture historical sponsor relationships
+- existing non-root users may temporarily have no referral profile/sponsor assignment or an explicit unassigned state, depending on final schema design
+- new registrations after the referral module is enabled follow Q1 and use a supplied referral or configured default sponsor
+- assignment/reassignment must obey Q2 authorization, cycle prevention, self-referral prevention, and auditing
+- future import/deployment workflows may select a different migration mode through an explicitly versioned/configured process
+
+---
+
 # Current Reference Figures from Supplied MLM Plan Image
 
 These are **initial/default reference values only**, not architecture constants.
@@ -920,7 +974,7 @@ implement vertical slice
 
 # Discovery Status
 
-**Questions 1–31: LOCKED.**
+**Questions 1–32: LOCKED.**
 
 Every question above intentionally preserves:
 - available options
