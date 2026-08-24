@@ -11,8 +11,9 @@ These documents are the persistent project source of truth used to continue deve
 6. `SECURITY.md` — security standards.
 7. `API-CONTRACT.md` — API/testing conventions.
 8. `ROADMAP.md` — phase-by-phase roadmap.
-9. `LOCAL-VERIFY-AUTH-ADMIN.md` — required local gate for the current auth/admin slice.
-10. `CHANGELOG.md` — session and milestone history.
+9. `LOCAL-VERIFICATION.md` — locked repository-wide local verification and delivery gate.
+10. `LOCAL-VERIFY-AUTH-ADMIN.md` — required local gate for the current auth/admin slice.
+11. `CHANGELOG.md` — session and milestone history.
 
 ## Rule
-Any material architecture or security decision should be reflected in these documents before the codebase moves forward.
+Any material architecture, security, or delivery-process decision should be reflected in these documents before the codebase moves forward.

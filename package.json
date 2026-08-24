@@ -1,0 +1,13 @@
+{
+  "name": "fixtradezone",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "verify:backend": "npm --prefix backend run verify:local",
+    "verify:admin": "npm --prefix admin run verify:local",
+    "verify:local": "npm run verify:backend && npm run verify:admin && git diff --check && git diff --cached --check",
+    "verify:milestone": "npm --prefix backend run verify:milestone && npm run verify:admin && git diff --check && git diff --cached --check",
+    "db:status": "npm --prefix backend run db:status",
+    "db:deploy": "npm --prefix backend run db:deploy"
+  }
+}
