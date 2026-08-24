@@ -71,3 +71,6 @@ LOCKED. Idle timeout locks the UI without logout or navigation. Password reauthe
 
 ## ADR-024 — Security configuration is SUPER_ADMIN-only
 LOCKED. Privileged security configuration is stored as a validated and audited singleton. Full Impersonation and idle-lock duration are configurable only by SUPER_ADMIN. Idle duration defaults to 5 minutes and is constrained to 1–120 minutes.
+
+## ADR-025 — Canonical FixTradeZone brand identity
+LOCKED. FixTradeZone uses one canonical brand mark across the complete project: the approved cyan/blue/purple hexagonal FixTradeZone symbol with the FIXTRADEZONE wordmark. Portal-specific labels such as ADMIN PORTAL and USER PORTAL are contextual text only and must not create alternate logo designs. New arbitrary logo variants are not permitted. Authenticated ADMIN and USER portals also use the shared teal Sign Out action pattern for consistent protected-application UX.

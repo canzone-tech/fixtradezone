@@ -2,8 +2,8 @@
 
 ## Latest Verified Checkpoint — 2026-08-23
 
-- Current feature branch: `feature/configurable-auth-registration`.
-- Base commit: `0bc78b5` (PR #10 merged into `main`).
+- Current feature branch: `feature/foundation-freeze-checkpoint`.
+- Base commit: `0c2795d` (PR #11 merged into `main`).
 - Configurable authentication and registration foundation is implemented and locally verified.
 - Migration `0005_configurable_auth_registration` is applied and verified in local MySQL.
 - Redis application infrastructure is implemented and live connectivity is verified.
@@ -13,7 +13,7 @@
 - Feature-only ESLint passes.
 - `git diff --check` passes.
 - Local Postman verification is GREEN.
-- No pull request has been opened for this feature yet.
+- PR #11 is merged into `main`; configurable authentication/registration/CAPTCHA foundation is now part of the mainline.
 
 ## Configurable Authentication
 
@@ -180,13 +180,13 @@ Backend:
 
 ## Immediate Next Actions
 
-1. Synchronize persistent project documentation with this verified milestone.
-2. Review and stage only the exact feature files.
-3. Create the local feature commit.
-4. Push the feature branch.
-5. Open a pull request only after explicit Founder approval.
-6. Merge only after CI/review is green.
-7. Continue reusable-foundation freeze/verification before starting Packages.
+1. Inventory the merged reusable platform foundation.
+2. Identify and remove FixTradeZone-specific coupling from reusable core candidates.
+3. Define the exact reusable-core copy manifest.
+4. Run complete local verification from the merged mainline.
+5. Freeze and copy the approved foundation into `canzone-platform-core`.
+6. Verify the reusable core independently.
+7. Return to FixTradeZone and begin the Packages vertical slice.
 
 ## Constraints
 
@@ -196,3 +196,48 @@ Backend:
 - Never weaken JWT/RBAC/audit/security invariants through configuration.
 - Never auto-credit deposits from TXID submission alone.
 - Never represent simulated trades/results as real.
+
+## Foundation Completion Checkpoint — 2026-08-24
+
+FixTradeZone platform foundation is COMPLETE and locally verified.
+
+### Authentication and account foundation
+- JWT access + rotating refresh sessions operational.
+- Secure Next.js BFF session boundary with HttpOnly/SameSite cookies.
+- Login supports configured identifier modes.
+- Public registration and configurable registration policy operational.
+- Required-password-change flow operational.
+- Custom CAPTCHA foundation operational.
+- SUPER_ADMIN, ADMIN and USER role-aware authentication operational.
+
+### Administration foundation
+- SUPER_ADMIN founder authority operational.
+- ADMIN role and permission-aware navigation operational.
+- Users administration operational.
+- RBAC roles and permissions console operational.
+- Security configuration, idle lock and reauthentication operational.
+- Secure USER impersonation with isolated authentication boundary operational.
+
+### Protected frontend foundation
+- Approved FixTradeZone Dark Neo design system shared by ADMIN and USER portals.
+- ADMIN dashboard operational.
+- Native USER dashboard operational at /user/dashboard.
+- USER profile operational at /user/profile.
+- ADMIN/SUPER_ADMIN login routes to /dashboard.
+- Standard USER login routes to /user/dashboard.
+- Dedicated /api/user/session rejects administrator identities.
+- Admin session boundary rejects standard USER identities.
+- Canonical FixTradeZone hex/cube logo locked project-wide.
+- Shared authenticated Sign Out action locked for ADMIN and USER portals.
+
+### Verification
+- Postman MASTER v10 role-aware USER/admin flow: GREEN.
+- Browser ADMIN and USER login/routing verification: GREEN.
+- Admin ESLint: GREEN.
+- Next.js 16.3.1 production build: GREEN.
+- Backend Jest: 23/23 suites, 126/126 tests passed.
+- NestJS production build: GREEN.
+- git diff --check: GREEN.
+
+### Next development phase
+Foundation work is frozen after merge. The next business-domain phase is MLM / Referral development, beginning with referral/sponsor relationship integrity before commissions or wallet credits.

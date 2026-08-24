@@ -259,3 +259,9 @@
     display: none;
   }
 }
+
+.disabledNav {
+  opacity: 0.52;
+  cursor: default;
+  pointer-events: none;
+}

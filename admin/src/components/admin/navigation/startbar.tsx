@@ -86,6 +86,7 @@ const sections: Array<{
         href: "/settings",
         label: "Settings",
         icon: "iconoir-settings",
+        enabled: true,
       },
       {
         href: "/audit-logs",
@@ -99,33 +100,21 @@ const sections: Array<{
 export default function Startbar() {
   const pathname = usePathname();
 
-  const [user, setUser] =
-    useState<AdminUser | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSession() {
-      const response = await fetch(
-        "/api/auth/session",
-        {
-          cache: "no-store",
-        },
-      );
+      const response = await fetch("/api/auth/session", {
+        cache: "no-store",
+      });
 
-      const payload = (
-        await response
-          .json()
-          .catch(() => ({}))
-      ) as {
+      const payload = (await response.json().catch(() => ({}))) as {
         user?: AdminUser;
       };
 
-      if (
-        mounted &&
-        response.ok &&
-        payload.user
-      ) {
+      if (mounted && response.ok && payload.user) {
         setUser(payload.user);
       }
     }
@@ -137,27 +126,16 @@ export default function Startbar() {
     };
   }, []);
 
-  const isSuperAdmin =
-    user?.roles.includes("SUPER_ADMIN") ??
-    false;
+  const isSuperAdmin = user?.roles.includes("SUPER_ADMIN") ?? false;
 
   const close = () => {
-    document.body.classList.remove(
-      "ftz-nav-open",
-    );
+    document.body.classList.remove("ftz-nav-open");
   };
 
   return (
     <>
-      <aside
-        className="ftz-sidebar"
-        aria-label="Admin navigation"
-      >
-        <Link
-          href="/dashboard"
-          className="ftz-logo"
-          onClick={close}
-        >
+      <aside className="ftz-sidebar" aria-label="Admin navigation">
+        <Link href="/dashboard" className="ftz-logo" onClick={close}>
           <Image
             src="/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
             alt="FixTradeZone Admin Portal"
@@ -169,95 +147,62 @@ export default function Startbar() {
 
         <nav className="ftz-sidebar-nav">
           {sections.map((section) => {
-            const visibleItems =
-              user
-                ? section.items.filter(
-                    (item) => {
-                      if (isSuperAdmin) {
-                        return true;
-                      }
+            const visibleItems = user
+              ? section.items.filter((item) => {
+                  if (isSuperAdmin) {
+                    return true;
+                  }
 
-                      if (!item.enabled) {
-                        return false;
-                      }
+                  if (!item.enabled) {
+                    return false;
+                  }
 
-                      if (!item.permission) {
-                        return false;
-                      }
+                  if (!item.permission) {
+                    return false;
+                  }
 
-                      return user.permissions.includes(
-                        item.permission,
-                      );
-                    },
-                  )
-                : [];
+                  return user.permissions.includes(item.permission);
+                })
+              : [];
 
-            if (
-              visibleItems.length === 0
-            ) {
+            if (visibleItems.length === 0) {
               return null;
             }
 
             return (
-              <div
-                className="ftz-nav-section"
-                key={section.label}
-              >
-                <div className="ftz-nav-label">
-                  {section.label}
-                </div>
+              <div className="ftz-nav-section" key={section.label}>
+                <div className="ftz-nav-label">{section.label}</div>
 
-                {visibleItems.map(
-                  (item) => {
-                    const active =
-                      pathname ===
-                        item.href ||
-                      pathname.startsWith(
-                        `${item.href}/`,
-                      );
+                {visibleItems.map((item) => {
+                  const active =
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
-                    if (!item.enabled) {
-                      return (
-                        <span
-                          className="ftz-nav-link is-disabled"
-                          aria-disabled="true"
-                          key={item.href}
-                        >
-                          <i
-                            className={
-                              item.icon
-                            }
-                          />
-                          <span>
-                            {item.label}
-                          </span>
-                        </span>
-                      );
-                    }
-
+                  if (!item.enabled) {
                     return (
-                      <Link
-                        href={item.href}
-                        className={`ftz-nav-link ${
-                          active
-                            ? "is-active"
-                            : ""
-                        }`}
-                        onClick={close}
+                      <span
+                        className="ftz-nav-link is-disabled"
+                        aria-disabled="true"
                         key={item.href}
                       >
-                        <i
-                          className={
-                            item.icon
-                          }
-                        />
-                        <span>
-                          {item.label}
-                        </span>
-                      </Link>
+                        <i className={item.icon} />
+                        <span>{item.label}</span>
+                      </span>
                     );
-                  },
-                )}
+                  }
+
+                  return (
+                    <Link
+                      href={item.href}
+                      className={`ftz-nav-link ${active ? "is-active" : ""}`}
+                      onClick={close}
+                      key={item.href}
+                    >
+                      <i className={item.icon} />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
               </div>
             );
           })}
@@ -269,17 +214,9 @@ export default function Startbar() {
           </div>
 
           <div>
-            <strong>
-              {isSuperAdmin
-                ? "SUPER ADMIN"
-                : "ADMIN"}
-            </strong>
+            <strong>{isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}</strong>
 
-            <small>
-              {isSuperAdmin
-                ? "All Access"
-                : "RBAC Access"}
-            </small>
+            <small>{isSuperAdmin ? "All Access" : "RBAC Access"}</small>
           </div>
 
           {isSuperAdmin ? (

@@ -708,3 +708,123 @@
     justify-self: stretch;
   }
 }
+
+.createPolicy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(24, 234, 220, 0.2);
+  border-radius: 10px;
+  color: #90a9be;
+  background: rgba(5, 55, 67, 0.14);
+  font-size: 11px;
+}
+
+.createPolicy span {
+  padding-right: 10px;
+  border-right: 1px solid rgba(78, 135, 188, 0.18);
+}
+
+.createPolicy span:last-child {
+  border-right: 0;
+}
+
+.createPolicy b {
+  color: #28e7d9;
+}
+
+.autoPolicy {
+  display: grid;
+  min-height: 72px;
+  align-content: center;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px dashed rgba(24, 234, 220, 0.28);
+  border-radius: 10px;
+  background: rgba(3, 32, 51, 0.48);
+}
+
+.autoPolicy strong {
+  color: #dffcff;
+  font-size: 12px;
+}
+
+.autoPolicy span {
+  color: #7796ae;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.credentialNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 176, 32, 0.32);
+  border-radius: 11px;
+  background: rgba(91, 57, 7, 0.18);
+}
+
+.credentialNotice > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.credentialNotice strong {
+  color: #ffc45b;
+  font-size: 12px;
+}
+
+.credentialNotice span,
+.credentialNotice p {
+  margin: 0;
+  color: #9badc0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.credentialNotice code {
+  width: fit-content;
+  max-width: 100%;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+  border-radius: 7px;
+  color: #f8fcff;
+  background: rgba(1, 8, 23, 0.72);
+  font-size: 12px;
+}
+
+.credentialNotice button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(24, 234, 220, 0.35);
+  border-radius: 8px;
+  color: #dffffc;
+  background: rgba(7, 112, 112, 0.38);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .credentialNotice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .credentialNotice button {
+    width: 100%;
+  }
+
+  .createPolicy span {
+    width: 100%;
+    padding-right: 0;
+    border-right: 0;
+  }
+}

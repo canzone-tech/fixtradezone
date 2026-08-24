@@ -61,6 +61,24 @@ export class RegistrationService {
     return this.register(dto, null, context);
   }
 
+  async getPublicRegistrationPolicy() {
+    const config = await this.prisma.systemRegistrationConfig.findUnique({
+      where: {
+        id: 1,
+      },
+    });
+
+    return {
+      publicRegistrationEnabled: config?.publicRegistrationEnabled ?? true,
+      emailRequired: config?.emailRequired ?? true,
+      mobileRequired: config?.mobileRequired ?? false,
+      passwordMode: config?.passwordMode ?? 'MANUAL',
+      usernameMode: config?.usernameMode ?? 'AUTO_OR_MANUAL',
+      usernamePrefixEnabled: config?.usernamePrefixEnabled ?? false,
+      usernamePrefix: config?.usernamePrefix ?? null,
+    };
+  }
+
   registerDashboard(
     dto: RegisterDto,
     actor: AuthenticatedUser,

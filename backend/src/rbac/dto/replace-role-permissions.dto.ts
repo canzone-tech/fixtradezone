@@ -9,15 +9,15 @@ import {
 } from 'class-validator';
 
 export class ReplaceRolePermissionsDto {
-  @Transform(({ value }) =>
-    Array.isArray(value)
-      ? value.map((code) =>
-          typeof code === 'string'
-            ? code.trim().toLowerCase()
-            : code,
-        )
-      : value,
-  )
+  @Transform(({ value }: { value: unknown }) => {
+    if (!Array.isArray(value)) {
+      return value;
+    }
+
+    return value.map((code: unknown) =>
+      typeof code === 'string' ? code.trim().toLowerCase() : code,
+    );
+  })
   @IsArray()
   @ArrayUnique()
   @ArrayMaxSize(100)

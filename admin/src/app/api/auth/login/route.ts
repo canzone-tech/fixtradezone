@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   type AuthResponse,
+  clearAuthCookies,
+  getPortalRedirect,
   isAuthResponse,
-  isAdministrator,
   isCrossSiteRequest,
+  isPasswordChangeRequiredResponse,
   setAuthCookies,
+  setPasswordChangeCookie,
 } from "@/lib/auth";
 import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
 
 interface LoginBody {
-  email?: unknown;
+  identifier?: unknown;
   password?: unknown;
+  captchaId?: unknown;
+  captchaAnswer?: unknown;
 }
 
 export async function POST(request: NextRequest) {
@@ -32,9 +37,31 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (typeof body.email !== "string" || typeof body.password !== "string") {
+  if (
+    typeof body.identifier !== "string" ||
+    body.identifier.trim().length === 0 ||
+    typeof body.password !== "string" ||
+    body.password.length === 0
+  ) {
     return NextResponse.json(
-      { message: "Email and password are required." },
+      { message: "Identifier and password are required." },
+      { status: 400 },
+    );
+  }
+
+  if (body.captchaId !== undefined && typeof body.captchaId !== "string") {
+    return NextResponse.json(
+      { message: "Invalid CAPTCHA challenge." },
+      { status: 400 },
+    );
+  }
+
+  if (
+    body.captchaAnswer !== undefined &&
+    typeof body.captchaAnswer !== "string"
+  ) {
+    return NextResponse.json(
+      { message: "Invalid CAPTCHA answer." },
       { status: 400 },
     );
   }
@@ -45,8 +72,16 @@ export async function POST(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email: body.email, password: body.password }),
+      body: JSON.stringify({
+        identifier: body.identifier,
+        password: body.password,
+        ...(body.captchaId !== undefined ? { captchaId: body.captchaId } : {}),
+        ...(body.captchaAnswer !== undefined
+          ? { captchaAnswer: body.captchaAnswer }
+          : {}),
+      }),
     });
+
     const payload = await readJson(backendResponse);
 
     if (!backendResponse.ok) {
@@ -58,6 +93,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (isPasswordChangeRequiredResponse(payload)) {
+      const response = NextResponse.json({
+        message: payload.message,
+        passwordChangeRequired: true,
+        expiresIn: payload.expiresIn,
+        user: payload.user,
+      });
+
+      clearAuthCookies(response);
+      setPasswordChangeCookie(response, payload);
+
+      return response;
+    }
+
     if (!isAuthResponse(payload)) {
       return NextResponse.json(
         { message: "Authentication service returned an invalid response." },
@@ -66,22 +115,34 @@ export async function POST(request: NextRequest) {
     }
 
     const auth: AuthResponse = payload;
+    const redirectTo = getPortalRedirect(auth.user);
 
-    if (!auth.user || !isAdministrator(auth.user)) {
+    if (!redirectTo) {
       await backendFetch("/auth/logout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken: auth.refreshToken }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          refreshToken: auth.refreshToken,
+        }),
       }).catch(() => undefined);
 
       return NextResponse.json(
-        { message: "Administrator access is required." },
+        {
+          message: "This account does not have access to a FixTradeZone portal.",
+        },
         { status: 403 },
       );
     }
 
-    const response = NextResponse.json({ user: auth.user });
+    const response = NextResponse.json({
+      user: auth.user,
+      redirectTo,
+    });
+
     setAuthCookies(response, auth);
+
     return response;
   } catch {
     return NextResponse.json(
