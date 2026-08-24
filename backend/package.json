@@ -8,6 +8,7 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -15,6 +16,10 @@
     "lint": "eslint \"{src,apps,libs,test,scripts}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
     "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "db:status": "prisma migrate status",
+    "db:deploy": "prisma migrate deploy",
+    "verify:local": "npm run prisma:validate && npm run format:check && npm run lint && npm test -- --runInBand && npm run build && git diff --check",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
