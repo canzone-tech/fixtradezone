@@ -1,6 +1,11 @@
 -- FixTradeZone MLM-01 referral/sponsor foundation.
 -- Existing-user rollout: LEAVE_UNASSIGNED_FOR_REVIEW.
 -- No historical sponsor relationships are backfilled by this migration.
+--
+-- MySQL does not allow CHECK constraints that reference columns used by
+-- foreign keys with referential actions. Referential integrity stays in SQL;
+-- self-referral, cycle prevention, assignment-state, and sponsor-change
+-- invariants are enforced transactionally by the application service layer.
 
 CREATE TABLE `referral_profiles` (
   `userId` CHAR(36) NOT NULL,
@@ -18,14 +23,7 @@ CREATE TABLE `referral_profiles` (
   CONSTRAINT `referral_profiles_userId_fkey`
     FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `referral_profiles_sponsorUserId_fkey`
-    FOREIGN KEY (`sponsorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `referral_profiles_no_self_sponsor_check`
-    CHECK (`sponsorUserId` IS NULL OR `sponsorUserId` <> `userId`),
-  CONSTRAINT `referral_profiles_assignment_state_check`
-    CHECK (
-      (`assignmentStatus` IN ('ROOT','UNASSIGNED') AND `sponsorUserId` IS NULL)
-      OR (`assignmentStatus` = 'ASSIGNED' AND `sponsorUserId` IS NOT NULL)
-    )
+    FOREIGN KEY (`sponsorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `referral_sponsor_history` (
@@ -52,13 +50,6 @@ CREATE TABLE `referral_sponsor_history` (
     FOREIGN KEY (`newSponsorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `referral_sponsor_history_changedByUserId_fkey`
     FOREIGN KEY (`changedByUserId`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `referral_sponsor_history_no_self_sponsor_check`
-    CHECK (
-      (`oldSponsorUserId` IS NULL OR `oldSponsorUserId` <> `memberUserId`)
-      AND (`newSponsorUserId` IS NULL OR `newSponsorUserId` <> `memberUserId`)
-    ),
-  CONSTRAINT `referral_sponsor_history_distinct_sponsors_check`
-    CHECK (`oldSponsorUserId` IS NULL OR `newSponsorUserId` IS NULL OR `oldSponsorUserId` <> `newSponsorUserId`),
   CONSTRAINT `referral_sponsor_history_manual_reason_check`
     CHECK (
       `source` NOT IN ('MANUAL_ASSIGNMENT','MANUAL_REASSIGNMENT')
@@ -90,8 +81,6 @@ CREATE TABLE `system_referral_config` (
   CONSTRAINT `system_referral_config_updatedByUserId_fkey`
     FOREIGN KEY (`updatedByUserId`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `system_referral_config_singleton_check` CHECK (`id` = 1),
-  CONSTRAINT `system_referral_config_enablement_check`
-    CHECK (`enrollmentEnabled` = FALSE OR (`primaryRootUserId` IS NOT NULL AND `defaultSponsorUserId` IS NOT NULL)),
   CONSTRAINT `system_referral_config_prefix_check`
     CHECK (`referralCodeMode` <> 'CUSTOM_PREFIX_RANDOM' OR (`referralCodePrefix` IS NOT NULL AND CHAR_LENGTH(TRIM(`referralCodePrefix`)) BETWEEN 1 AND 20)),
   CONSTRAINT `system_referral_config_pattern_check`
