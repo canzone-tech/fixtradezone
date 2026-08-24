@@ -1,11 +1,5 @@
 import { Transform } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-  Max,
-  Min,
-} from 'class-validator';
+import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import {
   MARKET_INTERVALS,
   MARKET_SYMBOLS,
@@ -14,27 +8,21 @@ import {
 } from '../dashboard.constants';
 
 export class MarketHistoryQueryDto {
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim().toUpperCase()
-      : value,
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
   @IsIn(MARKET_SYMBOLS)
   symbol!: MarketSymbol;
 
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? value.trim()
-      : value,
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
   )
   @IsOptional()
   @IsIn(MARKET_INTERVALS)
   interval: MarketInterval = '1h';
 
-  @Transform(({ value }) =>
-    typeof value === 'string'
-      ? Number(value)
-      : value,
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? Number(value) : value,
   )
   @IsOptional()
   @IsInt()

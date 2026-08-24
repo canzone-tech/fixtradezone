@@ -8,15 +8,15 @@ import {
 } from 'class-validator';
 
 export class ReplaceUserRolesDto {
-  @Transform(({ value }) =>
-    Array.isArray(value)
-      ? value.map((role) =>
-          typeof role === 'string'
-            ? role.trim().toUpperCase()
-            : role,
-        )
-      : value,
-  )
+  @Transform(({ value }: { value: unknown }) => {
+    if (!Array.isArray(value)) {
+      return value;
+    }
+
+    return value.map((role: unknown) =>
+      typeof role === 'string' ? role.trim().toUpperCase() : role,
+    );
+  })
   @IsArray()
   @ArrayUnique()
   @ArrayMaxSize(20)

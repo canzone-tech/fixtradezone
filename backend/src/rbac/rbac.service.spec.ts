@@ -1,7 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { RbacService } from './rbac.service';
@@ -45,9 +42,7 @@ describe('RbacService permission security', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    service = new RbacService(
-      prisma as unknown as PrismaService,
-    );
+    service = new RbacService(prisma as unknown as PrismaService);
   });
 
   it('refuses SUPER_ADMIN permission mutation', async () => {

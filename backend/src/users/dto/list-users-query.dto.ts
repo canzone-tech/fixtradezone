@@ -9,17 +9,12 @@ import {
   Min,
 } from 'class-validator';
 
-const USER_STATUSES = [
-  'ACTIVE',
-  'SUSPENDED',
-  'BLOCKED',
-  'PENDING',
-] as const;
+const USER_STATUSES = ['ACTIVE', 'SUSPENDED', 'BLOCKED', 'PENDING'] as const;
 
 export type UserStatusFilter = (typeof USER_STATUSES)[number];
 
 export class ListUsersQueryDto {
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsOptional()
@@ -31,14 +26,14 @@ export class ListUsersQueryDto {
   @IsIn(USER_STATUSES)
   status?: UserStatusFilter;
 
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     value === undefined ? 1 : Number(value),
   )
   @IsInt()
   @Min(1)
   page = 1;
 
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     value === undefined ? 20 : Number(value),
   )
   @IsInt()

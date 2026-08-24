@@ -1,11 +1,5 @@
-import {
-  Injectable,
-  ServiceUnavailableException,
-} from '@nestjs/common';
-import {
-  MARKET_SYMBOLS,
-  type MarketSymbol,
-} from './dashboard.constants';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { MARKET_SYMBOLS, type MarketSymbol } from './dashboard.constants';
 import type { MarketHistoryQueryDto } from './dto/market-history-query.dto';
 
 interface BinanceTicker {
@@ -38,13 +32,8 @@ export interface MarketOverview {
   unavailableSymbols: MarketSymbol[];
 }
 
-function isBinanceTicker(
-  value: unknown,
-): value is BinanceTicker {
-  if (
-    typeof value !== 'object' ||
-    value === null
-  ) {
+function isBinanceTicker(value: unknown): value is BinanceTicker {
+  if (typeof value !== 'object' || value === null) {
     return false;
   }
 
@@ -53,8 +42,7 @@ function isBinanceTicker(
   return (
     typeof record.symbol === 'string' &&
     typeof record.lastPrice === 'string' &&
-    typeof record.priceChangePercent ===
-      'string' &&
+    typeof record.priceChangePercent === 'string' &&
     typeof record.highPrice === 'string' &&
     typeof record.lowPrice === 'string' &&
     typeof record.volume === 'string' &&
@@ -64,8 +52,7 @@ function isBinanceTicker(
 
 @Injectable()
 export class DashboardService {
-  private readonly baseUrl =
-    'https://data-api.binance.vision';
+  private readonly baseUrl = 'https://data-api.binance.vision';
 
   private marketCache:
     | {
@@ -74,9 +61,7 @@ export class DashboardService {
       }
     | undefined;
 
-  private async fetchJson(
-    url: string,
-  ): Promise<unknown> {
+  private async fetchJson(url: string): Promise<unknown> {
     try {
       const response = await fetch(url, {
         headers: {
@@ -86,9 +71,7 @@ export class DashboardService {
       });
 
       if (!response.ok) {
-        throw new Error(
-          `Upstream HTTP ${response.status}`,
-        );
+        throw new Error(`Upstream HTTP ${response.status}`);
       }
 
       return (await response.json()) as unknown;
@@ -102,10 +85,7 @@ export class DashboardService {
   async getMarketOverview(): Promise<MarketOverview> {
     const now = Date.now();
 
-    if (
-      this.marketCache &&
-      this.marketCache.expiresAt > now
-    ) {
+    if (this.marketCache && this.marketCache.expiresAt > now) {
       return this.marketCache.value;
     }
 
@@ -116,42 +96,32 @@ export class DashboardService {
         );
 
         if (!isBinanceTicker(payload)) {
-          throw new Error(
-            'Invalid market data payload.',
-          );
+          throw new Error('Invalid market data payload.');
         }
 
-        const baseAsset = symbol.replace(
-          /USDT$/,
-          '',
-        );
+        const baseAsset = symbol.replace(/USDT$/, '');
 
         return {
           symbol: baseAsset,
           pair: `${baseAsset}/USDT`,
           price: payload.lastPrice,
-          change24hPercent:
-            payload.priceChangePercent,
+          change24hPercent: payload.priceChangePercent,
           high24h: payload.highPrice,
           low24h: payload.lowPrice,
           volume24h: payload.volume,
-          quoteVolume24h:
-            payload.quoteVolume,
+          quoteVolume24h: payload.quoteVolume,
         } satisfies MarketTicker;
       }),
     );
 
     const markets: MarketTicker[] = [];
-    const unavailableSymbols: MarketSymbol[] =
-      [];
+    const unavailableSymbols: MarketSymbol[] = [];
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
         markets.push(result.value);
       } else {
-        unavailableSymbols.push(
-          MARKET_SYMBOLS[index],
-        );
+        unavailableSymbols.push(MARKET_SYMBOLS[index]);
       }
     });
 
@@ -162,8 +132,7 @@ export class DashboardService {
     }
 
     const value: MarketOverview = {
-      source:
-        'BINANCE_SPOT_PUBLIC_MARKET_DATA',
+      source: 'BINANCE_SPOT_PUBLIC_MARKET_DATA',
       quoteAsset: 'USDT',
       asOf: new Date().toISOString(),
       markets,
@@ -178,9 +147,7 @@ export class DashboardService {
     return value;
   }
 
-  async getMarketHistory(
-    query: MarketHistoryQueryDto,
-  ) {
+  async getMarketHistory(query: MarketHistoryQueryDto) {
     const payload = await this.fetchJson(
       `${this.baseUrl}/api/v3/klines?symbol=${encodeURIComponent(query.symbol)}&interval=${encodeURIComponent(query.interval)}&limit=${query.limit}`,
     );
@@ -192,28 +159,19 @@ export class DashboardService {
     }
 
     const candles = payload
-      .filter(
-        (row): row is unknown[] =>
-          Array.isArray(row) &&
-          row.length >= 7,
-      )
+      .filter((row): row is unknown[] => Array.isArray(row) && row.length >= 7)
       .map((row) => ({
-        openTime: new Date(
-          Number(row[0]),
-        ).toISOString(),
+        openTime: new Date(Number(row[0])).toISOString(),
         open: String(row[1]),
         high: String(row[2]),
         low: String(row[3]),
         close: String(row[4]),
         volume: String(row[5]),
-        closeTime: new Date(
-          Number(row[6]),
-        ).toISOString(),
+        closeTime: new Date(Number(row[6])).toISOString(),
       }));
 
     return {
-      source:
-        'BINANCE_SPOT_PUBLIC_MARKET_DATA',
+      source: 'BINANCE_SPOT_PUBLIC_MARKET_DATA',
       symbol: query.symbol,
       interval: query.interval,
       asOf: new Date().toISOString(),

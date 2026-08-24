@@ -22,9 +22,7 @@ async function bootstrap(): Promise<void> {
     const service = application.get(FounderSuperAdminBootstrapService);
     const user = await service.bootstrap(email);
 
-    logger.log(
-      `Founder SUPER_ADMIN ready for ${user.email}.`,
-    );
+    logger.log(`Founder SUPER_ADMIN ready for ${user.email}.`);
   } finally {
     await application.close();
   }

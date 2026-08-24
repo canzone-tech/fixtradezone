@@ -148,9 +148,7 @@ export class RbacService {
       permissions.map((permission) => permission.code),
     );
 
-    const missingCodes = requestedCodes.filter(
-      (code) => !foundCodes.has(code),
-    );
+    const missingCodes = requestedCodes.filter((code) => !foundCodes.has(code));
 
     if (missingCodes.length > 0) {
       throw new BadRequestException(
@@ -186,8 +184,7 @@ export class RbacService {
             action: 'PERMISSION_CHANGE',
             entityType: 'Role',
             entityId: role.id,
-            description:
-              'Administrator replaced role permission assignments.',
+            description: 'Administrator replaced role permission assignments.',
             metadata: {
               source: 'ADMIN_API',
               roleName: role.name,
@@ -199,31 +196,30 @@ export class RbacService {
           },
         });
 
-        const updatedRole =
-          await transaction.role.findUniqueOrThrow({
-            where: {
-              id: role.id,
-            },
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              status: true,
-              createdAt: true,
-              updatedAt: true,
-              permissions: {
-                select: {
-                  permission: {
-                    select: {
-                      id: true,
-                      code: true,
-                      description: true,
-                    },
+        const updatedRole = await transaction.role.findUniqueOrThrow({
+          where: {
+            id: role.id,
+          },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            permissions: {
+              select: {
+                permission: {
+                  select: {
+                    id: true,
+                    code: true,
+                    description: true,
                   },
                 },
               },
             },
-          });
+          },
+        });
 
         return {
           message: 'Role permissions updated successfully.',
@@ -231,9 +227,7 @@ export class RbacService {
             ...updatedRole,
             permissions: updatedRole.permissions
               .map((entry) => entry.permission)
-              .sort((a, b) =>
-                a.code.localeCompare(b.code),
-              ),
+              .sort((a, b) => a.code.localeCompare(b.code)),
           },
         };
       },
