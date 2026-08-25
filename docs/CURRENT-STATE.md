@@ -1,27 +1,43 @@
 # FixTradeZone — Current State
 
-## Latest Verified Checkpoint — 2026-08-25
+## Latest Verified Mainline Checkpoint — 2026-08-25
 
-MLM-01 Referral Foundation is implemented and locally accepted end to end.
+MLM-01 Referral Foundation is complete, merged into `main`, and reverified locally from the merged mainline.
 
-### Current branches
-- Slice branch: `feature/mlm-referral-foundation`
-- Frontend child branch used for the integrated slice: `feature/mlm-referral-frontend`
-- Accepted frontend checkpoint before documentation seal: `039635cbcd29ada5436d1dbbd47dd0537dcb4aea`
-- No PR to `main` has been opened yet.
+### Mainline
+- PR #15: `feat(referrals): deliver MLM-01 referral foundation` — MERGED.
+- Main merge commit: `2a06487b23d2c9cb0bc2078e93bde6eba220c42d`.
+- Local `main` was fast-forwarded to `prashant/main` after merge.
+- Local mainline milestone verification: GREEN.
 
-### MLM-01 backend
-Implemented and verified:
-- referral profile / sponsor relationship foundation;
+### Local mainline verification
+`npm run verify:milestone` passed after the PR merge:
+- Prisma schema validation: GREEN;
+- backend Prettier check: GREEN;
+- backend ESLint: GREEN;
+- backend Jest: 24/24 suites, 129/129 tests;
+- NestJS production build: GREEN;
+- backend diff checks: GREEN;
+- Prisma migration status: 6 migrations, schema up to date;
+- admin ESLint: GREEN;
+- admin TypeScript `tsc --noEmit`: GREEN;
+- Next.js 16.3.1 production build: GREEN;
+- root diff checks: GREEN.
+
+## MLM-01 Referral Foundation — COMPLETE
+
+### Backend / database
+Implemented and accepted:
+- referral profiles and sponsor relationships;
 - sponsor-change history;
-- singleton referral configuration;
-- registration referral attribution;
-- configured default sponsor behavior;
-- SUPER_ADMIN referral configuration;
-- permission-gated delegated ADMIN sponsor reassignment;
-- self-sponsor and cycle protection;
-- audited manual sponsor changes;
-- direct referral query API.
+- singleton referral system configuration;
+- migration `0006_referral_foundation`;
+- registration-time referral attribution;
+- configured root/default sponsor behavior;
+- self-sponsor and referral-cycle protection;
+- audited sponsor assignment/reassignment;
+- delegated ADMIN sponsor changes behind explicit permission and system switch;
+- direct-referral query API.
 
 USER API:
 - `GET /referrals/me`
@@ -34,147 +50,100 @@ ADMIN/SUPER_ADMIN API:
 
 Registration accepts optional `referralCode`.
 
-### MLM-01 database
-Migration `0006_referral_foundation` is applied locally.
-
-Database migration status at the accepted milestone:
-- 6 migrations found;
-- schema up to date;
-- no additional FixTradeZone application/shadow/test database created.
-
-Application-enforced referral invariants include:
-- no self-sponsor;
-- no referral cycles;
-- assignment-state consistency;
-- controlled root/default sponsor behavior;
-- reasoned/audited sponsor changes.
-
 Existing-user migration mode remains `LEAVE_UNASSIGNED_FOR_REVIEW`; historical sponsor relationships are never guessed.
 
-### MLM-01 frontend / BFF
+### Frontend / BFF
 USER:
-- `/user/referrals`
-- live referral assignment status;
-- live sponsor display;
+- `/user/referrals` live referral workspace;
+- live sponsor and assignment status;
 - live direct-referral list;
-- shareable invite link `register?ref=<REFERRAL_CODE>`;
-- `/user/dashboard` shows live referral status and direct-referral total instead of the old referral API placeholder.
+- shareable `register?ref=<REFERRAL_CODE>` invite links;
+- `/user/dashboard` live referral assignment state and direct-referral count.
 
 ADMIN/SUPER_ADMIN:
-- `/referrals`
-- referral enrollment configuration;
-- default sponsor selection;
+- `/referrals` management workspace;
+- referral enrollment/default sponsor configuration;
 - delegated ADMIN sponsor-change switch;
 - audited sponsor assignment/reassignment controls;
 - permission-aware navigation.
 
-BFF/session behavior:
-- protected browser calls use same-origin Next.js BFF routes;
-- browser JavaScript does not own backend JWTs;
-- session refresh/validation runs before dependent referral data requests to avoid rotating-refresh-token races;
-- registration BFF forwards explicit `referralCode` or a same-origin `?ref=` invite code to the Nest registration contract.
+Browser authentication remains same-origin BFF + HttpOnly/SameSite cookies. Session validation/refresh precedes dependent referral data calls to avoid rotating-refresh-token races.
 
-## Verification — GREEN
+### Integrated acceptance
+The accepted browser/API flow proved:
+1. SUPER_ADMIN loaded and saved live referral configuration.
+2. Fresh USER A registered, was activated, logged in, and was assigned under the configured founder/root default sponsor.
+3. USER A copied the generated referral invite link.
+4. Fresh USER B registered through USER A's invite link.
+5. USER B was activated and showed USER A as sponsor.
+6. USER A's direct-referral UI/readback showed USER B as `ACTIVE / ASSIGNED` and the direct total increased.
 
-### Repository code gate
-Latest local `npm run verify:local` on the accepted frontend checkpoint:
-- Prisma schema validation: GREEN;
-- backend Prettier check: GREEN;
-- backend ESLint: GREEN;
-- backend Jest: 24/24 suites, 129/129 tests;
-- NestJS production build: GREEN;
-- backend diff checks: GREEN;
-- admin ESLint: GREEN;
-- admin TypeScript `tsc --noEmit`: GREEN;
-- Next.js 16.3.1 production build: GREEN;
-- root diff checks: GREEN.
+This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback.
 
-### Database milestone gate
-Latest local `npm run verify:milestone` before final UI acceptance:
-- all repository code gates GREEN;
-- Prisma migration status GREEN;
-- 6 migrations applied / schema up to date.
+## Active Development Slice
 
-### API checkpoint
-MLM-01 Postman referral collection: GREEN.
+New branch from verified `main`:
+- `feature/packages-foundation`
 
-The hardened referral collection covered success, authentication, authorization, validation, self-sponsor, cycle, delegated ADMIN switch/permission behavior, configuration restoration and token refresh behavior.
+Next slice: **Packages / Plan Foundation**.
 
-### Integrated API + frontend acceptance — GREEN
-Verified locally in browser on 2026-08-25:
-1. SUPER_ADMIN opened `/referrals` and loaded live referral configuration.
-2. Referral enrollment was enabled with the configured founder/root as default sponsor.
-3. Fresh USER A registered, was activated, logged in, and showed `ASSIGNED` referral state with founder/root as sponsor.
-4. USER A dashboard showed live referral state and direct referral count.
-5. USER A copied the generated referral invite link.
-6. Fresh USER B registered through USER A's `register?ref=<CODE>` invite link.
-7. USER B was activated and showed USER A as sponsor.
-8. USER A's `/user/referrals` direct-referral list updated to include USER B as `ACTIVE / ASSIGNED`.
-9. USER A direct-referral total increased accordingly.
+Reason for sequence: package state/config is a dependency for matching, reward generation, upgrade/renewal behavior, caps, deposit-triggered activation, and later ledger calculations. Commission/reward engines must not be implemented before package semantics and lifecycle are explicit.
 
-This proves the accepted path across frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback.
+## Packages / Plan Foundation — Planning Gate
 
-MLM-01 final module sign-off is therefore GREEN.
+Work should lock the exact contract before Codex implements dependent schema or APIs. At minimum the package slice must define:
+- package catalog/config and versioning;
+- package price and currency representation;
+- configured reward-rate range/rule representation;
+- configured return/cap multiplier semantics;
+- duration/cycle fields;
+- package status/availability;
+- user-package lifecycle states;
+- activation source/timing;
+- renewal and upgrade behavior;
+- single-active vs multiple-active package mode interaction;
+- historical configuration/version preservation;
+- SUPER_ADMIN vs delegated ADMIN management boundaries;
+- audit requirements;
+- what is intentionally deferred to Deposit, Wallet/Ledger, Commission/Matching and Simulated Activity modules.
 
-## Locked delivery workflow
-For future modules:
-1. confirm business semantics;
-2. implement focused backend/API foundation;
-3. use local API/Postman as an intermediate checkpoint;
-4. implement matching frontend/BFF/UI;
-5. run repository verification;
-6. run database milestone verification when relevant;
-7. run final API + frontend integrated local acceptance;
-8. update persistent docs;
-9. open PR only after all gates are green.
+Do not create mutable financial balances or earnings in the Packages slice. Financial effects must later flow through the approved ledger/idempotency/reversal architecture.
 
-Work/Codex may accelerate planning and implementation, but local verification remains the acceptance authority. GitHub repository + committed `docs/` remain the source of truth.
+## Locked Delivery Workflow
+1. Work locks business semantics and implementation contract.
+2. Codex/engineering implements one focused vertical slice on the feature branch.
+3. Backend/API may use Postman as an intermediate checkpoint.
+4. Matching frontend/BFF/UI is implemented in the same slice.
+5. Run `npm run verify:local`.
+6. Apply DB migrations explicitly when required and run `npm run verify:milestone`.
+7. Final module acceptance is API + frontend together locally.
+8. Update persistent docs.
+9. Open PR only after all gates are green.
 
-## Core architecture / security state
+Local verification remains the acceptance authority even when Work/Codex/CI reports success.
+
+## Core Architecture / Security
 - Backend: NestJS + TypeScript.
 - ORM: Prisma 7.9.1 with MariaDB adapter.
 - Relational source of truth: MySQL.
 - MongoDB reserved for document/config/CMS use where appropriate.
-- Redis used for transient/cache/session-adjacent infrastructure.
+- Redis for transient/cache/session-adjacent infrastructure.
 - Frontend/admin/user portal: Next.js.
 - JWT access + rotating refresh sessions.
 - Browser auth boundary: same-origin BFF + HttpOnly/SameSite cookies.
 - RBAC roles: `SUPER_ADMIN`, `ADMIN`, `USER`.
-- SUPER_ADMIN remains founder/master authority.
-- APIs remain deny-by-default except explicitly public endpoints.
-- Financial modules must preserve SQL DECIMAL, idempotency, auditability, immutable/reversal ledger patterns and explicit authorization.
-- Simulated activity must always be explicitly labeled simulated and never presented as real trading/profits.
+- Backend remains authentication/authorization authority.
+- Financial modules must use SQL `DECIMAL`, idempotency, immutable/auditable ledger entries, reversals and explicit authorization.
+- Simulated activity must always be explicitly labelled simulated and never presented as real trading/profits.
 
-## Foundation history
-The reusable authentication/account/admin/frontend foundation remains complete and green:
-- configurable authentication and registration;
-- rotating sessions;
-- required password change;
-- custom Redis-backed CAPTCHA;
-- users administration;
-- RBAC roles/permissions;
-- security configuration / reauthentication / idle lock;
-- secure USER impersonation boundary;
-- Dark Neo ADMIN and USER portal shell;
-- role-aware login routing;
-- USER dashboard/profile;
-- canonical FixTradeZone logo and shared sign-out behavior.
+## Continuity
+GitHub repository + committed `docs/` are the permanent source of truth.
 
-Historical detail is retained in `CHANGELOG.md`, `PROJECT-CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `DATABASE.md`, `SECURITY.md` and `API-CONTRACT.md`.
+Work and Codex are acceleration layers. If they are unavailable or limits are reached, resume in normal Chat from:
+1. current Git branch/commit;
+2. this file;
+3. `docs/WORK-CODEX-OPERATING-BRIEF.md`;
+4. relevant business-rule / architecture documents.
 
-## Immediate Next Actions
-1. Integrate `feature/mlm-referral-frontend` back into `feature/mlm-referral-foundation` by fast-forward only.
-2. On local machine, switch to the foundation branch and run `npm run verify:milestone` from the integrated branch state.
-3. Do not repeat the already-green browser journey unless the integration commit changes executable code; a branch-pointer-only fast-forward does not invalidate the accepted UI/API evidence.
-4. Update the Work/Codex handoff checkpoint.
-5. Prepare the next business-domain slice in Work/Codex using the existing locked MLM rules; no dependent implementation should proceed until any new ambiguous business semantics are explicitly locked.
-6. Open the single MLM referral PR to `main` only when the final integrated foundation branch gate is green.
-
-## Constraints
-- Never create extra FixTradeZone application databases without explicit approval.
-- Never use Prisma `migrate dev` without explicit shadow-database approval.
-- Never expose secrets, tokens, password material or CAPTCHA HMAC secrets.
-- Never weaken JWT/RBAC/audit/security invariants through configuration.
-- Never auto-credit deposits from TXID submission alone.
-- Never represent simulated trades/results as real.
-- Do not bypass failed gates to obtain a green result.
+## Immediate Next Action
+Open the FixTradeZone workspace in Work and use `docs/WORK-CODEX-OPERATING-BRIEF.md` plus the repository docs to lock the Packages / Plan Foundation contract before Codex implementation begins.
