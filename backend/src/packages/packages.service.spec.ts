@@ -4,9 +4,11 @@ import {
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { UpdatePackagePlanItemDto } from './dto/package-plan.dto';
 import { PackagesService } from './packages.service';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -273,6 +275,56 @@ describe('PackagesService', () => {
       operation: 'UPDATE_DRAFT_ITEM',
       revision: 2,
     });
+  });
+
+  it('preserves omitted nullable rates on a transformed partial-update DTO', async () => {
+    const plan = packagePlan();
+    const updatedItem = packageItem({
+      availability: 'CLOSED_TO_NEW_ACTIVATIONS',
+    });
+    const dto = plainToInstance(UpdatePackagePlanItemDto, {
+      expectedRevision: 1,
+      reason: 'Close this package while preserving its approved rate range.',
+      availability: 'CLOSED_TO_NEW_ACTIVATIONS',
+    });
+
+    const hasTransformedRateField = Object.prototype.hasOwnProperty.call(
+      dto,
+      'minimumRewardRate',
+    );
+
+    expect(hasTransformedRateField).toBe(true);
+    expect(dto.minimumRewardRate).toBeUndefined();
+
+    transaction.packagePlanVersion.findUnique.mockResolvedValue(plan);
+    transaction.packagePlanVersion.updateMany.mockResolvedValue({ count: 1 });
+    transaction.packagePlanItem.update.mockResolvedValue(updatedItem);
+    transaction.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.updatePlanItem(PLAN_ID, ITEM_ID, dto, admin),
+    ).resolves.toMatchObject({
+      revision: 2,
+      item: { availability: 'CLOSED_TO_NEW_ACTIVATIONS' },
+    });
+
+    const updateCalls = transaction.packagePlanItem.update.mock
+      .calls as unknown as Array<
+      [
+        {
+          data: {
+            fixedRewardRate: Prisma.Decimal | null;
+            minimumRewardRate: Prisma.Decimal;
+            maximumRewardRate: Prisma.Decimal;
+          };
+        },
+      ]
+    >;
+    const updateCall = updateCalls[0]?.[0];
+
+    expect(updateCall?.data.fixedRewardRate).toBeNull();
+    expect(updateCall?.data.minimumRewardRate.toFixed(6)).toBe('0.400000');
+    expect(updateCall?.data.maximumRewardRate.toFixed(6)).toBe('0.600000');
   });
 
   it('rejects a rate mode whose typed decimal fields do not match', async () => {

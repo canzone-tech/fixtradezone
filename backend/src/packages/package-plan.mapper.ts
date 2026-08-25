@@ -67,8 +67,6 @@ export function mergeItemTerms(
   dto: UpdatePackagePlanItemDto,
 ): ItemTerms {
   const current = itemTerms(item);
-  const supplied = <Key extends keyof UpdatePackagePlanItemDto>(key: Key) =>
-    Object.prototype.hasOwnProperty.call(dto, key);
 
   return {
     displayName: dto.displayName ?? current.displayName,
@@ -78,15 +76,18 @@ export function mergeItemTerms(
     price: dto.price ?? current.price,
     currency: dto.currency ?? current.currency,
     rewardRateMode: dto.rewardRateMode ?? current.rewardRateMode,
-    fixedRewardRate: supplied('fixedRewardRate')
-      ? (dto.fixedRewardRate ?? null)
-      : current.fixedRewardRate,
-    minimumRewardRate: supplied('minimumRewardRate')
-      ? (dto.minimumRewardRate ?? null)
-      : current.minimumRewardRate,
-    maximumRewardRate: supplied('maximumRewardRate')
-      ? (dto.maximumRewardRate ?? null)
-      : current.maximumRewardRate,
+    fixedRewardRate:
+      dto.fixedRewardRate === undefined
+        ? current.fixedRewardRate
+        : dto.fixedRewardRate,
+    minimumRewardRate:
+      dto.minimumRewardRate === undefined
+        ? current.minimumRewardRate
+        : dto.minimumRewardRate,
+    maximumRewardRate:
+      dto.maximumRewardRate === undefined
+        ? current.maximumRewardRate
+        : dto.maximumRewardRate,
     rewardRateMeaning: dto.rewardRateMeaning ?? current.rewardRateMeaning,
     capBasis: dto.capBasis ?? current.capBasis,
     capMultiplier: dto.capMultiplier ?? current.capMultiplier,

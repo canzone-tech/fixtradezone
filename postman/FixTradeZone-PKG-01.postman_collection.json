@@ -180,12 +180,14 @@
               "pm.test('Draft item update returns 200', function () {",
               "  pm.response.to.have.status(200);",
               "});",
-              "const body = pm.response.json();",
-              "pm.test('Availability and revision changed', function () {",
-              "  pm.expect(body.item.availability).to.eql('CLOSED_TO_NEW_ACTIVATIONS');",
-              "  pm.expect(body.revision).to.eql(Number(pm.environment.get('stalePackageRevision')) + 1);",
-              "});",
-              "pm.environment.set('packageRevision', String(body.revision));"
+              "if (pm.response.code === 200) {",
+              "  const body = pm.response.json();",
+              "  pm.test('Availability and revision changed', function () {",
+              "    pm.expect(body.item.availability).to.eql('CLOSED_TO_NEW_ACTIVATIONS');",
+              "    pm.expect(body.revision).to.eql(Number(pm.environment.get('stalePackageRevision')) + 1);",
+              "  });",
+              "  pm.environment.set('packageRevision', String(body.revision));",
+              "}"
             ]
           }
         }
