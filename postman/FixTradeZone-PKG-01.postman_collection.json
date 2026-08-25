@@ -1,0 +1,450 @@
+{
+  "info": {
+    "_postman_id": "8605de4c-af6b-4a49-81ed-0d0d5f303f09",
+    "name": "FixTradeZone PKG-01 API Gate",
+    "description": "Run once, in order, after migration 0007 is deployed to the local FixTradeZone database. Requires a current SUPER_ADMIN accessToken in the FixTradeZone Local environment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01 - USER catalogue is safely empty before publication",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/packages"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Catalogue request returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('No unpublished package terms leak to USER', function () {",
+              "  pm.expect(body.catalogueAvailable).to.eql(false);",
+              "  pm.expect(body.activationAvailable).to.eql(false);",
+              "  pm.expect(body.reason).to.eql('NO_EFFECTIVE_PUBLISHED_PLAN');",
+              "  pm.expect(body.items).to.eql([]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - List plan versions and select V1 draft",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/package-plans"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Plan list returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "const draft = body.planVersions.find((plan) => plan.status === 'DRAFT');",
+              "pm.test('Migration installed one nine-item draft', function () {",
+              "  pm.expect(draft).to.be.an('object');",
+              "  pm.expect(draft.versionNumber).to.eql(1);",
+              "  pm.expect(draft.revision).to.eql(1);",
+              "  pm.expect(draft.itemCount).to.eql(9);",
+              "});",
+              "pm.environment.set('packagePlanVersionId', draft.id);",
+              "pm.environment.set('packageRevision', String(draft.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Review the complete V1 draft",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Draft detail returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const plan = pm.response.json().plan;",
+              "const scout = plan.items.find((item) => item.packageCode === 'NEURAL_SCOUT');",
+              "const sovereign = plan.items.find((item) => item.packageCode === 'QUANT_SOVEREIGN');",
+              "pm.test('Founder-approved V1 values are exact decimal strings', function () {",
+              "  pm.expect(plan.status).to.eql('DRAFT');",
+              "  pm.expect(plan.items).to.have.length(9);",
+              "  pm.expect(plan.activePackageMode).to.eql('SINGLE_ACTIVE');",
+              "  pm.expect(plan.activationTrigger).to.eql('PAYMENT_APPROVED');",
+              "  pm.expect(plan.renewalMode).to.eql('MANUAL_AFTER_TERMINAL');",
+              "  pm.expect(plan.upgradesEnabled).to.eql(false);",
+              "  pm.expect(scout.price).to.eql('5.00000000');",
+              "  pm.expect(scout.minimumRewardRate).to.eql('0.400000');",
+              "  pm.expect(scout.maximumRewardRate).to.eql('0.600000');",
+              "  pm.expect(scout.maximumProfit).to.eql('5.00000000');",
+              "  pm.expect(sovereign.price).to.eql('5000.00000000');",
+              "  pm.expect(sovereign.capMultiplier).to.eql('4.0000');",
+              "  pm.expect(sovereign.maximumProfit).to.eql('15000.00000000');",
+              "});",
+              "pm.environment.set('packageItemId', scout.id);",
+              "pm.environment.set('packageRevision', String(plan.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Audited draft settings update",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{packageRevision}},\n  \"reason\": \"Confirm the Founder-approved UTC settlement boundary.\",\n  \"settlementTimezone\": \"UTC\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Draft settings update returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const plan = pm.response.json().plan;",
+              "pm.test('Aggregate revision increments', function () {",
+              "  pm.expect(plan.settlementTimezone).to.eql('UTC');",
+              "  pm.expect(plan.revision).to.eql(Number(pm.environment.get('packageRevision')) + 1);",
+              "});",
+              "pm.environment.set('packageRevision', String(plan.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Audited item update temporarily closes Neural Scout",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{packageRevision}},\n  \"reason\": \"Verify audited package availability mutation.\",\n  \"availability\": \"CLOSED_TO_NEW_ACTIVATIONS\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}/items/{{packageItemId}}"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.environment.set('stalePackageRevision', pm.environment.get('packageRevision'));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Draft item update returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('Availability and revision changed', function () {",
+              "  pm.expect(body.item.availability).to.eql('CLOSED_TO_NEW_ACTIVATIONS');",
+              "  pm.expect(body.revision).to.eql(Number(pm.environment.get('stalePackageRevision')) + 1);",
+              "});",
+              "pm.environment.set('packageRevision', String(body.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Stale optimistic-concurrency write is rejected",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{stalePackageRevision}},\n  \"reason\": \"This stale write must not be accepted.\",\n  \"availability\": \"AVAILABLE\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}/items/{{packageItemId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Stale revision returns 409', function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Restore Founder-approved availability",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{packageRevision}},\n  \"reason\": \"Restore the approved V1 AVAILABLE catalogue state.\",\n  \"availability\": \"AVAILABLE\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}/items/{{packageItemId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Availability restore returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "pm.test('Approved availability is restored', function () {",
+              "  pm.expect(body.item.availability).to.eql('AVAILABLE');",
+              "});",
+              "pm.environment.set('packageRevision', String(body.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Duplicate package item is rejected without mutation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{packageRevision}},\n  \"reason\": \"Verify duplicate package identity protection.\",\n  \"packageCode\": \"NEURAL_SCOUT\",\n  \"displayName\": \"Neural Scout Duplicate\",\n  \"slug\": \"neural-scout-duplicate\",\n  \"sortOrder\": 99,\n  \"availability\": \"AVAILABLE\",\n  \"price\": \"5.00000000\",\n  \"currency\": \"USDT\",\n  \"rewardRateMode\": \"RANDOM_RANGE\",\n  \"fixedRewardRate\": null,\n  \"minimumRewardRate\": \"0.400000\",\n  \"maximumRewardRate\": \"0.600000\",\n  \"rewardRateMeaning\": \"USER_NET_AFTER_SPLIT\",\n  \"capBasis\": \"TOTAL_RETURN\",\n  \"capMultiplier\": \"2.0000\",\n  \"principalTreatment\": \"INCLUDED_IN_TOTAL_RETURN\",\n  \"goalDays\": 90,\n  \"cycleDays\": 10,\n  \"rewardStartMode\": \"NEXT_CALENDAR_DAY\",\n  \"rewardFrequency\": \"DAILY_CALENDAR\",\n  \"cycleDayMode\": \"CALENDAR_DAYS\",\n  \"rewardDayMode\": \"EVERY_DAY\",\n  \"cycleEndAction\": \"AUTO_START_NEXT_CYCLE\",\n  \"capReachedAction\": \"COMPLETE_PACKAGE\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}/items"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Duplicate package definition returns 409', function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - SUPER_ADMIN publishes V1 atomically",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{packageRevision}},\n  \"reason\": \"Founder reviewed and approved the complete V1 package plan.\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{packagePlanVersionId}}/publish"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Publication returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const plan = pm.response.json().plan;",
+              "pm.test('Complete V1 is published atomically', function () {",
+              "  pm.expect(plan.status).to.eql('PUBLISHED');",
+              "  pm.expect(plan.items).to.have.length(9);",
+              "  pm.expect(plan.effectiveFrom).to.be.a('string');",
+              "  pm.expect(plan.publishedByUserId).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.environment.set('publishedPlanVersionId', plan.id);",
+              "pm.environment.set('publishedPackageRevision', String(plan.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - USER catalogue exposes only the effective published plan",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/packages"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Effective catalogue returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const body = pm.response.json();",
+              "const core = body.items.find((item) => item.packageCode === 'QUANT_CORE');",
+              "pm.test('Catalogue is published but activation stays unavailable', function () {",
+              "  pm.expect(body.catalogueAvailable).to.eql(true);",
+              "  pm.expect(body.activationAvailable).to.eql(false);",
+              "  pm.expect(body.reason).to.eql('PACKAGE_ACTIVATION_DEFERRED');",
+              "  pm.expect(body.items).to.have.length(9);",
+              "  pm.expect(core.price).to.eql('500.00000000');",
+              "  pm.expect(core.maximumTotalReturn).to.eql('1500.00000000');",
+              "  pm.expect(core.maximumProfit).to.eql('1000.00000000');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Published item mutation is rejected",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{publishedPackageRevision}},\n  \"reason\": \"Published terms must remain immutable.\",\n  \"availability\": \"CLOSED_TO_NEW_ACTIVATIONS\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/{{publishedPlanVersionId}}/items/{{packageItemId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Published mutation returns 409', function () {",
+              "  pm.response.to.have.status(409);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Clone published V1 into the sole V2 draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sourcePlanVersionId\": \"{{publishedPlanVersionId}}\",\n  \"reason\": \"Verify immutable correction workflow by creating the next draft.\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/package-plans/drafts"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Draft clone returns 201', function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "const plan = pm.response.json().plan;",
+              "pm.test('V2 is a complete fresh-revision clone', function () {",
+              "  pm.expect(plan.status).to.eql('DRAFT');",
+              "  pm.expect(plan.versionNumber).to.eql(2);",
+              "  pm.expect(plan.revision).to.eql(1);",
+              "  pm.expect(plan.clonedFromPlanVersionId).to.eql(pm.environment.get('publishedPlanVersionId'));",
+              "  pm.expect(plan.items).to.have.length(9);",
+              "});",
+              "pm.environment.set('packagePlanVersionId', plan.id);",
+              "pm.environment.set('packageRevision', String(plan.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Final plan/version readback",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/package-plans"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Final readback returns 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "const plans = pm.response.json().planVersions;",
+              "pm.test('Exactly one published plan and one active draft remain', function () {",
+              "  pm.expect(plans.filter((plan) => plan.status === 'PUBLISHED')).to.have.length(1);",
+              "  pm.expect(plans.filter((plan) => plan.status === 'DRAFT')).to.have.length(1);",
+              "  pm.expect(plans.every((plan) => plan.itemCount === 9)).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

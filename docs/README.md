@@ -14,7 +14,10 @@ These documents are the persistent project source of truth used to continue deve
 9. `ROADMAP.md` — phase-by-phase roadmap.
 10. `LOCAL-VERIFICATION.md` — locked repository-wide local verification and delivery gate.
 11. `LOCAL-VERIFY-AUTH-ADMIN.md` — required local gate for the current auth/admin slice.
-12. `CHANGELOG.md` — session and milestone history.
+12. `MLM-BUSINESS-RULES.md` — canonical numbered MLM/package decision record.
+13. `PACKAGES-PLAN-FOUNDATION.md` — Founder-approved PKG-01 implementation contract.
+14. `LOCAL-VERIFY-PACKAGES.md` — required migration/Postman/SQL backend gate before package UI work.
+15. `CHANGELOG.md` — session and milestone history.
 
 ## Rule
 Any material architecture, security, business-rule, continuity, or delivery-process decision should be reflected in these documents before the codebase moves forward.

@@ -11,6 +11,7 @@ import { SecurityConfigModule } from './security-config/security-config.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { RedisModule } from './redis/redis.module';
+import { PackagesModule } from './packages/packages.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { RedisModule } from './redis/redis.module';
     UsersModule,
     SecurityConfigModule,
     PlatformConfigModule,
+    PackagesModule,
     DashboardModule,
     HealthModule,
   ],

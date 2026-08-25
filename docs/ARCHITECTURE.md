@@ -53,3 +53,16 @@ Cache, queues, sessions/temporary state, rate limiting, and background-job coord
 - Do not directly manipulate financial balances through unsafe updates.
 - Admin access/refresh tokens remain in HttpOnly cookies at the Next.js BFF boundary; NestJS remains the identity and RBAC authority.
 - Persist only refresh-token hashes in MySQL. Redis is not the source of truth for durable authentication revocation.
+
+## Package / Plan Boundary
+
+- MySQL owns stable package definitions, atomic plan versions and typed plan
+  items.
+- A catalogue is resolved from exactly one effective `PUBLISHED` plan; plan
+  items from different versions are never mixed.
+- Draft management, effective resolution, publication, RBAC and audit belong to
+  NestJS.
+- Next.js uses the existing same-origin BFF/session boundary only after the
+  backend API gate is locally accepted.
+- User-package activation, deposits, ledger/accounting, rewards, commissions and
+  simulated activity are separate dependent modules and are not part of PKG-01.

@@ -6,6 +6,8 @@ export const PERMISSIONS = {
   USERS_ROLES_MANAGE: 'users.roles.manage',
   USERS_IMPERSONATE: 'users.impersonate',
   REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
+  PACKAGES_READ: 'packages.read',
+  PACKAGES_DRAFT_MANAGE: 'packages.draft.manage',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -38,6 +40,14 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
     description: 'Assign and exceptionally reassign referral sponsors',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_READ,
+    description: 'View package plan versions and draft package terms',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_DRAFT_MANAGE,
+    description: 'Create and edit package plan drafts',
   },
   {
     code: PERMISSIONS.RBAC_READ,

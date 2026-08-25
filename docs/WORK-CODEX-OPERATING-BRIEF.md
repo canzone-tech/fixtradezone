@@ -16,7 +16,11 @@ GitHub repository + committed `docs/` are the permanent source of truth. Work an
 - MLM-01 Postman API gate: GREEN.
 - MLM-01 integrated browser + API gate: GREEN.
 - Active next-slice branch: `feature/packages-foundation`.
-- No Packages implementation should begin until Work locks the package/plan contract below.
+- PKG-01 Q33–Q39 Option A and all initial safe defaults: FOUNDER APPROVED.
+- Package contract commit: `79cd4a5`.
+- PKG-01 backend/schema/static gate: GREEN in Work (26 suites / 145 tests).
+- Local migration/Postman/SQL acceptance: PENDING.
+- Package BFF/UI: BLOCKED until that local API gate is accepted.
 
 ## Accepted MLM-01 end-to-end proof
 The locally accepted referral flow proved:
@@ -34,25 +38,20 @@ This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback
 ## Next slice — Packages / Plan Foundation
 Packages comes before commissions/rewards because package state/config is required for matching bases, reward generation, caps, upgrades, renewals and deposit-triggered activation.
 
-### Work planning gate
-Before Codex writes dependent schema/API code, resolve and document the exact package contract, including:
-- package catalog/config model and versioning;
-- monetary/price representation;
-- reward-rate range/rule representation;
-- maximum-return / cap multiplier semantics;
-- duration and cycle configuration;
-- package active/inactive/availability status;
-- user-package lifecycle states;
-- activation source and activation timing;
-- renewal behavior;
-- upgrade behavior, including FULL vs INCREMENTAL treatment where applicable;
-- `SINGLE_ACTIVE` vs `MULTIPLE_ACTIVE` interaction;
-- historical package/config version preservation;
-- SUPER_ADMIN master controls and any explicit delegated ADMIN permissions;
-- audit-log requirements;
-- exact boundaries with Deposit, Wallet/Ledger, Commission/Matching and Simulated Activity modules.
+### Approved contract and active gate
 
-Do not invent or credit earnings in the Packages slice. Financial effects belong to later ledger-backed modules.
+The planning gate is complete. The implementation authority is
+`docs/PACKAGES-PLAN-FOUNDATION.md`, backed by Q33–Q39 in
+`docs/MLM-BUSINESS-RULES.md`.
+
+The backend checkpoint now contains migration `0007_package_plan_foundation`,
+the versioned package-plan APIs, RBAC/audit/publication protections, focused
+tests and `postman/FixTradeZone-PKG-01.postman_collection.json`.
+
+Do not invent or credit earnings in this slice. Financial effects belong to
+later ledger-backed modules. Do not start package BFF/UI work until local
+migration, milestone, Postman and SQL acceptance are confirmed under
+`docs/LOCAL-VERIFY-PACKAGES.md`.
 
 ## Relevant locked MLM/business rules
 The persistent `docs/MLM-BUSINESS-RULES.md` remains authoritative. Important package-dependent rules already locked include:
@@ -193,8 +192,12 @@ Use Codex for:
 
 Codex must inspect existing code/docs first and must not invent new architecture when an existing pattern already exists.
 
-## Recommended first Work instruction
-Continue FixTradeZone from `feature/packages-foundation`. Read `docs/CURRENT-STATE.md`, `docs/WORK-CODEX-OPERATING-BRIEF.md`, `docs/MLM-BUSINESS-RULES.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/SECURITY.md`, `docs/API-CONTRACT.md`, and `docs/LOCAL-VERIFICATION.md`. MLM-01 is merged and locally verified on `main`. Do not code yet. Act as Chief Architect and lock the Packages / Plan Foundation contract, identify only genuinely unresolved package-specific business questions, propose safe defaults separately from locked rules, define the backend/database/API/frontend boundaries, and produce an implementation-ready vertical-slice plan for Codex. Preserve all existing financial, RBAC, audit, BFF/session and local-verification invariants.
+## Recommended next local instruction
+Continue FixTradeZone from `feature/packages-foundation`. Pull the latest pushed
+backend checkpoint, read `docs/LOCAL-VERIFY-PACKAGES.md`, review/deploy migration
+`0007_package_plan_foundation`, run `npm run verify:milestone`, then run the
+ordered PKG-01 Postman collection and SQL readback. Do not begin package BFF/UI
+work and do not open a PR until the local backend/API gate is explicitly GREEN.
 
 ## Fallback rule
 If Work/Codex limits are reached, the feature is unavailable, or context is lost, resume in normal Chat from:

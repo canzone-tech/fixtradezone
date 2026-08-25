@@ -1,5 +1,26 @@
 # FixTradeZone — Changelog
 
+## 2026-08-25 — PKG-01 backend checkpoint (local DB/API acceptance pending)
+
+- Founder approved Q33–Q39 Option A and all proposed PKG-01 safe defaults.
+- Added the canonical Packages / Plan Foundation implementation contract.
+- Added migration `0007_package_plan_foundation` with versioned definitions,
+  plan versions/items and the unpublished nine-package V1 draft.
+- Added exact decimal serialization, typed package-term validation, derived
+  maximum-return/profit projections and safe empty-catalogue behavior.
+- Added audited optimistic-concurrency draft commands and immutable publication.
+- Added SUPER_ADMIN-only atomic publication/closure with overlap and backdating
+  protection.
+- Added `packages.read` and `packages.draft.manage` without granting either to
+  ADMIN by default.
+- Added protected USER/admin package APIs and 16 focused DTO/service tests.
+- Added the ordered 13-request PKG-01 Postman collection and local migration/SQL
+  verification guide.
+- Work checkout static gate: Prisma schema valid/generated; backend 26 suites / 145
+  tests, formatting, ESLint and Nest production build GREEN.
+- Local `db:deploy`, `verify:milestone`, Postman and SQL acceptance remain
+  mandatory before any package BFF/UI implementation.
+
 ## 2026-08-23
 - Merged PR #11 (`feature/configurable-auth-registration`) into `main` at `0c2795d`.
 - Started `feature/foundation-freeze-checkpoint` to inventory, sanitize, freeze, and independently verify the reusable platform core before Packages.

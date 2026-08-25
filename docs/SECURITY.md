@@ -101,6 +101,29 @@
 - Financial values use DECIMAL.
 - Ledger entries are immutable where appropriate.
 
+## Package-Plan Security and Integrity — PKG-01
+
+- USER sees only one currently effective `PUBLISHED` plan; unpublished drafts
+  never leak through the catalogue API.
+- SUPER_ADMIN has implicit package authority. ADMIN receives no package
+  permissions automatically.
+- Delegated draft reads require `packages.read`; draft changes require
+  `packages.draft.manage`.
+- Publication, published-plan closure and effective-date authority remain
+  SUPER_ADMIN-only and cannot be delegated.
+- Every draft command requires an audit reason and expected aggregate revision.
+- Stale or concurrent writes fail instead of silently overwriting another
+  administrator's work.
+- Draft mutation, revision increment and before/after audit are committed in the
+  same serializable transaction.
+- Published commercial terms are immutable. Corrections clone into a new draft.
+- Publication rejects backdating, ambiguous overlaps and any current contract
+  violation.
+- Package prices/rates/multipliers use exact SQL `DECIMAL` and are serialized as
+  strings.
+- PKG-01 creates no user package, balance, earnings, cap-consumption, deposit or
+  ledger state and exposes no activation endpoint.
+
 ## Secrets
 - Local `.env`, production secret manager.
 - `.env` must never be committed.

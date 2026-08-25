@@ -89,25 +89,40 @@ Next slice: **Packages / Plan Foundation**.
 
 Reason for sequence: package state/config is a dependency for matching, reward generation, upgrade/renewal behavior, caps, deposit-triggered activation, and later ledger calculations. Commission/reward engines must not be implemented before package semantics and lifecycle are explicit.
 
-## Packages / Plan Foundation — Planning Gate
+## PKG-01 Packages / Plan Foundation — Backend Checkpoint
 
-Work should lock the exact contract before Codex implements dependent schema or APIs. At minimum the package slice must define:
-- package catalog/config and versioning;
-- package price and currency representation;
-- configured reward-rate range/rule representation;
-- configured return/cap multiplier semantics;
-- duration/cycle fields;
-- package status/availability;
-- user-package lifecycle states;
-- activation source/timing;
-- renewal and upgrade behavior;
-- single-active vs multiple-active package mode interaction;
-- historical configuration/version preservation;
-- SUPER_ADMIN vs delegated ADMIN management boundaries;
-- audit requirements;
-- what is intentionally deferred to Deposit, Wallet/Ledger, Commission/Matching and Simulated Activity modules.
+Founder approval is locked:
+- Q33–Q39: Option A;
+- all proposed initial safe defaults;
+- canonical contract: `docs/PACKAGES-PLAN-FOUNDATION.md`;
+- contract commit: `79cd4a5`.
 
-Do not create mutable financial balances or earnings in the Packages slice. Financial effects must later flow through the approved ledger/idempotency/reversal architecture.
+Implemented in the Work checkout:
+- migration `0007_package_plan_foundation`;
+- immutable package definitions and versioned plan/version item models;
+- unpublished nine-item V1 seed;
+- exact decimal string serialization and derived maximum-return/profit values;
+- safe empty USER catalogue before publication;
+- `packages.read` and `packages.draft.manage` permissions, unassigned to ADMIN by default;
+- audited serializable draft create/update/item commands with optimistic revision checks;
+- SUPER_ADMIN-only atomic publication and published-plan closure;
+- effective-range overlap/backdating protection and immutable published terms;
+- protected USER/admin package API surface;
+- focused DTO/service tests and ordered Postman gate.
+
+Work-checkout static verification is GREEN:
+- Prisma schema validation/generation;
+- 26/26 backend suites, 145/145 tests;
+- backend Prettier, ESLint and Nest production build.
+
+Not yet accepted locally:
+- migration deployment/status against the local `fixtradezone` database;
+- the 13-request PKG-01 Postman gate;
+- SQL readback/audit verification.
+
+BFF/UI work remains intentionally blocked until the local backend/API gate in
+`docs/LOCAL-VERIFY-PACKAGES.md` is GREEN. No mutable financial balance, earning,
+deposit, activation, subscription or ledger state exists in PKG-01.
 
 ## Locked Delivery Workflow
 1. Work locks business semantics and implementation contract.
@@ -146,4 +161,8 @@ Work and Codex are acceleration layers. If they are unavailable or limits are re
 4. relevant business-rule / architecture documents.
 
 ## Immediate Next Action
-Open the FixTradeZone workspace in Work and use `docs/WORK-CODEX-OPERATING-BRIEF.md` plus the repository docs to lock the Packages / Plan Foundation contract before Codex implementation begins.
+Pull the pushed PKG-01 backend checkpoint locally, review/deploy migration
+`0007_package_plan_foundation`, run `npm run verify:milestone`, and complete the
+ordered Postman/SQL gate in `docs/LOCAL-VERIFY-PACKAGES.md`. Only after that gate
+is accepted should the same-slice Next.js BFF and Dark Neo package interfaces be
+implemented.

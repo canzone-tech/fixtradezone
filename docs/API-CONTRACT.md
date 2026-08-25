@@ -246,3 +246,155 @@ Automatically generated passwords are temporary. Successful temporary-password v
 - `PATCH /admin/settings/authentication`
 - `GET /admin/settings/registration`
 - `PATCH /admin/settings/registration`
+
+## PKG-01 Packages / Plan Foundation — Backend Checkpoint
+
+PKG-01 exposes catalogue configuration only. There is no purchase, payment,
+activation, renewal, upgrade, reward, commission, balance or ledger endpoint.
+
+All PKG-01 endpoints are authenticated and return `Cache-Control: no-store`.
+Money, percentage and multiplier values are JSON strings.
+
+### USER Effective Catalogue
+
+`GET /packages`
+
+Before the first effective publication:
+
+```json
+{
+  "catalogueAvailable": false,
+  "activationAvailable": false,
+  "reason": "NO_EFFECTIVE_PUBLISHED_PLAN",
+  "plan": null,
+  "items": []
+}
+```
+
+After publication, the response contains exactly one effective plan and every
+non-`HIDDEN` item. `CLOSED_TO_NEW_ACTIVATIONS` remains visible with its explicit
+availability. `activationAvailable` remains `false` throughout PKG-01.
+
+Example exact values:
+
+```json
+{
+  "price": "500.00000000",
+  "minimumRewardRate": "0.800000",
+  "maximumRewardRate": "1.000000",
+  "capMultiplier": "3.0000",
+  "maximumTotalReturn": "1500.00000000",
+  "maximumProfit": "1000.00000000"
+}
+```
+
+### ADMIN/SUPER_ADMIN Read APIs
+
+- `GET /admin/package-plans` — requires `packages.read`.
+- `GET /admin/package-plans/:planVersionId` — requires `packages.read`.
+
+SUPER_ADMIN has implicit authority. ADMIN receives no package permission by
+default and must be explicitly delegated through the existing RBAC workflow.
+
+### Clone a Draft
+
+`POST /admin/package-plans/drafts` — requires `packages.draft.manage`.
+
+```json
+{
+  "sourcePlanVersionId": "<published-plan-uuid>",
+  "reason": "Create the reviewed correction draft."
+}
+```
+
+Only a published plan can be cloned. At most one active `DRAFT` is permitted.
+The clone receives a new version number, revision 1, no effective dates and a
+complete copy of the source items.
+
+### Update Plan-Wide Draft Settings
+
+`PATCH /admin/package-plans/:planVersionId` — requires
+`packages.draft.manage`.
+
+```json
+{
+  "expectedRevision": 3,
+  "reason": "Record the reviewed plan-wide change.",
+  "activationTrigger": "PAYMENT_APPROVED",
+  "settlementTimezone": "UTC"
+}
+```
+
+Supported settings are active-package mode/basis, activation trigger, migration
+mode, renewal mode, upgrade switch and IANA settlement timezone. A successful
+draft mutation increments the whole-plan revision.
+
+For a `PUBLISHED` plan this endpoint accepts only a future finite `effectiveTo`,
+requires SUPER_ADMIN in the service layer, and never allows retroactive closure.
+Published commercial fields are immutable.
+
+### Create a Draft Item
+
+`POST /admin/package-plans/:planVersionId/items` — requires
+`packages.draft.manage`.
+
+The request includes `expectedRevision`, required audit `reason`, an existing
+stable `packageCode`, and all typed item terms defined in
+`PACKAGES-PLAN-FOUNDATION.md`. Duplicate definition, slug or sort order returns
+HTTP 409 without changing the aggregate revision.
+
+### Update a Draft Item
+
+`PATCH /admin/package-plans/:planVersionId/items/:itemId` — requires
+`packages.draft.manage`.
+
+```json
+{
+  "expectedRevision": 4,
+  "reason": "Close new activations after operational review.",
+  "availability": "CLOSED_TO_NEW_ACTIVATIONS"
+}
+```
+
+All mutable item terms are optional, but at least one must be supplied. To
+change rate mode, the fixed/range fields must be supplied in a logically valid
+combination. A stale `expectedRevision` returns HTTP 409.
+
+### Publish a Plan Atomically
+
+`POST /admin/package-plans/:planVersionId/publish` — SUPER_ADMIN only.
+
+Publish now:
+
+```json
+{
+  "expectedRevision": 5,
+  "reason": "Founder reviewed and approved the complete plan."
+}
+```
+
+Scheduled publication may additionally send ISO-8601 `effectiveFrom` and
+optional `effectiveTo`. Backdating and overlapping ranges are rejected. When a
+single currently effective open-ended predecessor exists, publication closes it
+at the successor's `effectiveFrom` in the same serializable transaction and
+audits both operations.
+
+Publication fails unless the approved package contract is satisfied, including:
+- USDT denomination;
+- `USER_NET_AFTER_SPLIT` displayed rate meaning;
+- `TOTAL_RETURN` plus `INCLUDED_IN_TOTAL_RETURN`;
+- manual terminal-state renewal and no auto-renew action;
+- upgrades disabled until dependent modules exist.
+
+### Error Contract
+
+- HTTP 400 — invalid DTO, decimals, durations, rates, timezone, effective range
+  or non-publishable terms.
+- HTTP 403 — missing permission or SUPER_ADMIN authority.
+- HTTP 404 — plan, item or stable package definition not found.
+- HTTP 409 — stale revision, immutable published terms, duplicate item values,
+  overlapping plan ranges or concurrent serializable write conflict.
+
+The mandatory local runner is
+`postman/FixTradeZone-PKG-01.postman_collection.json`; acceptance instructions
+are in `docs/LOCAL-VERIFY-PACKAGES.md`.

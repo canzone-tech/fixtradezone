@@ -52,20 +52,21 @@ Completed:
 
 Current:
 
-- PR #11 is merged into `main`.
-- Inventory the merged reusable platform foundation.
-- Separate reusable platform concerns from FixTradeZone-specific product/branding concerns.
-- Define and verify the reusable-core copy manifest.
-- Freeze/copy the approved foundation into `canzone-platform-core`.
-- Verify the reusable core independently before starting Packages.
+- Reusable foundation freeze is complete.
+- MLM-01 Referral Foundation is complete, merged and locally accepted on `main`.
+- PKG-01 Q33–Q39 and safe defaults are Founder-approved.
+- PKG-01 database/NestJS/static implementation is complete on
+  `feature/packages-foundation`.
+- Local migration, Postman and SQL acceptance is the active gate.
+- Package BFF/UI follows only after the backend/API gate is GREEN.
 
-Before Packages:
+PKG-01 delivery order:
 
-1. Keep FixTradeZone reusable foundation green.
-2. Freeze/copy the approved foundation into the reusable core repository.
-3. Verify the reusable core independently.
-4. Return to FixTradeZone.
-5. Begin Packages vertical slice.
+1. Deploy and verify migration `0007_package_plan_foundation` locally.
+2. Complete the ordered PKG-01 Postman and SQL gate.
+3. Implement same-origin BFF routes and Dark Neo admin/USER package pages.
+4. Complete integrated browser/API acceptance.
+5. Update final milestone state and open a PR only after all gates are GREEN.
 
 ## Later Product Phases
 

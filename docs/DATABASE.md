@@ -84,7 +84,10 @@ Verification confirmed:
 
 This verification applies only to the local development database. It does not imply that staging or production has been migrated.
 
-`prisma/migrations/0002_auth_sessions/migration.sql` adds the database-backed refresh-session lifecycle. It is additive and has been source-reviewed. It must still be backed up, applied with `prisma migrate deploy`, and verified locally before a pull request, merge, or deployment.
+`0002_auth_sessions` through `0006_referral_foundation` are applied and locally
+verified in the latest merged-main checkpoint. The next reviewed source migration
+is `0007_package_plan_foundation`; its local deployment/acceptance status is
+tracked separately below.
 
 ## RBAC Bootstrap and Registration Verification
 
@@ -101,7 +104,11 @@ Do not use `prisma migrate dev` for this project unless a shadow database is exp
 
 ## Founder Administrator Bootstrap
 
-The API idempotently ensures both `USER` and `ADMIN` roles exist. The one-time `admin:bootstrap` CLI uses a serializable transaction to activate one registered founder account and assign its ADMIN role. It refuses to run after any ADMIN assignment exists and records system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role assignments require the normal audited RBAC workflow.
+The API idempotently ensures `USER`, `ADMIN`, and `SUPER_ADMIN` roles exist. The
+one-time `super-admin:bootstrap` CLI uses a serializable transaction to activate
+the registered founder account and assign founder authority. It records
+system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role
+assignments require the normal audited RBAC workflow.
 
 ## Configurable Auth/Registration Schema — Migration 0005
 
@@ -188,3 +195,51 @@ Verified after migration:
 - existing EMAIL and MOBILE claims were backfilled.
 
 CAPTCHA does not require a MySQL table or migration because challenge state is intentionally short-lived Redis state.
+
+## Package / Plan Foundation — Migration 0007
+
+`0007_package_plan_foundation` introduces three MySQL source-of-truth tables:
+
+### PackageDefinition
+
+`package_definitions` stores immutable stable identity (`code`) only. It contains
+no price, rate, cap, duration or other commercial term.
+
+### PackagePlanVersion
+
+`package_plan_versions` stores:
+- unique integer version number and `DRAFT`/`PUBLISHED` status;
+- whole-plan optimistic `revision`;
+- active-package mode/basis;
+- activation trigger and plan migration mode;
+- renewal mode and upgrade switch;
+- settlement timezone and UTC effective range;
+- publication, clone and administrator audit references.
+
+### PackagePlanItem
+
+`package_plan_items` stores versioned typed terms:
+- definition, display name, slug, sort order and availability;
+- `DECIMAL(20,8)` price and explicit `USDT` currency;
+- rate mode plus nullable `DECIMAL(9,6)` fixed/min/max percentage fields;
+- rate meaning, cap basis, `DECIMAL(10,4)` multiplier and principal treatment;
+- goal/cycle day counts and reward/cycle action modes.
+
+Unique constraints prevent duplicate definition, slug or sort order inside one
+plan. SQL checks enforce positive price/multiplier, valid rate-field shape,
+percentage bounds, USDT currency, positive durations and cycle not exceeding
+goal.
+
+The migration seeds:
+- nine stable package definitions;
+- V1 as an intentionally unpublished revision-1 draft;
+- the nine Founder-approved initial items;
+- a system-attributed migration audit row.
+
+It does not create `UserPackage`, balances, earnings, cap consumption, deposits
+or ledger records.
+
+Source/schema/static gates are GREEN in the Work checkpoint. Local deployment,
+migration-status verification, Postman acceptance and SQL readback remain
+required under `docs/LOCAL-VERIFY-PACKAGES.md` before this migration is recorded
+as locally accepted.
