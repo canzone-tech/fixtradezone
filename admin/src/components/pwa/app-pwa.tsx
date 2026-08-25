@@ -68,9 +68,11 @@ export default function AppPwa() {
       });
     }
 
-    const standalone = isStandaloneMode();
-    setIos(isIosDevice());
-    setShouldRequireInstall(isMobileLikeDevice() && !standalone);
+    const deviceStateFrame = window.requestAnimationFrame(() => {
+      const standalone = isStandaloneMode();
+      setIos(isIosDevice());
+      setShouldRequireInstall(isMobileLikeDevice() && !standalone);
+    });
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -86,6 +88,7 @@ export default function AppPwa() {
     window.addEventListener("appinstalled", handleInstalled);
 
     return () => {
+      window.cancelAnimationFrame(deviceStateFrame);
       window.removeEventListener(
         "beforeinstallprompt",
         handleBeforeInstallPrompt,
