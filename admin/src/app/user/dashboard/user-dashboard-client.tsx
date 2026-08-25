@@ -11,6 +11,17 @@ interface ErrorPayload {
   redirectTo?: string;
 }
 
+interface ReferralProfile {
+  assignmentStatus: "ROOT" | "ASSIGNED" | "UNASSIGNED";
+  referralCode: string | null;
+}
+
+interface DirectReferralsResponse {
+  pagination: {
+    total: number;
+  };
+}
+
 const workspaceStrip = [
   {
     code: "A",
@@ -43,8 +54,8 @@ const workspaceStrip = [
   {
     code: "R",
     label: "Referral",
-    value: "AWAITING API",
-    detail: "Module pending",
+    value: "LIVE",
+    detail: "Referral workspace",
     tone: "gold",
   },
   {
@@ -76,6 +87,11 @@ export default function UserDashboardClient() {
   const router = useRouter();
 
   const [session, setSession] = useState<UserDirectSession | null>(null);
+  const [referralProfile, setReferralProfile] =
+    useState<ReferralProfile | null>(null);
+  const [directReferralTotal, setDirectReferralTotal] = useState<number | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -84,6 +100,9 @@ export default function UserDashboardClient() {
 
     async function loadSession() {
       try {
+        // Session validation/refresh runs first. Referral data requests start only
+        // after it completes so a rotating refresh token cannot be consumed by
+        // concurrent BFF requests when an access token has expired.
         const response = await fetch("/api/user/session", {
           method: "GET",
           cache: "no-store",
@@ -123,6 +142,42 @@ export default function UserDashboardClient() {
         if (mounted) {
           setSession(payload);
         }
+
+        try {
+          const [profileResponse, directResponse] = await Promise.all([
+            fetch("/api/user/referrals", { cache: "no-store" }),
+            fetch("/api/user/referrals/direct?page=1&limit=20", {
+              cache: "no-store",
+            }),
+          ]);
+
+          if (profileResponse.status === 401 || directResponse.status === 401) {
+            router.replace("/login");
+            router.refresh();
+            return;
+          }
+
+          const [profilePayload, directPayload] = await Promise.all([
+            readPayload<ReferralProfile>(profileResponse),
+            readPayload<DirectReferralsResponse>(directResponse),
+          ]);
+
+          if (mounted && profileResponse.ok && profilePayload) {
+            setReferralProfile(profilePayload);
+          }
+
+          if (
+            mounted &&
+            directResponse.ok &&
+            directPayload &&
+            typeof directPayload.pagination?.total === "number"
+          ) {
+            setDirectReferralTotal(directPayload.pagination.total);
+          }
+        } catch {
+          // Referral widgets degrade safely without hiding the authenticated
+          // dashboard. The dedicated referral workspace exposes detailed errors.
+        }
       } catch (caught) {
         if (mounted) {
           setError(
@@ -160,6 +215,22 @@ export default function UserDashboardClient() {
     );
   }, [session]);
 
+  const workspaceItems = useMemo(
+    () =>
+      workspaceStrip.map((item) =>
+        item.label === "Referral"
+          ? {
+              ...item,
+              value: referralProfile?.assignmentStatus ?? item.value,
+              detail: referralProfile
+                ? "Live referral API"
+                : item.detail,
+            }
+          : item,
+      ),
+    [referralProfile],
+  );
+
   if (loading) {
     return (
       <UserShell session={null}>
@@ -192,7 +263,7 @@ export default function UserDashboardClient() {
           className="ftz-market-ticker"
           aria-label="FixTradeZone USER workspace status"
         >
-          {workspaceStrip.map((item) => (
+          {workspaceItems.map((item) => (
             <div className="ftz-market-item" key={item.label}>
               <span className={`ftz-coin ftz-coin-${item.tone}`}>
                 {item.code}
@@ -220,15 +291,14 @@ export default function UserDashboardClient() {
                 <h2>Welcome back, {displayName}! 👋</h2>
 
                 <p>
-                  Manage your FixTradeZone account, packages, wallet,
-                  referrals and clearly labelled simulated activity from
-                  one secure workspace.
+                  Manage your FixTradeZone account, packages, wallet, referrals
+                  and clearly labelled simulated activity from one secure
+                  workspace.
                 </p>
 
                 <div className="ftz-hero-meta">
                   <span>
-                    <i className="iconoir-user" />
-                    @{user.username}
+                    <i className="iconoir-user" />@{user.username}
                   </span>
 
                   <span>
@@ -327,9 +397,7 @@ export default function UserDashboardClient() {
                     </div>
                   </div>
 
-                  <span className={styles.pendingBadge}>
-                    LIVE API PENDING
-                  </span>
+                  <span className={styles.pendingBadge}>LIVE API PENDING</span>
                 </div>
 
                 <div className={styles.chartEmpty}>
@@ -340,8 +408,8 @@ export default function UserDashboardClient() {
                   <strong>Activity chart is ready for live data</strong>
 
                   <p>
-                    Financial totals and chart points will appear only
-                    after their production APIs are connected.
+                    Financial totals and chart points will appear only after
+                    their production APIs are connected.
                   </p>
                 </div>
 
@@ -361,7 +429,7 @@ export default function UserDashboardClient() {
                   <div>
                     <small>Referral Earnings</small>
                     <strong>—</strong>
-                    <span>Awaiting API</span>
+                    <span>Commission module pending</span>
                   </div>
 
                   <div>
@@ -384,8 +452,8 @@ export default function UserDashboardClient() {
                     <div>
                       <strong>Wallet module pending</strong>
                       <p>
-                        Deposit account, transaction and balance data
-                        will connect here through the Wallet module.
+                        Deposit account, transaction and balance data will
+                        connect here through the Wallet module.
                       </p>
                     </div>
                   </div>
@@ -425,9 +493,7 @@ export default function UserDashboardClient() {
               <div className="ftz-panel-heading">
                 <h3>Recent Transactions</h3>
 
-                <span className={styles.pendingBadge}>
-                  LIVE DATA PENDING
-                </span>
+                <span className={styles.pendingBadge}>LIVE DATA PENDING</span>
               </div>
 
               <div className="ftz-table-wrap">
@@ -451,9 +517,7 @@ export default function UserDashboardClient() {
 
                           <div>
                             <strong>No transaction API connected yet</strong>
-                            <span>
-                              Real user transactions will appear here.
-                            </span>
+                            <span>Real user transactions will appear here.</span>
                           </div>
                         </div>
                       </td>
@@ -474,23 +538,31 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div>
-                  <small>Total Referrals</small>
-                  <strong>—</strong>
-                  <span>Awaiting Referral API</span>
+                  <small>Direct Referrals</small>
+                  <strong>{directReferralTotal ?? "—"}</strong>
+                  <span>
+                    {directReferralTotal === null
+                      ? "Referral data unavailable"
+                      : "Live referral API"}
+                  </span>
                 </div>
               </div>
 
               <div className="ftz-referral-split">
                 <div>
-                  <small>Active Referrals</small>
-                  <strong>—</strong>
-                  <span>Live data pending</span>
+                  <small>Referral Status</small>
+                  <strong>{referralProfile?.assignmentStatus ?? "—"}</strong>
+                  <span>
+                    {referralProfile?.referralCode
+                      ? `Code: ${referralProfile.referralCode}`
+                      : "Open referral workspace"}
+                  </span>
                 </div>
 
                 <div>
                   <small>Referral Earnings</small>
                   <strong>—</strong>
-                  <span>Live data pending</span>
+                  <span>Commission module pending</span>
                 </div>
               </div>
             </article>
@@ -508,9 +580,7 @@ export default function UserDashboardClient() {
 
                   <div>
                     <strong>Secure USER session active</strong>
-                    <small>
-                      Role-aware portal authentication verified
-                    </small>
+                    <small>Role-aware portal authentication verified</small>
                   </div>
 
                   <time>NOW</time>
@@ -538,9 +608,9 @@ export default function UserDashboardClient() {
                 <strong>Data integrity first</strong>
 
                 <p>
-                  Financial values remain unavailable until live APIs
-                  exist. Simulated activity will always be explicitly
-                  labelled as simulated.
+                  Financial values remain unavailable until live APIs exist.
+                  Simulated activity will always be explicitly labelled as
+                  simulated.
                 </p>
               </div>
             </article>
@@ -550,8 +620,8 @@ export default function UserDashboardClient() {
                 <h3>Manage Your Account</h3>
 
                 <p>
-                  Review your profile, account identity and secure
-                  session information.
+                  Review your profile, account identity and secure session
+                  information.
                 </p>
 
                 <button
