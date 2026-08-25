@@ -25,6 +25,31 @@ function isIosDevice(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
+async function registerFullAppServiceWorker(): Promise<void> {
+  const registration = await navigator.serviceWorker.register("/sw.js", {
+    scope: "/",
+    updateViaCache: "none",
+  });
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+
+  await Promise.all(
+    registrations
+      .filter((candidate) => {
+        if (candidate === registration) {
+          return false;
+        }
+
+        try {
+          return new URL(candidate.scope).pathname === "/user/";
+        } catch {
+          return false;
+        }
+      })
+      .map((candidate) => candidate.unregister()),
+  );
+}
+
 export default function AppPwa() {
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -33,9 +58,13 @@ export default function AppPwa() {
 
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      void navigator.serviceWorker.register("/sw.js", {
-        scope: "/",
-        updateViaCache: "none",
+      void registerFullAppServiceWorker().catch((error: unknown) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.error(
+            "FixTradeZone PWA service worker registration failed.",
+            error,
+          );
+        }
       });
     }
 
