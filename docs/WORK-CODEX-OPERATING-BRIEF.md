@@ -3,32 +3,103 @@
 ## Purpose
 This is the canonical handoff brief for continuing FixTradeZone through ChatGPT Work, Codex, or normal Chat without losing architecture, delivery discipline, or repository continuity.
 
-GitHub repository + committed `docs/` remain the permanent source of truth. Work and Codex are acceleration layers, not sources of truth.
+GitHub repository + committed `docs/` are the permanent source of truth. Work and Codex are acceleration layers, not sources of truth.
 
 ## Current checkpoint — 2026-08-25
-- Slice branch: `feature/mlm-referral-foundation`
-- Frontend child branch: `feature/mlm-referral-frontend`
-- MLM-01 backend API/Postman gate: GREEN.
-- MLM-01 frontend/BFF: implemented.
-- Integrated browser + API acceptance: GREEN.
-- Backend code gate: 24 suites / 129 tests GREEN.
-- Prisma milestone: 6 migrations, schema up to date GREEN.
+- MLM-01 Referral Foundation: COMPLETE.
+- PR #15 merged into `main`.
+- Main merge commit: `2a06487b23d2c9cb0bc2078e93bde6eba220c42d`.
+- Local merged-main `npm run verify:milestone`: GREEN.
+- Backend: 24/24 suites, 129/129 tests GREEN.
+- Prisma: 6 migrations, schema up to date GREEN.
 - Admin/Next.js lint, typecheck and production build: GREEN.
-- USER dashboard referral summary is live and no longer shows the old referral API placeholder.
-- No PR to `main` yet.
+- MLM-01 Postman API gate: GREEN.
+- MLM-01 integrated browser + API gate: GREEN.
+- Active next-slice branch: `feature/packages-foundation`.
+- No Packages implementation should begin until Work locks the package/plan contract below.
 
-## Accepted end-to-end proof
-The locally accepted MLM-01 flow proved:
+## Accepted MLM-01 end-to-end proof
+The locally accepted referral flow proved:
 1. SUPER_ADMIN referral configuration loaded and saved through the UI.
 2. Fresh USER A registered and was activated.
-3. USER A showed `ASSIGNED` referral state under the configured founder/root default sponsor.
+3. USER A showed `ASSIGNED` under the configured founder/root default sponsor.
 4. USER A copied the generated `register?ref=<REFERRAL_CODE>` invite link.
 5. Fresh USER B registered through USER A's invite link.
 6. USER B was activated and showed USER A as sponsor.
 7. USER A's live direct-referral list showed USER B as `ACTIVE / ASSIGNED`.
-8. USER A's direct-referral total updated in the live referral workspace/dashboard.
+8. USER A's live direct-referral total increased.
 
-This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback for the accepted referral path.
+This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback for MLM-01.
+
+## Next slice — Packages / Plan Foundation
+Packages comes before commissions/rewards because package state/config is required for matching bases, reward generation, caps, upgrades, renewals and deposit-triggered activation.
+
+### Work planning gate
+Before Codex writes dependent schema/API code, resolve and document the exact package contract, including:
+- package catalog/config model and versioning;
+- monetary/price representation;
+- reward-rate range/rule representation;
+- maximum-return / cap multiplier semantics;
+- duration and cycle configuration;
+- package active/inactive/availability status;
+- user-package lifecycle states;
+- activation source and activation timing;
+- renewal behavior;
+- upgrade behavior, including FULL vs INCREMENTAL treatment where applicable;
+- `SINGLE_ACTIVE` vs `MULTIPLE_ACTIVE` interaction;
+- historical package/config version preservation;
+- SUPER_ADMIN master controls and any explicit delegated ADMIN permissions;
+- audit-log requirements;
+- exact boundaries with Deposit, Wallet/Ledger, Commission/Matching and Simulated Activity modules.
+
+Do not invent or credit earnings in the Packages slice. Financial effects belong to later ledger-backed modules.
+
+## Relevant locked MLM/business rules
+The persistent `docs/MLM-BUSINESS-RULES.md` remains authoritative. Important package-dependent rules already locked include:
+- referral levels/rates configurable;
+- matching base `MIN(receiver active package, downline package) * level %`;
+- matching enablement configurable by level;
+- matching triggers configurable for first/new/renewal/upgrade;
+- upgrade matching treatment configurable as FULL or INCREMENTAL;
+- active-package qualification behavior configurable;
+- compression/pass-up configurable;
+- package mode configurable as `SINGLE_ACTIVE` / `MULTIPLE_ACTIVE`;
+- matching package basis configurable;
+- refund/reversal behavior must preserve financial auditability;
+- award/package eligibility configurable;
+- upgrade team-volume treatment configurable independently;
+- release timing and cap inclusion/action configurable;
+- plan migration mode configurable;
+- reward basis/rate/frequency/cycle/cap/start/day-counting rules configurable;
+- activation can be submitted/approved/manual/rule driven, with approved activation currently the safer default for later payment integration;
+- historical calculations must not be silently rewritten by later config changes.
+
+If a new ambiguity blocks the Packages contract, continue the numbered business-question sequence before implementation rather than guessing.
+
+## Poster/package defaults currently captured
+Treat these as configured product defaults, not hardcoded immutable business logic:
+- Neural Scout — $5 — 0.40–0.60% — 2X — max profit $5 — 90d
+- Voyager — $25 — 0.50–0.70% — 2X — max profit $25 — 90d
+- Navigator — $50 — 0.60–0.80% — 2X — max profit $50 — 90d
+- Strategist — $100 — 0.70–0.90% — 2X — max profit $100 — 90d
+- Quant Core — $500 — 0.80–1.00% — 3X — max profit $1000 — 90d
+- Prime — $1000 — 0.90–1.20% — 3X — max profit $2000 — 90d
+- Apex — $2000 — 1.00–1.50% — 3X — max profit $4000 — 90d
+- Titan — $4000 — 1.10–1.80% — 4X — max profit $12000 — 150d
+- Sovereign — $5000 — 1.20–2.00% — 4X — max profit $15000 — 150d
+
+Captured trade-cycle defaults:
+- $5–24: 10d
+- $25–49: 15d
+- $50–99: 20d
+- $100–499: 25d
+- $500–999: 30d
+- $1000–1999: 60d
+- $2000–3999: 90d
+- $4000–4999: 120d
+- $5000+: 150d
+
+These defaults must be reconciled into a versioned package/rule configuration; do not hardcode calculations in controllers or UI.
 
 ## Locked delivery workflow
 1. Confirm business semantics before dependent implementation.
@@ -60,7 +131,8 @@ Database deploy is an explicit write operation, separate from verification.
 
 ## Branch discipline
 - Feature branches only.
-- Child branches are allowed for frontend/backend work inside the same vertical slice.
+- Active next-slice branch: `feature/packages-foundation`.
+- Child branches may be used for frontend/backend work inside the same vertical slice.
 - Integrate child work back into the slice branch and reverify before PR preparation.
 - No PR to `main` until local code gate + DB gate when applicable + integrated API/frontend acceptance are green.
 - Keep meaningful checkpoints committed and pushed.
@@ -81,98 +153,48 @@ Database deploy is an explicit write operation, separate from verification.
 ## Security and financial invariants
 - Production-ready by default.
 - Never weaken validation, RBAC, auditability, data integrity, idempotency, maintainability, or financial safety for speed.
-- Financial calculations use SQL `DECIMAL`, immutable/auditable ledger patterns, idempotency, reversal entries, and explicit permissions.
+- Financial calculations use SQL `DECIMAL`, immutable/auditable ledger patterns, idempotency, reversal entries and explicit permissions.
 - Do not model commissions/rewards by unsafe mutable balance increments.
 - Plan/config versions must preserve historical calculations.
 - `SUPER_ADMIN` is founder/master authority; `ADMIN` has delegated, explicit permissions only.
 - Simulated activity must always be clearly labeled simulated; never present fake trades/profits as real.
 
-## MLM / referral rules already locked
-- Valid referral code assigns sponsor.
-- No referral code uses configured default/company sponsor; never hardcode founder identity.
-- Sponsor is normally permanent; exceptional reassignment is controlled, reasoned, audited, and cycle/self-sponsor safe.
-- Referral levels/rates are configurable.
-- Matching base: `MIN(receiver active package, downline package) * level %`.
-- Matching enablement, triggers, compression/pass-up, package modes, refunds/reversals, team-business qualification, awards, upgrades, release timing, caps, plan migration, referral-code mode, root/default routing, reward timing/rates/cycles, activation/start rules, day counting and existing-user migration are configurable according to the persistent MLM business-rules document.
-- Existing-user initial migration mode is `LEAVE_UNASSIGNED_FOR_REVIEW`.
-- Never guess historical sponsor relationships.
-
-## MLM-01 database foundation
-Models/tables include:
-- referral profiles;
-- sponsor-change history;
-- singleton referral system config.
-
-Important application-enforced invariants include:
-- no self-sponsor;
-- no cycles;
-- assignment-state consistency;
-- controlled root/default sponsor behavior;
-- audited manual sponsor changes.
-
-Migration `0006_referral_foundation` is applied locally and migration status is green.
-
-## MLM-01 API surface
+## MLM-01 retained contract
 USER:
 - `GET /referrals/me`
 - `GET /referrals/me/direct?page=1&limit=20`
+- `/user/referrals`
+- `/user/dashboard` live referral summary
 
 ADMIN/SUPER_ADMIN:
 - `GET /admin/referrals/config`
 - `PATCH /admin/referrals/config`
 - `PATCH /admin/referrals/:userId/sponsor`
-
-Registration accepts optional `referralCode`.
-
-## MLM-01 frontend surface
-USER:
-- `/user/referrals`
-- live referral profile;
-- live direct-referral list;
-- sponsor display;
-- shareable invite link `register?ref=<REFERRAL_CODE>`;
-- `/user/dashboard` live referral state and direct-referral total.
-
-ADMIN/SUPER_ADMIN:
 - `/referrals`
-- referral config controls;
-- sponsor-management UI;
-- permission-aware navigation.
 
-Next.js BFF routes proxy protected calls and refresh/validate the browser session before dependent referral data requests to avoid rotating-refresh-token races.
+Registration accepts optional `referralCode`; same-origin invite links use `register?ref=<REFERRAL_CODE>`.
 
-Registration BFF forwards an explicit `referralCode`, or a same-origin `?ref=` invite code, to the Nest registration contract.
+Existing-user referral migration remains `LEAVE_UNASSIGNED_FOR_REVIEW`. Never guess historical sponsor relationships.
 
-## Immediate next action
-1. Fast-forward `feature/mlm-referral-foundation` to the latest accepted frontend/docs checkpoint.
-2. On local machine switch to `feature/mlm-referral-foundation` and run:
-
-```bash
-npm run verify:milestone
-```
-
-3. If green, MLM-01 is fully sealed on the slice branch.
-4. Use Work for next-slice business semantics and architecture planning.
-5. Use Codex for implementation only after the next slice contract is explicit.
-6. Open the single MLM referral PR to `main` only after the final foundation-branch milestone gate is green.
-
-The already-green browser journey does not need to be repeated after a branch-pointer-only fast-forward because executable code is unchanged.
-
-## Work / Codex usage
+## Work / Codex responsibilities
 Use Work for:
 - resolving pending business questions;
-- sequencing modules;
+- package/plan contract definition;
+- module sequencing;
 - architecture/security reviews;
 - specifications and persistent docs.
 
 Use Codex for:
-- repository implementation;
+- repository implementation after the contract is explicit;
 - focused refactors;
 - tests;
 - lint/type/build fixes;
 - safe parallel work on independent tasks.
 
 Codex must inspect existing code/docs first and must not invent new architecture when an existing pattern already exists.
+
+## Recommended first Work instruction
+Continue FixTradeZone from `feature/packages-foundation`. Read `docs/CURRENT-STATE.md`, `docs/WORK-CODEX-OPERATING-BRIEF.md`, `docs/MLM-BUSINESS-RULES.md`, `docs/ARCHITECTURE.md`, `docs/DATABASE.md`, `docs/SECURITY.md`, `docs/API-CONTRACT.md`, and `docs/LOCAL-VERIFICATION.md`. MLM-01 is merged and locally verified on `main`. Do not code yet. Act as Chief Architect and lock the Packages / Plan Foundation contract, identify only genuinely unresolved package-specific business questions, propose safe defaults separately from locked rules, define the backend/database/API/frontend boundaries, and produce an implementation-ready vertical-slice plan for Codex. Preserve all existing financial, RBAC, audit, BFF/session and local-verification invariants.
 
 ## Fallback rule
 If Work/Codex limits are reached, the feature is unavailable, or context is lost, resume in normal Chat from:
