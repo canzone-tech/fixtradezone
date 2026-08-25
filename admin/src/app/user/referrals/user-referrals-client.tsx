@@ -169,12 +169,15 @@ export default function UserReferralsClient() {
     };
   }, [router]);
 
-  async function copyCode() {
+  async function copyInviteLink() {
     if (!profile?.referralCode) {
       return;
     }
 
-    await navigator.clipboard.writeText(profile.referralCode);
+    const inviteUrl = new URL("/register", window.location.origin);
+    inviteUrl.searchParams.set("ref", profile.referralCode);
+
+    await navigator.clipboard.writeText(inviteUrl.toString());
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
@@ -226,15 +229,16 @@ export default function UserReferralsClient() {
             <strong>{profile.referralCode ?? "Not assigned"}</strong>
             <p>
               {profile.enrolled
-                ? "Use this code when inviting a new member."
+                ? "Share your invite link so new members register under your referral code."
                 : "Referral enrollment is not available for this account yet."}
             </p>
             <button
               type="button"
-              onClick={() => void copyCode()}
+              onClick={() => void copyInviteLink()}
               disabled={!profile.referralCode}
             >
-              <i className="iconoir-copy" /> {copied ? "Copied" : "Copy code"}
+              <i className="iconoir-copy" />
+              {copied ? "Invite link copied" : "Copy invite link"}
             </button>
           </article>
 
