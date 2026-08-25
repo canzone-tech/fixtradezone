@@ -1,20 +1,34 @@
 # FixTradeZone Work / Codex Operating Brief
 
 ## Purpose
-This file is the canonical handoff brief for continuing FixTradeZone through ChatGPT Work, Codex, or normal Chat without losing architecture, delivery discipline, or repository continuity.
+This is the canonical handoff brief for continuing FixTradeZone through ChatGPT Work, Codex, or normal Chat without losing architecture, delivery discipline, or repository continuity.
 
 GitHub repository + committed `docs/` remain the permanent source of truth. Work and Codex are acceleration layers, not sources of truth.
 
-## Current branch and checkpoint
-- Active implementation branch: `feature/mlm-referral-frontend`
-- Parent slice branch: `feature/mlm-referral-foundation`
-- Current remote checkpoint at brief creation: `fee4783f9894bf104722943ce3b27c7f38b7800e`
+## Current checkpoint — 2026-08-25
+- Slice branch: `feature/mlm-referral-foundation`
+- Frontend child branch: `feature/mlm-referral-frontend`
+- MLM-01 backend API/Postman gate: GREEN.
+- MLM-01 frontend/BFF: implemented.
+- Integrated browser + API acceptance: GREEN.
+- Backend code gate: 24 suites / 129 tests GREEN.
+- Prisma milestone: 6 migrations, schema up to date GREEN.
+- Admin/Next.js lint, typecheck and production build: GREEN.
+- USER dashboard referral summary is live and no longer shows the old referral API placeholder.
 - No PR to `main` yet.
-- MLM-01 backend API/Postman gate is green.
-- Backend code gate is green: 24 suites / 129 tests.
-- Prisma migration milestone is green: 6 migrations, schema up to date.
-- Admin/Next.js lint, typecheck and production build are green.
-- Referral frontend/BFF is implemented and awaiting final integrated browser + API acceptance after latest referral-link commits are pulled and locally reverified.
+
+## Accepted end-to-end proof
+The locally accepted MLM-01 flow proved:
+1. SUPER_ADMIN referral configuration loaded and saved through the UI.
+2. Fresh USER A registered and was activated.
+3. USER A showed `ASSIGNED` referral state under the configured founder/root default sponsor.
+4. USER A copied the generated `register?ref=<REFERRAL_CODE>` invite link.
+5. Fresh USER B registered through USER A's invite link.
+6. USER B was activated and showed USER A as sponsor.
+7. USER A's live direct-referral list showed USER B as `ACTIVE / ASSIGNED`.
+8. USER A's direct-referral total updated in the live referral workspace/dashboard.
+
+This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback for the accepted referral path.
 
 ## Locked delivery workflow
 1. Confirm business semantics before dependent implementation.
@@ -79,7 +93,7 @@ Database deploy is an explicit write operation, separate from verification.
 - Sponsor is normally permanent; exceptional reassignment is controlled, reasoned, audited, and cycle/self-sponsor safe.
 - Referral levels/rates are configurable.
 - Matching base: `MIN(receiver active package, downline package) * level %`.
-- Matching enablement, triggers, compression/pass-up, package modes, refunds/reversals, team-business qualification, awards, upgrades, release timing, caps, plan migration, referral-code mode, root/default routing, reward timing/rates/cycles, activation/start rules, day counting and existing-user migration are configurable according to `docs/MLM-BUSINESS-RULES.md`.
+- Matching enablement, triggers, compression/pass-up, package modes, refunds/reversals, team-business qualification, awards, upgrades, release timing, caps, plan migration, referral-code mode, root/default routing, reward timing/rates/cycles, activation/start rules, day counting and existing-user migration are configurable according to the persistent MLM business-rules document.
 - Existing-user initial migration mode is `LEAVE_UNASSIGNED_FOR_REVIEW`.
 - Never guess historical sponsor relationships.
 
@@ -116,7 +130,8 @@ USER:
 - live referral profile;
 - live direct-referral list;
 - sponsor display;
-- shareable invite link `register?ref=<REFERRAL_CODE>`.
+- shareable invite link `register?ref=<REFERRAL_CODE>`;
+- `/user/dashboard` live referral state and direct-referral total.
 
 ADMIN/SUPER_ADMIN:
 - `/referrals`
@@ -124,32 +139,24 @@ ADMIN/SUPER_ADMIN:
 - sponsor-management UI;
 - permission-aware navigation.
 
-Next.js BFF routes proxy protected calls and refresh rotating sessions before dependent referral data requests to avoid refresh-token races.
+Next.js BFF routes proxy protected calls and refresh/validate the browser session before dependent referral data requests to avoid rotating-refresh-token races.
 
 Registration BFF forwards an explicit `referralCode`, or a same-origin `?ref=` invite code, to the Nest registration contract.
 
 ## Immediate next action
-On the local machine:
+1. Fast-forward `feature/mlm-referral-foundation` to the latest accepted frontend/docs checkpoint.
+2. On local machine switch to `feature/mlm-referral-foundation` and run:
 
 ```bash
-cd ~/FixTradeZone
-git pull --ff-only prashant feature/mlm-referral-frontend
-npm run verify:local
+npm run verify:milestone
 ```
 
-If green, start backend and Next.js locally and run one integrated browser + API acceptance flow:
-- SUPER_ADMIN referral config;
-- USER A registration/activation/login;
-- USER A referral workspace;
-- copy/open USER A invite link;
-- USER B registration through that invite;
-- activation/login as needed;
-- confirm USER B sponsor attribution through API/BFF;
-- confirm USER A direct-referral UI shows USER B;
-- verify permission-denied paths and session refresh behavior;
-- verify important responsive/error/empty states.
+3. If green, MLM-01 is fully sealed on the slice branch.
+4. Use Work for next-slice business semantics and architecture planning.
+5. Use Codex for implementation only after the next slice contract is explicit.
+6. Open the single MLM referral PR to `main` only after the final foundation-branch milestone gate is green.
 
-Do not open a PR before this integrated acceptance is green.
+The already-green browser journey does not need to be repeated after a branch-pointer-only fast-forward because executable code is unchanged.
 
 ## Work / Codex usage
 Use Work for:
