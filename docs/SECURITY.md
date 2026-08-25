@@ -142,6 +142,9 @@
 - Local `.env`, production secret manager.
 - `.env` must never be committed.
 - Never expose secrets in logs, API responses, Postman collections, or documentation.
+- Committed Postman collections keep password/token defaults empty and use
+  variables (including dynamic values for negative tests), never plaintext test
+  credentials or captured JWTs.
 
 ## Operational Security
 

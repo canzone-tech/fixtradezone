@@ -23,6 +23,9 @@
   rejected without revision changes.
 - Added a v13 MASTER Postman collection derived from the working v12 environment
   contract and hardened request-05 failure handling.
+- Replaced four plaintext synthetic negative-test passwords in the MASTER
+  collection with Postman dynamic variables before public branch publication;
+  collection defaults contain no password, token or JWT value.
 - Added same-origin package BFF routes, no-store responses and shared admin
   session resolution without exposing access/refresh tokens to browser code.
 - Added the permission-aware Dark Neo `/packages` plan workspace and protected
