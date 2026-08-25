@@ -1,4 +1,4 @@
-const STATIC_CACHE = "fixtradezone-user-static-v1";
+const STATIC_CACHE = "fixtradezone-static-v2";
 const STATIC_ASSETS = [
   "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
   "/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
