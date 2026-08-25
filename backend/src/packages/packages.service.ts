@@ -18,47 +18,20 @@ import type {
   UpdatePackagePlanDto,
   UpdatePackagePlanItemDto,
 } from './dto/package-plan.dto';
-import { PACKAGE_CURRENCY } from './packages.constants';
-
-const PLAN_INCLUDE = {
-  items: {
-    include: {
-      packageDefinition: true,
-    },
-    orderBy: [{ sortOrder: 'asc' as const }, { id: 'asc' as const }],
-  },
-} satisfies Prisma.PackagePlanVersionInclude;
-
-type PlanWithItems = Prisma.PackagePlanVersionGetPayload<{
-  include: typeof PLAN_INCLUDE;
-}>;
-
-type PlanItemWithDefinition = PlanWithItems['items'][number];
-
-interface ItemTerms {
-  displayName: string;
-  slug: string;
-  sortOrder: number;
-  availability: PlanItemWithDefinition['availability'];
-  price: string;
-  currency: string;
-  rewardRateMode: PlanItemWithDefinition['rewardRateMode'];
-  fixedRewardRate: string | null;
-  minimumRewardRate: string | null;
-  maximumRewardRate: string | null;
-  rewardRateMeaning: PlanItemWithDefinition['rewardRateMeaning'];
-  capBasis: PlanItemWithDefinition['capBasis'];
-  capMultiplier: string;
-  principalTreatment: PlanItemWithDefinition['principalTreatment'];
-  goalDays: number;
-  cycleDays: number;
-  rewardStartMode: PlanItemWithDefinition['rewardStartMode'];
-  rewardFrequency: PlanItemWithDefinition['rewardFrequency'];
-  cycleDayMode: PlanItemWithDefinition['cycleDayMode'];
-  rewardDayMode: PlanItemWithDefinition['rewardDayMode'];
-  cycleEndAction: PlanItemWithDefinition['cycleEndAction'];
-  capReachedAction: PlanItemWithDefinition['capReachedAction'];
-}
+import {
+  createDtoTerms,
+  mergeItemTerms,
+  toItemSnapshot,
+  toPlanSnapshot,
+  toPublicPlanSnapshot,
+} from './package-plan.mapper';
+import {
+  assertPublishablePlan,
+  assertValidTimezone,
+  parsePackagePlanDate,
+  validateAndConvertItemTerms,
+} from './package-plan.validation';
+import { PLAN_INCLUDE, type PlanWithItems } from './packages.types';
 
 const MIN_PUBLICATION_LEAD_MS = 0;
 
@@ -100,10 +73,10 @@ export class PackagesService {
       catalogueAvailable: true,
       activationAvailable: false,
       reason: 'PACKAGE_ACTIVATION_DEFERRED' as const,
-      plan: this.toPublicPlanSnapshot(plan),
+      plan: toPublicPlanSnapshot(plan),
       items: plan.items
         .filter((item) => item.availability !== 'HIDDEN')
-        .map((item) => this.toItemSnapshot(item)),
+        .map((item) => toItemSnapshot(item)),
     };
   }
 
@@ -147,7 +120,7 @@ export class PackagesService {
   async getPlanVersion(planVersionId: string) {
     const plan = await this.findPlanOrThrow(this.prisma, planVersionId);
 
-    return { plan: this.toPlanSnapshot(plan) };
+    return { plan: toPlanSnapshot(plan) };
   }
 
   async createDraft(
@@ -229,7 +202,7 @@ export class PackagesService {
         include: PLAN_INCLUDE,
       });
 
-      const after = this.toPlanSnapshot(created);
+      const after = toPlanSnapshot(created);
 
       await transaction.auditLog.create({
         data: {
@@ -297,10 +270,10 @@ export class PackagesService {
       }
 
       if (dto.settlementTimezone !== undefined) {
-        this.assertValidTimezone(dto.settlementTimezone);
+        assertValidTimezone(dto.settlementTimezone);
       }
 
-      const before = this.toPlanSnapshot(plan);
+      const before = toPlanSnapshot(plan);
       const updatedCount = await transaction.packagePlanVersion.updateMany({
         where: {
           id: plan.id,
@@ -325,7 +298,7 @@ export class PackagesService {
       }
 
       const updated = await this.findPlanOrThrow(transaction, plan.id);
-      const after = this.toPlanSnapshot(updated);
+      const after = toPlanSnapshot(updated);
 
       await transaction.auditLog.create({
         data: {
@@ -393,8 +366,8 @@ export class PackagesService {
         );
       }
 
-      const terms = this.createDtoTerms(dto);
-      const decimalTerms = this.validateAndConvertItemTerms(terms);
+      const terms = createDtoTerms(dto);
+      const decimalTerms = validateAndConvertItemTerms(terms);
 
       await this.bumpDraftRevision(
         transaction,
@@ -413,7 +386,7 @@ export class PackagesService {
         include: { packageDefinition: true },
       });
 
-      const after = this.toItemSnapshot(item);
+      const after = toItemSnapshot(item);
 
       await transaction.auditLog.create({
         data: {
@@ -471,9 +444,9 @@ export class PackagesService {
         );
       }
 
-      const terms = this.mergeItemTerms(item, dto);
-      const decimalTerms = this.validateAndConvertItemTerms(terms);
-      const before = this.toItemSnapshot(item);
+      const terms = mergeItemTerms(item, dto);
+      const decimalTerms = validateAndConvertItemTerms(terms);
+      const before = toItemSnapshot(item);
 
       if (
         plan.items.some(
@@ -513,7 +486,7 @@ export class PackagesService {
         include: { packageDefinition: true },
       });
 
-      const after = this.toItemSnapshot(updated);
+      const after = toItemSnapshot(updated);
 
       await transaction.auditLog.create({
         data: {
@@ -556,14 +529,14 @@ export class PackagesService {
     return this.runSerializable(async (transaction) => {
       const plan = await this.findPlanOrThrow(transaction, planVersionId);
       this.assertEditableDraft(plan, dto.expectedRevision);
-      this.assertPublishablePlan(plan);
+      assertPublishablePlan(plan);
 
       const publishedAt = new Date();
       const effectiveFrom = dto.effectiveFrom
-        ? this.parseDate(dto.effectiveFrom, 'effectiveFrom')
+        ? parsePackagePlanDate(dto.effectiveFrom, 'effectiveFrom')
         : publishedAt;
       const effectiveTo = dto.effectiveTo
-        ? this.parseDate(dto.effectiveTo, 'effectiveTo')
+        ? parsePackagePlanDate(dto.effectiveTo, 'effectiveTo')
         : null;
 
       if (
@@ -603,7 +576,7 @@ export class PackagesService {
       }
 
       if (closablePredecessor) {
-        const predecessorBefore = this.toPlanSnapshot(closablePredecessor);
+        const predecessorBefore = toPlanSnapshot(closablePredecessor);
 
         await transaction.packagePlanVersion.update({
           where: { id: closablePredecessor.id },
@@ -634,7 +607,7 @@ export class PackagesService {
               successorPlanVersionId: plan.id,
               revision: predecessorAfter.revision,
               before: predecessorBefore,
-              after: this.toPlanSnapshot(predecessorAfter),
+              after: toPlanSnapshot(predecessorAfter),
             },
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
@@ -642,7 +615,7 @@ export class PackagesService {
         });
       }
 
-      const before = this.toPlanSnapshot(plan);
+      const before = toPlanSnapshot(plan);
       const updatedCount = await transaction.packagePlanVersion.updateMany({
         where: {
           id: plan.id,
@@ -665,7 +638,7 @@ export class PackagesService {
       }
 
       const published = await this.findPlanOrThrow(transaction, plan.id);
-      const after = this.toPlanSnapshot(published);
+      const after = toPlanSnapshot(published);
 
       await transaction.auditLog.create({
         data: {
@@ -718,7 +691,7 @@ export class PackagesService {
     }
 
     const now = new Date();
-    const effectiveTo = this.parseDate(dto.effectiveTo, 'effectiveTo');
+    const effectiveTo = parsePackagePlanDate(dto.effectiveTo, 'effectiveTo');
 
     if (!plan.effectiveFrom || effectiveTo <= plan.effectiveFrom) {
       throw new BadRequestException(
@@ -751,7 +724,7 @@ export class PackagesService {
       );
     }
 
-    const before = this.toPlanSnapshot(plan);
+    const before = toPlanSnapshot(plan);
     const updatedCount = await transaction.packagePlanVersion.updateMany({
       where: {
         id: plan.id,
@@ -770,7 +743,7 @@ export class PackagesService {
     }
 
     const updated = await this.findPlanOrThrow(transaction, plan.id);
-    const after = this.toPlanSnapshot(updated);
+    const after = toPlanSnapshot(updated);
 
     await transaction.auditLog.create({
       data: {
@@ -882,270 +855,6 @@ export class PackagesService {
     }
   }
 
-  private assertPublishablePlan(plan: PlanWithItems) {
-    if (plan.items.length === 0) {
-      throw new BadRequestException(
-        'A package plan must contain at least one item before publication.',
-      );
-    }
-
-    this.assertValidTimezone(plan.settlementTimezone);
-
-    if (plan.upgradesEnabled) {
-      throw new BadRequestException(
-        'Package upgrades remain disabled until subscription, payment and ledger support exists.',
-      );
-    }
-
-    if (plan.renewalMode !== 'MANUAL_AFTER_TERMINAL') {
-      throw new BadRequestException(
-        'The approved renewal contract is MANUAL_AFTER_TERMINAL.',
-      );
-    }
-
-    if (
-      plan.activePackageMode === 'MULTIPLE_ACTIVE' &&
-      plan.multipleActivePackageBasis !== 'HIGHEST_ACTIVE_PACKAGE'
-    ) {
-      throw new BadRequestException(
-        'The approved initial MULTIPLE_ACTIVE basis is HIGHEST_ACTIVE_PACKAGE.',
-      );
-    }
-
-    for (const item of plan.items) {
-      this.validateAndConvertItemTerms(this.itemTerms(item));
-
-      if (item.currency !== PACKAGE_CURRENCY) {
-        throw new BadRequestException(
-          `${item.packageDefinition.code} must be denominated in USDT.`,
-        );
-      }
-
-      if (item.rewardRateMeaning !== 'USER_NET_AFTER_SPLIT') {
-        throw new BadRequestException(
-          `${item.packageDefinition.code} must publish a USER_NET_AFTER_SPLIT rate.`,
-        );
-      }
-
-      if (
-        item.capBasis !== 'TOTAL_RETURN' ||
-        item.principalTreatment !== 'INCLUDED_IN_TOTAL_RETURN'
-      ) {
-        throw new BadRequestException(
-          `${item.packageDefinition.code} must use TOTAL_RETURN with INCLUDED_IN_TOTAL_RETURN.`,
-        );
-      }
-
-      if (item.capReachedAction === 'AUTO_RENEW') {
-        throw new BadRequestException(
-          `${item.packageDefinition.code} cannot auto-renew under the approved renewal contract.`,
-        );
-      }
-    }
-  }
-
-  private validateAndConvertItemTerms(terms: ItemTerms) {
-    const price = this.decimal(terms.price, 'price');
-    const capMultiplier = this.decimal(terms.capMultiplier, 'capMultiplier');
-    const fixedRewardRate = this.nullableDecimal(
-      terms.fixedRewardRate,
-      'fixedRewardRate',
-    );
-    const minimumRewardRate = this.nullableDecimal(
-      terms.minimumRewardRate,
-      'minimumRewardRate',
-    );
-    const maximumRewardRate = this.nullableDecimal(
-      terms.maximumRewardRate,
-      'maximumRewardRate',
-    );
-
-    if (!price.gt(0)) {
-      throw new BadRequestException('Package price must be greater than zero.');
-    }
-
-    if (!capMultiplier.gt(0)) {
-      throw new BadRequestException(
-        'Package cap multiplier must be greater than zero.',
-      );
-    }
-
-    if (
-      terms.capBasis === 'TOTAL_RETURN' &&
-      terms.principalTreatment === 'INCLUDED_IN_TOTAL_RETURN' &&
-      capMultiplier.lt(1)
-    ) {
-      throw new BadRequestException(
-        'TOTAL_RETURN with included principal requires a cap multiplier of at least 1.',
-      );
-    }
-
-    if (terms.currency !== PACKAGE_CURRENCY) {
-      throw new BadRequestException('Package currency must be USDT.');
-    }
-
-    if (terms.cycleDays > terms.goalDays) {
-      throw new BadRequestException(
-        'Package cycleDays cannot exceed package goalDays.',
-      );
-    }
-
-    if (terms.rewardRateMode === 'FIXED') {
-      if (
-        fixedRewardRate === null ||
-        minimumRewardRate !== null ||
-        maximumRewardRate !== null
-      ) {
-        throw new BadRequestException(
-          'FIXED rate mode requires fixedRewardRate and no range values.',
-        );
-      }
-
-      this.assertValidPercentage(fixedRewardRate, 'fixedRewardRate');
-    } else {
-      if (
-        fixedRewardRate !== null ||
-        minimumRewardRate === null ||
-        maximumRewardRate === null
-      ) {
-        throw new BadRequestException(
-          `${terms.rewardRateMode} rate mode requires minimumRewardRate and maximumRewardRate, with no fixedRewardRate.`,
-        );
-      }
-
-      this.assertValidPercentage(minimumRewardRate, 'minimumRewardRate');
-      this.assertValidPercentage(maximumRewardRate, 'maximumRewardRate');
-
-      if (minimumRewardRate.gt(maximumRewardRate)) {
-        throw new BadRequestException(
-          'minimumRewardRate cannot exceed maximumRewardRate.',
-        );
-      }
-    }
-
-    return {
-      price,
-      capMultiplier,
-      fixedRewardRate,
-      minimumRewardRate,
-      maximumRewardRate,
-    };
-  }
-
-  private assertValidPercentage(value: Prisma.Decimal, field: string) {
-    if (!value.gt(0) || value.gt(100)) {
-      throw new BadRequestException(
-        `${field} must be greater than zero and no more than 100 percentage points.`,
-      );
-    }
-  }
-
-  private decimal(value: string, field: string) {
-    try {
-      return new Prisma.Decimal(value);
-    } catch {
-      throw new BadRequestException(`${field} must be a valid decimal string.`);
-    }
-  }
-
-  private nullableDecimal(value: string | null, field: string) {
-    return value === null ? null : this.decimal(value, field);
-  }
-
-  private createDtoTerms(dto: CreatePackagePlanItemDto): ItemTerms {
-    return {
-      displayName: dto.displayName,
-      slug: dto.slug,
-      sortOrder: dto.sortOrder,
-      availability: dto.availability,
-      price: dto.price,
-      currency: dto.currency,
-      rewardRateMode: dto.rewardRateMode,
-      fixedRewardRate: dto.fixedRewardRate ?? null,
-      minimumRewardRate: dto.minimumRewardRate ?? null,
-      maximumRewardRate: dto.maximumRewardRate ?? null,
-      rewardRateMeaning: dto.rewardRateMeaning,
-      capBasis: dto.capBasis,
-      capMultiplier: dto.capMultiplier,
-      principalTreatment: dto.principalTreatment,
-      goalDays: dto.goalDays,
-      cycleDays: dto.cycleDays,
-      rewardStartMode: dto.rewardStartMode,
-      rewardFrequency: dto.rewardFrequency,
-      cycleDayMode: dto.cycleDayMode,
-      rewardDayMode: dto.rewardDayMode,
-      cycleEndAction: dto.cycleEndAction,
-      capReachedAction: dto.capReachedAction,
-    };
-  }
-
-  private itemTerms(item: PlanItemWithDefinition): ItemTerms {
-    return {
-      displayName: item.displayName,
-      slug: item.slug,
-      sortOrder: item.sortOrder,
-      availability: item.availability,
-      price: item.price.toFixed(8),
-      currency: item.currency,
-      rewardRateMode: item.rewardRateMode,
-      fixedRewardRate: item.fixedRewardRate?.toFixed(6) ?? null,
-      minimumRewardRate: item.minimumRewardRate?.toFixed(6) ?? null,
-      maximumRewardRate: item.maximumRewardRate?.toFixed(6) ?? null,
-      rewardRateMeaning: item.rewardRateMeaning,
-      capBasis: item.capBasis,
-      capMultiplier: item.capMultiplier.toFixed(4),
-      principalTreatment: item.principalTreatment,
-      goalDays: item.goalDays,
-      cycleDays: item.cycleDays,
-      rewardStartMode: item.rewardStartMode,
-      rewardFrequency: item.rewardFrequency,
-      cycleDayMode: item.cycleDayMode,
-      rewardDayMode: item.rewardDayMode,
-      cycleEndAction: item.cycleEndAction,
-      capReachedAction: item.capReachedAction,
-    };
-  }
-
-  private mergeItemTerms(
-    item: PlanItemWithDefinition,
-    dto: UpdatePackagePlanItemDto,
-  ): ItemTerms {
-    const current = this.itemTerms(item);
-    const supplied = <Key extends keyof UpdatePackagePlanItemDto>(key: Key) =>
-      Object.prototype.hasOwnProperty.call(dto, key);
-
-    return {
-      displayName: dto.displayName ?? current.displayName,
-      slug: dto.slug ?? current.slug,
-      sortOrder: dto.sortOrder ?? current.sortOrder,
-      availability: dto.availability ?? current.availability,
-      price: dto.price ?? current.price,
-      currency: dto.currency ?? current.currency,
-      rewardRateMode: dto.rewardRateMode ?? current.rewardRateMode,
-      fixedRewardRate: supplied('fixedRewardRate')
-        ? (dto.fixedRewardRate ?? null)
-        : current.fixedRewardRate,
-      minimumRewardRate: supplied('minimumRewardRate')
-        ? (dto.minimumRewardRate ?? null)
-        : current.minimumRewardRate,
-      maximumRewardRate: supplied('maximumRewardRate')
-        ? (dto.maximumRewardRate ?? null)
-        : current.maximumRewardRate,
-      rewardRateMeaning: dto.rewardRateMeaning ?? current.rewardRateMeaning,
-      capBasis: dto.capBasis ?? current.capBasis,
-      capMultiplier: dto.capMultiplier ?? current.capMultiplier,
-      principalTreatment: dto.principalTreatment ?? current.principalTreatment,
-      goalDays: dto.goalDays ?? current.goalDays,
-      cycleDays: dto.cycleDays ?? current.cycleDays,
-      rewardStartMode: dto.rewardStartMode ?? current.rewardStartMode,
-      rewardFrequency: dto.rewardFrequency ?? current.rewardFrequency,
-      cycleDayMode: dto.cycleDayMode ?? current.cycleDayMode,
-      rewardDayMode: dto.rewardDayMode ?? current.rewardDayMode,
-      cycleEndAction: dto.cycleEndAction ?? current.cycleEndAction,
-      capReachedAction: dto.capReachedAction ?? current.capReachedAction,
-    };
-  }
-
   private planUpdateFields(dto: UpdatePackagePlanDto) {
     return Object.keys(dto).filter(
       (key) => key !== 'expectedRevision' && key !== 'reason',
@@ -1175,104 +884,6 @@ export class PackagesService {
     return plan;
   }
 
-  private toPublicPlanSnapshot(plan: PlanWithItems) {
-    return {
-      id: plan.id,
-      versionNumber: plan.versionNumber,
-      activePackageMode: plan.activePackageMode,
-      multipleActivePackageBasis: plan.multipleActivePackageBasis,
-      activationTrigger: plan.activationTrigger,
-      migrationMode: plan.migrationMode,
-      renewalMode: plan.renewalMode,
-      upgradesEnabled: plan.upgradesEnabled,
-      settlementTimezone: plan.settlementTimezone,
-      effectiveFrom: this.iso(plan.effectiveFrom),
-      effectiveTo: this.iso(plan.effectiveTo),
-    };
-  }
-
-  private toPlanSnapshot(plan: PlanWithItems) {
-    return {
-      ...this.toPublicPlanSnapshot(plan),
-      status: plan.status,
-      revision: plan.revision,
-      publishedAt: this.iso(plan.publishedAt),
-      clonedFromPlanVersionId: plan.clonedFromPlanVersionId,
-      createdByUserId: plan.createdByUserId,
-      updatedByUserId: plan.updatedByUserId,
-      publishedByUserId: plan.publishedByUserId,
-      createdAt: plan.createdAt.toISOString(),
-      updatedAt: plan.updatedAt.toISOString(),
-      items: plan.items.map((item) => this.toItemSnapshot(item)),
-    };
-  }
-
-  private toItemSnapshot(item: PlanItemWithDefinition) {
-    const capAmount = item.price.mul(item.capMultiplier);
-    const maximumProfit =
-      item.capBasis === 'TOTAL_RETURN' &&
-      item.principalTreatment === 'INCLUDED_IN_TOTAL_RETURN'
-        ? capAmount.minus(item.price)
-        : capAmount;
-    const maximumTotalReturn =
-      item.capBasis === 'PROFIT_ONLY' &&
-      item.principalTreatment === 'RETURN_SEPARATELY'
-        ? capAmount.plus(item.price)
-        : capAmount;
-
-    return {
-      id: item.id,
-      packageDefinitionId: item.packageDefinitionId,
-      packageCode: item.packageDefinition.code,
-      displayName: item.displayName,
-      slug: item.slug,
-      sortOrder: item.sortOrder,
-      availability: item.availability,
-      price: item.price.toFixed(8),
-      currency: item.currency,
-      rewardRateMode: item.rewardRateMode,
-      fixedRewardRate: item.fixedRewardRate?.toFixed(6) ?? null,
-      minimumRewardRate: item.minimumRewardRate?.toFixed(6) ?? null,
-      maximumRewardRate: item.maximumRewardRate?.toFixed(6) ?? null,
-      rewardRateMeaning: item.rewardRateMeaning,
-      capBasis: item.capBasis,
-      capMultiplier: item.capMultiplier.toFixed(4),
-      principalTreatment: item.principalTreatment,
-      maximumTotalReturn: maximumTotalReturn.toFixed(8),
-      maximumProfit: maximumProfit.toFixed(8),
-      goalDays: item.goalDays,
-      cycleDays: item.cycleDays,
-      rewardStartMode: item.rewardStartMode,
-      rewardFrequency: item.rewardFrequency,
-      cycleDayMode: item.cycleDayMode,
-      rewardDayMode: item.rewardDayMode,
-      cycleEndAction: item.cycleEndAction,
-      capReachedAction: item.capReachedAction,
-      createdAt: item.createdAt.toISOString(),
-      updatedAt: item.updatedAt.toISOString(),
-    };
-  }
-
-  private parseDate(value: string, field: string) {
-    const parsed = new Date(value);
-
-    if (Number.isNaN(parsed.getTime())) {
-      throw new BadRequestException(`${field} must be a valid ISO timestamp.`);
-    }
-
-    return parsed;
-  }
-
-  private assertValidTimezone(timezone: string) {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
-    } catch {
-      throw new BadRequestException(
-        'settlementTimezone must be a valid IANA timezone.',
-      );
-    }
-  }
-
   private assertSuperAdmin(actor: AuthenticatedUser) {
     if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
       throw new ForbiddenException('SUPER_ADMIN access is required.');
@@ -1285,9 +896,5 @@ export class PackagesService {
         ? `Package plan revision is stale. Current revision is ${currentRevision}.`
         : 'Package plan revision is stale; reload the plan and retry.',
     );
-  }
-
-  private iso(value: Date | null) {
-    return value?.toISOString() ?? null;
   }
 }
