@@ -9,13 +9,16 @@ This is the default delivery workflow for all future software projects unless th
 ## 2. Focused vertical slices
 Deliver one focused module/API slice at a time:
 1. confirm the contract and business rules;
-2. implement the smallest production-ready slice;
-3. run the relevant local module gate;
-4. run the repository-wide local gate;
-5. if database changes exist, apply them explicitly and run the milestone/database gate;
-6. verify changed APIs locally with Postman/manual API testing;
-7. update persistent project documentation/current state;
-8. open a PR to main only after all local gates are green.
+2. implement the smallest production-ready backend/API foundation;
+3. implement the matching frontend/BFF/UI integration for the same slice;
+4. run the relevant local module gates;
+5. run the repository-wide local gate;
+6. if database changes exist, apply them explicitly and run the milestone/database gate;
+7. verify the API and frontend together as one integrated local acceptance gate;
+8. update persistent project documentation/current state;
+9. open a PR to main only after the integrated local gate is green.
+
+A backend-only API gate may be used as an intermediate development checkpoint, but it does not count as final module sign-off once a frontend exists for that slice.
 
 ## 3. Verification is read-only
 Normal verification must not mutate source files or database state.
@@ -61,20 +64,33 @@ npm run verify:milestone
 that adds read-only database migration/status checks.
 
 ## 6. Database safety
-- Apply migrations explicitly and locally before API sign-off.
+- Apply migrations explicitly and locally before integrated module sign-off.
 - Inspect and repair failed migrations rather than blindly retrying or marking them applied.
 - Do not reset a real application database as routine recovery.
 - Do not use development migration workflows that require extra/shadow databases unless explicitly approved for that project.
 
-## 7. API-first local verification
-For modules exposing APIs:
-- verify locally first;
-- use Postman/manual requests for success, authorization, validation, conflict/idempotency, and important negative cases;
-- only after Postman/manual API verification is green move to the next module or PR preparation.
+## 7. Integrated API + frontend local acceptance
+For modules that expose APIs and have a frontend/UI surface, final local acceptance is one combined gate.
+
+The combined gate must verify, as applicable:
+- API success paths;
+- authorization/RBAC boundaries;
+- validation and important negative cases;
+- conflict/idempotency behavior;
+- frontend loading, empty, success, validation, denied, and error states;
+- frontend/BFF requests reaching the intended backend endpoints;
+- authenticated session behavior and token/session renewal where relevant;
+- data created or changed in the UI is reflected correctly through the API and vice versa;
+- responsive behavior for the supported protected/public UI surface.
+
+Postman/manual API testing remains useful as an intermediate backend checkpoint, but after the frontend for the slice exists, API and frontend must be tested together before the slice is considered complete.
+
+Do not move to the next module or PR preparation until this integrated gate is green.
 
 ## 8. PR discipline
 - Work on a feature branch.
-- No PR to main until local code gate, database gate when relevant, and Postman/manual API gate are green.
+- No PR to main until local code gate, database gate when relevant, and integrated API + frontend acceptance gate are green.
+- Backend and frontend work for the same vertical slice may use child branches, but final PR preparation happens only after they are integrated back into the slice branch and reverified together.
 - Keep meaningful milestones committed and pushed so work is recoverable across sessions.
 
 ## 9. Failure handling
@@ -91,5 +107,7 @@ At project start, create/adapt these commands immediately:
 - `db:status` as read-only status;
 - `db:deploy` as explicit write operation;
 - formatting/check commands separated into write vs check modes.
+
+Also define the integrated acceptance path for the project early: backend/API checkpoint during development, then API + frontend together for final module sign-off.
 
 This workflow is the default for future projects unless explicitly changed by the Founder.
