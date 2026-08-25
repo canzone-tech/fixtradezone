@@ -1,15 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
 import "iconoir/css/iconoir.css";
 import "../styles/fixtradezone-theme.scss";
 
 export const metadata: Metadata = {
+  applicationName: "FixTradeZone",
   title: {
-    default: "FixTradeZone Admin",
-    template: "%s | FixTradeZone Admin",
+    default: "FixTradeZone",
+    template: "%s | FixTradeZone",
   },
-  description:
-    "Secure operations dashboard for FixTradeZone administrators.",
+  description: "Secure FixTradeZone application for administrators and users.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+    apple: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#071a35",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({
@@ -25,7 +36,10 @@ export default function RootLayout({
       data-bs-theme="dark"
       suppressHydrationWarning
     >
-      <body id="body">{children}</body>
+      <body id="body">
+        <AppPwa />
+        {children}
+      </body>
     </html>
   );
 }
