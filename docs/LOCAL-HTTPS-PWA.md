@@ -1,10 +1,10 @@
-# FixTradeZone — Local HTTPS + USER PWA Verification
+# FixTradeZone — Local HTTPS + Full-App PWA Verification
 
 ## Scope
 
 This guide is for trusted local/LAN development only. Production TLS is terminated by the production web/reverse-proxy platform and must use a publicly trusted certificate.
 
-The USER portal is the PWA surface. ADMIN remains responsive web. NestJS stays bound to the local backend boundary and the Next.js BFF remains the browser-facing authentication/session boundary.
+The complete Next.js application is the PWA surface. Login, ADMIN and USER routes share one manifest and one root-scoped service worker. NestJS stays bound to the local backend boundary and the Next.js BFF remains the browser-facing authentication/session boundary.
 
 ## 1. Install a local certificate authority
 
@@ -16,36 +16,29 @@ sudo apt install -y mkcert libnss3-tools
 mkcert -install
 ```
 
-`mkcert -install` creates a development CA and installs it in the local desktop trust store. Never commit the generated CA, certificate or private key.
+Never commit the generated CA, certificate or private key.
 
 ## 2. Generate the local HTTPS certificate
 
-From the repository root, first inspect current LAN IPv4 addresses:
+Inspect current LAN IPv4 addresses:
 
 ```bash
 hostname -I
 ```
 
-Create the ignored certificate directory:
+Create the ignored certificate directory and generate a certificate covering localhost and the current trusted LAN IPv4 addresses:
 
 ```bash
 cd ~/FixTradeZone
 mkdir -p admin/certs
-```
-
-Generate a certificate covering localhost and the current trusted LAN IPv4 addresses. Example for the current development machine:
-
-```bash
-cd ~/FixTradeZone/admin
+cd admin
 mkcert \
   -cert-file certs/fixtradezone.local.pem \
   -key-file certs/fixtradezone.local-key.pem \
   localhost 127.0.0.1 ::1 192.168.31.84 192.168.31.50
 ```
 
-Both generated files end in `.pem` and are ignored by `admin/.gitignore`.
-
-If the LAN address changes to an address not present in the certificate SAN list, regenerate the certificate with the new address before testing HTTPS from another device.
+If the LAN address changes to an address not present in the certificate SAN list, regenerate the certificate before device testing.
 
 ## 3. Trust the development CA on the test phone/tablet
 
@@ -55,11 +48,9 @@ Find the local CA directory:
 mkcert -CAROOT
 ```
 
-Copy only `rootCA.pem` from that directory to the trusted test device through a private local transfer. Do not commit it or publish it.
+Copy only `rootCA.pem` from that directory to the trusted test device through a private local transfer. Never transfer or publish `rootCA-key.pem`.
 
-Install/trust that CA on the test device using the operating system certificate/profile settings. This is required for a real secure context on a LAN IP. A browser warning that is merely bypassed is not accepted for PWA verification.
-
-After local testing is finished, the CA can be removed from the device trust store.
+Install/trust the CA using the device operating-system certificate/profile settings. A browser warning that is merely bypassed is not accepted for PWA verification.
 
 ## 4. Run the application
 
@@ -77,19 +68,19 @@ cd ~/FixTradeZone
 npm --prefix admin run dev:https
 ```
 
-The USER portal can then be opened on the trusted device using an address included in the certificate, for example:
+Open an address included in the certificate, for example:
 
 ```text
-https://192.168.31.84:3001/user/dashboard
+https://192.168.31.84:3001/login
 ```
 
 Do not expose NestJS port 3000 to the LAN merely for browser/PWA use. Next.js BFF continues to call `API_BASE_URL=http://127.0.0.1:3000` server-side.
 
 ## 5. PWA boundary
 
-The install manifest is `/user-manifest.webmanifest` with scope `/user/` and start URL `/user/dashboard`.
+The install manifest is `/manifest.webmanifest` with scope `/` and start URL `/`.
 
-The service worker is `/sw.js` and is registered only from the nested `/user/*` layout with scope `/user/`.
+The service worker is `/sw.js`, registered from the root application layout with scope `/`.
 
 The service worker intentionally does **not** cache:
 
@@ -101,23 +92,36 @@ The service worker intentionally does **not** cache:
 
 Only explicitly listed static brand assets are cacheable. Sensitive state remains network-authoritative.
 
-## 6. Browser acceptance
+## 6. Mobile/tablet install-required behavior
 
-On desktop and one real mobile device:
+Browsers do not allow silent forced PWA installation. User interaction is required by the platform.
 
-1. Open the HTTPS USER portal with no certificate warning.
-2. Confirm login/session flow works through the same-origin Next.js BFF.
-3. Confirm `/user/packages` and existing USER routes remain responsive.
-4. Confirm DevTools/Application shows `user-manifest.webmanifest`.
-5. Confirm service worker `/sw.js` is active with scope ending in `/user/`.
-6. Confirm browser installation/Add to Home Screen is offered where supported.
-7. Launch the installed PWA and confirm it opens `/user/dashboard` in standalone mode.
-8. Disable network and confirm sensitive/auth/business data is not falsely served as fresh application state.
-9. Restore network and confirm normal session/API behavior resumes.
+FixTradeZone therefore uses the strongest supported mobile install flow:
 
-## 7. Automated gate
+1. Normal mobile/tablet browser mode shows a blocking FixTradeZone install screen.
+2. Chromium/Android uses the browser's native install prompt when `beforeinstallprompt` is available.
+3. iPhone/iPad shows Add to Home Screen instructions because iOS does not expose the same programmatic install prompt.
+4. Once launched in installed standalone mode, the blocking gate is removed.
+5. Desktop browser access remains available for ADMIN/operator workflows.
 
-After pulling the PWA/HTTPS changes:
+## 7. Browser and installed-app acceptance
+
+On desktop and at least one real mobile device:
+
+1. Open HTTPS with no certificate warning.
+2. Confirm `/manifest.webmanifest` loads and has root scope `/`.
+3. Confirm service worker `/sw.js` is active with root scope `/`.
+4. Confirm mobile normal-browser mode shows the install-required screen.
+5. Install FixTradeZone and relaunch from the installed icon.
+6. Confirm the installed app can reach login, ADMIN routes for ADMIN/SUPER_ADMIN accounts, and USER routes for USER accounts using the same PWA shell.
+7. Confirm login/session flow works through the same-origin Next.js BFF.
+8. Confirm ADMIN and USER routes remain responsive.
+9. Disable network and confirm sensitive/auth/business state is not falsely served as fresh data.
+10. Restore network and confirm normal session/API behavior resumes.
+
+## 8. Automated gate
+
+After pulling the full-app PWA changes:
 
 ```bash
 cd ~/FixTradeZone
