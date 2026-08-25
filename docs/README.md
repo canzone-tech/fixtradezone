@@ -1,19 +1,22 @@
 # FixTradeZone Documentation
 
-These documents are the persistent project source of truth used to continue development across chat sessions.
+These documents are the persistent project source of truth used to continue development across chat sessions, ChatGPT Work, and Codex.
 
 ## Start Here
 1. `CURRENT-STATE.md` — exact current implementation state and next actions.
-2. `PROJECT-CONTEXT.md` — product requirements and locked rules.
-3. `ARCHITECTURE.md` — system and technology architecture.
-4. `DECISIONS.md` — locked architecture decisions / ADRs.
-5. `DATABASE.md` — database design and migration state.
-6. `SECURITY.md` — security standards.
-7. `API-CONTRACT.md` — API/testing conventions.
-8. `ROADMAP.md` — phase-by-phase roadmap.
-9. `LOCAL-VERIFICATION.md` — locked repository-wide local verification and delivery gate.
-10. `LOCAL-VERIFY-AUTH-ADMIN.md` — required local gate for the current auth/admin slice.
-11. `CHANGELOG.md` — session and milestone history.
+2. `WORK-CODEX-OPERATING-BRIEF.md` — canonical Work/Codex/normal-Chat handoff, delivery workflow, current MLM checkpoint, and fallback rules.
+3. `PROJECT-CONTEXT.md` — product requirements and locked rules.
+4. `ARCHITECTURE.md` — system and technology architecture.
+5. `DECISIONS.md` — locked architecture decisions / ADRs.
+6. `DATABASE.md` — database design and migration state.
+7. `SECURITY.md` — security standards.
+8. `API-CONTRACT.md` — API/testing conventions.
+9. `ROADMAP.md` — phase-by-phase roadmap.
+10. `LOCAL-VERIFICATION.md` — locked repository-wide local verification and delivery gate.
+11. `LOCAL-VERIFY-AUTH-ADMIN.md` — required local gate for the current auth/admin slice.
+12. `CHANGELOG.md` — session and milestone history.
 
 ## Rule
-Any material architecture, security, or delivery-process decision should be reflected in these documents before the codebase moves forward.
+Any material architecture, security, business-rule, continuity, or delivery-process decision should be reflected in these documents before the codebase moves forward.
+
+The repository and committed `docs/` are the permanent source of truth. ChatGPT Work, Codex, and normal Chat are execution interfaces and may be interchanged without changing the delivery gates.
