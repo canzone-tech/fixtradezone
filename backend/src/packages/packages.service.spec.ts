@@ -8,7 +8,10 @@ import { plainToInstance } from 'class-transformer';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
-import { UpdatePackagePlanItemDto } from './dto/package-plan.dto';
+import {
+  UpdatePackagePlanDto,
+  UpdatePackagePlanItemDto,
+} from './dto/package-plan.dto';
 import { PackagesService } from './packages.service';
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -264,7 +267,11 @@ describe('PackagesService', () => {
         {
           data: {
             action: string;
-            metadata: { operation: string; revision: number };
+            metadata: {
+              operation: string;
+              revision: number;
+              changedFields: string[];
+            };
           };
         },
       ]
@@ -274,6 +281,7 @@ describe('PackagesService', () => {
     expect(auditCalls[0]?.[0].data.metadata).toMatchObject({
       operation: 'UPDATE_DRAFT_ITEM',
       revision: 2,
+      changedFields: ['availability'],
     });
   });
 
@@ -325,6 +333,37 @@ describe('PackagesService', () => {
     expect(updateCall?.data.fixedRewardRate).toBeNull();
     expect(updateCall?.data.minimumRewardRate.toFixed(6)).toBe('0.400000');
     expect(updateCall?.data.maximumRewardRate.toFixed(6)).toBe('0.600000');
+  });
+
+  it('rejects a transformed item update with no supplied item field', async () => {
+    const dto = plainToInstance(UpdatePackagePlanItemDto, {
+      expectedRevision: 1,
+      reason: 'Attempt a reason-only item update.',
+    });
+
+    transaction.packagePlanVersion.findUnique.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.updatePlanItem(PLAN_ID, ITEM_ID, dto, admin),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction.packagePlanVersion.updateMany).not.toHaveBeenCalled();
+    expect(transaction.packagePlanItem.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a transformed plan update with no supplied setting', async () => {
+    const dto = plainToInstance(UpdatePackagePlanDto, {
+      expectedRevision: 1,
+      reason: 'Attempt a reason-only plan update.',
+    });
+
+    transaction.packagePlanVersion.findUnique.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.updatePlanVersion(PLAN_ID, dto, admin),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction.packagePlanVersion.updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects a rate mode whose typed decimal fields do not match', async () => {

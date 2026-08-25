@@ -856,15 +856,20 @@ export class PackagesService {
   }
 
   private planUpdateFields(dto: UpdatePackagePlanDto) {
-    return Object.keys(dto).filter(
-      (key) => key !== 'expectedRevision' && key !== 'reason',
-    );
+    return this.suppliedUpdateFields(dto);
   }
 
   private itemUpdateFields(dto: UpdatePackagePlanItemDto) {
-    return Object.keys(dto).filter(
-      (key) => key !== 'expectedRevision' && key !== 'reason',
-    );
+    return this.suppliedUpdateFields(dto);
+  }
+
+  private suppliedUpdateFields(dto: object) {
+    return Object.entries(dto)
+      .filter(
+        ([key, value]) =>
+          key !== 'expectedRevision' && key !== 'reason' && value !== undefined,
+      )
+      .map(([key]) => key);
   }
 
   private async findPlanOrThrow(
