@@ -123,13 +123,16 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             <div className="ftz-nav-section">
               <div className="ftz-nav-label">TRADING & FINANCE</div>
 
-              <span
-                className={`ftz-nav-link ${styles.disabledNav}`}
-                aria-disabled="true"
+              <Link
+                href="/user/packages"
+                className={`ftz-nav-link ${
+                  isActive("/user/packages") ? "is-active" : ""
+                }`}
+                onClick={close}
               >
                 <i className="iconoir-box" />
                 <span>Packages</span>
-              </span>
+              </Link>
 
               <span
                 className={`ftz-nav-link ${styles.disabledNav}`}

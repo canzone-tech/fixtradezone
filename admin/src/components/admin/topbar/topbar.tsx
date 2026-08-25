@@ -1,10 +1,47 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
+import {
+  clearAdminSessionCache,
+  resolveAdminSession,
+} from "@/lib/admin-session-client";
+
+const routeHeadings: Array<{
+  path: string;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    path: "/packages",
+    title: "Package Plans",
+    subtitle: "Versioned catalogue and publication controls",
+  },
+  {
+    path: "/referrals",
+    title: "Referral Management",
+    subtitle: "Enrollment and audited sponsor controls",
+  },
+  {
+    path: "/users",
+    title: "Users",
+    subtitle: "Accounts, roles and access status",
+  },
+  {
+    path: "/rbac",
+    title: "Roles & Permissions",
+    subtitle: "Backend-authoritative access management",
+  },
+  {
+    path: "/settings",
+    title: "Settings",
+    subtitle: "Platform and security configuration",
+  },
+];
 
 export default function Topbar() {
+  const pathname = usePathname();
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -14,20 +51,14 @@ export default function Topbar() {
     let mounted = true;
 
     async function loadSession() {
-      const response = await fetch("/api/auth/session", {
-        cache: "no-store",
-      });
+      const session = await resolveAdminSession();
 
-      const payload = (await response.json().catch(() => ({}))) as {
-        user?: AdminUser;
-      };
-
-      if (!response.ok || !payload.user) {
+      if (!session.user) {
         router.replace("/login");
         return;
       }
 
-      if (mounted) setUser(payload.user);
+      if (mounted) setUser(session.user);
     }
 
     void loadSession();
@@ -72,9 +103,18 @@ export default function Topbar() {
     document.body.classList.toggle("ftz-nav-open");
   };
 
+  const heading = routeHeadings.find(
+    (candidate) =>
+      pathname === candidate.path || pathname.startsWith(`${candidate.path}/`),
+  ) ?? {
+    title: "Dashboard",
+    subtitle: "Real-time overview of your platform",
+  };
+
   async function logout() {
     setLoggingOut(true);
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearAdminSessionCache();
     router.replace("/login");
     router.refresh();
   }
@@ -92,8 +132,8 @@ export default function Topbar() {
         </button>
 
         <div>
-          <h1>Dashboard</h1>
-          <p>Real-time overview of your platform</p>
+          <h1>{heading.title}</h1>
+          <p>{heading.subtitle}</p>
         </div>
       </div>
 
@@ -147,9 +187,7 @@ export default function Topbar() {
         >
           <i className="iconoir-log-out" />
 
-          <span>
-            {loggingOut ? "Signing out..." : "Sign Out"}
-          </span>
+          <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
         </button>
       </div>
     </header>

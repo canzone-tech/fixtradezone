@@ -43,17 +43,29 @@ export default function UserTopbar({
     .slice(0, 2)
     .toUpperCase();
 
-  const impersonated =
-    session !== null && isImpersonationSession(session);
+  const impersonated = session !== null && isImpersonationSession(session);
 
   const idleMinutes = session?.sessionPolicy.idleLockMinutes;
 
-  const title = pathname === "/user/profile" ? "My Profile" : "User Dashboard";
-
-  const subtitle =
-    pathname === "/user/profile"
-      ? "Account identity, security and session"
-      : "Overview of your FixTradeZone account";
+  const heading = pathname.startsWith("/user/packages")
+    ? {
+        title: "Packages",
+        subtitle: "Published USDT plans and exact commercial terms",
+      }
+    : pathname.startsWith("/user/referrals")
+      ? {
+          title: "My Referrals",
+          subtitle: "Referral identity and direct network",
+        }
+      : pathname === "/user/profile"
+        ? {
+            title: "My Profile",
+            subtitle: "Account identity, security and session",
+          }
+        : {
+            title: "User Dashboard",
+            subtitle: "Overview of your FixTradeZone account",
+          };
 
   async function logout() {
     if (loggingOut) {
@@ -92,8 +104,8 @@ export default function UserTopbar({
         </button>
 
         <div>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
+          <h1>{heading.title}</h1>
+          <p>{heading.subtitle}</p>
         </div>
       </div>
 
@@ -102,24 +114,20 @@ export default function UserTopbar({
           <>
             <span
               className={
-                impersonated &&
-                session.impersonation.accessMode === "FULL"
+                impersonated && session.impersonation.accessMode === "FULL"
                   ? styles.fullMode
                   : styles.limitedMode
               }
             >
               <i
                 className={
-                  impersonated &&
-                  session.impersonation.accessMode === "FULL"
+                  impersonated && session.impersonation.accessMode === "FULL"
                     ? "iconoir-warning-triangle"
                     : "iconoir-shield-check"
                 }
               />
 
-              {impersonated
-                ? session.impersonation.accessMode
-                : "SECURE"}
+              {impersonated ? session.impersonation.accessMode : "SECURE"}
             </span>
 
             <span className={styles.policyBadge}>
@@ -146,9 +154,7 @@ export default function UserTopbar({
               >
                 <i className="iconoir-log-out" />
 
-                <span>
-                  {returning ? "Returning..." : "Return to Admin"}
-                </span>
+                <span>{returning ? "Returning..." : "Return to Admin"}</span>
               </button>
             ) : (
               <button
@@ -160,9 +166,7 @@ export default function UserTopbar({
               >
                 <i className="iconoir-log-out" />
 
-                <span>
-                  {loggingOut ? "Signing out..." : "Sign Out"}
-                </span>
+                <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
               </button>
             )}
           </>
