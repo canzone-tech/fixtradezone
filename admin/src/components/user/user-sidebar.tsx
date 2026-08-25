@@ -120,51 +120,52 @@ export default function UserSidebar({ session }: UserSidebarProps) {
           </div>
 
           {!impersonated ? (
-            <>
-              <div className="ftz-nav-section">
-                <div className="ftz-nav-label">TRADING & FINANCE</div>
+            <div className="ftz-nav-section">
+              <div className="ftz-nav-label">TRADING & FINANCE</div>
 
-                <span
-                  className={`ftz-nav-link ${styles.disabledNav}`}
-                  aria-disabled="true"
-                >
-                  <i className="iconoir-box" />
-                  <span>Packages</span>
-                </span>
+              <span
+                className={`ftz-nav-link ${styles.disabledNav}`}
+                aria-disabled="true"
+              >
+                <i className="iconoir-box" />
+                <span>Packages</span>
+              </span>
 
-                <span
-                  className={`ftz-nav-link ${styles.disabledNav}`}
-                  aria-disabled="true"
-                >
-                  <i className="iconoir-wallet" />
-                  <span>Deposits</span>
-                </span>
+              <span
+                className={`ftz-nav-link ${styles.disabledNav}`}
+                aria-disabled="true"
+              >
+                <i className="iconoir-wallet" />
+                <span>Deposits</span>
+              </span>
 
-                <span
-                  className={`ftz-nav-link ${styles.disabledNav}`}
-                  aria-disabled="true"
-                >
-                  <i className="iconoir-coins-swap" />
-                  <span>Payouts</span>
-                </span>
+              <span
+                className={`ftz-nav-link ${styles.disabledNav}`}
+                aria-disabled="true"
+              >
+                <i className="iconoir-coins-swap" />
+                <span>Payouts</span>
+              </span>
 
-                <span
-                  className={`ftz-nav-link ${styles.disabledNav}`}
-                  aria-disabled="true"
-                >
-                  <i className="iconoir-community" />
-                  <span>Referrals</span>
-                </span>
+              <Link
+                href="/user/referrals"
+                className={`ftz-nav-link ${
+                  isActive("/user/referrals") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-community" />
+                <span>Referrals</span>
+              </Link>
 
-                <span
-                  className={`ftz-nav-link ${styles.disabledNav}`}
-                  aria-disabled="true"
-                >
-                  <i className="iconoir-graph-up" />
-                  <span>Simulated Trade Activity</span>
-                </span>
-              </div>
-            </>
+              <span
+                className={`ftz-nav-link ${styles.disabledNav}`}
+                aria-disabled="true"
+              >
+                <i className="iconoir-graph-up" />
+                <span>Simulated Trade Activity</span>
+              </span>
+            </div>
           ) : null}
         </nav>
 

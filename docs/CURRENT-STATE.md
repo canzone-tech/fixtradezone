@@ -1,243 +1,180 @@
 # FixTradeZone — Current State
 
-## Latest Verified Checkpoint — 2026-08-23
+## Latest Verified Checkpoint — 2026-08-25
 
-- Current feature branch: `feature/foundation-freeze-checkpoint`.
-- Base commit: `0c2795d` (PR #11 merged into `main`).
-- Configurable authentication and registration foundation is implemented and locally verified.
-- Migration `0005_configurable_auth_registration` is applied and verified in local MySQL.
-- Redis application infrastructure is implemented and live connectivity is verified.
-- Custom server-authoritative CAPTCHA is implemented for public Login and Registration.
-- Backend regression status: 23 test suites / 124 tests pass.
-- NestJS production build passes.
-- Feature-only ESLint passes.
-- `git diff --check` passes.
-- Local Postman verification is GREEN.
-- PR #11 is merged into `main`; configurable authentication/registration/CAPTCHA foundation is now part of the mainline.
+MLM-01 Referral Foundation is implemented and locally accepted end to end.
 
-## Configurable Authentication
+### Current branches
+- Slice branch: `feature/mlm-referral-foundation`
+- Frontend child branch used for the integrated slice: `feature/mlm-referral-frontend`
+- Accepted frontend checkpoint before documentation seal: `039635cbcd29ada5436d1dbbd47dd0537dcb4aea`
+- No PR to `main` has been opened yet.
 
-SUPER_ADMIN-controlled authentication settings:
+### MLM-01 backend
+Implemented and verified:
+- referral profile / sponsor relationship foundation;
+- sponsor-change history;
+- singleton referral configuration;
+- registration referral attribution;
+- configured default sponsor behavior;
+- SUPER_ADMIN referral configuration;
+- permission-gated delegated ADMIN sponsor reassignment;
+- self-sponsor and cycle protection;
+- audited manual sponsor changes;
+- direct referral query API.
 
-- Login with username.
-- Login with email.
-- Login with mobile.
-- CAPTCHA on Login.
-- CAPTCHA on Registration.
+USER API:
+- `GET /referrals/me`
+- `GET /referrals/me/direct?page=1&limit=20`
 
-Rules:
+ADMIN/SUPER_ADMIN API:
+- `GET /admin/referrals/config`
+- `PATCH /admin/referrals/config`
+- `PATCH /admin/referrals/:userId/sponsor`
 
-- At least one login identifier must remain enabled.
-- Username is the canonical human account handle and remains unique.
-- JWT/session identity is based on immutable user/session IDs, not email.
-- Email and mobile may be nullable.
-- When multiple accounts per email or mobile are enabled, username-only login is enforced.
-- Email/mobile login rejects ambiguous identifier matches.
-- E.164 mobile login is supported.
-- Login credential failures remain generic.
+Registration accepts optional `referralCode`.
 
-## Configurable Registration
+### MLM-01 database
+Migration `0006_referral_foundation` is applied locally.
 
-SUPER_ADMIN-controlled registration settings:
+Database migration status at the accepted milestone:
+- 6 migrations found;
+- schema up to date;
+- no additional FixTradeZone application/shadow/test database created.
 
-- Public registration.
-- SUPER_ADMIN-created registration.
-- ADMIN-created registration.
-- Authorized USER-created registration.
-- Email required.
-- Mobile required.
-- Password mode:
-  - AUTO
-  - MANUAL
-  - AUTO_OR_MANUAL
-- Username mode:
-  - AUTO
-  - MANUAL
-  - AUTO_OR_MANUAL
-- Optional generated-username prefix.
-- Multiple accounts per email.
-- Multiple accounts per mobile.
+Application-enforced referral invariants include:
+- no self-sponsor;
+- no referral cycles;
+- assignment-state consistency;
+- controlled root/default sponsor behavior;
+- reasoned/audited sponsor changes.
 
-Registration sources remain independently auditable:
+Existing-user migration mode remains `LEAVE_UNASSIGNED_FOR_REVIEW`; historical sponsor relationships are never guessed.
 
-- SELF_REGISTRATION
-- SUPER_ADMIN
-- ADMIN
-- AUTHORIZED_USER
+### MLM-01 frontend / BFF
+USER:
+- `/user/referrals`
+- live referral assignment status;
+- live sponsor display;
+- live direct-referral list;
+- shareable invite link `register?ref=<REFERRAL_CODE>`;
+- `/user/dashboard` shows live referral status and direct-referral total instead of the old referral API placeholder.
 
-`createdBy` and future sponsor/referral relationships remain separate concepts.
+ADMIN/SUPER_ADMIN:
+- `/referrals`
+- referral enrollment configuration;
+- default sponsor selection;
+- delegated ADMIN sponsor-change switch;
+- audited sponsor assignment/reassignment controls;
+- permission-aware navigation.
 
-## Generated Username and Identifier Claims
+BFF/session behavior:
+- protected browser calls use same-origin Next.js BFF routes;
+- browser JavaScript does not own backend JWTs;
+- session refresh/validation runs before dependent referral data requests to avoid rotating-refresh-token races;
+- registration BFF forwards explicit `referralCode` or a same-origin `?ref=` invite code to the Nest registration contract.
 
-- Username is required and unique.
-- Automatic usernames use the transactional `username` system sequence.
-- Current local sequence starts from `100001`.
-- Optional username prefix affects future generated usernames only.
-- `user_identifier_claims` enforces EMAIL/MOBILE uniqueness while the related identifier is configured for single-account mode.
-- SINGLE -> MULTIPLE removes the related uniqueness claims.
-- MULTIPLE -> SINGLE rejects existing duplicate users and rebuilds claims transactionally.
+## Verification — GREEN
 
-## Required Password Change
+### Repository code gate
+Latest local `npm run verify:local` on the accepted frontend checkpoint:
+- Prisma schema validation: GREEN;
+- backend Prettier check: GREEN;
+- backend ESLint: GREEN;
+- backend Jest: 24/24 suites, 129/129 tests;
+- NestJS production build: GREEN;
+- backend diff checks: GREEN;
+- admin ESLint: GREEN;
+- admin TypeScript `tsc --noEmit`: GREEN;
+- Next.js 16.3.1 production build: GREEN;
+- root diff checks: GREEN.
 
-Automatically generated passwords are temporary credentials.
+### Database milestone gate
+Latest local `npm run verify:milestone` before final UI acceptance:
+- all repository code gates GREEN;
+- Prisma migration status GREEN;
+- 6 migrations applied / schema up to date.
 
-A user with `mustChangePassword=true`:
+### API checkpoint
+MLM-01 Postman referral collection: GREEN.
 
-- does not receive a normal access token;
-- does not receive a normal refresh token;
-- does not receive a normal authenticated session;
-- receives only a short-lived one-purpose `password_change` JWT;
-- must submit a different new password;
-- has active sessions revoked defensively;
-- has the flag cleared atomically after successful password replacement;
-- must sign in again after successful password change.
+The hardened referral collection covered success, authentication, authorization, validation, self-sponsor, cycle, delegated ADMIN switch/permission behavior, configuration restoration and token refresh behavior.
 
-Password-change replay and concurrent update races are rejected.
+### Integrated API + frontend acceptance — GREEN
+Verified locally in browser on 2026-08-25:
+1. SUPER_ADMIN opened `/referrals` and loaded live referral configuration.
+2. Referral enrollment was enabled with the configured founder/root as default sponsor.
+3. Fresh USER A registered, was activated, logged in, and showed `ASSIGNED` referral state with founder/root as sponsor.
+4. USER A dashboard showed live referral state and direct referral count.
+5. USER A copied the generated referral invite link.
+6. Fresh USER B registered through USER A's `register?ref=<CODE>` invite link.
+7. USER B was activated and showed USER A as sponsor.
+8. USER A's `/user/referrals` direct-referral list updated to include USER B as `ACTIVE / ASSIGNED`.
+9. USER A direct-referral total increased accordingly.
 
-## CAPTCHA
+This proves the accepted path across frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback.
 
-Custom CAPTCHA is implemented without a third-party CAPTCHA service.
+MLM-01 final module sign-off is therefore GREEN.
 
-Security properties:
+## Locked delivery workflow
+For future modules:
+1. confirm business semantics;
+2. implement focused backend/API foundation;
+3. use local API/Postman as an intermediate checkpoint;
+4. implement matching frontend/BFF/UI;
+5. run repository verification;
+6. run database milestone verification when relevant;
+7. run final API + frontend integrated local acceptance;
+8. update persistent docs;
+9. open PR only after all gates are green.
 
-- Public challenge endpoint: `POST /auth/captcha`.
-- Purposes:
-  - LOGIN
-  - REGISTRATION
-- CAPTCHA configuration is SUPER_ADMIN-controlled.
-- Challenge state is stored in Redis.
-- Challenge TTL is 180 seconds.
-- Maximum failed attempts: 5.
-- Successful verification consumes the challenge atomically.
-- Fifth failed attempt destroys the challenge.
-- Challenge is bound to its declared purpose.
-- Redis stores only a keyed HMAC digest of the answer, never the plaintext answer.
-- Challenge IDs are cryptographically random.
-- CAPTCHA is fail-closed when enabled.
-- When disabled, existing Login/Registration behavior remains unchanged.
+Work/Codex may accelerate planning and implementation, but local verification remains the acceptance authority. GitHub repository + committed `docs/` remain the source of truth.
 
-## Redis Foundation
+## Core architecture / security state
+- Backend: NestJS + TypeScript.
+- ORM: Prisma 7.9.1 with MariaDB adapter.
+- Relational source of truth: MySQL.
+- MongoDB reserved for document/config/CMS use where appropriate.
+- Redis used for transient/cache/session-adjacent infrastructure.
+- Frontend/admin/user portal: Next.js.
+- JWT access + rotating refresh sessions.
+- Browser auth boundary: same-origin BFF + HttpOnly/SameSite cookies.
+- RBAC roles: `SUPER_ADMIN`, `ADMIN`, `USER`.
+- SUPER_ADMIN remains founder/master authority.
+- APIs remain deny-by-default except explicitly public endpoints.
+- Financial modules must preserve SQL DECIMAL, idempotency, auditability, immutable/reversal ledger patterns and explicit authorization.
+- Simulated activity must always be explicitly labeled simulated and never presented as real trading/profits.
 
-- `ioredis` is used by the backend.
-- Redis configuration uses existing `REDIS_HOST`, `REDIS_PORT`, and `REDIS_PASSWORD`.
-- `CAPTCHA_HMAC_SECRET` is required and must contain at least 32 characters.
-- Application Redis lifecycle connection/disconnection is managed by `RedisService`.
-- Local Redis connection is verified with `PING -> PONG`.
+## Foundation history
+The reusable authentication/account/admin/frontend foundation remains complete and green:
+- configurable authentication and registration;
+- rotating sessions;
+- required password change;
+- custom Redis-backed CAPTCHA;
+- users administration;
+- RBAC roles/permissions;
+- security configuration / reauthentication / idle lock;
+- secure USER impersonation boundary;
+- Dark Neo ADMIN and USER portal shell;
+- role-aware login routing;
+- USER dashboard/profile;
+- canonical FixTradeZone logo and shared sign-out behavior.
 
-## Database Migration State
-
-Applied and verified locally:
-
-- `0001_foundation_auth_rbac`
-- `0002_auth_sessions`
-- `0003_user_impersonation`
-- `0004_security_configuration`
-- `0005_configurable_auth_registration`
-
-Migration `0005_configurable_auth_registration` verified:
-
-- `users.username` is required and unique.
-- `users.email` is nullable and indexed without a direct unique constraint.
-- `users.phone` is nullable and indexed without a direct unique constraint.
-- `users.phoneVerifiedAt` exists.
-- `users.mustChangePassword` exists.
-- `user_identifier_claims` exists.
-- `system_auth_config` exists.
-- `system_registration_config` exists.
-- `system_sequences` exists.
-- Authentication and registration singleton defaults are seeded.
-- Existing EMAIL/MOBILE claims were backfilled.
-
-No additional FixTradeZone application/shadow/test database was created.
-
-## Local Verification Status
-
-Backend:
-
-- 23 test suites pass.
-- 124 tests pass.
-- NestJS production build passes.
-- Feature-only ESLint passes.
-- `git diff --check` passes.
-- Prisma migration `0005` is locally applied and verified.
-- Redis connectivity is locally verified.
-- Postman Configurable Auth / Registration / CAPTCHA APIs are GREEN.
-
-## Security Boundaries Preserved
-
-- APIs remain deny-by-default.
-- Only explicitly public endpoints bypass the global JWT guard.
-- RBAC remains backend-authoritative.
-- SUPER_ADMIN founder protections remain intact.
-- Configuration mutation remains SUPER_ADMIN-only.
-- JWT identity is not coupled to mutable email/mobile identifiers.
-- Plaintext passwords are never stored.
-- CAPTCHA answers are never stored in plaintext.
-- Refresh-token hashes remain non-reversible.
-- Impersonation boundaries remain isolated.
-- Financial security rules remain unchanged.
-- Simulated trade activity must remain explicitly labeled as simulated.
+Historical detail is retained in `CHANGELOG.md`, `PROJECT-CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `DATABASE.md`, `SECURITY.md` and `API-CONTRACT.md`.
 
 ## Immediate Next Actions
-
-1. Inventory the merged reusable platform foundation.
-2. Identify and remove FixTradeZone-specific coupling from reusable core candidates.
-3. Define the exact reusable-core copy manifest.
-4. Run complete local verification from the merged mainline.
-5. Freeze and copy the approved foundation into `canzone-platform-core`.
-6. Verify the reusable core independently.
-7. Return to FixTradeZone and begin the Packages vertical slice.
+1. Integrate `feature/mlm-referral-frontend` back into `feature/mlm-referral-foundation` by fast-forward only.
+2. On local machine, switch to the foundation branch and run `npm run verify:milestone` from the integrated branch state.
+3. Do not repeat the already-green browser journey unless the integration commit changes executable code; a branch-pointer-only fast-forward does not invalidate the accepted UI/API evidence.
+4. Update the Work/Codex handoff checkpoint.
+5. Prepare the next business-domain slice in Work/Codex using the existing locked MLM rules; no dependent implementation should proceed until any new ambiguous business semantics are explicitly locked.
+6. Open the single MLM referral PR to `main` only when the final integrated foundation branch gate is green.
 
 ## Constraints
-
-- Never create extra FixTradeZone application databases.
+- Never create extra FixTradeZone application databases without explicit approval.
 - Never use Prisma `migrate dev` without explicit shadow-database approval.
-- Never expose secrets, CAPTCHA HMAC secrets, tokens, or password material.
+- Never expose secrets, tokens, password material or CAPTCHA HMAC secrets.
 - Never weaken JWT/RBAC/audit/security invariants through configuration.
 - Never auto-credit deposits from TXID submission alone.
 - Never represent simulated trades/results as real.
-
-## Foundation Completion Checkpoint — 2026-08-24
-
-FixTradeZone platform foundation is COMPLETE and locally verified.
-
-### Authentication and account foundation
-- JWT access + rotating refresh sessions operational.
-- Secure Next.js BFF session boundary with HttpOnly/SameSite cookies.
-- Login supports configured identifier modes.
-- Public registration and configurable registration policy operational.
-- Required-password-change flow operational.
-- Custom CAPTCHA foundation operational.
-- SUPER_ADMIN, ADMIN and USER role-aware authentication operational.
-
-### Administration foundation
-- SUPER_ADMIN founder authority operational.
-- ADMIN role and permission-aware navigation operational.
-- Users administration operational.
-- RBAC roles and permissions console operational.
-- Security configuration, idle lock and reauthentication operational.
-- Secure USER impersonation with isolated authentication boundary operational.
-
-### Protected frontend foundation
-- Approved FixTradeZone Dark Neo design system shared by ADMIN and USER portals.
-- ADMIN dashboard operational.
-- Native USER dashboard operational at /user/dashboard.
-- USER profile operational at /user/profile.
-- ADMIN/SUPER_ADMIN login routes to /dashboard.
-- Standard USER login routes to /user/dashboard.
-- Dedicated /api/user/session rejects administrator identities.
-- Admin session boundary rejects standard USER identities.
-- Canonical FixTradeZone hex/cube logo locked project-wide.
-- Shared authenticated Sign Out action locked for ADMIN and USER portals.
-
-### Verification
-- Postman MASTER v10 role-aware USER/admin flow: GREEN.
-- Browser ADMIN and USER login/routing verification: GREEN.
-- Admin ESLint: GREEN.
-- Next.js 16.3.1 production build: GREEN.
-- Backend Jest: 23/23 suites, 126/126 tests passed.
-- NestJS production build: GREEN.
-- git diff --check: GREEN.
-
-### Next development phase
-Foundation work is frozen after merge. The next business-domain phase is MLM / Referral development, beginning with referral/sponsor relationship integrity before commissions or wallet credits.
+- Do not bypass failed gates to obtain a green result.

@@ -66,6 +66,8 @@ const sections: Array<{
         href: "/referrals",
         label: "Referrals",
         icon: "iconoir-community",
+        permission: "referrals.sponsor.manage",
+        enabled: true,
       },
       {
         href: "/simulated-trades",
@@ -99,7 +101,6 @@ const sections: Array<{
 
 export default function Startbar() {
   const pathname = usePathname();
-
   const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
@@ -153,11 +154,7 @@ export default function Startbar() {
                     return true;
                   }
 
-                  if (!item.enabled) {
-                    return false;
-                  }
-
-                  if (!item.permission) {
+                  if (!item.enabled || !item.permission) {
                     return false;
                   }
 
@@ -175,8 +172,7 @@ export default function Startbar() {
 
                 {visibleItems.map((item) => {
                   const active =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                    pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                   if (!item.enabled) {
                     return (
@@ -215,7 +211,6 @@ export default function Startbar() {
 
           <div>
             <strong>{isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}</strong>
-
             <small>{isSuperAdmin ? "All Access" : "RBAC Access"}</small>
           </div>
 

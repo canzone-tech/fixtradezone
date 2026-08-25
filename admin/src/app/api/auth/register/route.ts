@@ -9,6 +9,7 @@ interface RegisterBody {
   phone?: string;
   firstName?: string;
   lastName?: string;
+  referralCode?: string;
   captchaId?: string;
   captchaAnswer?: string;
 }
@@ -23,6 +24,47 @@ function optionalString(value: unknown, maxLength: number): string | undefined {
   }
 
   return value;
+}
+
+function referralCodeFromRequest(
+  request: NextRequest,
+  source: Record<string, unknown>,
+): string | undefined {
+  const explicit = optionalString(source.referralCode, 64)?.trim();
+
+  if (explicit) {
+    return explicit;
+  }
+
+  const referer = request.headers.get("referer");
+
+  if (!referer) {
+    return undefined;
+  }
+
+  let refererUrl: URL;
+
+  try {
+    refererUrl = new URL(referer);
+  } catch {
+    return undefined;
+  }
+
+  if (refererUrl.origin !== request.nextUrl.origin) {
+    return undefined;
+  }
+
+  const referralCode = refererUrl.searchParams.get("ref")?.trim();
+
+  if (!referralCode) {
+    return undefined;
+  }
+
+  if (referralCode.length > 64) {
+    throw new Error("Invalid registration request.");
+  }
+
+  return referralCode;
 }
 
 export async function POST(request: NextRequest) {
@@ -52,6 +94,7 @@ export async function POST(request: NextRequest) {
       phone: optionalString(source.phone, 16),
       firstName: optionalString(source.firstName, 100),
       lastName: optionalString(source.lastName, 100),
+      referralCode: referralCodeFromRequest(request, source),
       captchaId: optionalString(source.captchaId, 128),
       captchaAnswer: optionalString(source.captchaAnswer, 32),
     };

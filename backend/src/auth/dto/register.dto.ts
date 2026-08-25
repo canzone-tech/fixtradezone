@@ -56,6 +56,16 @@ export class RegisterDto {
   @IsString()
   @Length(1, 100)
   lastName?: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toUpperCase() : value,
+  )
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(64)
+  referralCode?: string;
+
   @Transform(trimString)
   @IsOptional()
   @IsString()

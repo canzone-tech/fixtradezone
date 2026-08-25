@@ -32,6 +32,34 @@ enum UsernameCreationMode {
   AUTO_OR_MANUAL
 }
 
+enum ReferralAssignmentStatus {
+  ROOT
+  ASSIGNED
+  UNASSIGNED
+}
+
+enum ReferralCodeMode {
+  SYSTEM_RANDOM
+  USERNAME
+  CUSTOM_PREFIX_RANDOM
+  CUSTOM_PATTERN
+}
+
+enum ExistingUserReferralMigrationMode {
+  ASSIGN_DEFAULT_SPONSOR
+  LEAVE_UNASSIGNED_FOR_REVIEW
+  REQUIRE_EXPLICIT_MAPPING
+}
+
+enum ReferralSponsorChangeSource {
+  REGISTRATION
+  DEFAULT_SPONSOR
+  MANUAL_ASSIGNMENT
+  MANUAL_REASSIGNMENT
+  MIGRATION
+  ROOT_CONFIGURATION
+}
+
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -82,6 +110,16 @@ model User {
   authConfigUpdates         SystemAuthConfig[]         @relation("AuthConfigUpdater")
   registrationConfigUpdates SystemRegistrationConfig[] @relation("RegistrationConfigUpdater")
   identifierClaims          UserIdentifierClaim[]
+
+  referralProfile               ReferralProfile?         @relation("ReferralProfileOwner")
+  sponsoredReferralProfiles     ReferralProfile[]        @relation("ReferralProfileSponsor")
+  referralChangesAsMember       ReferralSponsorHistory[] @relation("ReferralHistoryMember")
+  referralChangesAsOldSponsor   ReferralSponsorHistory[] @relation("ReferralHistoryOldSponsor")
+  referralChangesAsNewSponsor   ReferralSponsorHistory[] @relation("ReferralHistoryNewSponsor")
+  referralChangesAsActor        ReferralSponsorHistory[] @relation("ReferralHistoryActor")
+  referralPrimaryRootConfigs    SystemReferralConfig[]   @relation("ReferralPrimaryRoot")
+  referralDefaultSponsorConfigs SystemReferralConfig[]   @relation("ReferralDefaultSponsor")
+  referralConfigUpdates         SystemReferralConfig[]   @relation("ReferralConfigUpdater")
 
   @@index([status])
   @@index([createdAt])
@@ -272,6 +310,72 @@ model SystemRegistrationConfig {
 
   @@index([updatedByUserId])
   @@map("system_registration_config")
+}
+
+model ReferralProfile {
+  userId           String                   @id @db.Char(36)
+  referralCode     String                   @unique @db.VarChar(64)
+  sponsorUserId    String?                  @db.Char(36)
+  assignmentStatus ReferralAssignmentStatus @default(UNASSIGNED)
+  assignedAt       DateTime?                @db.DateTime(3)
+  createdAt        DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt        DateTime                 @updatedAt @db.DateTime(3)
+
+  user    User  @relation("ReferralProfileOwner", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  sponsor User? @relation("ReferralProfileSponsor", fields: [sponsorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([sponsorUserId])
+  @@index([assignmentStatus])
+  @@index([createdAt])
+  @@map("referral_profiles")
+}
+
+model ReferralSponsorHistory {
+  id               String                      @id @default(uuid()) @db.Char(36)
+  memberUserId     String                      @db.Char(36)
+  oldSponsorUserId String?                     @db.Char(36)
+  newSponsorUserId String?                     @db.Char(36)
+  changedByUserId  String?                     @db.Char(36)
+  source           ReferralSponsorChangeSource
+  reason           String?                     @db.VarChar(500)
+  metadata         Json?
+  createdAt        DateTime                    @default(now()) @db.DateTime(3)
+
+  member     User  @relation("ReferralHistoryMember", fields: [memberUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  oldSponsor User? @relation("ReferralHistoryOldSponsor", fields: [oldSponsorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  newSponsor User? @relation("ReferralHistoryNewSponsor", fields: [newSponsorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  changedBy  User? @relation("ReferralHistoryActor", fields: [changedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([memberUserId, createdAt])
+  @@index([oldSponsorUserId])
+  @@index([newSponsorUserId])
+  @@index([changedByUserId])
+  @@index([source])
+  @@map("referral_sponsor_history")
+}
+
+model SystemReferralConfig {
+  id                        Int                                @id @default(1)
+  enrollmentEnabled         Boolean                            @default(false)
+  existingUserMigrationMode ExistingUserReferralMigrationMode @default(LEAVE_UNASSIGNED_FOR_REVIEW)
+  referralCodeMode          ReferralCodeMode                   @default(SYSTEM_RANDOM)
+  referralCodePrefix        String?                            @db.VarChar(20)
+  referralCodePattern       String?                            @db.VarChar(100)
+  adminSponsorChangeEnabled Boolean                            @default(false)
+  primaryRootUserId         String?                            @db.Char(36)
+  defaultSponsorUserId      String?                            @db.Char(36)
+  updatedByUserId           String?                            @db.Char(36)
+  createdAt                 DateTime                           @default(now()) @db.DateTime(3)
+  updatedAt                 DateTime                           @updatedAt @db.DateTime(3)
+
+  primaryRoot    User? @relation("ReferralPrimaryRoot", fields: [primaryRootUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  defaultSponsor User? @relation("ReferralDefaultSponsor", fields: [defaultSponsorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  updatedBy      User? @relation("ReferralConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([primaryRootUserId])
+  @@index([defaultSponsorUserId])
+  @@index([updatedByUserId])
+  @@map("system_referral_config")
 }
 
 model SystemSequence {

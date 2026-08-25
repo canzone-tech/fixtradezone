@@ -3,9 +3,11 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from './auth.constants';
 import {
@@ -55,6 +57,7 @@ export class RegistrationService {
     private readonly prisma: PrismaService,
     private readonly passwordService: PasswordService,
     private readonly rbacBootstrapService: RbacBootstrapService,
+    @Optional() private readonly referralsService?: ReferralsService,
   ) {}
 
   registerPublic(dto: RegisterDto, context: RequestContext = {}) {
@@ -63,9 +66,7 @@ export class RegistrationService {
 
   async getPublicRegistrationPolicy() {
     const config = await this.prisma.systemRegistrationConfig.findUnique({
-      where: {
-        id: 1,
-      },
+      where: { id: 1 },
     });
 
     return {
@@ -96,9 +97,7 @@ export class RegistrationService {
       return await this.prisma.$transaction(
         async (transaction) => {
           const config = await transaction.systemRegistrationConfig.findUnique({
-            where: {
-              id: 1,
-            },
+            where: { id: 1 },
           });
 
           const policy: RegistrationConfig = {
@@ -122,17 +121,13 @@ export class RegistrationService {
           };
 
           const source = this.assertRegistrationAllowed(actor, policy);
-
           this.assertRequiredIdentifiers(dto, policy);
 
           const passwordResult = this.resolvePassword(dto, policy);
-
           const passwordHash = await this.passwordService.hash(
             passwordResult.password,
           );
-
           const username = await this.resolveUsername(transaction, dto, policy);
-
           const defaultRole =
             await this.rbacBootstrapService.ensureDefaultUserRole(transaction);
 
@@ -149,9 +144,7 @@ export class RegistrationService {
               roles: {
                 create: {
                   role: {
-                    connect: {
-                      id: defaultRole.id,
-                    },
+                    connect: { id: defaultRole.id },
                   },
                 },
               },
@@ -179,6 +172,14 @@ export class RegistrationService {
             });
           }
 
+          const referralEnrollment = this.referralsService
+            ? await this.referralsService.enrollRegisteredUser(
+                transaction,
+                { id: user.id, username: user.username },
+                dto.referralCode,
+              )
+            : null;
+
           await transaction.auditLog.create({
             data: {
               actorUserId: actor?.id ?? user.id,
@@ -204,6 +205,7 @@ export class RegistrationService {
           return {
             message: 'Registration successful.',
             user: toAuthenticatedUser(user),
+            ...(referralEnrollment ? { referral: referralEnrollment } : {}),
             ...(passwordResult.generated
               ? {
                   temporaryPassword: passwordResult.password,
@@ -212,9 +214,7 @@ export class RegistrationService {
               : {}),
           };
         },
-        {
-          isolationLevel: 'Serializable',
-        },
+        { isolationLevel: 'Serializable' },
       );
     } catch (error: unknown) {
       if (hasPrismaErrorCode(error, 'P2002')) {
@@ -237,7 +237,6 @@ export class RegistrationService {
           'Public registration is currently disabled.',
         );
       }
-
       return 'SELF_REGISTRATION';
     }
 
@@ -247,7 +246,6 @@ export class RegistrationService {
           'SUPER_ADMIN registration is currently disabled.',
         );
       }
-
       return 'SUPER_ADMIN';
     }
 
@@ -257,7 +255,6 @@ export class RegistrationService {
           'ADMIN registration is currently disabled.',
         );
       }
-
       return 'ADMIN';
     }
 
@@ -282,7 +279,6 @@ export class RegistrationService {
         'Email is required by the current registration policy.',
       );
     }
-
     if (config.mobileRequired && !dto.phone) {
       throw new BadRequestException(
         'Mobile number is required by the current registration policy.',
@@ -293,17 +289,13 @@ export class RegistrationService {
   private resolvePassword(
     dto: RegisterDto,
     config: RegistrationConfig,
-  ): {
-    password: string;
-    generated: boolean;
-  } {
+  ): { password: string; generated: boolean } {
     if (config.passwordMode === 'AUTO') {
       if (dto.password !== undefined) {
         throw new BadRequestException(
           'Manual password entry is disabled by the current registration policy.',
         );
       }
-
       return {
         password: this.passwordService.generateTemporaryPassword(),
         generated: true,
@@ -316,18 +308,11 @@ export class RegistrationService {
           'Password is required by the current registration policy.',
         );
       }
-
-      return {
-        password: dto.password,
-        generated: false,
-      };
+      return { password: dto.password, generated: false };
     }
 
     if (dto.password) {
-      return {
-        password: dto.password,
-        generated: false,
-      };
+      return { password: dto.password, generated: false };
     }
 
     return {
@@ -349,7 +334,6 @@ export class RegistrationService {
           'Username is required by the current registration policy.',
         );
       }
-
       return suppliedUsername;
     }
 
@@ -359,14 +343,12 @@ export class RegistrationService {
           'Manual username entry is disabled by the current registration policy.',
         );
       }
-
       return this.generateUsername(transaction, config);
     }
 
     if (suppliedUsername) {
       return suppliedUsername;
     }
-
     return this.generateUsername(transaction, config);
   }
 
@@ -375,9 +357,7 @@ export class RegistrationService {
     config: RegistrationConfig,
   ): Promise<string> {
     await transaction.systemSequence.upsert({
-      where: {
-        key: USERNAME_SEQUENCE_KEY,
-      },
+      where: { key: USERNAME_SEQUENCE_KEY },
       create: {
         key: USERNAME_SEQUENCE_KEY,
         nextValue: USERNAME_SEQUENCE_START,
@@ -397,7 +377,6 @@ export class RegistrationService {
     }
 
     let nextValue = BigInt(rows[0].nextValue);
-
     const prefix = config.usernamePrefixEnabled
       ? (config.usernamePrefix ?? '').trim().toLowerCase()
       : '';
@@ -408,7 +387,6 @@ export class RegistrationService {
 
     for (let attempt = 0; attempt < AUTO_USERNAME_ATTEMPTS; attempt += 1) {
       const candidate = `${prefix}${nextValue.toString()}`;
-
       nextValue += 1n;
 
       if (candidate.length > 100) {
@@ -416,24 +394,15 @@ export class RegistrationService {
       }
 
       const existing = await transaction.user.findUnique({
-        where: {
-          username: candidate,
-        },
-        select: {
-          id: true,
-        },
+        where: { username: candidate },
+        select: { id: true },
       });
 
       if (!existing) {
         await transaction.systemSequence.update({
-          where: {
-            key: USERNAME_SEQUENCE_KEY,
-          },
-          data: {
-            nextValue,
-          },
+          where: { key: USERNAME_SEQUENCE_KEY },
+          data: { nextValue },
         });
-
         return candidate;
       }
     }

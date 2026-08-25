@@ -5,6 +5,7 @@ export const PERMISSIONS = {
   USERS_STATUS_MANAGE: 'users.status.manage',
   USERS_ROLES_MANAGE: 'users.roles.manage',
   USERS_IMPERSONATE: 'users.impersonate',
+  REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -33,6 +34,10 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.USERS_IMPERSONATE,
     description: 'Temporarily access an eligible user account for support',
+  },
+  {
+    code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
+    description: 'Assign and exceptionally reassign referral sponsors',
   },
   {
     code: PERMISSIONS.RBAC_READ,

@@ -1,0 +1,6 @@
+# Generated code is owned by Prisma and must not be reformatted by project tooling.
+src/generated/prisma/
+
+# Build/test outputs.
+dist/
+coverage/
