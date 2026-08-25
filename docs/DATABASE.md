@@ -1,6 +1,7 @@
 # FixTradeZone — Database Standards & Current State
 
 ## Single Application Database
+
 - Host: 127.0.0.1
 - Port: 3306
 - Database: `fixtradezone`
@@ -10,6 +11,7 @@
 Do not create additional application databases.
 
 ## Prisma
+
 - Prisma: 7.9.1
 - Generator: `prisma-client`
 - Output: `src/generated/prisma`
@@ -20,6 +22,7 @@ Do not create additional application databases.
 - Local adapter currently uses `allowPublicKeyRetrieval=true`, connectionLimit=10, connectTimeout=5000, acquireTimeout=10000.
 
 ## Conventions
+
 - UUID IDs stored as CHAR(36)
 - UTC timestamps
 - createdAt + updatedAt
@@ -33,6 +36,7 @@ Do not create additional application databases.
 ## Initial Auth/RBAC Schema
 
 Models:
+
 - User
 - Role
 - Permission
@@ -42,28 +46,36 @@ Models:
 - AuthSession
 
 ### User
+
 id, email unique, username optional unique, phone optional unique, passwordHash, firstName, lastName, status (ACTIVE/SUSPENDED/BLOCKED/PENDING), emailVerifiedAt, lastLoginAt, createdAt, updatedAt.
 
 ### Role
+
 name unique, description, status (ACTIVE/INACTIVE).
 
 ### Permission
+
 code unique, description.
 
 ### UserRole
+
 Composite primary key userId + roleId, assignedAt.
 
 ### RolePermission
+
 Composite primary key roleId + permissionId.
 
 ### AuditLog
+
 actorUserId nullable, action enum:
 CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, SUSPEND, ACTIVATE, BLOCK, UNBLOCK, PASSWORD_CHANGE, ROLE_CHANGE, PERMISSION_CHANGE; plus entityType, entityId, description, metadata JSON, IP, userAgent, createdAt.
 
 ### AuthSession
+
 id (also used as refresh JWT `jti`), userId, SHA-256 refreshTokenHash unique, expiresAt, revokedAt, revocationReason, rotatedToSessionId, createdAt, updatedAt. Raw refresh tokens are never stored.
 
 ### FK behaviors
+
 - user -> user_roles: CASCADE
 - user_roles -> role: RESTRICT
 - role_permissions -> role/permission: CASCADE
@@ -77,6 +89,7 @@ id (also used as refresh JWT `jti`), userId, SHA-256 refreshTokenHash unique, ex
 On 2026-08-18 it was applied with `prisma migrate deploy` to the local development MySQL `fixtradezone` database after a pre-apply database dump.
 
 Verification confirmed:
+
 - Prisma reports the database schema is up to date.
 - `_prisma_migrations` records `0001_foundation_auth_rbac` as finished, not rolled back, with one applied step.
 - `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, and `audit_logs` exist.
@@ -94,6 +107,7 @@ tracked separately below.
 The API idempotently upserts the default `USER` role as an active system invariant. Registration also ensures that role inside the same transaction used to create the user and audit event.
 
 Local Postman and SQL verification confirmed:
+
 - a new user is created with `PENDING` status;
 - the password is stored as an Argon2id hash;
 - the `USER` role is assigned through `user_roles`;
@@ -208,6 +222,7 @@ no price, rate, cap, duration or other commercial term.
 ### PackagePlanVersion
 
 `package_plan_versions` stores:
+
 - unique integer version number and `DRAFT`/`PUBLISHED` status;
 - whole-plan optimistic `revision`;
 - active-package mode/basis;
@@ -219,6 +234,7 @@ no price, rate, cap, duration or other commercial term.
 ### PackagePlanItem
 
 `package_plan_items` stores versioned typed terms:
+
 - definition, display name, slug, sort order and availability;
 - `DECIMAL(20,8)` price and explicit `USDT` currency;
 - rate mode plus nullable `DECIMAL(9,6)` fixed/min/max percentage fields;
@@ -231,6 +247,7 @@ percentage bounds, USDT currency, positive durations and cycle not exceeding
 goal.
 
 The migration seeds:
+
 - nine stable package definitions;
 - V1 as an intentionally unpublished revision-1 draft;
 - the nine Founder-approved initial items;
@@ -239,7 +256,8 @@ The migration seeds:
 It does not create `UserPackage`, balances, earnings, cap consumption, deposits
 or ledger records.
 
-Source/schema/static gates are GREEN in the Work checkpoint. Local deployment,
-migration-status verification, Postman acceptance and SQL readback remain
-required under `docs/LOCAL-VERIFY-PACKAGES.md` before this migration is recorded
-as locally accepted.
+Source/schema/static gates are GREEN. The operator took a verified pre-0007
+backup, deployed `0007_package_plan_foundation`, and confirmed seven migrations
+with the local schema up to date through `npm run verify:milestone`. The ordered
+Postman mutation/readback and final SQL/audit acceptance remain required under
+`docs/LOCAL-VERIFY-PACKAGES.md` before PKG-01 is accepted end to end.

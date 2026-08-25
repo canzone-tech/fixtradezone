@@ -1,6 +1,6 @@
 # FixTradeZone — Changelog
 
-## 2026-08-25 — PKG-01 backend checkpoint (local DB/API acceptance pending)
+## 2026-08-25 — PKG-01 full-slice checkpoint (combined acceptance pending)
 
 - Founder approved Q33–Q39 Option A and all proposed PKG-01 safe defaults.
 - Added the canonical Packages / Plan Foundation implementation contract.
@@ -13,15 +13,28 @@
   protection.
 - Added `packages.read` and `packages.draft.manage` without granting either to
   ADMIN by default.
-- Added protected USER/admin package APIs and 16 focused DTO/service tests.
+- Added protected USER/admin package APIs and focused DTO/service tests.
 - Added the ordered 13-request PKG-01 Postman collection and local migration/SQL
   verification guide.
-- Work checkout static gate: Prisma schema valid/generated; backend 26 suites / 145
-  tests, formatting, ESLint and Nest production build GREEN.
-- Local `db:deploy`, `verify:milestone`, Postman and SQL acceptance remain
-  mandatory before any package BFF/UI implementation.
+- Operator deployed migration 0007 after a verified backup; seven migrations and
+  local milestone status were GREEN.
+- Corrected transformed partial item updates so omitted rate terms are preserved,
+  omitted fields do not pollute audit metadata, and reason-only writes are
+  rejected without revision changes.
+- Added a v13 MASTER Postman collection derived from the working v12 environment
+  contract and hardened request-05 failure handling.
+- Added same-origin package BFF routes, no-store responses and shared admin
+  session resolution without exposing access/refresh tokens to browser code.
+- Added the permission-aware Dark Neo `/packages` plan workspace and protected
+  `/user/packages` effective catalogue/safe-empty experience.
+- Work checkout automated gate: Prisma valid/generated; backend 26 suites / 148
+  tests, formatting, ESLint and Nest build GREEN; admin lint, typecheck and
+  44-route Next.js production build GREEN.
+- Full Postman, SQL/audit and integrated browser acceptance remain mandatory
+  before push/PR completion.
 
 ## 2026-08-23
+
 - Merged PR #11 (`feature/configurable-auth-registration`) into `main` at `0c2795d`.
 - Started `feature/foundation-freeze-checkpoint` to inventory, sanitize, freeze, and independently verify the reusable platform core before Packages.
 - Added SUPER_ADMIN-controlled configurable username/email/mobile login methods with invariant enforcement.
@@ -42,6 +55,7 @@
 - Verified Configurable Auth, Registration, required-password-change, and CAPTCHA flows locally through Postman.
 
 ## 2026-08-21
+
 - Started the secure user-impersonation vertical slice on `agent/user-impersonation`.
 - Added `users.impersonate` RBAC authority and eligible ordinary-USER impersonation controls.
 - Added migration `0003_user_impersonation` with persisted/audited impersonation sessions and start/stop audit actions.
@@ -60,6 +74,7 @@
 - Verified backend tests/build, Postman security/session flows, admin lint/build, browser UI behavior, and whitespace checks locally.
 
 ## 2026-08-20
+
 - Merged PR #8, establishing the secure Dark Neo admin console foundation.
 - Locked the approved dashboard/global admin design and shared protected application shell.
 - Added and approved the `/rbac` Roles & Permissions console.
@@ -70,6 +85,7 @@
 - Verified admin lint and Next.js production build with the RBAC route.
 
 ## 2026-08-19
+
 - Started the focused auth-session + admin-shell vertical slice on `agent/auth-session-admin-foundation`.
 - Added Login with generic credential errors, Argon2 verification, ACTIVE-status enforcement, short-lived access tokens, persisted refresh sessions, last-login update, and audit logging.
 - Added rotating refresh tokens, concurrent/reused-token response, logout revocation, and protected `GET /auth/me` with a fresh MySQL user/status/RBAC lookup.
@@ -88,6 +104,7 @@
 - Generated the admin lockfile; backend lint/build and 36 tests pass, while admin lint/build and production dependency audit pass.
 
 ## 2026-08-18
+
 - Added persistent project documentation under `docs/`.
 - Established repository documentation as the project source of truth for cross-chat continuity.
 - NestJS backend established.

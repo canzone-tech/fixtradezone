@@ -1,12 +1,15 @@
 # FixTradeZone — API Contract & Testing
 
 ## Development Base URL
+
 `http://localhost:3000`
 
 ## Current Public Endpoint
+
 `GET /health`
 
 Expected shape:
+
 ```json
 {
   "status": "ok",
@@ -19,12 +22,14 @@ Expected shape:
 ```
 
 ## JWT Rule
+
 Protected endpoints use:
 `Authorization: Bearer {{accessToken}}`
 
 Access JWTs use HS256, the `fixtradezone-api` issuer, the `fixtradezone-clients` audience, and a persisted session ID. Refresh JWTs use the separate refresh secret and `fixtradezone-sessions` audience.
 
 ## Auth Endpoint Status
+
 - `POST /auth/register` — implemented and locally verified
 - `POST /auth/login` — implemented and locally verified
 - `POST /auth/refresh` — implemented and locally verified
@@ -46,20 +51,20 @@ All DTO-backed request bodies reject unknown fields.
   "email": "user@example.com",
   "password": "a-password-of-at-least-12-characters",
   "username": "trader.one",
-  "phone": "+919876543210",
+  "phone": "{{userPhoneE164}}",
   "firstName": "Prashant",
   "lastName": "Shukla"
 }
 ```
 
-| Field | Required | Validation |
-|---|---:|---|
-| `email` | Yes | Valid email, maximum 191 characters; trimmed and lowercased |
-| `password` | Yes | String, 12–128 characters; never trimmed or normalized |
-| `username` | No | 3–30 characters; lowercase letters, numbers, period, underscore, or hyphen |
-| `phone` | No | E.164 format |
-| `firstName` | No | Trimmed string, 1–100 characters |
-| `lastName` | No | Trimmed string, 1–100 characters |
+| Field       | Required | Validation                                                                 |
+| ----------- | -------: | -------------------------------------------------------------------------- |
+| `email`     |      Yes | Valid email, maximum 191 characters; trimmed and lowercased                |
+| `password`  |      Yes | String, 12–128 characters; never trimmed or normalized                     |
+| `username`  |       No | 3–30 characters; lowercase letters, numbers, period, underscore, or hyphen |
+| `phone`     |       No | E.164 format                                                               |
+| `firstName` |       No | Trimmed string, 1–100 characters                                           |
+| `lastName`  |       No | Trimmed string, 1–100 characters                                           |
 
 A successful registration returns HTTP 201 with a safe user projection, `PENDING` status, and the assigned `USER` role. Passwords and password hashes are never returned.
 
@@ -90,7 +95,7 @@ A successful login returns HTTP 200:
     "id": "<uuid>",
     "email": "user@example.com",
     "username": "trader.one",
-    "phone": "+919876543210",
+    "phone": "{{userPhoneE164}}",
     "firstName": "Prashant",
     "lastName": "Shukla",
     "status": "ACTIVE",
@@ -142,7 +147,7 @@ Successful response:
     "id": "<uuid>",
     "email": "user@example.com",
     "username": "trader.one",
-    "phone": "+919876543210",
+    "phone": "{{userPhoneE164}}",
     "firstName": "Prashant",
     "lastName": "Shukla",
     "status": "ACTIVE",
@@ -208,23 +213,28 @@ Requires normal authenticated access and verifies the submitted password against
 During USER impersonation, idle-lock unlock reauthenticates the preserved original ADMIN/SUPER_ADMIN actor session rather than the selected USER.
 
 ## Planned Core Areas
+
 Users, Admin, Packages, AI Agents, Deposits, Wallet/Ledger, Referrals, Commissions, Rewards, Simulated Trades, CMS.
 
 ## Postman
+
 Postman is installed and configured. Health and Register are verified. During local feature validation, Login must save `accessToken` and `refreshToken`, Refresh must replace both variables, the previous refresh token must fail, Me must work with the new access token, and Logout must make the latest refresh token unusable.
 
 ## Configurable Authentication, Registration & CAPTCHA — 2026-08-23
 
 ### CAPTCHA
+
 `POST /auth/captcha`
 
 Supported purposes:
+
 - `LOGIN`
 - `REGISTRATION`
 
 When enabled, the endpoint returns an opaque challenge ID, SVG data URI, and a 180-second expiry. CAPTCHA answers are never returned or stored in plaintext.
 
 ### Login
+
 `POST /auth/login`
 
 Login now accepts a single `identifier` which may be username, email, or E.164 mobile according to SUPER_ADMIN configuration.
@@ -232,16 +242,19 @@ Login now accepts a single `identifier` which may be username, email, or E.164 m
 At least one login method must remain enabled. Multiple-account email/mobile modes require username-only login, and ambiguous email/mobile matches are rejected.
 
 ### Registration
+
 `POST /auth/register`
 
 Registration policy controls public/SUPER_ADMIN/ADMIN/authorized-USER registration, required identifiers, AUTO/MANUAL password mode, AUTO/MANUAL username mode, optional username prefix, and multiple-account behavior.
 
 ### Required Password Change
+
 `POST /auth/change-required-password`
 
 Automatically generated passwords are temporary. Successful temporary-password verification returns only a short-lived password-change token and does not establish a normal session.
 
 ### SUPER_ADMIN Configuration
+
 - `GET /admin/settings/authentication`
 - `PATCH /admin/settings/authentication`
 - `GET /admin/settings/registration`
@@ -380,6 +393,7 @@ at the successor's `effectiveFrom` in the same serializable transaction and
 audits both operations.
 
 Publication fails unless the approved package contract is satisfied, including:
+
 - USDT denomination;
 - `USER_NET_AFTER_SPLIT` displayed rate meaning;
 - `TOTAL_RETURN` plus `INCLUDED_IN_TOTAL_RETURN`;
@@ -395,6 +409,34 @@ Publication fails unless the approved package contract is satisfied, including:
 - HTTP 409 — stale revision, immutable published terms, duplicate item values,
   overlapping plan ranges or concurrent serializable write conflict.
 
+### Same-Origin Package BFF
+
+Browser code never receives a NestJS bearer or refresh token. The Next.js
+server forwards the existing HttpOnly-cookie session through these no-store
+routes:
+
+USER:
+
+- `GET /api/user/packages` -> `GET /packages`
+
+ADMIN/SUPER_ADMIN:
+
+- `GET /api/admin/package-plans`
+- `POST /api/admin/package-plans/drafts`
+- `GET|PATCH /api/admin/package-plans/:planVersionId`
+- `POST /api/admin/package-plans/:planVersionId/items`
+- `PATCH /api/admin/package-plans/:planVersionId/items/:itemId`
+- `POST /api/admin/package-plans/:planVersionId/publish`
+
+The ADMIN `/packages` workspace resolves the shared browser session before any
+dependent package request and enforces UI visibility for `packages.read` and
+`packages.draft.manage`; NestJS remains authoritative. The USER
+`/user/packages` route resolves the USER session first, renders the explicit
+empty response before publication, and never renders a purchase/activation
+control while `activationAvailable` is false.
+
 The mandatory local runner is
-`postman/FixTradeZone-PKG-01.postman_collection.json`; acceptance instructions
-are in `docs/LOCAL-VERIFY-PACKAGES.md`.
+`postman/FixTradeZone-PKG-01.postman_collection.json`. The v12-compatible MASTER
+runner is
+`postman/FixTradeZone-Local-API-MASTER-v13-PKG-01-FINAL-v2-ENV.postman_collection.json`;
+acceptance instructions are in `docs/LOCAL-VERIFY-PACKAGES.md`.

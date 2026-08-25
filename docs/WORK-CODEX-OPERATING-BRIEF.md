@@ -1,11 +1,13 @@
 # FixTradeZone Work / Codex Operating Brief
 
 ## Purpose
+
 This is the canonical handoff brief for continuing FixTradeZone through ChatGPT Work, Codex, or normal Chat without losing architecture, delivery discipline, or repository continuity.
 
 GitHub repository + committed `docs/` are the permanent source of truth. Work and Codex are acceleration layers, not sources of truth.
 
 ## Current checkpoint — 2026-08-25
+
 - MLM-01 Referral Foundation: COMPLETE.
 - PR #15 merged into `main`.
 - Main merge commit: `2a06487b23d2c9cb0bc2078e93bde6eba220c42d`.
@@ -18,12 +20,15 @@ GitHub repository + committed `docs/` are the permanent source of truth. Work an
 - Active next-slice branch: `feature/packages-foundation`.
 - PKG-01 Q33–Q39 Option A and all initial safe defaults: FOUNDER APPROVED.
 - Package contract commit: `79cd4a5`.
-- PKG-01 backend/schema/static gate: GREEN in Work (26 suites / 145 tests).
-- Local migration/Postman/SQL acceptance: PENDING.
-- Package BFF/UI: BLOCKED until that local API gate is accepted.
+- PKG-01 backend/schema/static gate: GREEN in Work (26 suites / 148 tests).
+- Local migration and milestone status: GREEN; seven migrations up to date.
+- Package BFF/UI implementation and production build: GREEN in Work.
+- Combined Postman/SQL/browser acceptance: PENDING.
 
 ## Accepted MLM-01 end-to-end proof
+
 The locally accepted referral flow proved:
+
 1. SUPER_ADMIN referral configuration loaded and saved through the UI.
 2. Fresh USER A registered and was activated.
 3. USER A showed `ASSIGNED` under the configured founder/root default sponsor.
@@ -36,6 +41,7 @@ The locally accepted referral flow proved:
 This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback for MLM-01.
 
 ## Next slice — Packages / Plan Foundation
+
 Packages comes before commissions/rewards because package state/config is required for matching bases, reward generation, caps, upgrades, renewals and deposit-triggered activation.
 
 ### Approved contract and active gate
@@ -44,17 +50,21 @@ The planning gate is complete. The implementation authority is
 `docs/PACKAGES-PLAN-FOUNDATION.md`, backed by Q33–Q39 in
 `docs/MLM-BUSINESS-RULES.md`.
 
-The backend checkpoint now contains migration `0007_package_plan_foundation`,
-the versioned package-plan APIs, RBAC/audit/publication protections, focused
-tests and `postman/FixTradeZone-PKG-01.postman_collection.json`.
+The slice now contains migration `0007_package_plan_foundation`, the versioned
+package-plan APIs, RBAC/audit/publication protections, focused tests, the
+same-origin BFF, Dark Neo ADMIN/USER package interfaces and the ordered Postman
+gate.
 
 Do not invent or credit earnings in this slice. Financial effects belong to
-later ledger-backed modules. Do not start package BFF/UI work until local
-migration, milestone, Postman and SQL acceptance are confirmed under
-`docs/LOCAL-VERIFY-PACKAGES.md`.
+later ledger-backed modules. The Founder explicitly authorized BFF/UI work while
+manual package verification is batched into one final pass. Do not push/open a
+PR or call PKG-01 accepted until Postman, SQL and browser checks are confirmed
+under `docs/LOCAL-VERIFY-PACKAGES.md`.
 
 ## Relevant locked MLM/business rules
+
 The persistent `docs/MLM-BUSINESS-RULES.md` remains authoritative. Important package-dependent rules already locked include:
+
 - referral levels/rates configurable;
 - matching base `MIN(receiver active package, downline package) * level %`;
 - matching enablement configurable by level;
@@ -76,7 +86,9 @@ The persistent `docs/MLM-BUSINESS-RULES.md` remains authoritative. Important pac
 If a new ambiguity blocks the Packages contract, continue the numbered business-question sequence before implementation rather than guessing.
 
 ## Poster/package defaults currently captured
+
 Treat these as configured product defaults, not hardcoded immutable business logic:
+
 - Neural Scout — $5 — 0.40–0.60% — 2X — max profit $5 — 90d
 - Voyager — $25 — 0.50–0.70% — 2X — max profit $25 — 90d
 - Navigator — $50 — 0.60–0.80% — 2X — max profit $50 — 90d
@@ -88,6 +100,7 @@ Treat these as configured product defaults, not hardcoded immutable business log
 - Sovereign — $5000 — 1.20–2.00% — 4X — max profit $15000 — 150d
 
 Captured trade-cycle defaults:
+
 - $5–24: 10d
 - $25–49: 15d
 - $50–99: 20d
@@ -101,6 +114,7 @@ Captured trade-cycle defaults:
 These defaults must be reconciled into a versioned package/rule configuration; do not hardcode calculations in controllers or UI.
 
 ## Locked delivery workflow
+
 1. Confirm business semantics before dependent implementation.
 2. Implement one focused production-ready vertical slice.
 3. Backend/API checkpoint may be tested during development.
@@ -114,6 +128,7 @@ These defaults must be reconciled into a versioned package/rule configuration; d
 Do not merge or open a PR merely because Codex/CI says green. Local verification remains the acceptance authority.
 
 ## Local verification commands
+
 Repository root:
 
 ```bash
@@ -129,6 +144,7 @@ npm run verify:milestone
 Database deploy is an explicit write operation, separate from verification.
 
 ## Branch discipline
+
 - Feature branches only.
 - Active next-slice branch: `feature/packages-foundation`.
 - Child branches may be used for frontend/backend work inside the same vertical slice.
@@ -137,6 +153,7 @@ Database deploy is an explicit write operation, separate from verification.
 - Keep meaningful checkpoints committed and pushed.
 
 ## Core architecture
+
 - Backend: NestJS + TypeScript.
 - ORM: Prisma 7.9.1 with MariaDB adapter.
 - Relational source of truth: MySQL.
@@ -150,6 +167,7 @@ Database deploy is an explicit write operation, separate from verification.
 - Health may be public; business/admin/user APIs remain protected.
 
 ## Security and financial invariants
+
 - Production-ready by default.
 - Never weaken validation, RBAC, auditability, data integrity, idempotency, maintainability, or financial safety for speed.
 - Financial calculations use SQL `DECIMAL`, immutable/auditable ledger patterns, idempotency, reversal entries and explicit permissions.
@@ -159,13 +177,16 @@ Database deploy is an explicit write operation, separate from verification.
 - Simulated activity must always be clearly labeled simulated; never present fake trades/profits as real.
 
 ## MLM-01 retained contract
+
 USER:
+
 - `GET /referrals/me`
 - `GET /referrals/me/direct?page=1&limit=20`
 - `/user/referrals`
 - `/user/dashboard` live referral summary
 
 ADMIN/SUPER_ADMIN:
+
 - `GET /admin/referrals/config`
 - `PATCH /admin/referrals/config`
 - `PATCH /admin/referrals/:userId/sponsor`
@@ -176,7 +197,9 @@ Registration accepts optional `referralCode`; same-origin invite links use `regi
 Existing-user referral migration remains `LEAVE_UNASSIGNED_FOR_REVIEW`. Never guess historical sponsor relationships.
 
 ## Work / Codex responsibilities
+
 Use Work for:
+
 - resolving pending business questions;
 - package/plan contract definition;
 - module sequencing;
@@ -184,6 +207,7 @@ Use Work for:
 - specifications and persistent docs.
 
 Use Codex for:
+
 - repository implementation after the contract is explicit;
 - focused refactors;
 - tests;
@@ -193,14 +217,17 @@ Use Codex for:
 Codex must inspect existing code/docs first and must not invent new architecture when an existing pattern already exists.
 
 ## Recommended next local instruction
-Continue FixTradeZone from `feature/packages-foundation`. Pull the latest pushed
-backend checkpoint, read `docs/LOCAL-VERIFY-PACKAGES.md`, review/deploy migration
-`0007_package_plan_foundation`, run `npm run verify:milestone`, then run the
-ordered PKG-01 Postman collection and SQL readback. Do not begin package BFF/UI
-work and do not open a PR until the local backend/API gate is explicitly GREEN.
+
+Continue FixTradeZone from `feature/packages-foundation`. Pull the latest
+approved checkpoint, read `docs/LOCAL-VERIFY-PACKAGES.md`, and run the combined
+PKG-01 acceptance: corrected ordered Postman flow, SQL/audit readback, ADMIN and
+USER browser scenarios, then `npm run verify:milestone`. Do not push/open a PR
+or call the slice complete until the Founder explicitly accepts those results.
 
 ## Fallback rule
+
 If Work/Codex limits are reached, the feature is unavailable, or context is lost, resume in normal Chat from:
+
 1. current Git branch/commit;
 2. `docs/CURRENT-STATE.md`;
 3. this operating brief;

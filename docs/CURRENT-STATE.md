@@ -5,13 +5,16 @@
 MLM-01 Referral Foundation is complete, merged into `main`, and reverified locally from the merged mainline.
 
 ### Mainline
+
 - PR #15: `feat(referrals): deliver MLM-01 referral foundation` — MERGED.
 - Main merge commit: `2a06487b23d2c9cb0bc2078e93bde6eba220c42d`.
 - Local `main` was fast-forwarded to `prashant/main` after merge.
 - Local mainline milestone verification: GREEN.
 
 ### Local mainline verification
+
 `npm run verify:milestone` passed after the PR merge:
+
 - Prisma schema validation: GREEN;
 - backend Prettier check: GREEN;
 - backend ESLint: GREEN;
@@ -27,7 +30,9 @@ MLM-01 Referral Foundation is complete, merged into `main`, and reverified local
 ## MLM-01 Referral Foundation — COMPLETE
 
 ### Backend / database
+
 Implemented and accepted:
+
 - referral profiles and sponsor relationships;
 - sponsor-change history;
 - singleton referral system configuration;
@@ -40,10 +45,12 @@ Implemented and accepted:
 - direct-referral query API.
 
 USER API:
+
 - `GET /referrals/me`
 - `GET /referrals/me/direct?page=1&limit=20`
 
 ADMIN/SUPER_ADMIN API:
+
 - `GET /admin/referrals/config`
 - `PATCH /admin/referrals/config`
 - `PATCH /admin/referrals/:userId/sponsor`
@@ -53,7 +60,9 @@ Registration accepts optional `referralCode`.
 Existing-user migration mode remains `LEAVE_UNASSIGNED_FOR_REVIEW`; historical sponsor relationships are never guessed.
 
 ### Frontend / BFF
+
 USER:
+
 - `/user/referrals` live referral workspace;
 - live sponsor and assignment status;
 - live direct-referral list;
@@ -61,6 +70,7 @@ USER:
 - `/user/dashboard` live referral assignment state and direct-referral count.
 
 ADMIN/SUPER_ADMIN:
+
 - `/referrals` management workspace;
 - referral enrollment/default sponsor configuration;
 - delegated ADMIN sponsor-change switch;
@@ -70,7 +80,9 @@ ADMIN/SUPER_ADMIN:
 Browser authentication remains same-origin BFF + HttpOnly/SameSite cookies. Session validation/refresh precedes dependent referral data calls to avoid rotating-refresh-token races.
 
 ### Integrated acceptance
+
 The accepted browser/API flow proved:
+
 1. SUPER_ADMIN loaded and saved live referral configuration.
 2. Fresh USER A registered, was activated, logged in, and was assigned under the configured founder/root default sponsor.
 3. USER A copied the generated referral invite link.
@@ -83,21 +95,24 @@ This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback
 ## Active Development Slice
 
 New branch from verified `main`:
+
 - `feature/packages-foundation`
 
 Next slice: **Packages / Plan Foundation**.
 
 Reason for sequence: package state/config is a dependency for matching, reward generation, upgrade/renewal behavior, caps, deposit-triggered activation, and later ledger calculations. Commission/reward engines must not be implemented before package semantics and lifecycle are explicit.
 
-## PKG-01 Packages / Plan Foundation — Backend Checkpoint
+## PKG-01 Packages / Plan Foundation — Full-Slice Checkpoint
 
 Founder approval is locked:
+
 - Q33–Q39: Option A;
 - all proposed initial safe defaults;
 - canonical contract: `docs/PACKAGES-PLAN-FOUNDATION.md`;
 - contract commit: `79cd4a5`.
 
 Implemented in the Work checkout:
+
 - migration `0007_package_plan_foundation`;
 - immutable package definitions and versioned plan/version item models;
 - unpublished nine-item V1 seed;
@@ -108,23 +123,36 @@ Implemented in the Work checkout:
 - SUPER_ADMIN-only atomic publication and published-plan closure;
 - effective-range overlap/backdating protection and immutable published terms;
 - protected USER/admin package API surface;
-- focused DTO/service tests and ordered Postman gate.
+- focused DTO/service tests and ordered Postman gate;
+- same-origin ADMIN/USER package BFF routes with HttpOnly-cookie authentication;
+- permission-aware Dark Neo `/packages` plan-management workspace;
+- protected Dark Neo `/user/packages` effective catalogue and safe empty state;
+- session-first package loading and coalesced admin shell session resolution;
+- stale-revision UI reload behavior and exact string-decimal rendering.
 
-Work-checkout static verification is GREEN:
+Automated Work-checkout verification is GREEN:
+
 - Prisma schema validation/generation;
-- 26/26 backend suites, 145/145 tests;
-- backend Prettier, ESLint and Nest production build.
+- 26/26 backend suites, 148/148 tests;
+- backend Prettier, ESLint and Nest production build;
+- admin ESLint, TypeScript and Next.js production build with 44 routes.
 
-Not yet accepted locally:
-- migration deployment/status against the local `fixtradezone` database;
-- the 13-request PKG-01 Postman gate;
-- SQL readback/audit verification.
+Operator-confirmed local database gate:
 
-BFF/UI work remains intentionally blocked until the local backend/API gate in
-`docs/LOCAL-VERIFY-PACKAGES.md` is GREEN. No mutable financial balance, earning,
-deposit, activation, subscription or ledger state exists in PKG-01.
+- a verified pre-0007 backup was taken;
+- `0007_package_plan_foundation` deployed successfully;
+- `npm run verify:milestone` passed with seven migrations and schema up to date.
+
+The first ordered Postman run reached request 05 and exposed an omitted-field
+partial-update bug before publication. The backend now preserves omitted rate
+terms, ignores omitted DTO fields in audit/change detection, rejects reason-only
+writes, and includes regression coverage. The full Postman, SQL and integrated
+browser gate remains pending and will be run as one combined acceptance pass at
+the Founder's direction. No mutable financial balance, earning, deposit,
+activation, subscription or ledger state exists in PKG-01.
 
 ## Locked Delivery Workflow
+
 1. Work locks business semantics and implementation contract.
 2. Codex/engineering implements one focused vertical slice on the feature branch.
 3. Backend/API may use Postman as an intermediate checkpoint.
@@ -138,6 +166,7 @@ deposit, activation, subscription or ledger state exists in PKG-01.
 Local verification remains the acceptance authority even when Work/Codex/CI reports success.
 
 ## Core Architecture / Security
+
 - Backend: NestJS + TypeScript.
 - ORM: Prisma 7.9.1 with MariaDB adapter.
 - Relational source of truth: MySQL.
@@ -152,17 +181,20 @@ Local verification remains the acceptance authority even when Work/Codex/CI repo
 - Simulated activity must always be explicitly labelled simulated and never presented as real trading/profits.
 
 ## Continuity
+
 GitHub repository + committed `docs/` are the permanent source of truth.
 
 Work and Codex are acceleration layers. If they are unavailable or limits are reached, resume in normal Chat from:
+
 1. current Git branch/commit;
 2. this file;
 3. `docs/WORK-CODEX-OPERATING-BRIEF.md`;
 4. relevant business-rule / architecture documents.
 
 ## Immediate Next Action
-Pull the pushed PKG-01 backend checkpoint locally, review/deploy migration
-`0007_package_plan_foundation`, run `npm run verify:milestone`, and complete the
-ordered Postman/SQL gate in `docs/LOCAL-VERIFY-PACKAGES.md`. Only after that gate
-is accepted should the same-slice Next.js BFF and Dark Neo package interfaces be
-implemented.
+
+Complete the combined local acceptance in `docs/LOCAL-VERIFY-PACKAGES.md`:
+resume the corrected ordered Postman flow without replaying the already-applied
+request 04 mutation, run SQL/audit readback, verify `/packages` and
+`/user/packages` in the browser, and rerun `npm run verify:milestone`. Push or
+open a PR only after the Founder accepts that combined gate.

@@ -1,6 +1,7 @@
 # FixTradeZone — Security Standards
 
 ## Authentication
+
 - JWT access + refresh token architecture.
 - Access tokens expire after 15 minutes.
 - Refresh tokens expire after 7 days and rotate on every successful refresh.
@@ -16,6 +17,7 @@
 - Revoking a persisted session immediately invalidates access JWTs bound to that session.
 
 ## Passwords
+
 - Hash passwords with Argon2id using at least 19 MiB memory, 2 iterations, and parallelism 1.
 - Argon2 generates a unique salt for each password hash.
 - Never store plaintext passwords.
@@ -25,6 +27,7 @@
 - Login accepts any non-empty password up to 128 characters so authentication does not expose registration-policy details.
 
 ## Request Validation
+
 - A global NestJS `ValidationPipe` validates concrete DTO classes.
 - Unknown request fields are rejected instead of silently accepted.
 - Implicit primitive conversion is disabled.
@@ -34,6 +37,7 @@
 - Refresh and logout tokens must be JWT-shaped strings and are cryptographically verified by the authentication service before use.
 
 ## Registration Controls
+
 - Registration is explicitly public; other business routes remain deny-by-default.
 - Password hashing happens before opening the database transaction.
 - User creation, default USER role assignment, and registration audit creation are transactional.
@@ -41,6 +45,7 @@
 - Registration responses use an explicit safe projection and never include password hashes.
 
 ## Authorization
+
 - Authentication establishes identity.
 - RBAC establishes role membership.
 - Permissions protect privileged/admin operations.
@@ -48,6 +53,7 @@
 - The admin UI rejects non-ADMIN accounts, but every future admin data endpoint must also enforce RBAC in NestJS.
 
 ## Admin Browser Session
+
 - The browser submits credentials only to same-origin Next.js route handlers.
 - The Next.js server exchanges credentials and refresh tokens with NestJS.
 - Access and refresh tokens use HttpOnly, Secure-in-production, SameSite=Strict cookies.
@@ -94,6 +100,7 @@
 - Browser reauthentication is performed through the same-origin BFF and preserved administrator HttpOnly cookies.
 
 ## Financial Security
+
 - TXID submission does not auto-credit balance.
 - Deposit is PENDING until authorized admin approval.
 - Duplicate TXIDs are prevented.
@@ -121,15 +128,23 @@
   violation.
 - Package prices/rates/multipliers use exact SQL `DECIMAL` and are serialized as
   strings.
+- Package browser calls use same-origin Next.js BFF routes; access and rotating
+  refresh tokens remain HttpOnly/SameSite cookies and are never returned to UI
+  code.
+- ADMIN shell/package clients share one in-flight session resolution before
+  dependent package requests, preventing concurrent refresh-token consumption.
+- Package BFF success and error responses are marked `Cache-Control: no-store`.
 - PKG-01 creates no user package, balance, earnings, cap-consumption, deposit or
   ledger state and exposes no activation endpoint.
 
 ## Secrets
+
 - Local `.env`, production secret manager.
 - `.env` must never be committed.
 - Never expose secrets in logs, API responses, Postman collections, or documentation.
 
 ## Operational Security
+
 - Validate request input with DTOs and class-validator.
 - Rate-limit authentication and sensitive endpoints.
 - Audit important admin/financial actions.
@@ -137,6 +152,7 @@
 - Production uses TLS and secure secret management.
 
 ## Dependency Security
+
 - Do not blindly run `npm audit fix --force`.
 - Investigate advisories and compatibility first.
 - Review install-script approval warnings before approving.
