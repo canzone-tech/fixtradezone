@@ -76,39 +76,70 @@ export default function UserReferralsClient() {
 
     async function load() {
       try {
-        const [sessionResponse, profileResponse, directResponse] = await Promise.all([
-          fetch("/api/user/session", { cache: "no-store" }),
-          fetch("/api/user/referrals", { cache: "no-store" }),
-          fetch("/api/user/referrals/direct?page=1&limit=20", { cache: "no-store" }),
-        ]);
+        // Validate/refresh the browser session first. Referral data requests are
+        // intentionally issued only after this completes so rotating refresh
+        // tokens cannot be consumed concurrently by multiple BFF requests.
+        const sessionResponse = await fetch("/api/user/session", {
+          cache: "no-store",
+        });
+        const sessionPayload = await readPayload<UserDirectSession & ErrorPayload>(
+          sessionResponse,
+        );
 
-        const sessionPayload = await readPayload<UserDirectSession & ErrorPayload>(sessionResponse);
-
-        if (sessionResponse.status === 401 || profileResponse.status === 401) {
+        if (sessionResponse.status === 401) {
           router.replace("/login");
           router.refresh();
           return;
         }
 
         if (sessionResponse.status === 403) {
-          router.replace(sessionPayload?.redirectTo === "/dashboard" ? "/dashboard" : "/login");
+          router.replace(
+            sessionPayload?.redirectTo === "/dashboard"
+              ? "/dashboard"
+              : "/login",
+          );
           router.refresh();
           return;
         }
 
-        const profilePayload = await readPayload<ReferralProfile & ErrorPayload>(profileResponse);
-        const directPayload = await readPayload<DirectResponse & ErrorPayload>(directResponse);
-
-        if (!sessionResponse.ok || !sessionPayload?.user || !sessionPayload.sessionPolicy) {
+        if (
+          !sessionResponse.ok ||
+          !sessionPayload?.user ||
+          !sessionPayload.sessionPolicy
+        ) {
           throw new Error(sessionPayload?.message || "Unable to load USER session.");
         }
 
+        const [profileResponse, directResponse] = await Promise.all([
+          fetch("/api/user/referrals", { cache: "no-store" }),
+          fetch("/api/user/referrals/direct?page=1&limit=20", {
+            cache: "no-store",
+          }),
+        ]);
+
+        if (profileResponse.status === 401 || directResponse.status === 401) {
+          router.replace("/login");
+          router.refresh();
+          return;
+        }
+
+        const profilePayload = await readPayload<ReferralProfile & ErrorPayload>(
+          profileResponse,
+        );
+        const directPayload = await readPayload<DirectResponse & ErrorPayload>(
+          directResponse,
+        );
+
         if (!profileResponse.ok || !profilePayload) {
-          throw new Error(profilePayload?.message || "Unable to load referral profile.");
+          throw new Error(
+            profilePayload?.message || "Unable to load referral profile.",
+          );
         }
 
         if (!directResponse.ok || !directPayload) {
-          throw new Error(directPayload?.message || "Unable to load direct referrals.");
+          throw new Error(
+            directPayload?.message || "Unable to load direct referrals.",
+          );
         }
 
         if (mounted) {
@@ -118,7 +149,11 @@ export default function UserReferralsClient() {
         }
       } catch (caught) {
         if (mounted) {
-          setError(caught instanceof Error ? caught.message : "Unable to load referrals.");
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Unable to load referrals.",
+          );
         }
       } finally {
         if (mounted) {
@@ -147,7 +182,10 @@ export default function UserReferralsClient() {
   if (loading) {
     return (
       <UserShell session={null}>
-        <div className="ftz-dashboard-loading"><span /><p>Loading referral workspace…</p></div>
+        <div className="ftz-dashboard-loading">
+          <span />
+          <p>Loading referral workspace…</p>
+        </div>
       </UserShell>
     );
   }
@@ -171,18 +209,31 @@ export default function UserReferralsClient() {
           <div>
             <span>NETWORK</span>
             <h2>My Referrals</h2>
-            <p>Your referral identity and direct network are loaded from the live referral API.</p>
+            <p>
+              Your referral identity and direct network are loaded from the live
+              referral API.
+            </p>
           </div>
           <div className={styles.status}>{profile.assignmentStatus}</div>
         </header>
 
         <section className={styles.summaryGrid}>
           <article className={styles.primaryCard}>
-            <div className={styles.cardIcon}><i className="iconoir-community" /></div>
+            <div className={styles.cardIcon}>
+              <i className="iconoir-community" />
+            </div>
             <small>MY REFERRAL CODE</small>
             <strong>{profile.referralCode ?? "Not assigned"}</strong>
-            <p>{profile.enrolled ? "Use this code when inviting a new member." : "Referral enrollment is not available for this account yet."}</p>
-            <button type="button" onClick={() => void copyCode()} disabled={!profile.referralCode}>
+            <p>
+              {profile.enrolled
+                ? "Use this code when inviting a new member."
+                : "Referral enrollment is not available for this account yet."}
+            </p>
+            <button
+              type="button"
+              onClick={() => void copyCode()}
+              disabled={!profile.referralCode}
+            >
               <i className="iconoir-copy" /> {copied ? "Copied" : "Copy code"}
             </button>
           </article>
@@ -195,8 +246,18 @@ export default function UserReferralsClient() {
 
           <article className={styles.infoCard}>
             <small>SPONSOR</small>
-            <strong>{profile.sponsor ? displayName(profile.sponsor) : profile.assignmentStatus === "ROOT" ? "ROOT ACCOUNT" : "Not assigned"}</strong>
-            <span>{profile.sponsor ? `@${profile.sponsor.username}` : "Referral hierarchy"}</span>
+            <strong>
+              {profile.sponsor
+                ? displayName(profile.sponsor)
+                : profile.assignmentStatus === "ROOT"
+                  ? "ROOT ACCOUNT"
+                  : "Not assigned"}
+            </strong>
+            <span>
+              {profile.sponsor
+                ? `@${profile.sponsor.username}`
+                : "Referral hierarchy"}
+            </span>
           </article>
         </section>
 
@@ -213,20 +274,35 @@ export default function UserReferralsClient() {
             <div className={styles.emptyState}>
               <i className="iconoir-community" />
               <strong>No direct referrals yet</strong>
-              <p>Your direct referrals will appear here after they register under your referral code.</p>
+              <p>
+                Your direct referrals will appear here after they register under
+                your referral code.
+              </p>
             </div>
           ) : (
             <div className={styles.tableWrap}>
               <table>
-                <thead><tr><th>Member</th><th>Username</th><th>Status</th><th>Referral state</th><th>Joined</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Username</th>
+                    <th>Status</th>
+                    <th>Referral state</th>
+                    <th>Joined</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {direct.items.map((member) => (
                     <tr key={member.id}>
                       <td>{displayName(member)}</td>
                       <td>@{member.username}</td>
-                      <td><span className={styles.badge}>{member.status}</span></td>
+                      <td>
+                        <span className={styles.badge}>{member.status}</span>
+                      </td>
                       <td>{member.assignmentStatus}</td>
-                      <td>{new Date(member.referralJoinedAt).toLocaleDateString()}</td>
+                      <td>
+                        {new Date(member.referralJoinedAt).toLocaleDateString()}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
