@@ -1,10 +1,28 @@
+import { networkInterfaces } from "node:os";
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
-const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
+
+const configuredDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const detectedLanDevOrigins = isProduction
+  ? []
+  : Object.values(networkInterfaces())
+      .flatMap((interfaces) => interfaces ?? [])
+      .filter(
+        (network) =>
+          network.family === "IPv4" &&
+          !network.internal &&
+          network.address.length > 0,
+      )
+      .map((network) => network.address);
+
+const allowedDevOrigins = Array.from(
+  new Set([...configuredDevOrigins, ...detectedLanDevOrigins]),
+);
 
 const contentSecurityPolicy = [
   "default-src 'self'",
