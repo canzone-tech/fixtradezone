@@ -880,6 +880,235 @@ Implementation implications:
 
 ---
 
+
+## Q33. Package Price Denomination
+
+**Context**
+
+Package prices are displayed and funded through the USDT deposit flow. The
+package catalogue must not silently introduce a USD/USDT conversion or an
+unrecorded exchange-rate dependency.
+
+**Options**
+- **A. USDT denomination:** package prices are denominated directly in USDT; no
+  USD/USDT conversion is performed.
+- **B. USD denomination with locked quote:** package price is stored in USD and
+  an immutable conversion quote is captured when a package is activated.
+- **C. Multi-currency:** each package may be priced in one of multiple supported
+  currencies with versioned conversion rules.
+
+**LOCKED ANSWER:** **A — USDT denomination with no FX conversion.**
+
+Rule classification: **plan-versioned package rule** with a current
+system-supported currency of `USDT`.
+
+Implementation implications:
+- every package-plan item stores an explicit currency code
+- package price uses `DECIMAL(20,8)` and must be positive
+- monetary values are returned by JSON APIs as strings, never JavaScript numbers
+- a future currency/FX capability requires a new approved plan/schema change
+- historical package records retain their exact price, currency and plan-item ID
+
+---
+
+
+## Q34. Package Goal and Cycle Meaning
+
+**Context**
+
+The supplied plan contains both a package goal such as 90 or 150 days and a
+shorter trade-cycle value. These values cannot be treated as synonyms.
+
+**Options**
+- **A. Lifetime plus separate cycle:** goal days define package lifetime while
+  cycle days define a separate reward/activity cycle inside that lifetime.
+- **B. Same duration:** goal and cycle are two labels for one duration.
+- **C. Goal is display-only:** only cycle duration affects package behavior.
+
+**LOCKED ANSWER:** **A — package lifetime and reward/activity cycle are separate.**
+
+Rule classification: **plan-versioned package rule**.
+
+Implementation implications:
+- package items store typed `goalDays` and `cycleDays` columns
+- both values must be positive; cycle duration cannot exceed package lifetime
+- cycle completion and package completion remain separate future events
+- any user-facing trade-cycle wording or activity is explicitly labelled
+  `Simulated Trade Activity`; no real trading claim is permitted
+- PKG-01 stores configuration only and does not generate cycle/reward events
+
+---
+
+
+## Q35. Initial Active-Package Mode
+
+**Options**
+- **A. SINGLE_ACTIVE:** a user may have only one active package.
+- **B. MULTIPLE_ACTIVE with HIGHEST_ACTIVE_PACKAGE qualification.**
+- **C. MULTIPLE_ACTIVE with TOTAL_ACTIVE_PACKAGE_VALUE qualification.**
+- **D. MULTIPLE_ACTIVE with an explicitly selected PRIMARY_PACKAGE.**
+
+**LOCKED ANSWER:** **A — initial mode is `SINGLE_ACTIVE`.** If a later approved
+plan enables `MULTIPLE_ACTIVE`, its initial qualification basis is
+`HIGHEST_ACTIVE_PACKAGE`.
+
+Rule classification: **plan-versioned package rule**.
+
+Implementation implications:
+- PKG-01 versions the selected mode and multiple-package basis
+- the later activation/subscription service enforces the rule transactionally
+- changing the plan never rewrites historical user-package records
+- PKG-01 does not create `UserPackage` or activation records
+
+---
+
+## Q36. Package Upgrade Lifecycle
+
+**Options**
+- **A. Incremental top-up and supersession:** charge the target price minus the
+  source price, supersede the source record, preserve settled history, carry
+  prior cap consumption, and restart the target lifetime.
+- **B. Full-price replacement:** charge the full target price and replace the
+  source package without carrying cap consumption.
+- **C. Independent additional package:** retain the source and create a separate
+  target package.
+
+**LOCKED ANSWER:** **A — incremental top-up with linked supersession.**
+
+Rule classification: **package/subscription lifecycle rule** whose applicable
+commercial terms are **plan-versioned**.
+
+Implementation implications:
+- the original user-package record and settled events remain immutable
+- the new record links to the superseded source record
+- prior cap consumption carries forward through immutable ledger/event history
+- the target package lifetime restarts at activation
+- the upgrade source/idempotency key must be unique
+- upgrades remain disabled until subscription, deposit/payment and ledger support
+  exist; PKG-01 publishes no upgrade endpoint
+
+---
+
+
+## Q37. Package Renewal Lifecycle
+
+**Options**
+- **A. Manual terminal-state renewal:** after a terminal package state, pay the
+  full current price and create a new record using the current published plan.
+- **B. Automatic renewal:** renew automatically at cycle, lifetime or cap end.
+- **C. Rollover renewal:** create a renewal while carrying value, time or unused
+  cap from the old record.
+
+**LOCKED ANSWER:** **A — manual renewal only after a terminal state.** Renewal
+uses the full current price, the current published plan version and a new linked
+user-package record, with no value, time or cap rollover.
+
+Rule classification: **package/subscription lifecycle rule** whose applicable
+commercial terms are **plan-versioned**.
+
+Implementation implications:
+- no auto-renewal is enabled in the initial plan
+- a renewal never edits or reactivates the original record
+- renewal payment/activation is idempotent and audited in the later modules
+- PKG-01 publishes no renewal endpoint
+
+---
+
+
+## Q38. Meaning of the Published/Displayed Reward Rate
+
+**Options**
+- **A. USER_NET_AFTER_SPLIT:** the displayed package percentage is the user's
+  net rate and is not later reduced by a distribution split.
+- **B. GROSS_BEFORE_SPLIT:** the displayed rate is gross and an explicit split
+  determines the user's lower net rate.
+- **C. Display both gross and net rates.**
+
+**LOCKED ANSWER:** **A — `USER_NET_AFTER_SPLIT`.**
+
+Rule classification: **plan-versioned package rule**.
+
+Implementation implications:
+- the rate-meaning field is explicit on each package-plan item
+- the user catalogue labels the range as the user/net rate
+- the later reward event records the actual applied rate immutably
+- distribution recipients and percentages remain a later Reward/Commission
+  contract and cannot silently reduce the displayed user rate
+
+---
+
+
+## Q39. Cap Basis and Principal Treatment
+
+**Options**
+- **A. TOTAL_RETURN + INCLUDED_IN_TOTAL_RETURN:** the cap multiplier includes
+  the package principal; principal is not paid separately at completion.
+- **B. PROFIT_ONLY + RETURN_SEPARATELY:** the cap applies only to profit and the
+  principal is returned separately.
+- **C. TOTAL_RETURN + RETURN_SEPARATELY:** principal is separately returned in
+  addition to the total-return cap.
+
+**LOCKED ANSWER:** **A — `TOTAL_RETURN` with
+`INCLUDED_IN_TOTAL_RETURN`.** There is no separate principal payout at normal
+completion. Refund/cancellation rules remain independent.
+
+Rule classification: **plan-versioned package rule** with later ledger-backed
+accounting effects.
+
+Example:
+```text
+Package price = 500 USDT
+Cap multiplier = 3X
+Maximum total return = 1,500 USDT
+Maximum profit component = 1,000 USDT
+Separate principal payout at completion = 0 USDT
+```
+
+Implementation implications:
+- maximum return/profit is derived, not stored as a conflicting mutable value
+- later cap consumption is calculated from immutable, typed ledger events
+- cap inclusion remains configurable by earning type under Q17
+- refunds/reversals use linked reversal entries and do not rewrite history
+- PKG-01 stores terms only and creates no balances, earnings or cap consumption
+
+---
+
+
+## PKG-01 Approved Initial Safe Defaults — 2026-08-25
+
+The Founder approved these initial **configured V1 draft values**. They are not
+hardcoded engine invariants and may change only through a validated, audited new
+plan version:
+
+```text
+currency                         = USDT
+activationTrigger                = PAYMENT_APPROVED
+planMigrationMode                = NEW_PACKAGE_ACTIVATIONS
+activePackageMode                = SINGLE_ACTIVE
+multipleActivePackageBasis       = HIGHEST_ACTIVE_PACKAGE
+rewardRateMode                   = RANDOM_RANGE
+rewardRateMeaning                = USER_NET_AFTER_SPLIT
+settlementTimezone               = UTC
+firstRewardStart                 = NEXT_CALENDAR_DAY
+rewardFrequency                  = DAILY_CALENDAR
+cycleDayMode                     = CALENDAR_DAYS
+rewardDayMode                    = EVERY_DAY
+capBasis                         = TOTAL_RETURN
+principalTreatment               = INCLUDED_IN_TOTAL_RETURN
+capReachedAction                 = COMPLETE_PACKAGE
+renewalMode                      = MANUAL_AFTER_TERMINAL
+autoRenewal                      = disabled
+upgrade                          = disabled until dependent modules exist
+initial package availability     = AVAILABLE
+ADMIN package permissions        = none assigned initially
+```
+
+PKG-01 still exposes catalogue/configuration only. Package activation remains
+unavailable until the approved Deposit/Payment and UserPackage/ledger boundaries
+are implemented.
+
+---
+
 # Current Reference Figures from Supplied MLM Plan Image
 
 These are **initial/default reference values only**, not architecture constants.
@@ -974,7 +1203,7 @@ implement vertical slice
 
 # Discovery Status
 
-**Questions 1–32: LOCKED.**
+**Questions 1–39: LOCKED.**
 
 Every question above intentionally preserves:
 - available options
