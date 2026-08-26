@@ -5,6 +5,11 @@ import { SubscriptionsService } from './subscriptions.service';
 
 const DEPOSIT_ID = '11111111-1111-4111-8111-111111111111';
 const USER_ID = '22222222-2222-4222-8222-222222222222';
+const PLAN_VERSION_ID = '77777777-7777-4777-8777-777777777777';
+const PLAN_ITEM_ID = '88888888-8888-4888-8888-888888888888';
+const DEFINITION_ID = '99999999-9999-4999-8999-999999999999';
+const ACCOUNTING_TRANSACTION_ID = '55555555-5555-4555-8555-555555555555';
+const FUNDING_TRANSACTION_ID = '66666666-6666-4666-8666-666666666666';
 
 const actor: AuthenticatedUser = {
   id: '33333333-3333-4333-8333-333333333333',
@@ -24,12 +29,11 @@ const existingSubscription = {
   id: '44444444-4444-4444-8444-444444444444',
   userId: USER_ID,
   sourceDepositId: DEPOSIT_ID,
-  sourceDepositAccountingTransactionId:
-    '55555555-5555-4555-8555-555555555555',
-  fundingLedgerTransactionId: '66666666-6666-4666-8666-666666666666',
-  packagePlanVersionId: '77777777-7777-4777-8777-777777777777',
-  packagePlanItemId: '88888888-8888-4888-8888-888888888888',
-  packageDefinitionId: '99999999-9999-4999-8999-999999999999',
+  sourceDepositAccountingTransactionId: ACCOUNTING_TRANSACTION_ID,
+  fundingLedgerTransactionId: FUNDING_TRANSACTION_ID,
+  packagePlanVersionId: PLAN_VERSION_ID,
+  packagePlanItemId: PLAN_ITEM_ID,
+  packageDefinitionId: DEFINITION_ID,
   packageCode: 'NEURAL_SCOUT',
   packageDisplayName: 'Neural Scout',
   price: new Prisma.Decimal('5'),
@@ -64,6 +68,52 @@ const existingSubscription = {
   updatedAt: new Date('2026-08-26T01:00:00.000Z'),
 };
 
+const approvedDeposit = {
+  id: DEPOSIT_ID,
+  userId: USER_ID,
+  status: 'APPROVED',
+  amount: new Prisma.Decimal('5'),
+  currency: 'USDT',
+  packagePlanVersionId: PLAN_VERSION_ID,
+  packagePlanItemId: PLAN_ITEM_ID,
+  packageCode: 'NEURAL_SCOUT',
+  packageDisplayName: 'Neural Scout',
+  reviewedAt: new Date('2026-08-26T00:30:00.000Z'),
+};
+
+const planItem = {
+  id: PLAN_ITEM_ID,
+  planVersionId: PLAN_VERSION_ID,
+  packageDefinitionId: DEFINITION_ID,
+  price: new Prisma.Decimal('5'),
+  currency: 'USDT',
+  rewardRateMode: 'RANDOM_RANGE',
+  fixedRewardRate: null,
+  minimumRewardRate: new Prisma.Decimal('0.004'),
+  maximumRewardRate: new Prisma.Decimal('0.006'),
+  rewardRateMeaning: 'USER_NET_AFTER_SPLIT',
+  capBasis: 'TOTAL_RETURN',
+  capMultiplier: new Prisma.Decimal('2'),
+  principalTreatment: 'INCLUDED_IN_TOTAL_RETURN',
+  goalDays: 90,
+  cycleDays: 10,
+  rewardStartMode: 'NEXT_CALENDAR_DAY',
+  rewardFrequency: 'DAILY_CALENDAR',
+  cycleDayMode: 'CALENDAR_DAYS',
+  rewardDayMode: 'EVERY_DAY',
+  cycleEndAction: 'COMPLETE_PACKAGE',
+  capReachedAction: 'COMPLETE_PACKAGE',
+  planVersion: {
+    activationTrigger: 'PAYMENT_APPROVED',
+    activePackageMode: 'SINGLE_ACTIVE',
+    multipleActivePackageBasis: 'HIGHEST_ACTIVE_PACKAGE',
+    renewalMode: 'MANUAL_AFTER_TERMINAL',
+    upgradesEnabled: false,
+    settlementTimezone: 'UTC',
+  },
+  packageDefinition: { id: DEFINITION_ID },
+};
+
 describe('SubscriptionsService', () => {
   const transaction = {
     $queryRaw: jest.fn(),
@@ -80,6 +130,7 @@ describe('SubscriptionsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    transaction.$executeRaw.mockResolvedValue(1);
     prisma.$transaction.mockImplementation(
       async (work: (tx: typeof transaction) => Promise<unknown>) =>
         work(transaction),
@@ -111,22 +162,13 @@ describe('SubscriptionsService', () => {
       .mockResolvedValueOnce([{ id: USER_ID }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
-    transaction.deposit.findUnique.mockResolvedValue({
-      id: DEPOSIT_ID,
-      userId: USER_ID,
-      status: 'APPROVED',
-      amount: new Prisma.Decimal('5'),
-      currency: 'USDT',
-      packagePlanVersionId: '77777777-7777-4777-8777-777777777777',
-      packagePlanItemId: '88888888-8888-4888-8888-888888888888',
-      packageCode: 'NEURAL_SCOUT',
-      packageDisplayName: 'Neural Scout',
-      reviewedAt: new Date(),
-    });
+    transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
 
     await expect(
       service.activateFromApprovedDeposit(DEPOSIT_ID, actor),
-    ).rejects.toThrow('Deposit accounting must be posted before package activation.');
+    ).rejects.toThrow(
+      'Deposit accounting must be posted before package activation.',
+    );
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
@@ -136,39 +178,99 @@ describe('SubscriptionsService', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
-          id: '55555555-5555-4555-8555-555555555555',
+          id: ACCOUNTING_TRANSACTION_ID,
           sourceKey: `DEPOSIT:${DEPOSIT_ID}:CREDIT`,
         },
       ])
-      .mockResolvedValueOnce([{ total: 1 }]);
-    transaction.deposit.findUnique.mockResolvedValue({
-      id: DEPOSIT_ID,
-      userId: USER_ID,
-      status: 'APPROVED',
-      amount: new Prisma.Decimal('5'),
-      currency: 'USDT',
-      packagePlanVersionId: '77777777-7777-4777-8777-777777777777',
-      packagePlanItemId: '88888888-8888-4888-8888-888888888888',
-      packageCode: 'NEURAL_SCOUT',
-      packageDisplayName: 'Neural Scout',
-      reviewedAt: new Date(),
-    });
-    transaction.packagePlanItem.findUnique.mockResolvedValue({
-      id: '88888888-8888-4888-8888-888888888888',
-      planVersionId: '77777777-7777-4777-8777-777777777777',
-      packageDefinitionId: '99999999-9999-4999-8999-999999999999',
-      price: new Prisma.Decimal('5'),
-      currency: 'USDT',
-      planVersion: {
-        activationTrigger: 'PAYMENT_APPROVED',
-        activePackageMode: 'SINGLE_ACTIVE',
-      },
-      packageDefinition: { id: '99999999-9999-4999-8999-999999999999' },
-    });
+      .mockResolvedValueOnce([{ id: existingSubscription.id }]);
+    transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
+    transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
 
     await expect(
       service.activateFromApprovedDeposit(DEPOSIT_ID, actor),
     ).rejects.toThrow('This plan allows only one active package for the USER.');
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('creates one balanced funding transaction and subscription for an eligible deposit', async () => {
+    const mainAccount = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      accountKey: `USER:${USER_ID}:MAIN:USDT`,
+      ownerType: 'USER',
+      ownerUserId: USER_ID,
+      bucket: 'MAIN',
+      currency: 'USDT',
+      normalSide: 'CREDIT',
+    };
+    const principalAccount = {
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      accountKey: 'SYSTEM:PACKAGE_PRINCIPAL:USDT',
+      ownerType: 'SYSTEM',
+      ownerUserId: null,
+      bucket: 'PACKAGE_PRINCIPAL',
+      currency: 'USDT',
+      normalSide: 'CREDIT',
+    };
+
+    transaction.$queryRaw
+      .mockResolvedValueOnce([{ id: USER_ID }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: ACCOUNTING_TRANSACTION_ID,
+          sourceKey: `DEPOSIT:${DEPOSIT_ID}:CREDIT`,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: FUNDING_TRANSACTION_ID,
+          sourceKey: `DEPOSIT:${DEPOSIT_ID}:PACKAGE_ACTIVATION`,
+        },
+      ])
+      .mockResolvedValueOnce([{ total: 0 }])
+      .mockResolvedValueOnce([mainAccount])
+      .mockResolvedValueOnce([principalAccount])
+      .mockResolvedValueOnce([
+        { side: 'DEBIT', amount: new Prisma.Decimal('5') },
+        { side: 'CREDIT', amount: new Prisma.Decimal('5') },
+      ])
+      .mockResolvedValueOnce([existingSubscription]);
+    transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
+    transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
+    transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
+
+    const result = await service.activateFromApprovedDeposit(DEPOSIT_ID, actor, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'jest',
+    });
+
+    expect(result).toMatchObject({
+      created: true,
+      subscription: {
+        sourceDepositId: DEPOSIT_ID,
+        packageCode: 'NEURAL_SCOUT',
+        price: '5.00000000',
+        currency: 'USDT',
+        status: 'ACTIVE',
+      },
+    });
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(8);
+    expect(transaction.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'ACTIVATE',
+          entityType: 'UserPackageSubscription',
+          metadata: expect.objectContaining({
+            balanced: true,
+            depositId: DEPOSIT_ID,
+            amount: '5.00000000',
+            currency: 'USDT',
+            referralCommissionApplied: false,
+            rewardsApplied: false,
+          }),
+        }),
+      }),
+    );
   });
 });
