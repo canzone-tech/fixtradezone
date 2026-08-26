@@ -6,18 +6,29 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
-import { CreateDepositDto, SubmitDepositTxidDto } from './dto/deposit.dto';
+import {
+  CreateDepositDto,
+  DepositPaymentRailQueryDto,
+  SubmitDepositTxidDto,
+} from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
 
 @Controller('deposits')
 export class DepositsController {
   constructor(private readonly depositsService: DepositsService) {}
+
+  @Get('payment-rails')
+  @Header('Cache-Control', 'no-store')
+  listAvailablePaymentRails(@Query() query: DepositPaymentRailQueryDto) {
+    return this.depositsService.listAvailableDepositPaymentRails(query);
+  }
 
   @Get('me')
   @Header('Cache-Control', 'no-store')
