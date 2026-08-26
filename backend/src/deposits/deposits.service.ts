@@ -294,12 +294,7 @@ export class DepositsService {
         );
       }
 
-      if (
-        !isValidDepositAddress(
-          rail.validationProfile as DepositValidationProfile,
-          dto.walletAddress,
-        )
-      ) {
+      if (!isValidDepositAddress(rail.validationProfile, dto.walletAddress)) {
         throw new BadRequestException(
           `Receiving address is invalid for ${rail.networkCode}.`,
         );
@@ -615,7 +610,7 @@ export class DepositsService {
       }
 
       const normalizedTxid = normalizeDepositTransactionId(
-        deposit.assignedValidationProfile as DepositValidationProfile,
+        deposit.assignedValidationProfile,
         dto.txid,
       );
 
@@ -981,10 +976,7 @@ export class DepositsService {
           );
         }
 
-        if (
-          target.includes('asset') &&
-          target.includes('networkCode')
-        ) {
+        if (target.includes('asset') && target.includes('networkCode')) {
           throw new ConflictException(
             'This asset/network payment rail already exists.',
           );
