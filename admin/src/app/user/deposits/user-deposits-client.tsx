@@ -11,9 +11,11 @@ import {
   type DepositsResponse,
   compactDecimal,
   messageFrom,
+  normalizeTransactionId,
   readJson,
   statusLabel,
   statusTone,
+  transactionIdHint,
 } from "@/lib/deposits";
 import type { PackageCatalogue, PackagePlanItem } from "@/lib/packages";
 import type { UserDirectSession } from "@/lib/user-session";
@@ -266,9 +268,9 @@ export default function UserDepositsClient() {
   }
 
   async function submitTxid(deposit: Deposit) {
-    const normalized = txid.trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(normalized)) {
-      setError("TXID must be exactly 64 hexadecimal characters.");
+    const normalized = normalizeTransactionId(deposit.assignedNetwork, txid);
+    if (!normalized) {
+      setError(`Transaction ID is invalid for ${deposit.assignedNetwork}.`);
       return;
     }
 
@@ -287,7 +289,7 @@ export default function UserDepositsClient() {
       );
 
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not submit TXID."));
+        throw new Error(messageFrom(payload, "Could not submit transaction ID."));
       }
 
       setTxid("");
@@ -297,7 +299,7 @@ export default function UserDepositsClient() {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Could not submit TXID.",
+          : "Could not submit transaction ID.",
       );
     } finally {
       setBusy(null);
@@ -318,13 +320,13 @@ export default function UserDepositsClient() {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>USDT / TRC20</p>
+            <p className={styles.eyebrow}>NETWORK-AWARE DEPOSITS</p>
             <h1>Deposits</h1>
             <p>
-              Create a package payment request, send the exact USDT amount to the
-              server-assigned TRC20 address, then submit the transaction ID for
-              manual review. An approved payment does not become wallet balance or
-              an active package until the later accounting/activation milestone.
+              Create a package payment request, then pay the exact amount using
+              the server-assigned asset, network and public receiving address.
+              Submit that network&apos;s transaction identifier for manual review.
+              Approval does not create wallet balance or activate a package yet.
             </p>
           </div>
           {openDeposit ? (
@@ -365,7 +367,7 @@ export default function UserDepositsClient() {
               <img
                 className={styles.qr}
                 src={openDeposit.assignedQrCodeDataUrl}
-                alt={`USDT TRC20 QR for ${openDeposit.assignedAccountLabel}`}
+                alt={`${openDeposit.currency} ${openDeposit.assignedNetwork} QR for ${openDeposit.assignedAccountLabel}`}
               />
               <div className={styles.list}>
                 <div className={styles.kv}>
@@ -403,16 +405,19 @@ export default function UserDepositsClient() {
             {openDeposit.status === "AWAITING_TXID" ? (
               <div className={styles.formGrid}>
                 <div className={`${styles.field} ${styles.full}`}>
-                  <label htmlFor="deposit-txid">TRON transaction ID (TXID)</label>
+                  <label htmlFor="deposit-txid">
+                    Transaction ID · {openDeposit.assignedNetwork}
+                  </label>
                   <input
                     className={styles.input}
                     id="deposit-txid"
                     value={txid}
                     onChange={(event) => setTxid(event.target.value)}
-                    placeholder="64 hexadecimal characters"
-                    maxLength={64}
+                    placeholder={transactionIdHint(openDeposit.assignedNetwork)}
+                    maxLength={191}
                     autoCapitalize="none"
                     autoCorrect="off"
+                    spellCheck={false}
                   />
                 </div>
                 <div className={`${styles.actions} ${styles.full}`}>
@@ -424,15 +429,15 @@ export default function UserDepositsClient() {
                   >
                     {busy === `txid-${openDeposit.id}`
                       ? "Submitting…"
-                      : "Submit TXID for review"}
+                      : "Submit transaction ID for review"}
                   </button>
                 </div>
               </div>
             ) : (
               <div className={styles.notice}>
-                TXID <span className={styles.mono}>{openDeposit.txid}</span> was
-                submitted {formatDate(openDeposit.submittedAt)}. Manual review is
-                pending; do not send another payment for this request.
+                Transaction ID <span className={styles.mono}>{openDeposit.txid}</span>{" "}
+                was submitted {formatDate(openDeposit.submittedAt)}. Manual review
+                is pending; do not send another payment for this request.
               </div>
             )}
           </section>
@@ -470,9 +475,11 @@ export default function UserDepositsClient() {
                 {selectedPackage ? (
                   <div className={`${styles.notice} ${styles.full}`}>
                     The backend will use the published price of{" "}
-                    <strong>{compactDecimal(selectedPackage.price)} USDT</strong>{" "}
-                    and randomly assign an active TRC20 receiving account. You
-                    cannot choose or override the payment address.
+                    <strong>
+                      {compactDecimal(selectedPackage.price)} {selectedPackage.currency}
+                    </strong>{" "}
+                    and randomly assign an active receiving account for that asset.
+                    You cannot choose or override the network or payment address.
                   </div>
                 ) : null}
 
@@ -516,8 +523,9 @@ export default function UserDepositsClient() {
                   <tr>
                     <th>Package</th>
                     <th>Amount</th>
+                    <th>Network</th>
                     <th>Status</th>
-                    <th>TXID</th>
+                    <th>Transaction ID</th>
                     <th>Created</th>
                     <th>Review</th>
                   </tr>
@@ -529,6 +537,7 @@ export default function UserDepositsClient() {
                       <td>
                         {compactDecimal(deposit.amount)} {deposit.currency}
                       </td>
+                      <td>{deposit.assignedNetwork}</td>
                       <td>
                         <span
                           className={styles.badge}
