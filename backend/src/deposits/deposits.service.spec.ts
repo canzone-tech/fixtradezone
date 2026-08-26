@@ -186,9 +186,13 @@ describe('DepositsService', () => {
         updatedAt: new Date(),
       },
     ]);
+
+    let createdData: Record<string, unknown> | null = null;
     transaction.deposit.create.mockImplementation(
-      ({ data }: { data: Record<string, unknown> }) =>
-        Promise.resolve(deposit(data)),
+      ({ data }: { data: Record<string, unknown> }) => {
+        createdData = data;
+        return Promise.resolve(deposit(data));
+      },
     );
 
     const result = await service.createDeposit(
@@ -196,19 +200,15 @@ describe('DepositsService', () => {
       actor,
     );
 
-    expect(transaction.deposit.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId: USER_ID,
-          openKey: USER_ID,
-          packagePlanItemId: ITEM_ID,
-          amount: new Prisma.Decimal('5.00000000'),
-          assignedDepositAccountId: ACCOUNT_ID,
-          assignedWalletAddress: ADDRESS,
-          assignedNetwork: 'TRC20',
-        }),
-      }),
-    );
+    expect(createdData).toMatchObject({
+      userId: USER_ID,
+      openKey: USER_ID,
+      packagePlanItemId: ITEM_ID,
+      amount: new Prisma.Decimal('5.00000000'),
+      assignedDepositAccountId: ACCOUNT_ID,
+      assignedWalletAddress: ADDRESS,
+      assignedNetwork: 'TRC20',
+    });
     expect(result.deposit.amount).toBe('5');
     expect(result.deposit.assignedWalletAddress).toBe(ADDRESS);
   });
@@ -230,7 +230,21 @@ describe('DepositsService', () => {
       submittedAt: new Date('2026-08-26T01:00:00.000Z'),
     });
     transaction.deposit.findUnique.mockResolvedValue(pending);
-    transaction.deposit.updateMany.mockResolvedValue({ count: 1 });
+
+    let updateArgs: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    } | null = null;
+    transaction.deposit.updateMany.mockImplementation(
+      (args: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        updateArgs = args;
+        return Promise.resolve({ count: 1 });
+      },
+    );
+
     transaction.deposit.findUniqueOrThrow.mockResolvedValue(
       deposit({
         status: 'APPROVED',
@@ -243,36 +257,37 @@ describe('DepositsService', () => {
       }),
     );
 
+    let auditArgs: { data: Record<string, unknown> } | null = null;
+    transaction.auditLog.create.mockImplementation(
+      (args: { data: Record<string, unknown> }) => {
+        auditArgs = args;
+        return Promise.resolve({ id: 'audit-id' });
+      },
+    );
+
     await service.approveDeposit(
       DEPOSIT_ID,
       { note: 'TXID manually verified' },
       actor,
     );
 
-    expect(transaction.deposit.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: DEPOSIT_ID,
-          status: 'PENDING_REVIEW',
-          openKey: USER_ID,
-        }),
-        data: expect.objectContaining({
-          status: 'APPROVED',
-          openKey: null,
-          reviewedByUserId: USER_ID,
-        }),
-      }),
-    );
-    expect(transaction.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'APPROVE',
-          metadata: expect.objectContaining({
-            downstreamAccountingApplied: false,
-            packageActivationApplied: false,
-          }),
-        }),
-      }),
-    );
+    expect(updateArgs?.where).toMatchObject({
+      id: DEPOSIT_ID,
+      status: 'PENDING_REVIEW',
+      openKey: USER_ID,
+    });
+    expect(updateArgs?.data).toMatchObject({
+      status: 'APPROVED',
+      openKey: null,
+      reviewedByUserId: USER_ID,
+    });
+
+    expect(auditArgs?.data).toMatchObject({
+      action: 'APPROVE',
+      metadata: {
+        downstreamAccountingApplied: false,
+        packageActivationApplied: false,
+      },
+    });
   });
 });
