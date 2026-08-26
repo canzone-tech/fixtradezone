@@ -38,6 +38,17 @@ function dateLabel(value: string) {
   }).format(new Date(value));
 }
 
+async function fetchSubscriptions(): Promise<ResponsePayload> {
+  const response = await fetch("/api/user/subscriptions?limit=100", {
+    cache: "no-store",
+  });
+  const body = (await response.json().catch(() => ({}))) as ResponsePayload;
+  if (!response.ok) {
+    throw new Error(message(body, "Unable to load package subscriptions."));
+  }
+  return body;
+}
+
 export default function UserSubscriptionsPanel() {
   const [loading, setLoading] = useState(true);
   const [payload, setPayload] = useState<ResponsePayload>({});
@@ -47,14 +58,7 @@ export default function UserSubscriptionsPanel() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/user/subscriptions?limit=100", {
-        cache: "no-store",
-      });
-      const body = (await response.json().catch(() => ({}))) as ResponsePayload;
-      if (!response.ok) {
-        throw new Error(message(body, "Unable to load package subscriptions."));
-      }
-      setPayload(body);
+      setPayload(await fetchSubscriptions());
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -67,8 +71,31 @@ export default function UserSubscriptionsPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let mounted = true;
+
+    async function loadInitialSubscriptions() {
+      try {
+        const body = await fetchSubscriptions();
+        if (!mounted) return;
+        setPayload(body);
+      } catch (caught) {
+        if (!mounted) return;
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load package subscriptions.",
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitialSubscriptions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const active = payload.active ?? [];
   const history = payload.history ?? [];
