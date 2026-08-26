@@ -66,37 +66,57 @@ describe('AccountingConfigService', () => {
   });
 
   it('audits SUPER_ADMIN policy changes with previous and current values', async () => {
+    const previousUpdatedAt = new Date('2026-08-26T01:00:00.000Z');
+    const currentUpdatedAt = new Date('2026-08-26T01:05:00.000Z');
+
     transaction.$queryRaw
       .mockResolvedValueOnce([
         {
           depositPostingMode: 'AUTO_ON_APPROVAL',
-          updatedAt: new Date('2026-08-26T01:00:00.000Z'),
+          updatedAt: previousUpdatedAt,
         },
       ])
       .mockResolvedValueOnce([
         {
           depositPostingMode: 'MANUAL_RECONCILIATION',
-          updatedAt: new Date('2026-08-26T01:05:00.000Z'),
+          updatedAt: currentUpdatedAt,
         },
       ]);
     transaction.$executeRaw.mockResolvedValue(1);
 
-    const result = await service.updateAccounting(
-      { depositPostingMode: 'MANUAL_RECONCILIATION' },
-      actor(['SUPER_ADMIN']),
-      { ipAddress: '127.0.0.1', userAgent: 'jest' },
-    );
+    await expect(
+      service.updateAccounting(
+        { depositPostingMode: 'MANUAL_RECONCILIATION' },
+        actor(['SUPER_ADMIN']),
+        { ipAddress: '127.0.0.1', userAgent: 'jest' },
+      ),
+    ).resolves.toEqual({
+      message: 'Accounting configuration updated.',
+      depositPostingMode: 'MANUAL_RECONCILIATION',
+      updatedAt: currentUpdatedAt,
+    });
 
-    expect(result.depositPostingMode).toBe('MANUAL_RECONCILIATION');
+    expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: {
         actorUserId: SUPER_ADMIN_ID,
+        action: 'UPDATE',
         entityType: 'SystemAccountingConfig',
-        metadata: expect.objectContaining({
-          previous: { depositPostingMode: 'AUTO_ON_APPROVAL' },
-          current: { depositPostingMode: 'MANUAL_RECONCILIATION' },
-        }),
-      }),
+        entityId: '1',
+        description:
+          'SUPER_ADMIN updated approved-deposit accounting posting policy.',
+        metadata: {
+          source: 'ADMIN_ACCOUNTING_CONFIG',
+          previous: {
+            depositPostingMode: 'AUTO_ON_APPROVAL',
+          },
+          current: {
+            depositPostingMode: 'MANUAL_RECONCILIATION',
+          },
+        },
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+      },
     });
   });
 });
