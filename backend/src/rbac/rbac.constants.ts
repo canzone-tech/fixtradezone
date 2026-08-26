@@ -12,6 +12,9 @@ export const PERMISSIONS = {
   DEPOSIT_ACCOUNTS_MANAGE: 'deposits.accounts.manage',
   DEPOSITS_READ: 'deposits.read',
   DEPOSITS_REVIEW: 'deposits.review',
+  WALLETS_READ: 'wallets.read',
+  LEDGER_READ: 'ledger.read',
+  LEDGER_POST: 'ledger.post',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -55,11 +58,11 @@ export const SYSTEM_PERMISSIONS = [
   },
   {
     code: PERMISSIONS.DEPOSIT_ACCOUNTS_READ,
-    description: 'View USDT TRC20 receiving accounts',
+    description: 'View configured deposit payment rails and receiving accounts',
   },
   {
     code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE,
-    description: 'Create and manage USDT TRC20 receiving accounts',
+    description: 'Create and manage deposit payment rails and receiving accounts',
   },
   {
     code: PERMISSIONS.DEPOSITS_READ,
@@ -68,6 +71,18 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.DEPOSITS_REVIEW,
     description: 'Approve or reject submitted deposit payments',
+  },
+  {
+    code: PERMISSIONS.WALLETS_READ,
+    description: 'View USER wallet totals and accounting bucket balances',
+  },
+  {
+    code: PERMISSIONS.LEDGER_READ,
+    description: 'View immutable accounting transactions and entries',
+  },
+  {
+    code: PERMISSIONS.LEDGER_POST,
+    description: 'Post or reconcile eligible approved deposits into accounting',
   },
   {
     code: PERMISSIONS.RBAC_READ,
