@@ -82,6 +82,14 @@ export class UpdateDepositPaymentRailDto {
   reason!: string;
 }
 
+export class DepositPaymentRailQueryDto {
+  @IsOptional()
+  @Transform(normalizeUppercase)
+  @IsString()
+  @Matches(ASSET_PATTERN)
+  asset?: string;
+}
+
 export class CreateDepositAccountDto {
   @Transform(trimString)
   @IsString()
@@ -150,6 +158,11 @@ export class CreateDepositDto {
   @IsString()
   @IsUUID()
   packagePlanItemId!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @IsUUID()
+  paymentRailId!: string;
 }
 
 export class SubmitDepositTxidDto {
