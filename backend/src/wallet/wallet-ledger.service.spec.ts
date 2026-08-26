@@ -65,9 +65,7 @@ function ledgerAccount(
   accountKey: string,
   ownerType: 'SYSTEM' | 'USER',
   ownerUserId: string | null,
-  bucket:
-    | (typeof USER_WALLET_BUCKETS)[number]
-    | 'DEPOSIT_CLEARING',
+  bucket: (typeof USER_WALLET_BUCKETS)[number] | 'DEPOSIT_CLEARING',
   normalSide: 'DEBIT' | 'CREDIT',
 ) {
   return {
