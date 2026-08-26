@@ -63,6 +63,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/wallets",
+        label: "Wallets & Ledger",
+        icon: "iconoir-bank",
+        permission: "wallets.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
