@@ -1,200 +1,145 @@
 # FixTradeZone — Current State
 
-## Latest Verified Mainline Checkpoint — 2026-08-25
+## Canonical Checkpoint — 2026-08-26
 
-MLM-01 Referral Foundation is complete, merged into `main`, and reverified locally from the merged mainline.
+This file is the current operational checkpoint for FixTradeZone. Repository state and local verification remain the final acceptance authority.
 
-### Mainline
+## Mainline
 
-- PR #15: `feat(referrals): deliver MLM-01 referral foundation` — MERGED.
+MLM-01 Referral Foundation is complete, merged into `main`, and locally reverified.
+
+- PR #15 merged.
 - Main merge commit: `2a06487b23d2c9cb0bc2078e93bde6eba220c42d`.
-- Local `main` was fast-forwarded to `prashant/main` after merge.
-- Local mainline milestone verification: GREEN.
+- Mainline referral/API/UI acceptance: GREEN.
 
-### Local mainline verification
+## Active Branch
 
-`npm run verify:milestone` passed after the PR merge:
+`feature/packages-foundation`
 
-- Prisma schema validation: GREEN;
-- backend Prettier check: GREEN;
-- backend ESLint: GREEN;
-- backend Jest: 24/24 suites, 129/129 tests;
-- NestJS production build: GREEN;
-- backend diff checks: GREEN;
-- Prisma migration status: 6 migrations, schema up to date;
-- admin ESLint: GREEN;
-- admin TypeScript `tsc --noEmit`: GREEN;
-- Next.js 16.3.1 production build: GREEN;
-- root diff checks: GREEN.
+The branch is ahead of `main` and contains the completed PKG-01 package slice plus full-app PWA/local-HTTPS improvements and the latest roadmap/decision corrections.
 
-## MLM-01 Referral Foundation — COMPLETE
+## PKG-01 — Packages / Plan Foundation
 
-### Backend / database
+Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
-Implemented and accepted:
-
-- referral profiles and sponsor relationships;
-- sponsor-change history;
-- singleton referral system configuration;
-- migration `0006_referral_foundation`;
-- registration-time referral attribution;
-- configured root/default sponsor behavior;
-- self-sponsor and referral-cycle protection;
-- audited sponsor assignment/reassignment;
-- delegated ADMIN sponsor changes behind explicit permission and system switch;
-- direct-referral query API.
-
-USER API:
-
-- `GET /referrals/me`
-- `GET /referrals/me/direct?page=1&limit=20`
-
-ADMIN/SUPER_ADMIN API:
-
-- `GET /admin/referrals/config`
-- `PATCH /admin/referrals/config`
-- `PATCH /admin/referrals/:userId/sponsor`
-
-Registration accepts optional `referralCode`.
-
-Existing-user migration mode remains `LEAVE_UNASSIGNED_FOR_REVIEW`; historical sponsor relationships are never guessed.
-
-### Frontend / BFF
-
-USER:
-
-- `/user/referrals` live referral workspace;
-- live sponsor and assignment status;
-- live direct-referral list;
-- shareable `register?ref=<REFERRAL_CODE>` invite links;
-- `/user/dashboard` live referral assignment state and direct-referral count.
-
-ADMIN/SUPER_ADMIN:
-
-- `/referrals` management workspace;
-- referral enrollment/default sponsor configuration;
-- delegated ADMIN sponsor-change switch;
-- audited sponsor assignment/reassignment controls;
-- permission-aware navigation.
-
-Browser authentication remains same-origin BFF + HttpOnly/SameSite cookies. Session validation/refresh precedes dependent referral data calls to avoid rotating-refresh-token races.
-
-### Integrated acceptance
-
-The accepted browser/API flow proved:
-
-1. SUPER_ADMIN loaded and saved live referral configuration.
-2. Fresh USER A registered, was activated, logged in, and was assigned under the configured founder/root default sponsor.
-3. USER A copied the generated referral invite link.
-4. Fresh USER B registered through USER A's invite link.
-5. USER B was activated and showed USER A as sponsor.
-6. USER A's direct-referral UI/readback showed USER B as `ACTIVE / ASSIGNED` and the direct total increased.
-
-This validates frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback.
-
-## Active Development Slice
-
-New branch from verified `main`:
-
-- `feature/packages-foundation`
-
-Next slice: **Packages / Plan Foundation**.
-
-Reason for sequence: package state/config is a dependency for matching, reward generation, upgrade/renewal behavior, caps, deposit-triggered activation, and later ledger calculations. Commission/reward engines must not be implemented before package semantics and lifecycle are explicit.
-
-## PKG-01 Packages / Plan Foundation — Full-Slice Checkpoint
-
-Founder approval is locked:
-
-- Q33–Q39: Option A;
-- all proposed initial safe defaults;
-- canonical contract: `docs/PACKAGES-PLAN-FOUNDATION.md`;
-- contract commit: `79cd4a5`.
-
-Implemented in the Work checkout:
+Accepted implementation:
 
 - migration `0007_package_plan_foundation`;
-- immutable package definitions and versioned plan/version item models;
-- unpublished nine-item V1 seed;
-- exact decimal string serialization and derived maximum-return/profit values;
-- safe empty USER catalogue before publication;
-- `packages.read` and `packages.draft.manage` permissions, unassigned to ADMIN by default;
-- audited serializable draft create/update/item commands with optimistic revision checks;
-- SUPER_ADMIN-only atomic publication and published-plan closure;
-- effective-range overlap/backdating protection and immutable published terms;
-- protected USER/admin package API surface;
-- focused DTO/service tests and ordered Postman gate;
-- same-origin ADMIN/USER package BFF routes with HttpOnly-cookie authentication;
-- permission-aware Dark Neo `/packages` plan-management workspace;
-- protected Dark Neo `/user/packages` effective catalogue and safe empty state;
-- session-first package loading and coalesced admin shell session resolution;
-- stale-revision UI reload behavior and exact string-decimal rendering.
+- immutable package definitions;
+- atomic versioned plan/version-item aggregate;
+- nine-package V1 plan;
+- audited draft/update/clone/publish workflow;
+- SUPER_ADMIN-only publication controls;
+- optimistic plan revisions;
+- exact decimal strings for all package economics;
+- immutable published commercial terms;
+- protected package APIs;
+- same-origin ADMIN/USER BFF routes;
+- Dark Neo `/packages` admin workspace;
+- Dark Neo `/user/packages` user catalogue;
+- full-app PWA scope `/` with trusted local HTTPS/LAN acceptance;
+- static-only safe service-worker caching; no sensitive API/business state caching.
 
-Automated Work-checkout verification is GREEN:
+Final local acceptance:
 
-- Prisma schema validation/generation;
-- 26/26 backend suites, 148/148 tests;
-- backend Prettier, ESLint and Nest production build;
-- admin ESLint, TypeScript and Next.js production build with 44 routes.
+- ordered PKG-01 Postman API run: GREEN;
+- SQL package/audit readback: GREEN;
+- migration status: 7 migrations, schema up to date;
+- backend Prisma validation: GREEN;
+- backend Prettier + ESLint: GREEN;
+- backend Jest: 26/26 suites, 148/148 tests;
+- Nest production build: GREEN;
+- backend diff gate: GREEN;
+- admin ESLint: GREEN;
+- admin TypeScript: GREEN;
+- Next.js 16.3.1 production build: GREEN, 44 routes;
+- final local working tree was clean before the documentation checkpoint updates.
 
-Operator-confirmed local database gate:
+PKG-01 intentionally contains no package purchase, activation, balance, earning, deposit, subscription or ledger mutation.
 
-- a verified pre-0007 backup was taken;
-- `0007_package_plan_foundation` deployed successfully;
-- `npm run verify:milestone` passed with seven migrations and schema up to date.
+## Product Scope Correction — LOCKED
 
-The first ordered Postman run reached request 05 and exposed an omitted-field
-partial-update bug before publication. The backend now preserves omitted rate
-terms, ignores omitted DTO fields in audit/change detection, rejects reason-only
-writes, and includes regression coverage. The full Postman, SQL and integrated
-browser gate remains pending and will be run as one combined acceptance pass at
-the Founder's direction. No mutable financial balance, earning, deposit,
-activation, subscription or ledger state exists in PKG-01.
+There is **no AI Agents milestone in FixTradeZone v1**.
 
-## Locked Delivery Workflow
+Older backbone/roadmap references to `AI Agents` are superseded by the Founder's later scope decision. FixTradeZone does not execute real trades and will not implement an AI trading engine, broker/exchange execution, strategy execution or automated trading.
 
-1. Work locks business semantics and implementation contract.
-2. Codex/engineering implements one focused vertical slice on the feature branch.
-3. Backend/API may use Postman as an intermediate checkpoint.
-4. Matching frontend/BFF/UI is implemented in the same slice.
-5. Run `npm run verify:local`.
-6. Apply DB migrations explicitly when required and run `npm run verify:milestone`.
-7. Final module acceptance is API + frontend together locally.
-8. Update persistent docs.
-9. Open PR only after all gates are green.
+Future trade-like presentation is limited to explicitly labelled **Simulated Trade Activity** / **SIMULATED RESULTS**. It must never be represented as real trading or realized/withdrawable trading profit.
 
-Local verification remains the acceptance authority even when Work/Codex/CI reports success.
+## Immediate Next Milestone
 
-## Core Architecture / Security
+### DEP-01A — Deposit Accounts / USDT TRC20 Receiving Accounts
 
-- Backend: NestJS + TypeScript.
-- ORM: Prisma 7.9.1 with MariaDB adapter.
-- Relational source of truth: MySQL.
-- MongoDB reserved for document/config/CMS use where appropriate.
-- Redis for transient/cache/session-adjacent infrastructure.
-- Frontend/admin/user portal: Next.js.
-- JWT access + rotating refresh sessions.
-- Browser auth boundary: same-origin BFF + HttpOnly/SameSite cookies.
-- RBAC roles: `SUPER_ADMIN`, `ADMIN`, `USER`.
-- Backend remains authentication/authorization authority.
-- Financial modules must use SQL `DECIMAL`, idempotency, immutable/auditable ledger entries, reversals and explicit authorization.
-- Simulated activity must always be explicitly labelled simulated and never presented as real trading/profits.
+Next implementation after PKG-01 handoff.
 
-## Continuity
+Locked foundation:
 
-GitHub repository + committed `docs/` are the permanent source of truth.
+- ADMIN/SUPER_ADMIN manages multiple public USDT TRC20 receiving accounts;
+- no private keys or seed phrases are ever stored;
+- receiving accounts have explicit active/disabled lifecycle;
+- account changes are authorized and audited;
+- backend chooses eligible active accounts; USER never chooses the receiving account;
+- deposit/account data remains in MySQL.
 
-Work and Codex are acceleration layers. If they are unavailable or limits are reached, resume in normal Chat from:
+### DEP-01B — Deposits / TXID / Manual Approval
 
-1. current Git branch/commit;
-2. this file;
-3. `docs/WORK-CODEX-OPERATING-BRIEF.md`;
-4. relevant business-rule / architecture documents.
+Immediately follows DEP-01A.
 
-## Immediate Next Action
+Locked flow:
 
-Complete the combined local acceptance in `docs/LOCAL-VERIFY-PACKAGES.md`:
-resume the corrected ordered Postman flow without replaying the already-applied
-request 04 mutation, run SQL/audit readback, verify `/packages` and
-`/user/packages` in the browser, and rerun `npm run verify:milestone`. Push or
-open a PR only after the Founder accepts that combined gate.
+1. USER initiates a deposit/payment flow.
+2. Backend randomly assigns one eligible active USDT TRC20 receiving account.
+3. Assigned `depositAccountId` is persisted with the deposit.
+4. USER sees only the assigned public wallet address + QR.
+5. USER sends USDT and submits the TXID manually.
+6. Deposit becomes `PENDING` / `PENDING_REVIEW`.
+7. Authorized ADMIN/SUPER_ADMIN manually verifies and APPROVES or REJECTS.
+8. Duplicate TXIDs are rejected.
+9. Approval/rejection is audited and idempotent.
+10. Deposit approval itself does not silently mutate balances; controlled ledger/accounting integration follows in the Wallet/Ledger milestone.
+
+Financial invariants:
+
+- SQL `DECIMAL` only for money;
+- no FLOAT/DOUBLE for financial values;
+- no client-supplied value is sufficient to credit funds;
+- financial writes use authorization, source-of-truth validation, transaction boundaries, idempotency and immutable audit/history;
+- no blockchain auto-verification in DEP-01 unless explicitly approved later.
+
+## Current V1 Sequence
+
+1. DEP-01A Deposit Accounts
+2. DEP-01B Deposits / TXID / Approval
+3. Wallet / Ledger foundation + controlled accounting credit
+4. Package subscription / activation from approved payment
+5. Referral commissions on legitimate package/payment events
+6. Rewards / caps / lifecycle accounting
+7. Simulated Trade Activity display only
+8. Minimal v1 landing/template controls
+9. Remaining USER/ADMIN operational slices
+10. Notifications/reports required for launch
+11. QA/security/release hardening
+12. Production deployment
+
+## Infrastructure / Data Ownership
+
+- MySQL is the relational/business/accounting source of truth.
+- MongoDB is reserved for later document/CMS/flexible configuration use where actually required.
+- Redis is transient infrastructure and should only be used when a repository feature actually needs it.
+- Do not introduce new infrastructure merely because it exists in the architecture plan.
+
+## Delivery Workflow
+
+For every module:
+
+1. reconcile live repo + docs;
+2. lock business semantics;
+3. implement one focused vertical slice;
+4. test APIs locally first;
+5. implement matching BFF/UI;
+6. run automated local verification;
+7. apply/verify DB migration explicitly;
+8. complete integrated API + frontend acceptance;
+9. update docs;
+10. open PR to `main` only after all gates are GREEN.
+
+Production deployment remains deferred until the required v1 product and local acceptance milestones are complete.
