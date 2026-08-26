@@ -126,6 +126,44 @@ export function compactDecimal(value: string): string {
   return value.replace(/0+$/, "").replace(/\.$/, "") || "0";
 }
 
+export function normalizeTransactionId(
+  network: DepositNetwork,
+  value: string,
+): string | null {
+  const trimmed = value.trim();
+
+  if (network === "TRC20") {
+    return /^[0-9a-fA-F]{64}$/.test(trimmed) ? trimmed.toLowerCase() : null;
+  }
+
+  if (
+    ["ERC20", "BEP20", "POLYGON", "ARBITRUM", "BASE", "OPTIMISM"].includes(
+      network,
+    )
+  ) {
+    if (!/^(?:0x)?[0-9a-fA-F]{64}$/.test(trimmed)) return null;
+    return trimmed.toLowerCase().replace(/^0x/, "");
+  }
+
+  if (network === "SOLANA") {
+    return /^[1-9A-HJ-NP-Za-km-z]{80,100}$/.test(trimmed) ? trimmed : null;
+  }
+
+  return null;
+}
+
+export function transactionIdHint(network: DepositNetwork): string {
+  if (network === "SOLANA") {
+    return "Solana transaction signature";
+  }
+
+  if (network === "TRC20") {
+    return "64-character TRON transaction ID";
+  }
+
+  return "EVM transaction hash (0x prefix optional)";
+}
+
 export function statusLabel(status: DepositStatus): string {
   return status
     .toLowerCase()
