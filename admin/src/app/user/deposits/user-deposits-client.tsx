@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import UserShell from "@/components/user/user-shell";
 import styles from "@/components/deposits/deposits.module.css";
 import {
   type ApiMessagePayload,
@@ -14,6 +16,24 @@ import {
   statusTone,
 } from "@/lib/deposits";
 import type { PackageCatalogue, PackagePlanItem } from "@/lib/packages";
+import type { UserDirectSession } from "@/lib/user-session";
+
+interface UserDepositWorkspace {
+  session: UserDirectSession;
+  packages: PackagePlanItem[];
+  deposits: Deposit[];
+}
+
+class UserWorkspaceAccessError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly redirectTo: string | null,
+  ) {
+    super(message);
+    this.name = "UserWorkspaceAccessError";
+  }
+}
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -23,7 +43,95 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
+function redirectFor(error: unknown): string | null {
+  if (!(error instanceof UserWorkspaceAccessError)) return null;
+  if (error.status === 401) return "/login";
+  if (error.status === 403) {
+    return error.redirectTo === "/dashboard" ? "/dashboard" : "/login";
+  }
+  return null;
+}
+
+async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
+  // Resolve/refresh the USER session first so dependent BFF calls never race a
+  // rotating refresh token.
+  const sessionResponse = await fetch("/api/user/session", {
+    cache: "no-store",
+  });
+  const sessionPayload = await readJson<UserDirectSession & ApiMessagePayload>(
+    sessionResponse,
+  );
+
+  if (sessionResponse.status === 401 || sessionResponse.status === 403) {
+    throw new UserWorkspaceAccessError(
+      messageFrom(sessionPayload, "USER session is unavailable."),
+      sessionResponse.status,
+      sessionPayload?.redirectTo ?? null,
+    );
+  }
+
+  if (
+    !sessionResponse.ok ||
+    !sessionPayload?.user ||
+    !sessionPayload.sessionPolicy
+  ) {
+    throw new Error(messageFrom(sessionPayload, "Unable to load USER session."));
+  }
+
+  // These are intentionally sequential after session resolution. The fresh
+  // access token can then be reused without parallel refresh-token rotation.
+  const packageResponse = await fetch("/api/user/packages", {
+    cache: "no-store",
+  });
+  const packagePayload = await readJson<PackageCatalogue & ApiMessagePayload>(
+    packageResponse,
+  );
+
+  if (packageResponse.status === 401 || packageResponse.status === 403) {
+    throw new UserWorkspaceAccessError(
+      messageFrom(packagePayload, "USER package access is unavailable."),
+      packageResponse.status,
+      packagePayload?.redirectTo ?? null,
+    );
+  }
+
+  if (!packageResponse.ok || !packagePayload) {
+    throw new Error(
+      messageFrom(packagePayload, "Could not load available packages."),
+    );
+  }
+
+  const depositResponse = await fetch("/api/user/deposits", {
+    cache: "no-store",
+  });
+  const depositPayload = await readJson<DepositsResponse & ApiMessagePayload>(
+    depositResponse,
+  );
+
+  if (depositResponse.status === 401 || depositResponse.status === 403) {
+    throw new UserWorkspaceAccessError(
+      messageFrom(depositPayload, "USER deposit access is unavailable."),
+      depositResponse.status,
+      depositPayload?.redirectTo ?? null,
+    );
+  }
+
+  if (!depositResponse.ok || !depositPayload) {
+    throw new Error(messageFrom(depositPayload, "Could not load deposit history."));
+  }
+
+  return {
+    session: sessionPayload,
+    packages: packagePayload.catalogueAvailable
+      ? packagePayload.items.filter((item) => item.availability === "AVAILABLE")
+      : [],
+    deposits: depositPayload.deposits,
+  };
+}
+
 export default function UserDepositsClient() {
+  const router = useRouter();
+  const [session, setSession] = useState<UserDirectSession | null>(null);
   const [packages, setPackages] = useState<PackagePlanItem[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
@@ -54,60 +162,74 @@ export default function UserDepositsClient() {
     [availablePackages, selectedPackageId],
   );
 
-  const load = useCallback(async () => {
+  function applyWorkspace(workspace: UserDepositWorkspace) {
+    setSession(workspace.session);
+    setPackages(workspace.packages);
+    setDeposits(workspace.deposits);
+    setSelectedPackageId((current) =>
+      workspace.packages.some((item) => item.id === current)
+        ? current
+        : (workspace.packages[0]?.id ?? ""),
+    );
+  }
+
+  async function reloadWorkspace() {
     setLoading(true);
     setError(null);
 
     try {
-      const [packageResponse, depositResponse] = await Promise.all([
-        fetch("/api/user/packages", { cache: "no-store" }),
-        fetch("/api/user/deposits", { cache: "no-store" }),
-      ]);
-
-      const packagePayload = await readJson<PackageCatalogue & ApiMessagePayload>(
-        packageResponse,
-      );
-      const depositPayload = await readJson<DepositsResponse & ApiMessagePayload>(
-        depositResponse,
-      );
-
-      if (!packageResponse.ok || !packagePayload) {
-        throw new Error(
-          messageFrom(packagePayload, "Could not load available packages."),
-        );
+      applyWorkspace(await fetchUserDepositWorkspace());
+    } catch (caught) {
+      const redirectTo = redirectFor(caught);
+      if (redirectTo) {
+        router.replace(redirectTo);
+        router.refresh();
+        return;
       }
 
-      if (!depositResponse.ok || !depositPayload) {
-        throw new Error(
-          messageFrom(depositPayload, "Could not load deposit history."),
-        );
-      }
-
-      const available = packagePayload.catalogueAvailable
-        ? packagePayload.items.filter((item) => item.availability === "AVAILABLE")
-        : [];
-
-      setPackages(available);
-      setDeposits(depositPayload.deposits);
-      setSelectedPackageId((current) =>
-        available.some((item) => item.id === current)
-          ? current
-          : (available[0]?.id ?? ""),
-      );
-    } catch (loadError) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not load deposit workspace.",
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let mounted = true;
+
+    async function loadInitialWorkspace() {
+      try {
+        const workspace = await fetchUserDepositWorkspace();
+        if (mounted) applyWorkspace(workspace);
+      } catch (caught) {
+        const redirectTo = redirectFor(caught);
+        if (redirectTo) {
+          router.replace(redirectTo);
+          router.refresh();
+          return;
+        }
+
+        if (mounted) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load deposit workspace.",
+          );
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitialWorkspace();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   async function createDeposit() {
     if (!selectedPackageId || openDeposit) return;
@@ -131,7 +253,7 @@ export default function UserDepositsClient() {
       }
 
       setNotice(payload.message);
-      await load();
+      await reloadWorkspace();
     } catch (createError) {
       setError(
         createError instanceof Error
@@ -170,7 +292,7 @@ export default function UserDepositsClient() {
 
       setTxid("");
       setNotice(payload.message);
-      await load();
+      await reloadWorkspace();
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -192,236 +314,240 @@ export default function UserDepositsClient() {
   }
 
   return (
-    <div className={styles.page}>
-      <section className={styles.hero}>
-        <div>
-          <p className={styles.eyebrow}>USDT / TRC20</p>
-          <h1>Deposits</h1>
-          <p>
-            Create a package payment request, send the exact USDT amount to the
-            server-assigned TRC20 address, then submit the transaction ID for
-            manual review. An approved payment does not become wallet balance or
-            an active package until the later accounting/activation milestone.
-          </p>
-        </div>
-        {openDeposit ? (
-          <span
-            className={styles.badge}
-            data-tone={statusTone(openDeposit.status)}
-          >
-            {statusLabel(openDeposit.status)}
-          </span>
-        ) : null}
-      </section>
-
-      {notice ? <div className={styles.success}>{notice}</div> : null}
-      {error ? <div className={styles.error}>{error}</div> : null}
-
-      {loading ? (
-        <div className={styles.card}>
-          <div className={styles.empty}>Loading deposit workspace…</div>
-        </div>
-      ) : openDeposit ? (
-        <section className={styles.card}>
-          <div className={styles.cardHeader}>
-            <div>
-              <p className={styles.eyebrow}>Open Deposit</p>
-              <h2>{openDeposit.packageDisplayName}</h2>
-            </div>
+    <UserShell session={session}>
+      <div className={styles.page}>
+        <section className={styles.hero}>
+          <div>
+            <p className={styles.eyebrow}>USDT / TRC20</p>
+            <h1>Deposits</h1>
+            <p>
+              Create a package payment request, send the exact USDT amount to the
+              server-assigned TRC20 address, then submit the transaction ID for
+              manual review. An approved payment does not become wallet balance or
+              an active package until the later accounting/activation milestone.
+            </p>
+          </div>
+          {openDeposit ? (
             <span
               className={styles.badge}
               data-tone={statusTone(openDeposit.status)}
             >
               {statusLabel(openDeposit.status)}
             </span>
-          </div>
-
-          <div className={styles.qrWrap}>
-            {/* Stored account QR is an operator-controlled data URL snapshot. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              className={styles.qr}
-              src={openDeposit.assignedQrCodeDataUrl}
-              alt={`USDT TRC20 QR for ${openDeposit.assignedAccountLabel}`}
-            />
-            <div className={styles.list}>
-              <div className={styles.kv}>
-                <div>
-                  <small>Exact amount</small>
-                  <strong>
-                    {compactDecimal(openDeposit.amount)} {openDeposit.currency}
-                  </strong>
-                </div>
-                <div>
-                  <small>Network</small>
-                  <strong>{openDeposit.assignedNetwork}</strong>
-                </div>
-                <div className={styles.full}>
-                  <small>Assigned receiving address</small>
-                  <strong className={styles.mono}>
-                    {openDeposit.assignedWalletAddress}
-                  </strong>
-                </div>
-              </div>
-              <div className={styles.actions}>
-                <button
-                  className={styles.buttonSecondary}
-                  type="button"
-                  onClick={() => void copyAddress(openDeposit.assignedWalletAddress)}
-                >
-                  Copy address
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {openDeposit.status === "AWAITING_TXID" ? (
-            <div className={styles.formGrid}>
-              <div className={`${styles.field} ${styles.full}`}>
-                <label htmlFor="deposit-txid">TRON transaction ID (TXID)</label>
-                <input
-                  className={styles.input}
-                  id="deposit-txid"
-                  value={txid}
-                  onChange={(event) => setTxid(event.target.value)}
-                  placeholder="64 hexadecimal characters"
-                  maxLength={64}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                />
-              </div>
-              <div className={`${styles.actions} ${styles.full}`}>
-                <button
-                  className={styles.button}
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void submitTxid(openDeposit)}
-                >
-                  {busy === `txid-${openDeposit.id}`
-                    ? "Submitting…"
-                    : "Submit TXID for review"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.notice}>
-              TXID <span className={styles.mono}>{openDeposit.txid}</span> was
-              submitted {formatDate(openDeposit.submittedAt)}. Manual review is
-              pending; do not send another payment for this request.
-            </div>
-          )}
+          ) : null}
         </section>
-      ) : (
+
+        {notice ? <div className={styles.success}>{notice}</div> : null}
+        {error ? <div className={styles.error}>{error}</div> : null}
+
+        {loading ? (
+          <div className={styles.card}>
+            <div className={styles.empty}>Loading deposit workspace…</div>
+          </div>
+        ) : openDeposit ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div>
+                <p className={styles.eyebrow}>Open Deposit</p>
+                <h2>{openDeposit.packageDisplayName}</h2>
+              </div>
+              <span
+                className={styles.badge}
+                data-tone={statusTone(openDeposit.status)}
+              >
+                {statusLabel(openDeposit.status)}
+              </span>
+            </div>
+
+            <div className={styles.qrWrap}>
+              {/* Stored account QR is an operator-controlled data URL snapshot. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className={styles.qr}
+                src={openDeposit.assignedQrCodeDataUrl}
+                alt={`USDT TRC20 QR for ${openDeposit.assignedAccountLabel}`}
+              />
+              <div className={styles.list}>
+                <div className={styles.kv}>
+                  <div>
+                    <small>Exact amount</small>
+                    <strong>
+                      {compactDecimal(openDeposit.amount)} {openDeposit.currency}
+                    </strong>
+                  </div>
+                  <div>
+                    <small>Network</small>
+                    <strong>{openDeposit.assignedNetwork}</strong>
+                  </div>
+                  <div className={styles.full}>
+                    <small>Assigned receiving address</small>
+                    <strong className={styles.mono}>
+                      {openDeposit.assignedWalletAddress}
+                    </strong>
+                  </div>
+                </div>
+                <div className={styles.actions}>
+                  <button
+                    className={styles.buttonSecondary}
+                    type="button"
+                    onClick={() =>
+                      void copyAddress(openDeposit.assignedWalletAddress)
+                    }
+                  >
+                    Copy address
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {openDeposit.status === "AWAITING_TXID" ? (
+              <div className={styles.formGrid}>
+                <div className={`${styles.field} ${styles.full}`}>
+                  <label htmlFor="deposit-txid">TRON transaction ID (TXID)</label>
+                  <input
+                    className={styles.input}
+                    id="deposit-txid"
+                    value={txid}
+                    onChange={(event) => setTxid(event.target.value)}
+                    placeholder="64 hexadecimal characters"
+                    maxLength={64}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                  />
+                </div>
+                <div className={`${styles.actions} ${styles.full}`}>
+                  <button
+                    className={styles.button}
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void submitTxid(openDeposit)}
+                  >
+                    {busy === `txid-${openDeposit.id}`
+                      ? "Submitting…"
+                      : "Submit TXID for review"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.notice}>
+                TXID <span className={styles.mono}>{openDeposit.txid}</span> was
+                submitted {formatDate(openDeposit.submittedAt)}. Manual review is
+                pending; do not send another payment for this request.
+              </div>
+            )}
+          </section>
+        ) : (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div>
+                <p className={styles.eyebrow}>New Deposit</p>
+                <h2>Select package</h2>
+              </div>
+            </div>
+
+            {availablePackages.length === 0 ? (
+              <div className={styles.empty}>
+                No currently available package can create a deposit request.
+              </div>
+            ) : (
+              <div className={styles.formGrid}>
+                <div className={`${styles.field} ${styles.full}`}>
+                  <label htmlFor="deposit-package">Package</label>
+                  <select
+                    className={styles.select}
+                    id="deposit-package"
+                    value={selectedPackageId}
+                    onChange={(event) => setSelectedPackageId(event.target.value)}
+                  >
+                    {availablePackages.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.displayName} — {compactDecimal(item.price)} {item.currency}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedPackage ? (
+                  <div className={`${styles.notice} ${styles.full}`}>
+                    The backend will use the published price of{" "}
+                    <strong>{compactDecimal(selectedPackage.price)} USDT</strong>{" "}
+                    and randomly assign an active TRC20 receiving account. You
+                    cannot choose or override the payment address.
+                  </div>
+                ) : null}
+
+                <div className={`${styles.actions} ${styles.full}`}>
+                  <button
+                    className={styles.button}
+                    type="button"
+                    disabled={!selectedPackageId || busy !== null}
+                    onClick={() => void createDeposit()}
+                  >
+                    {busy === "create" ? "Creating…" : "Create deposit request"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.eyebrow}>New Deposit</p>
-              <h2>Select package</h2>
+              <p className={styles.eyebrow}>History</p>
+              <h2>My deposits</h2>
             </div>
+            <button
+              className={styles.buttonSecondary}
+              type="button"
+              disabled={loading}
+              onClick={() => void reloadWorkspace()}
+            >
+              Refresh
+            </button>
           </div>
 
-          {availablePackages.length === 0 ? (
-            <div className={styles.empty}>
-              No currently available package can create a deposit request.
-            </div>
+          {deposits.length === 0 ? (
+            <div className={styles.empty}>No deposit requests yet.</div>
           ) : (
-            <div className={styles.formGrid}>
-              <div className={`${styles.field} ${styles.full}`}>
-                <label htmlFor="deposit-package">Package</label>
-                <select
-                  className={styles.select}
-                  id="deposit-package"
-                  value={selectedPackageId}
-                  onChange={(event) => setSelectedPackageId(event.target.value)}
-                >
-                  {availablePackages.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.displayName} — {compactDecimal(item.price)} {item.currency}
-                    </option>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Package</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>TXID</th>
+                    <th>Created</th>
+                    <th>Review</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deposits.map((deposit) => (
+                    <tr key={deposit.id}>
+                      <td>{deposit.packageDisplayName}</td>
+                      <td>
+                        {compactDecimal(deposit.amount)} {deposit.currency}
+                      </td>
+                      <td>
+                        <span
+                          className={styles.badge}
+                          data-tone={statusTone(deposit.status)}
+                        >
+                          {statusLabel(deposit.status)}
+                        </span>
+                      </td>
+                      <td className={styles.mono}>{deposit.txid ?? "—"}</td>
+                      <td>{formatDate(deposit.createdAt)}</td>
+                      <td>{deposit.reviewNote ?? "—"}</td>
+                    </tr>
                   ))}
-                </select>
-              </div>
-
-              {selectedPackage ? (
-                <div className={`${styles.notice} ${styles.full}`}>
-                  The backend will use the published price of{" "}
-                  <strong>{compactDecimal(selectedPackage.price)} USDT</strong>{" "}
-                  and randomly assign an active TRC20 receiving account. You
-                  cannot choose or override the payment address.
-                </div>
-              ) : null}
-
-              <div className={`${styles.actions} ${styles.full}`}>
-                <button
-                  className={styles.button}
-                  type="button"
-                  disabled={!selectedPackageId || busy !== null}
-                  onClick={() => void createDeposit()}
-                >
-                  {busy === "create" ? "Creating…" : "Create deposit request"}
-                </button>
-              </div>
+                </tbody>
+              </table>
             </div>
           )}
         </section>
-      )}
-
-      <section className={styles.card}>
-        <div className={styles.cardHeader}>
-          <div>
-            <p className={styles.eyebrow}>History</p>
-            <h2>My deposits</h2>
-          </div>
-          <button
-            className={styles.buttonSecondary}
-            type="button"
-            disabled={loading}
-            onClick={() => void load()}
-          >
-            Refresh
-          </button>
-        </div>
-
-        {deposits.length === 0 ? (
-          <div className={styles.empty}>No deposit requests yet.</div>
-        ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Package</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>TXID</th>
-                  <th>Created</th>
-                  <th>Review</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deposits.map((deposit) => (
-                  <tr key={deposit.id}>
-                    <td>{deposit.packageDisplayName}</td>
-                    <td>
-                      {compactDecimal(deposit.amount)} {deposit.currency}
-                    </td>
-                    <td>
-                      <span
-                        className={styles.badge}
-                        data-tone={statusTone(deposit.status)}
-                      >
-                        {statusLabel(deposit.status)}
-                      </span>
-                    </td>
-                    <td className={styles.mono}>{deposit.txid ?? "—"}</td>
-                    <td>{formatDate(deposit.createdAt)}</td>
-                    <td>{deposit.reviewNote ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </div>
+      </div>
+    </UserShell>
   );
 }
