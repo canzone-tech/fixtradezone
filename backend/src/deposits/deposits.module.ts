@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AdminDepositAccountsController } from './admin-deposit-accounts.controller';
 import { AdminDepositPaymentRailsController } from './admin-deposit-payment-rails.controller';
@@ -9,7 +10,7 @@ import { DepositsController } from './deposits.controller';
 import { DepositsService } from './deposits.service';
 
 @Module({
-  imports: [WalletModule, PlatformConfigModule],
+  imports: [WalletModule, PlatformConfigModule, SubscriptionsModule],
   controllers: [
     DepositsController,
     AdminDepositPaymentRailsController,
