@@ -85,3 +85,7 @@ Published terms are immutable; corrections clone into a new draft. Effective
 ranges cannot overlap or be backdated. Historical business events retain their
 exact plan-item reference. PKG-01 exposes configuration/catalogue only and does
 not create purchases, activations, balances, earnings or ledger state.
+
+## ADR-027 — No AI Agents milestone in FixTradeZone v1
+
+LOCKED. Older planning references to `AI Agents` are superseded by the Founder's later scope decision. FixTradeZone v1 does not implement an AI trading engine, broker/exchange integration, strategy execution or automated trading. The next product milestone after PKG-01 is the USDT TRC20 deposit flow: Deposit Accounts first, then Deposits/TXID/manual approval. Any later trade-like visualization is limited to clearly labelled Simulated Trade Activity and must never be represented as real trading or realized profit.
