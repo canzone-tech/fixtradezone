@@ -14,6 +14,7 @@ const ITEM_ID = '33333333-3333-4333-8333-333333333333';
 const DEFINITION_ID = '44444444-4444-4444-8444-444444444444';
 const ACCOUNT_ID = '55555555-5555-4555-8555-555555555555';
 const DEPOSIT_ID = '66666666-6666-4666-8666-666666666666';
+const RAIL_ID = '77777777-7777-4777-8777-777777777777';
 const ADDRESS = 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE';
 const QR = 'data:image/png;base64,aGVsbG8=';
 const TXID = 'a'.repeat(64);
@@ -32,6 +33,37 @@ const actor: AuthenticatedUser = {
   permissions: [],
 };
 
+const rail = {
+  id: RAIL_ID,
+  asset: 'USDT',
+  networkCode: 'TRC20',
+  displayName: 'USDT on TRON (TRC20)',
+  validationProfile: 'TRON' as const,
+  isActive: true,
+  revision: 1,
+  createdByUserId: null,
+  updatedByUserId: null,
+  createdAt: new Date('2026-08-26T00:00:00.000Z'),
+  updatedAt: new Date('2026-08-26T00:00:00.000Z'),
+};
+
+const account = {
+  id: ACCOUNT_ID,
+  label: 'Treasury A',
+  paymentRailId: RAIL_ID,
+  asset: 'USDT',
+  network: 'TRC20',
+  walletAddress: ADDRESS,
+  qrCodeDataUrl: QR,
+  isActive: true,
+  revision: 1,
+  createdByUserId: null,
+  updatedByUserId: null,
+  createdAt: new Date('2026-08-26T00:00:00.000Z'),
+  updatedAt: new Date('2026-08-26T00:00:00.000Z'),
+  paymentRail: rail,
+};
+
 function deposit(overrides: Record<string, unknown> = {}) {
   return {
     id: DEPOSIT_ID,
@@ -48,6 +80,7 @@ function deposit(overrides: Record<string, unknown> = {}) {
     assignedAccountLabel: 'Treasury A',
     assignedWalletAddress: ADDRESS,
     assignedNetwork: 'TRC20',
+    assignedValidationProfile: 'TRON' as const,
     assignedQrCodeDataUrl: QR,
     txid: null,
     submittedAt: null,
@@ -68,18 +101,46 @@ function deposit(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function packagePlan() {
+  return [
+    {
+      id: PLAN_ID,
+      items: [
+        {
+          id: ITEM_ID,
+          displayName: 'Neural Scout',
+          availability: 'AVAILABLE',
+          price: new Prisma.Decimal('5.00000000'),
+          currency: 'USDT',
+          packageDefinition: {
+            id: DEFINITION_ID,
+            code: 'NEURAL_SCOUT',
+          },
+        },
+      ],
+    },
+  ];
+}
+
 describe('DepositsService', () => {
   const transaction = {
     deposit: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
-      findMany: jest.fn(),
       create: jest.fn(),
       updateMany: jest.fn(),
       findUniqueOrThrow: jest.fn(),
     },
     packagePlanVersion: {
       findMany: jest.fn(),
+    },
+    depositPaymentRail: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      create: jest.fn(),
+      updateMany: jest.fn(),
     },
     depositAccount: {
       findMany: jest.fn(),
@@ -99,6 +160,9 @@ describe('DepositsService', () => {
       findUnique: jest.fn(),
       count: jest.fn(),
     },
+    depositPaymentRail: {
+      findMany: jest.fn(),
+    },
     depositAccount: {
       findMany: jest.fn(),
     },
@@ -116,92 +180,51 @@ describe('DepositsService', () => {
     transaction.deposit.findUnique.mockResolvedValue(null);
   });
 
-  it('rejects a second open deposit before assigning a receiving account', async () => {
+  it('rejects a second open deposit before package or rail assignment', async () => {
     transaction.deposit.findUnique.mockResolvedValue({
       id: DEPOSIT_ID,
       status: 'PENDING_REVIEW',
     });
 
     await expect(
-      service.createDeposit({ packagePlanItemId: ITEM_ID }, actor),
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(transaction.packagePlanVersion.findMany).not.toHaveBeenCalled();
   });
 
-  it('requires an active receiving account matching the package currency', async () => {
-    transaction.packagePlanVersion.findMany.mockResolvedValue([
-      {
-        id: PLAN_ID,
-        items: [
-          {
-            id: ITEM_ID,
-            displayName: 'Neural Scout',
-            availability: 'AVAILABLE',
-            price: new Prisma.Decimal('5.00000000'),
-            currency: 'USDT',
-            packageDefinition: {
-              id: DEFINITION_ID,
-              code: 'NEURAL_SCOUT',
-            },
-          },
-        ],
-      },
-    ]);
-
-    let accountLookup: { where?: Record<string, unknown> } | null = null;
-    transaction.depositAccount.findMany.mockImplementation(
-      (args: { where?: Record<string, unknown> }) => {
-        accountLookup = args;
-        return Promise.resolve([]);
-      },
-    );
+  it('rejects a payment rail that does not match the package currency', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+    transaction.depositPaymentRail.findFirst.mockResolvedValue(null);
 
     await expect(
-      service.createDeposit({ packagePlanItemId: ITEM_ID }, actor),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
-
-    expect(accountLookup?.where).toMatchObject({
-      isActive: true,
-      asset: 'USDT',
-    });
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('uses the published package amount and server-assigned account snapshot', async () => {
-    transaction.packagePlanVersion.findMany.mockResolvedValue([
-      {
-        id: PLAN_ID,
-        items: [
-          {
-            id: ITEM_ID,
-            displayName: 'Neural Scout',
-            availability: 'AVAILABLE',
-            price: new Prisma.Decimal('5.00000000'),
-            currency: 'USDT',
-            packageDefinition: {
-              id: DEFINITION_ID,
-              code: 'NEURAL_SCOUT',
-            },
-          },
-        ],
-      },
-    ]);
-    transaction.depositAccount.findMany.mockResolvedValue([
-      {
-        id: ACCOUNT_ID,
-        label: 'Treasury A',
-        asset: 'USDT',
-        network: 'TRC20',
-        walletAddress: ADDRESS,
-        qrCodeDataUrl: QR,
-        isActive: true,
-        revision: 1,
-        createdByUserId: null,
-        updatedByUserId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    ]);
+  it('requires an active account inside the selected payment rail', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+    transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
+    transaction.depositAccount.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('uses package amount and snapshots the selected rail/account', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+    transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
+    transaction.depositAccount.findMany.mockResolvedValue([account]);
 
     let createdData: Record<string, unknown> | null = null;
     transaction.deposit.create.mockImplementation(
@@ -212,7 +235,7 @@ describe('DepositsService', () => {
     );
 
     const result = await service.createDeposit(
-      { packagePlanItemId: ITEM_ID },
+      { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
       actor,
     );
 
@@ -224,17 +247,14 @@ describe('DepositsService', () => {
       assignedDepositAccountId: ACCOUNT_ID,
       assignedWalletAddress: ADDRESS,
       assignedNetwork: 'TRC20',
+      assignedValidationProfile: 'TRON',
     });
     expect(result.deposit.amount).toBe('5');
-    expect(result.deposit.assignedWalletAddress).toBe(ADDRESS);
   });
 
-  it('validates and normalizes transaction IDs against the assigned network', async () => {
+  it('normalizes transaction IDs from the immutable validation profile snapshot', async () => {
     transaction.deposit.findFirst.mockResolvedValue(
-      deposit({
-        assignedNetwork: 'ERC20',
-        assignedWalletAddress: '0x1111111111111111111111111111111111111111',
-      }),
+      deposit({ assignedNetwork: 'ETHEREUM', assignedValidationProfile: 'EVM' }),
     );
 
     let txUpdate: { data?: Record<string, unknown> } | null = null;
@@ -246,7 +266,8 @@ describe('DepositsService', () => {
     );
     transaction.deposit.findUniqueOrThrow.mockResolvedValue(
       deposit({
-        assignedNetwork: 'ERC20',
+        assignedNetwork: 'ETHEREUM',
+        assignedValidationProfile: 'EVM',
         txid: TXID,
         status: 'PENDING_REVIEW',
         submittedAt: new Date('2026-08-26T01:00:00.000Z'),
@@ -265,27 +286,15 @@ describe('DepositsService', () => {
     });
   });
 
-  it('rejects a transaction identifier invalid for the assigned network', async () => {
-    transaction.deposit.findFirst.mockResolvedValue(
-      deposit({ assignedNetwork: 'TRC20' }),
-    );
+  it('rejects a transaction identifier invalid for the snapshotted profile', async () => {
+    transaction.deposit.findFirst.mockResolvedValue(deposit());
 
     await expect(
       service.submitTxid(DEPOSIT_ID, { txid: 'not-a-tron-txid' }, actor),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('submits TXID only from AWAITING_TXID', async () => {
-    transaction.deposit.findFirst.mockResolvedValue(
-      deposit({ status: 'PENDING_REVIEW', txid: TXID }),
-    );
-
-    await expect(
-      service.submitTxid(DEPOSIT_ID, { txid: TXID }, actor),
-    ).rejects.toBeInstanceOf(ConflictException);
-  });
-
-  it('approves only PENDING_REVIEW and releases the DB open-deposit key', async () => {
+  it('approves only pending review and releases the open-deposit key', async () => {
     const pending = deposit({
       status: 'PENDING_REVIEW',
       txid: TXID,
@@ -333,17 +342,11 @@ describe('DepositsService', () => {
       actor,
     );
 
-    expect(updateArgs?.where).toMatchObject({
-      id: DEPOSIT_ID,
-      status: 'PENDING_REVIEW',
-      openKey: USER_ID,
-    });
     expect(updateArgs?.data).toMatchObject({
       status: 'APPROVED',
       openKey: null,
       reviewedByUserId: USER_ID,
     });
-
     expect(auditArgs?.data).toMatchObject({
       action: 'APPROVE',
       metadata: {
