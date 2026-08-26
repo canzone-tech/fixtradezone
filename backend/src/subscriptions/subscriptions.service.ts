@@ -29,6 +29,15 @@ interface CountRow {
   total: bigint | number | string;
 }
 
+interface IdRow {
+  id: string;
+}
+
+interface FundingEntryRow {
+  side: 'DEBIT' | 'CREDIT';
+  amount: DecimalValue;
+}
+
 interface LedgerTransactionRow {
   id: string;
   kind: 'DEPOSIT_CREDIT' | 'PACKAGE_ACTIVATION_FUNDING';
@@ -136,7 +145,9 @@ export class SubscriptionsService {
     `);
 
     return {
-      active: rows.filter((row) => row.status === 'ACTIVE').map((row) => this.snapshot(row)),
+      active: rows
+        .filter((row) => row.status === 'ACTIVE')
+        .map((row) => this.snapshot(row)),
       history: rows.map((row) => this.snapshot(row)),
       page: query.page,
       limit: query.limit,
@@ -192,7 +203,9 @@ export class SubscriptionsService {
       LIMIT 1
     `);
     const row = rows[0];
-    if (!row) throw new NotFoundException('Package subscription was not found.');
+    if (!row) {
+      throw new NotFoundException('Package subscription was not found.');
+    }
 
     return {
       ...this.snapshot(row),
@@ -287,12 +300,18 @@ export class SubscriptionsService {
           reviewedAt: true,
         },
       });
-      if (!deposit) throw new NotFoundException('Deposit was not found.');
+      if (!deposit) {
+        throw new NotFoundException('Deposit was not found.');
+      }
       if (deposit.status !== 'APPROVED') {
-        throw new ConflictException('Only an approved deposit may activate a package.');
+        throw new ConflictException(
+          'Only an approved deposit may activate a package.',
+        );
       }
 
-      const accountingRows = await transaction.$queryRaw<LedgerTransactionRow[]>(Prisma.sql`
+      const accountingRows = await transaction.$queryRaw<
+        LedgerTransactionRow[]
+      >(Prisma.sql`
         SELECT lt.*
         FROM ledger_transactions lt
         WHERE lt.sourceKey = ${depositCreditSourceKey(deposit.id)}
@@ -314,10 +333,17 @@ export class SubscriptionsService {
         },
       });
       if (!planItem || planItem.planVersionId !== deposit.packagePlanVersionId) {
-        throw new ConflictException('Deposit package snapshot no longer resolves to its source plan item.');
+        throw new ConflictException(
+          'Deposit package snapshot no longer resolves to its source plan item.',
+        );
       }
-      if (!planItem.price.equals(deposit.amount) || planItem.currency !== deposit.currency) {
-        throw new ConflictException('Deposit amount/currency does not match its immutable package source.');
+      if (
+        !planItem.price.equals(deposit.amount) ||
+        planItem.currency !== deposit.currency
+      ) {
+        throw new ConflictException(
+          'Deposit amount/currency does not match its immutable package source.',
+        );
       }
       if (planItem.planVersion.activationTrigger !== 'PAYMENT_APPROVED') {
         throw new ConflictException(
@@ -326,14 +352,14 @@ export class SubscriptionsService {
       }
 
       if (planItem.planVersion.activePackageMode === 'SINGLE_ACTIVE') {
-        const activeRows = await transaction.$queryRaw<CountRow[]>(Prisma.sql`
-          SELECT COUNT(*) AS total
+        const activeRows = await transaction.$queryRaw<IdRow[]>(Prisma.sql`
+          SELECT id
           FROM user_package_subscriptions
           WHERE userId = ${deposit.userId}
             AND status = 'ACTIVE'
-          FOR UPDATE
+          LIMIT 1
         `);
-        if (this.countNumber(activeRows[0]?.total) > 0) {
+        if (activeRows.length > 0) {
           throw new ConflictException(
             'This plan allows only one active package for the USER.',
           );
@@ -385,16 +411,20 @@ export class SubscriptionsService {
         ON DUPLICATE KEY UPDATE sourceKey = VALUES(sourceKey)
       `);
 
-      const fundingRows = await transaction.$queryRaw<LedgerTransactionRow[]>(Prisma.sql`
-        SELECT lt.*
-        FROM ledger_transactions lt
-        WHERE lt.sourceKey = ${fundingSourceKey}
-        LIMIT 1
-        FOR UPDATE
-      `);
+      const fundingRows = await transaction.$queryRaw<LedgerTransactionRow[]>(
+        Prisma.sql`
+          SELECT lt.*
+          FROM ledger_transactions lt
+          WHERE lt.sourceKey = ${fundingSourceKey}
+          LIMIT 1
+          FOR UPDATE
+        `,
+      );
       const fundingTransaction = fundingRows[0];
       if (!fundingTransaction) {
-        throw new ServiceUnavailableException('Package funding transaction could not be established.');
+        throw new ServiceUnavailableException(
+          'Package funding transaction could not be established.',
+        );
       }
 
       const entryCount = await transaction.$queryRaw<CountRow[]>(Prisma.sql`
@@ -439,8 +469,17 @@ export class SubscriptionsService {
         `Package ${deposit.packageDisplayName} principal received by system package principal account.`,
       );
 
+      await this.assertBalancedFundingEntries(
+        transaction,
+        fundingTransaction.id,
+      );
       await this.applyBalance(transaction, mainAccount, 'DEBIT', amount);
-      await this.applyBalance(transaction, principalAccount, 'CREDIT', amount);
+      await this.applyBalance(
+        transaction,
+        principalAccount,
+        'CREDIT',
+        amount,
+      );
 
       const activatedAt = new Date();
       const scheduledEndAt = new Date(
@@ -538,7 +577,8 @@ export class SubscriptionsService {
           action: 'ACTIVATE',
           entityType: 'UserPackageSubscription',
           entityId: subscriptionId,
-          description: 'Approved and accounted deposit activated a USER package.',
+          description:
+            'Approved and accounted deposit activated a USER package.',
           metadata: {
             source: 'PACKAGE_SUBSCRIPTION',
             operation,
@@ -552,6 +592,7 @@ export class SubscriptionsService {
             fundingLedgerTransactionId: fundingTransaction.id,
             debitAccount: mainAccount.accountKey,
             creditAccount: principalAccount.accountKey,
+            balanced: true,
             referralCommissionApplied: false,
             rewardsApplied: false,
           },
@@ -562,12 +603,15 @@ export class SubscriptionsService {
 
       const created = await this.findByDeposit(transaction, deposit.id, false);
       if (!created) {
-        throw new ServiceUnavailableException('Package subscription could not be read after activation.');
+        throw new ServiceUnavailableException(
+          'Package subscription could not be read after activation.',
+        );
       }
 
       return {
         created: true,
-        message: 'Package activated and principal moved from Main / Deposit.',
+        message:
+          'Package activated and principal moved from Main / Deposit.',
         subscription: this.snapshot(created),
       };
     });
@@ -631,7 +675,9 @@ export class SubscriptionsService {
       account.currency !== currency ||
       account.normalSide !== normalSide
     ) {
-      throw new ServiceUnavailableException('Ledger account semantics are inconsistent.');
+      throw new ServiceUnavailableException(
+        'Ledger account semantics are inconsistent.',
+      );
     }
     return account;
   }
@@ -683,6 +729,40 @@ export class SubscriptionsService {
     `);
   }
 
+  private async assertBalancedFundingEntries(
+    transaction: Prisma.TransactionClient,
+    transactionId: string,
+  ) {
+    const entries = await transaction.$queryRaw<FundingEntryRow[]>(Prisma.sql`
+      SELECT side, amount
+      FROM ledger_entries
+      WHERE transactionId = ${transactionId}
+      ORDER BY createdAt ASC, id ASC
+    `);
+    if (entries.length < 2) {
+      throw new ServiceUnavailableException(
+        'Package funding requires debit and credit entries.',
+      );
+    }
+
+    let debit = new Prisma.Decimal(0);
+    let credit = new Prisma.Decimal(0);
+    for (const entry of entries) {
+      const amount = new Prisma.Decimal(entry.amount);
+      if (entry.side === 'DEBIT') {
+        debit = debit.add(amount);
+      } else {
+        credit = credit.add(amount);
+      }
+    }
+
+    if (!debit.eq(credit) || debit.lte(0)) {
+      throw new ServiceUnavailableException(
+        'Package funding ledger transaction is not balanced.',
+      );
+    }
+  }
+
   private async applyBalance(
     transaction: Prisma.TransactionClient,
     account: LedgerAccountRow,
@@ -729,7 +809,9 @@ export class SubscriptionsService {
       settlementTimezone: row.settlementTimezone,
       rewardRateMode: row.rewardRateMode,
       fixedRewardRate:
-        row.fixedRewardRate === null ? null : this.rateString(row.fixedRewardRate),
+        row.fixedRewardRate === null
+          ? null
+          : this.rateString(row.fixedRewardRate),
       minimumRewardRate:
         row.minimumRewardRate === null
           ? null
@@ -776,7 +858,11 @@ export class SubscriptionsService {
     work: (transaction: Prisma.TransactionClient) => Promise<T>,
   ) {
     let lastError: unknown;
-    for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+    for (
+      let attempt = 1;
+      attempt <= MAX_SERIALIZABLE_ATTEMPTS;
+      attempt += 1
+    ) {
       try {
         return await this.prisma.$transaction(work, {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -786,7 +872,9 @@ export class SubscriptionsService {
         const retryable =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2034';
-        if (!retryable || attempt === MAX_SERIALIZABLE_ATTEMPTS) throw error;
+        if (!retryable || attempt === MAX_SERIALIZABLE_ATTEMPTS) {
+          throw error;
+        }
       }
     }
     throw lastError;
