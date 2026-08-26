@@ -11,6 +11,7 @@ const DEFINITION_ID = '99999999-9999-4999-8999-999999999999';
 const ACCOUNTING_TRANSACTION_ID = '55555555-5555-4555-8555-555555555555';
 const FUNDING_TRANSACTION_ID = '66666666-6666-4666-8666-666666666666';
 
+// Keep the audit assertion explicitly typed so strict lint guards the money path.
 interface AuditCreateCall {
   data: {
     action: string;
