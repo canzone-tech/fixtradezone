@@ -112,7 +112,7 @@ describe('DepositApprovalOrchestratorService', () => {
     });
   });
 
-  it('surfaces an accounting failure after approval so reconciliation can recover it', async () => {
+  it('keeps approval successful when accounting needs reconciliation', async () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'AUTO_ON_APPROVAL',
     );
@@ -120,9 +120,11 @@ describe('DepositApprovalOrchestratorService', () => {
       new Error('ledger unavailable'),
     );
 
-    await expect(
-      service.approveDeposit(DEPOSIT_ID, { note: 'verified' }, actor),
-    ).rejects.toThrow('ledger unavailable');
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'verified' },
+      actor,
+    );
 
     expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
     expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledTimes(
@@ -131,6 +133,13 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateFromApprovedDeposit,
     ).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      accountingPostingMode: 'AUTO_ON_APPROVAL',
+      accountingPosted: false,
+      accountingPendingReason: 'ledger unavailable',
+      packageActivated: false,
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
   });
 
   it('keeps approval/accounting successful when package activation needs reconciliation', async () => {
