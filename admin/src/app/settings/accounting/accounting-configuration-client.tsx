@@ -169,6 +169,8 @@ export default function AccountingConfigurationClient() {
     );
   }
 
+  const isAutomatic = mode === "AUTO_ON_APPROVAL";
+
   return (
     <section className={styles.page}>
       {error ? (
@@ -195,116 +197,58 @@ export default function AccountingConfigurationClient() {
           </div>
           <h2>Deposit Accounting</h2>
           <p>
-            Choose whether approved deposits credit the Main / Deposit wallet
-            automatically or wait in the manual reconciliation queue.
+            Select one posting mode for approved deposits. The modes are
+            mutually exclusive and apply only to future approvals.
           </p>
         </div>
 
-        <div
-          className={
-            mode === "AUTO_ON_APPROVAL"
-              ? styles.fullBadge
-              : styles.limitedBadge
-          }
-        >
+        <div className={isAutomatic ? styles.fullBadge : styles.limitedBadge}>
           <i className="iconoir-coins" />
-          {mode === "AUTO_ON_APPROVAL" ? "AUTO POSTING" : "MANUAL POSTING"}
+          {isAutomatic ? "AUTO POSTING" : "MANUAL POSTING"}
         </div>
       </header>
 
       <PlatformSettingsNav active="accounting" />
 
       <div className={styles.grid}>
-        <article className={styles.card}>
+        <article className={styles.card} style={{ gridColumn: "1 / -1" }}>
           <div className={styles.cardTitle}>
             <span className={styles.iconBox}>
-              <i className="iconoir-flash" />
+              <i className="iconoir-settings" />
             </span>
             <div>
-              <h3>Automatic on approval</h3>
+              <h3>Approved deposit posting mode</h3>
               <p>
-                Recommended. Approval immediately creates the idempotent,
-                double-entry wallet credit.
+                Choose whether approval credits Main / Deposit immediately or
+                waits for an authorized reconciliation action.
               </p>
             </div>
           </div>
 
-          <div
-            className={`${styles.settingRow} ${
-              mode === "AUTO_ON_APPROVAL"
-                ? styles.settingSafe
-                : styles.settingWarning
-            }`}
-          >
-            <div>
-              <strong>Credit Main / Deposit after approval</strong>
-              <p>
-                If posting fails, the approved deposit remains recoverable in
-                Accounting Pending and cannot double-credit on retry.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={mode === "AUTO_ON_APPROVAL"}
-              className={`${styles.switch} ${
-                mode === "AUTO_ON_APPROVAL" ? styles.switchOn : ""
-              }`}
-              onClick={() => {
-                setMode("AUTO_ON_APPROVAL");
+          <label className={styles.field}>
+            <span>Posting mode</span>
+            <select
+              className={styles.select}
+              value={mode}
+              onChange={(event) => {
+                setMode(event.target.value as DepositPostingMode);
                 setError(null);
                 setSuccess(null);
               }}
             >
-              <span />
-            </button>
-          </div>
-        </article>
-
-        <article className={styles.card}>
-          <div className={styles.cardTitle}>
-            <span className={styles.iconBox}>
-              <i className="iconoir-task-list" />
-            </span>
-            <div>
-              <h3>Manual reconciliation</h3>
-              <p>
-                Keep approved deposits in the accounting queue until an
-                authorized operator posts them.
-              </p>
-            </div>
-          </div>
-
-          <div
-            className={`${styles.settingRow} ${
-              mode === "MANUAL_RECONCILIATION"
-                ? styles.settingSafe
-                : styles.settingWarning
-            }`}
-          >
-            <div>
-              <strong>Require Post accounting</strong>
-              <p>
-                Intended for QA, migration, incident recovery, and controlled
-                operational periods.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={mode === "MANUAL_RECONCILIATION"}
-              className={`${styles.switch} ${
-                mode === "MANUAL_RECONCILIATION" ? styles.switchOn : ""
-              }`}
-              onClick={() => {
-                setMode("MANUAL_RECONCILIATION");
-                setError(null);
-                setSuccess(null);
-              }}
-            >
-              <span />
-            </button>
-          </div>
+              <option value="AUTO_ON_APPROVAL">
+                Automatic on approval — recommended
+              </option>
+              <option value="MANUAL_RECONCILIATION">
+                Manual reconciliation
+              </option>
+            </select>
+            <small className={styles.fieldHelp}>
+              {isAutomatic
+                ? "Approval immediately posts the idempotent double-entry Main / Deposit credit. If posting fails, the approved deposit remains recoverable in Accounting Pending."
+                : "Approval leaves the deposit in Accounting Pending until an authorized operator uses Post accounting. Intended for QA, migration, incident recovery, or controlled operations."}
+            </small>
+          </label>
         </article>
       </div>
 
