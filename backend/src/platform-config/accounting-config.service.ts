@@ -8,7 +8,8 @@ import type { DepositPostingMode } from './update-accounting-config.dto';
 import { UpdateAccountingConfigDto } from './update-accounting-config.dto';
 
 const CONFIG_ID = 1;
-const DEFAULT_DEPOSIT_POSTING_MODE: DepositPostingMode = 'AUTO_ON_APPROVAL';
+const DEFAULT_DEPOSIT_POSTING_MODE: DepositPostingMode =
+  'AUTO_ON_APPROVAL';
 
 interface AccountingConfigRow {
   depositPostingMode: DepositPostingMode;
