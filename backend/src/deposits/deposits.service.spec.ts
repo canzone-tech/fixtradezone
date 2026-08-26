@@ -1,4 +1,8 @@
-import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
@@ -125,7 +129,7 @@ describe('DepositsService', () => {
     expect(transaction.packagePlanVersion.findMany).not.toHaveBeenCalled();
   });
 
-  it('requires an active USDT TRC20 receiving account', async () => {
+  it('requires an active receiving account matching the package currency', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue([
       {
         id: PLAN_ID,
@@ -149,6 +153,14 @@ describe('DepositsService', () => {
     await expect(
       service.createDeposit({ packagePlanItemId: ITEM_ID }, actor),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    const findManyArgs = transaction.depositAccount.findMany.mock.calls[0]?.[0] as
+      | { where?: Record<string, unknown> }
+      | undefined;
+    expect(findManyArgs?.where).toMatchObject({
+      isActive: true,
+      asset: 'USDT',
+    });
   });
 
   it('uses the published package amount and server-assigned account snapshot', async () => {
@@ -211,6 +223,48 @@ describe('DepositsService', () => {
     });
     expect(result.deposit.amount).toBe('5');
     expect(result.deposit.assignedWalletAddress).toBe(ADDRESS);
+  });
+
+  it('validates and normalizes transaction IDs against the assigned network', async () => {
+    transaction.deposit.findFirst.mockResolvedValue(
+      deposit({
+        assignedNetwork: 'ERC20',
+        assignedWalletAddress: '0x1111111111111111111111111111111111111111',
+      }),
+    );
+    transaction.deposit.updateMany.mockResolvedValue({ count: 1 });
+    transaction.deposit.findUniqueOrThrow.mockResolvedValue(
+      deposit({
+        assignedNetwork: 'ERC20',
+        txid: TXID,
+        status: 'PENDING_REVIEW',
+        submittedAt: new Date('2026-08-26T01:00:00.000Z'),
+      }),
+    );
+
+    await service.submitTxid(
+      DEPOSIT_ID,
+      { txid: `0x${'A'.repeat(64)}` },
+      actor,
+    );
+
+    const updateArgs = transaction.deposit.updateMany.mock.calls[0]?.[0] as
+      | { data?: Record<string, unknown> }
+      | undefined;
+    expect(updateArgs?.data).toMatchObject({
+      txid: TXID,
+      status: 'PENDING_REVIEW',
+    });
+  });
+
+  it('rejects a transaction identifier invalid for the assigned network', async () => {
+    transaction.deposit.findFirst.mockResolvedValue(
+      deposit({ assignedNetwork: 'TRC20' }),
+    );
+
+    await expect(
+      service.submitTxid(DEPOSIT_ID, { txid: 'not-a-tron-txid' }, actor),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('submits TXID only from AWAITING_TXID', async () => {
