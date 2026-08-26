@@ -8,6 +8,10 @@ export const PERMISSIONS = {
   REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
   PACKAGES_READ: 'packages.read',
   PACKAGES_DRAFT_MANAGE: 'packages.draft.manage',
+  DEPOSIT_ACCOUNTS_READ: 'deposits.accounts.read',
+  DEPOSIT_ACCOUNTS_MANAGE: 'deposits.accounts.manage',
+  DEPOSITS_READ: 'deposits.read',
+  DEPOSITS_REVIEW: 'deposits.review',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -48,6 +52,22 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.PACKAGES_DRAFT_MANAGE,
     description: 'Create and edit package plan drafts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_READ,
+    description: 'View USDT TRC20 receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE,
+    description: 'Create and manage USDT TRC20 receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_READ,
+    description: 'View deposit requests and payment review state',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_REVIEW,
+    description: 'Approve or reject submitted deposit payments',
   },
   {
     code: PERMISSIONS.RBAC_READ,
