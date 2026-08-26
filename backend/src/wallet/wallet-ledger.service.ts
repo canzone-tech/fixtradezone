@@ -26,8 +26,9 @@ import {
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
-type DecimalValue = Prisma.Decimal | bigint | number | string;
-
+type DecimalValue = Prisma.Decimal | number | string;
+type WalletAuditOperation =
+  (typeof WALLET_AUDIT_OPERATIONS)[keyof typeof WALLET_AUDIT_OPERATIONS];
 type LedgerAccountBucket = UserWalletBucket | 'DEPOSIT_CLEARING';
 
 interface LedgerAccountRow {
@@ -445,7 +446,7 @@ export class WalletLedgerService {
     deposit: ApprovedDepositAccountingSource,
     actor: AuthenticatedUser,
     context: RequestContext = {},
-    operation = WALLET_AUDIT_OPERATIONS.POST_DEPOSIT,
+    operation: WalletAuditOperation = WALLET_AUDIT_OPERATIONS.POST_DEPOSIT,
   ) {
     if (deposit.status !== 'APPROVED') {
       throw new ConflictException(
