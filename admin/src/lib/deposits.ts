@@ -6,24 +6,34 @@ export type DepositStatus =
   | "APPROVED"
   | "REJECTED";
 
-export const DEPOSIT_NETWORKS = [
-  "TRC20",
-  "ERC20",
-  "BEP20",
-  "POLYGON",
-  "ARBITRUM",
-  "BASE",
-  "OPTIMISM",
-  "SOLANA",
-] as const;
+export type DepositValidationProfile = "TRON" | "EVM" | "SOLANA";
 
-export type DepositNetwork = (typeof DEPOSIT_NETWORKS)[number];
+export const DEPOSIT_VALIDATION_PROFILES: DepositValidationProfile[] = [
+  "TRON",
+  "EVM",
+  "SOLANA",
+];
+
+export interface DepositPaymentRail {
+  id: string;
+  asset: string;
+  networkCode: string;
+  displayName: string;
+  validationProfile: DepositValidationProfile;
+  isActive: boolean;
+  revision: number;
+  createdByUserId: string | null;
+  updatedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface DepositAccount {
   id: string;
   label: string;
+  paymentRailId: string;
   asset: string;
-  network: DepositNetwork;
+  network: string;
   walletAddress: string;
   qrCodeDataUrl: string;
   isActive: boolean;
@@ -32,6 +42,7 @@ export interface DepositAccount {
   updatedByUserId: string | null;
   createdAt: string;
   updatedAt: string;
+  paymentRail: DepositPaymentRail;
 }
 
 export interface DepositUserSummary {
@@ -55,7 +66,8 @@ export interface Deposit {
   assignedDepositAccountId: string;
   assignedAccountLabel: string;
   assignedWalletAddress: string;
-  assignedNetwork: DepositNetwork;
+  assignedNetwork: string;
+  assignedValidationProfile: DepositValidationProfile;
   assignedQrCodeDataUrl: string;
   txid: string | null;
   submittedAt: string | null;
@@ -70,6 +82,10 @@ export interface Deposit {
     username: string;
     email: string | null;
   } | null;
+}
+
+export interface DepositPaymentRailsResponse {
+  rails: DepositPaymentRail[];
 }
 
 export interface DepositAccountsResponse {
@@ -91,6 +107,11 @@ export interface DepositMutationResponse {
 export interface DepositAccountMutationResponse {
   message: string;
   account: DepositAccount;
+}
+
+export interface DepositPaymentRailMutationResponse {
+  message: string;
+  rail: DepositPaymentRail;
 }
 
 export interface DepositPackageCatalogue {
@@ -127,41 +148,40 @@ export function compactDecimal(value: string): string {
 }
 
 export function normalizeTransactionId(
-  network: DepositNetwork,
+  profile: DepositValidationProfile,
   value: string,
 ): string | null {
   const trimmed = value.trim();
 
-  if (network === "TRC20") {
+  if (profile === "TRON") {
     return /^[0-9a-fA-F]{64}$/.test(trimmed) ? trimmed.toLowerCase() : null;
   }
 
-  if (
-    ["ERC20", "BEP20", "POLYGON", "ARBITRUM", "BASE", "OPTIMISM"].includes(
-      network,
-    )
-  ) {
+  if (profile === "EVM") {
     if (!/^(?:0x)?[0-9a-fA-F]{64}$/.test(trimmed)) return null;
     return trimmed.toLowerCase().replace(/^0x/, "");
   }
 
-  if (network === "SOLANA") {
+  if (profile === "SOLANA") {
     return /^[1-9A-HJ-NP-Za-km-z]{80,100}$/.test(trimmed) ? trimmed : null;
   }
 
   return null;
 }
 
-export function transactionIdHint(network: DepositNetwork): string {
-  if (network === "SOLANA") {
-    return "Solana transaction signature";
+export function transactionIdHint(
+  profile: DepositValidationProfile,
+  networkCode: string,
+): string {
+  if (profile === "SOLANA") {
+    return `${networkCode} transaction signature`;
   }
 
-  if (network === "TRC20") {
-    return "64-character TRON transaction ID";
+  if (profile === "TRON") {
+    return `${networkCode} transaction ID (64 hex characters)`;
   }
 
-  return "EVM transaction hash (0x prefix optional)";
+  return `${networkCode} EVM transaction hash (0x prefix optional)`;
 }
 
 export function statusLabel(status: DepositStatus): string {
