@@ -8,6 +8,8 @@ import {
   type ApiMessagePayload,
   type Deposit,
   type DepositMutationResponse,
+  type DepositPaymentRail,
+  type DepositPaymentRailsResponse,
   type DepositsResponse,
   compactDecimal,
   messageFrom,
@@ -23,6 +25,7 @@ import type { UserDirectSession } from "@/lib/user-session";
 interface UserDepositWorkspace {
   session: UserDirectSession;
   packages: PackagePlanItem[];
+  rails: DepositPaymentRail[];
   deposits: Deposit[];
 }
 
@@ -54,79 +57,61 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+async function checkedUserJson<T extends ApiMessagePayload>(
+  response: Response,
+  fallback: string,
+): Promise<T> {
+  const payload = await readJson<T>(response);
+  if (response.status === 401 || response.status === 403) {
+    throw new UserWorkspaceAccessError(
+      messageFrom(payload, fallback),
+      response.status,
+      payload?.redirectTo ?? null,
+    );
+  }
+  if (!response.ok || !payload) {
+    throw new Error(messageFrom(payload, fallback));
+  }
+  return payload;
+}
+
 async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
-  // Resolve/refresh the USER session first so dependent BFF calls never race a
-  // rotating refresh token.
-  const sessionResponse = await fetch("/api/user/session", {
-    cache: "no-store",
-  });
-  const sessionPayload = await readJson<UserDirectSession & ApiMessagePayload>(
+  // Keep requests sequential so a rotating refresh token can never be raced by
+  // parallel BFF calls.
+  const sessionResponse = await fetch("/api/user/session", { cache: "no-store" });
+  const session = await checkedUserJson<UserDirectSession & ApiMessagePayload>(
     sessionResponse,
+    "USER session is unavailable.",
   );
-
-  if (sessionResponse.status === 401 || sessionResponse.status === 403) {
-    throw new UserWorkspaceAccessError(
-      messageFrom(sessionPayload, "USER session is unavailable."),
-      sessionResponse.status,
-      sessionPayload?.redirectTo ?? null,
-    );
+  if (!session.user || !session.sessionPolicy) {
+    throw new Error("USER session is incomplete.");
   }
 
-  if (
-    !sessionResponse.ok ||
-    !sessionPayload?.user ||
-    !sessionPayload.sessionPolicy
-  ) {
-    throw new Error(messageFrom(sessionPayload, "Unable to load USER session."));
-  }
-
-  // These are intentionally sequential after session resolution. The fresh
-  // access token can then be reused without parallel refresh-token rotation.
-  const packageResponse = await fetch("/api/user/packages", {
-    cache: "no-store",
-  });
-  const packagePayload = await readJson<PackageCatalogue & ApiMessagePayload>(
+  const packageResponse = await fetch("/api/user/packages", { cache: "no-store" });
+  const packagePayload = await checkedUserJson<PackageCatalogue & ApiMessagePayload>(
     packageResponse,
+    "Could not load available packages.",
   );
 
-  if (packageResponse.status === 401 || packageResponse.status === 403) {
-    throw new UserWorkspaceAccessError(
-      messageFrom(packagePayload, "USER package access is unavailable."),
-      packageResponse.status,
-      packagePayload?.redirectTo ?? null,
-    );
-  }
-
-  if (!packageResponse.ok || !packagePayload) {
-    throw new Error(
-      messageFrom(packagePayload, "Could not load available packages."),
-    );
-  }
-
-  const depositResponse = await fetch("/api/user/deposits", {
+  const railResponse = await fetch("/api/user/deposit-payment-rails", {
     cache: "no-store",
   });
-  const depositPayload = await readJson<DepositsResponse & ApiMessagePayload>(
+  const railPayload = await checkedUserJson<
+    DepositPaymentRailsResponse & ApiMessagePayload
+  >(railResponse, "Could not load available payment networks.");
+
+  const depositResponse = await fetch("/api/user/deposits", { cache: "no-store" });
+  const depositPayload = await checkedUserJson<DepositsResponse & ApiMessagePayload>(
     depositResponse,
+    "Could not load deposit history.",
   );
-
-  if (depositResponse.status === 401 || depositResponse.status === 403) {
-    throw new UserWorkspaceAccessError(
-      messageFrom(depositPayload, "USER deposit access is unavailable."),
-      depositResponse.status,
-      depositPayload?.redirectTo ?? null,
-    );
-  }
-
-  if (!depositResponse.ok || !depositPayload) {
-    throw new Error(messageFrom(depositPayload, "Could not load deposit history."));
-  }
 
   return {
-    session: sessionPayload,
+    session,
     packages: packagePayload.catalogueAvailable
       ? packagePayload.items.filter((item) => item.availability === "AVAILABLE")
       : [],
+    rails: railPayload.rails,
     deposits: depositPayload.deposits,
   };
 }
@@ -135,8 +120,10 @@ export default function UserDepositsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [packages, setPackages] = useState<PackagePlanItem[]>([]);
+  const [rails, setRails] = useState<DepositPaymentRail[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
+  const [selectedRailId, setSelectedRailId] = useState("");
   const [txid, setTxid] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -153,20 +140,28 @@ export default function UserDepositsClient() {
     [deposits],
   );
 
-  const availablePackages = useMemo(
-    () => packages.filter((item) => item.availability === "AVAILABLE"),
-    [packages],
+  const selectedPackage = useMemo(
+    () => packages.find((item) => item.id === selectedPackageId) ?? null,
+    [packages, selectedPackageId],
   );
 
-  const selectedPackage = useMemo(
+  const eligibleRails = useMemo(
     () =>
-      availablePackages.find((item) => item.id === selectedPackageId) ?? null,
-    [availablePackages, selectedPackageId],
+      selectedPackage
+        ? rails.filter((rail) => rail.asset === selectedPackage.currency && rail.isActive)
+        : [],
+    [rails, selectedPackage],
+  );
+
+  const selectedRail = useMemo(
+    () => eligibleRails.find((rail) => rail.id === selectedRailId) ?? null,
+    [eligibleRails, selectedRailId],
   );
 
   function applyWorkspace(workspace: UserDepositWorkspace) {
     setSession(workspace.session);
     setPackages(workspace.packages);
+    setRails(workspace.rails);
     setDeposits(workspace.deposits);
     setSelectedPackageId((current) =>
       workspace.packages.some((item) => item.id === current)
@@ -178,7 +173,6 @@ export default function UserDepositsClient() {
   async function reloadWorkspace() {
     setLoading(true);
     setError(null);
-
     try {
       applyWorkspace(await fetchUserDepositWorkspace());
     } catch (caught) {
@@ -188,7 +182,6 @@ export default function UserDepositsClient() {
         router.refresh();
         return;
       }
-
       setError(
         caught instanceof Error
           ? caught.message
@@ -213,7 +206,6 @@ export default function UserDepositsClient() {
           router.refresh();
           return;
         }
-
         if (mounted) {
           setError(
             caught instanceof Error
@@ -227,15 +219,19 @@ export default function UserDepositsClient() {
     }
 
     void loadInitialWorkspace();
-
     return () => {
       mounted = false;
     };
   }, [router]);
 
-  async function createDeposit() {
-    if (!selectedPackageId || openDeposit) return;
+  useEffect(() => {
+    if (eligibleRails.some((rail) => rail.id === selectedRailId)) return;
+    const nextRailId = eligibleRails[0]?.id ?? "";
+    queueMicrotask(() => setSelectedRailId(nextRailId));
+  }, [eligibleRails, selectedRailId]);
 
+  async function createDeposit() {
+    if (!selectedPackageId || !selectedRailId || openDeposit) return;
     setBusy("create");
     setError(null);
     setNotice(null);
@@ -244,22 +240,24 @@ export default function UserDepositsClient() {
       const response = await fetch("/api/user/deposits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ packagePlanItemId: selectedPackageId }),
+        body: JSON.stringify({
+          packagePlanItemId: selectedPackageId,
+          paymentRailId: selectedRailId,
+        }),
       });
       const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
         response,
       );
-
       if (!response.ok || !payload) {
         throw new Error(messageFrom(payload, "Could not create deposit request."));
       }
 
       setNotice(payload.message);
       await reloadWorkspace();
-    } catch (createError) {
+    } catch (caught) {
       setError(
-        createError instanceof Error
-          ? createError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not create deposit request.",
       );
     } finally {
@@ -268,7 +266,10 @@ export default function UserDepositsClient() {
   }
 
   async function submitTxid(deposit: Deposit) {
-    const normalized = normalizeTransactionId(deposit.assignedNetwork, txid);
+    const normalized = normalizeTransactionId(
+      deposit.assignedValidationProfile,
+      txid,
+    );
     if (!normalized) {
       setError(`Transaction ID is invalid for ${deposit.assignedNetwork}.`);
       return;
@@ -277,7 +278,6 @@ export default function UserDepositsClient() {
     setBusy(`txid-${deposit.id}`);
     setError(null);
     setNotice(null);
-
     try {
       const response = await fetch(`/api/user/deposits/${deposit.id}/txid`, {
         method: "POST",
@@ -287,7 +287,6 @@ export default function UserDepositsClient() {
       const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
         response,
       );
-
       if (!response.ok || !payload) {
         throw new Error(messageFrom(payload, "Could not submit transaction ID."));
       }
@@ -295,10 +294,10 @@ export default function UserDepositsClient() {
       setTxid("");
       setNotice(payload.message);
       await reloadWorkspace();
-    } catch (submitError) {
+    } catch (caught) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not submit transaction ID.",
       );
     } finally {
@@ -320,20 +319,16 @@ export default function UserDepositsClient() {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>NETWORK-AWARE DEPOSITS</p>
+            <p className={styles.eyebrow}>CONFIGURED PAYMENT NETWORKS</p>
             <h1>Deposits</h1>
             <p>
-              Create a package payment request, then pay the exact amount using
-              the server-assigned asset, network and public receiving address.
-              Submit that network&apos;s transaction identifier for manual review.
-              Approval does not create wallet balance or activate a package yet.
+              Select a package and one supported payment network for its currency.
+              The backend then randomly assigns an active public receiving account
+              inside that exact network. Never send funds on a different network.
             </p>
           </div>
           {openDeposit ? (
-            <span
-              className={styles.badge}
-              data-tone={statusTone(openDeposit.status)}
-            >
+            <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
               {statusLabel(openDeposit.status)}
             </span>
           ) : null}
@@ -353,21 +348,17 @@ export default function UserDepositsClient() {
                 <p className={styles.eyebrow}>Open Deposit</p>
                 <h2>{openDeposit.packageDisplayName}</h2>
               </div>
-              <span
-                className={styles.badge}
-                data-tone={statusTone(openDeposit.status)}
-              >
+              <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
                 {statusLabel(openDeposit.status)}
               </span>
             </div>
 
             <div className={styles.qrWrap}>
-              {/* Stored account QR is an operator-controlled data URL snapshot. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 className={styles.qr}
                 src={openDeposit.assignedQrCodeDataUrl}
-                alt={`${openDeposit.currency} ${openDeposit.assignedNetwork} QR for ${openDeposit.assignedAccountLabel}`}
+                alt={`${openDeposit.currency} ${openDeposit.assignedNetwork} receiving QR`}
               />
               <div className={styles.list}>
                 <div className={styles.kv}>
@@ -392,9 +383,7 @@ export default function UserDepositsClient() {
                   <button
                     className={styles.buttonSecondary}
                     type="button"
-                    onClick={() =>
-                      void copyAddress(openDeposit.assignedWalletAddress)
-                    }
+                    onClick={() => void copyAddress(openDeposit.assignedWalletAddress)}
                   >
                     Copy address
                   </button>
@@ -413,7 +402,10 @@ export default function UserDepositsClient() {
                     id="deposit-txid"
                     value={txid}
                     onChange={(event) => setTxid(event.target.value)}
-                    placeholder={transactionIdHint(openDeposit.assignedNetwork)}
+                    placeholder={transactionIdHint(
+                      openDeposit.assignedValidationProfile,
+                      openDeposit.assignedNetwork,
+                    )}
                     maxLength={191}
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -446,17 +438,15 @@ export default function UserDepositsClient() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.eyebrow}>New Deposit</p>
-                <h2>Select package</h2>
+                <h2>Select package and payment network</h2>
               </div>
             </div>
 
-            {availablePackages.length === 0 ? (
-              <div className={styles.empty}>
-                No currently available package can create a deposit request.
-              </div>
+            {packages.length === 0 ? (
+              <div className={styles.empty}>No package is currently available.</div>
             ) : (
               <div className={styles.formGrid}>
-                <div className={`${styles.field} ${styles.full}`}>
+                <div className={styles.field}>
                   <label htmlFor="deposit-package">Package</label>
                   <select
                     className={styles.select}
@@ -464,22 +454,43 @@ export default function UserDepositsClient() {
                     value={selectedPackageId}
                     onChange={(event) => setSelectedPackageId(event.target.value)}
                   >
-                    {availablePackages.map((item) => (
+                    {packages.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.displayName} — {compactDecimal(item.price)} {item.currency}
                       </option>
                     ))}
                   </select>
                 </div>
+                <div className={styles.field}>
+                  <label htmlFor="deposit-rail">Payment network</label>
+                  <select
+                    className={styles.select}
+                    id="deposit-rail"
+                    value={selectedRailId}
+                    onChange={(event) => setSelectedRailId(event.target.value)}
+                    disabled={eligibleRails.length === 0}
+                  >
+                    {eligibleRails.length === 0 ? (
+                      <option value="">No active payment network</option>
+                    ) : (
+                      eligibleRails.map((rail) => (
+                        <option key={rail.id} value={rail.id}>
+                          {rail.displayName}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
 
-                {selectedPackage ? (
+                {selectedPackage && selectedRail ? (
                   <div className={`${styles.notice} ${styles.full}`}>
-                    The backend will use the published price of{" "}
+                    Pay exactly{" "}
                     <strong>
                       {compactDecimal(selectedPackage.price)} {selectedPackage.currency}
                     </strong>{" "}
-                    and randomly assign an active receiving account for that asset.
-                    You cannot choose or override the network or payment address.
+                    on <strong>{selectedRail.networkCode}</strong>. The receiving
+                    address will be assigned by the backend from that rail&apos;s active
+                    account pool.
                   </div>
                 ) : null}
 
@@ -487,7 +498,7 @@ export default function UserDepositsClient() {
                   <button
                     className={styles.button}
                     type="button"
-                    disabled={!selectedPackageId || busy !== null}
+                    disabled={!selectedPackageId || !selectedRailId || busy !== null}
                     onClick={() => void createDeposit()}
                   >
                     {busy === "create" ? "Creating…" : "Create deposit request"}
@@ -526,7 +537,6 @@ export default function UserDepositsClient() {
                     <th>Network</th>
                     <th>Status</th>
                     <th>Transaction ID</th>
-                    <th>Created</th>
                     <th>Review</th>
                   </tr>
                 </thead>
@@ -547,7 +557,6 @@ export default function UserDepositsClient() {
                         </span>
                       </td>
                       <td className={styles.mono}>{deposit.txid ?? "—"}</td>
-                      <td>{formatDate(deposit.createdAt)}</td>
                       <td>{deposit.reviewNote ?? "—"}</td>
                     </tr>
                   ))}
