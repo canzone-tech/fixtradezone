@@ -10,9 +10,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
-import {
-  normalizeDepositTransactionId,
-} from './deposit.validation';
+import { normalizeDepositTransactionId } from './deposit.validation';
 import type {
   AdminDepositQueryDto,
   CreateDepositAccountDto,
