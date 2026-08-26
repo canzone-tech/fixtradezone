@@ -15,6 +15,8 @@ export const PERMISSIONS = {
   WALLETS_READ: 'wallets.read',
   LEDGER_READ: 'ledger.read',
   LEDGER_POST: 'ledger.post',
+  SUBSCRIPTIONS_READ: 'subscriptions.read',
+  SUBSCRIPTIONS_ACTIVATE: 'subscriptions.activate',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -84,6 +86,15 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.LEDGER_POST,
     description: 'Post or reconcile eligible approved deposits into accounting',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_READ,
+    description: 'View USER package subscriptions and activation history',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_ACTIVATE,
+    description:
+      'Reconcile eligible approved and accounted deposits into package activation',
   },
   {
     code: PERMISSIONS.RBAC_READ,
