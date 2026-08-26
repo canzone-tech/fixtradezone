@@ -70,6 +70,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/subscriptions",
+        label: "Subscriptions",
+        icon: "iconoir-box-iso",
+        permission: "subscriptions.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
