@@ -1,7 +1,4 @@
-import {
-  ConflictException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
