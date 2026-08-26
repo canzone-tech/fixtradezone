@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - main
+      - 'feature/**'
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Lint, test, and build
+    name: Format, validate, lint, test, and build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -60,6 +61,14 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
+      - name: Verify Prisma schema
+        run: npm run prisma:validate
+
+      - name: Verify committed formatting
+        run: |
+          npm run format
+          git diff --exit-code -- .
+
       - name: Lint
         run: npm run lint
 
@@ -71,4 +80,3 @@ jobs:
 
       - name: Block critical dependency advisories
         run: npm audit --audit-level=critical
-
