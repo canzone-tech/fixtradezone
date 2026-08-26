@@ -13,6 +13,7 @@ import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { RedisModule } from './redis/redis.module';
 import { PackagesModule } from './packages/packages.module';
 import { WalletModule } from './wallet/wallet.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { DepositsModule } from './deposits/deposits.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { DepositsModule } from './deposits/deposits.module';
     PlatformConfigModule,
     PackagesModule,
     WalletModule,
+    SubscriptionsModule,
     DepositsModule,
     DashboardModule,
     HealthModule,
