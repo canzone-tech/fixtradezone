@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Lint, typecheck, and build
+    name: Lint, typecheck, build, and audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -51,3 +51,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Block critical dependency advisories
+        run: npm audit --audit-level=critical
