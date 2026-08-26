@@ -13,15 +13,25 @@ import {
   Min,
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
-import { IsValidTronAddress } from '../deposit.validation';
-import { DEPOSIT_STATUSES, type DepositStatus } from '../deposits.constants';
+import { IsValidDepositAddress } from '../deposit.validation';
+import {
+  DEFAULT_DEPOSIT_ASSET,
+  DEFAULT_DEPOSIT_NETWORK,
+  DEPOSIT_NETWORKS,
+  DEPOSIT_STATUSES,
+  type DepositNetwork,
+  type DepositStatus,
+} from '../deposits.constants';
 
-const TXID_PATTERN = /^[0-9a-f]{64}$/;
 const QR_DATA_URL_PATTERN =
   /^data:image\/(?:png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
+const ASSET_PATTERN = /^[A-Z0-9]{2,10}$/;
+
+const normalizeUppercase = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim().toUpperCase() : value;
 
 const normalizeTxid = ({ value }: { value: unknown }) =>
-  typeof value === 'string' ? value.trim().toLowerCase() : value;
+  typeof value === 'string' ? value.trim() : value;
 
 export class CreateDepositAccountDto {
   @Transform(trimString)
@@ -29,9 +39,22 @@ export class CreateDepositAccountDto {
   @Length(2, 100)
   label!: string;
 
+  @IsOptional()
+  @Transform(normalizeUppercase)
+  @IsString()
+  @Matches(ASSET_PATTERN, {
+    message: 'asset must contain 2 to 10 uppercase letters or digits.',
+  })
+  asset: string = DEFAULT_DEPOSIT_ASSET;
+
+  @IsOptional()
+  @Transform(normalizeUppercase)
+  @IsIn(DEPOSIT_NETWORKS)
+  network: DepositNetwork = DEFAULT_DEPOSIT_NETWORK;
+
   @Transform(trimString)
   @IsString()
-  @IsValidTronAddress()
+  @IsValidDepositAddress()
   walletAddress!: string;
 
   @Transform(trimString)
@@ -92,9 +115,7 @@ export class CreateDepositDto {
 export class SubmitDepositTxidDto {
   @Transform(normalizeTxid)
   @IsString()
-  @Matches(TXID_PATTERN, {
-    message: 'txid must be exactly 64 hexadecimal characters.',
-  })
+  @Length(1, 191)
   txid!: string;
 }
 
