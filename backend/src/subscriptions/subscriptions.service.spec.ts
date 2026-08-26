@@ -227,6 +227,7 @@ describe('SubscriptionsService', () => {
       currency: 'USDT',
       normalSide: 'CREDIT',
     };
+    let auditCall: AuditCreateCall | null = null;
 
     transaction.$queryRaw
       .mockResolvedValueOnce([{ id: USER_ID }])
@@ -254,7 +255,10 @@ describe('SubscriptionsService', () => {
       .mockResolvedValueOnce([existingSubscription]);
     transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
     transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
-    transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
+    transaction.auditLog.create.mockImplementation((input: AuditCreateCall) => {
+      auditCall = input;
+      return Promise.resolve({ id: 'audit-id' });
+    });
 
     const result = await service.activateFromApprovedDeposit(DEPOSIT_ID, actor, {
       ipAddress: '127.0.0.1',
@@ -274,9 +278,9 @@ describe('SubscriptionsService', () => {
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(8);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
 
-    const rawAuditCall: unknown = transaction.auditLog.create.mock.calls[0]?.[0];
-    const auditCall = rawAuditCall as AuditCreateCall;
-
+    if (!auditCall) {
+      throw new Error('Expected package activation audit call.');
+    }
     expect(auditCall.data.action).toBe('ACTIVATE');
     expect(auditCall.data.entityType).toBe('UserPackageSubscription');
     expect(auditCall.data.metadata.balanced).toBe(true);
