@@ -17,153 +17,195 @@ Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
 PKG-01 local API/SQL/UI/milestone acceptance is GREEN. It intentionally creates no user balance, earning, deposit, subscription or ledger mutation.
 
-## Active Development Branch
-
-`feature/deposits-foundation`
-
-Created from accepted `feature/packages-foundation` head.
-
 ## DEP-01 — Deposit Foundation
 
-Status: **PAYMENT-RAIL HARDENING IMPLEMENTED IN SOURCE / LOCAL REVERIFICATION + 0009 DEPLOYMENT + COMBINED ACCEPTANCE PENDING**.
+Status: **SOURCE COMPLETE / WAL-01 INTEGRATION BASELINE**.
 
 Canonical contract: `docs/DEPOSITS-FOUNDATION.md`.
 
-### Verified history before payment-rail hardening
+DEP-01 provides the data-driven payment-rail and receiving-account foundation used by WAL-01:
 
-- backend/admin code gate had reached GREEN;
-- migration `0008_deposit_foundation` initially hit MySQL CHECK/FK error 3823;
-- failed partial state was cleanly removed and migration marked rolled back;
-- corrected `0008` was successfully redeployed;
-- local DB confirmed 8 migrations and schema up to date.
+- package amount/currency are backend authoritative;
+- USER chooses an eligible payment rail/network;
+- backend assigns one ACTIVE receiving account inside that selected rail;
+- deposit stores immutable package, amount, address, network and validation-profile snapshots;
+- transaction review remains manual ADMIN/SUPER_ADMIN approval/rejection;
+- no private key/seed/signing secret is stored;
+- no automatic blockchain verification is performed.
 
-`0008` is now immutable applied migration history and must not be edited.
+Applied migration history must never be rewritten. `0008_deposit_foundation` and `0009_deposit_network_generalization` are prerequisites for WAL-01.
 
-### Founder architecture correction
+## Active Development Branch
 
-During Admin UI acceptance, the original TRON-only receiving-address form exposed a platform-hardcoded network assumption. Founder rejected that as non-production-ready because future currencies/tokens may use other networks.
+`feature/wallet-ledger-foundation`
 
-The replacement architecture is **data-driven payment rails**:
+## WAL-01 — Wallet / Immutable Ledger Foundation
 
-```text
-DepositPaymentRail
-  asset
-  networkCode
-  displayName
-  validationProfile
-  active/revision/audit metadata
+Status: **BACKEND + FRONTEND IMPLEMENTED / BACKEND CI GREEN / ADMIN CI GREEN / LOCAL ACCEPTANCE PENDING**.
 
-DepositAccount
-  references paymentRailId
-  immutable public address
-  QR
-  active/revision/audit metadata
+Canonical contract: `docs/WALLET-LEDGER-FOUNDATION.md`.
 
-Deposit
-  package/amount/currency snapshot
-  assigned account/address/network snapshot
-  assigned validation-profile snapshot
-  transaction/review lifecycle
-```
+### Wallet model
 
-Network names are no longer a frontend/backend hardcoded list.
-
-Protocol validator families remain reviewed code:
+USER wallet accounting is currency-scoped and bucketed:
 
 ```text
-TRON
-EVM
-SOLANA
+Main / Deposit
+Package Earnings
+Referral Commission
+Rewards
+-------------------
+Total Wallet = sum of buckets for the same currency only
 ```
 
-Unknown validation semantics are never silently accepted.
+Different currencies are never added into one fake platform total.
 
-### Correct network-selection rule
+At WAL-01 launch only approved deposit accounting posts into `Main / Deposit`.
 
-If one package currency is available on multiple payment rails, the **USER chooses the payment network**.
+`Package Earnings`, `Referral Commission`, and `Rewards` are structurally available but remain zero until their own milestones establish legitimate posting events.
 
-The backend never randomly chooses a blockchain/network. After the rail is selected, the backend randomly assigns one ACTIVE receiving account **inside that exact rail**.
+Simulated Trade Activity never mutates wallet or ledger balances.
 
-This prevents wrong-chain payment ambiguity while preserving account-pool distribution.
+### Accounting invariant
 
-### Payment-rail integrity
-
-- Admin creates/configures payment rails before receiving accounts.
-- Account creation accepts `paymentRailId`, not freehand asset/network strings.
-- Account address validation uses the selected rail's protocol profile.
-- Rail `asset`, `networkCode`, and `validationProfile` are immutable after creation.
-- Rail display name and active state are revision-controlled and audited.
-- Account address is immutable after creation.
-- Account activation is blocked while its rail is inactive.
-- Account uniqueness is `(paymentRailId, walletAddress)`.
-- Deposit creation requires `packagePlanItemId + paymentRailId`.
-- Selected rail must be ACTIVE and match package currency.
-- Deposit snapshots `assignedNetwork + assignedValidationProfile`.
-- Transaction validation uses the immutable deposit snapshot, not current rail settings.
-- Transaction uniqueness is `(assignedNetwork, txid)`.
-
-### Current QA rail
-
-The first acceptance lane remains the seeded configuration:
+Approved deposits are posted as immutable double-entry transactions:
 
 ```text
-asset = USDT
-networkCode = TRC20
-validationProfile = TRON
+DEBIT   SYSTEM / DEPOSIT_CLEARING / <currency>
+CREDIT  USER / MAIN / <currency>
 ```
 
-This is launch/QA data, not a platform-wide hardcode.
+The source key is deterministic and unique:
 
-### Migration `0009_deposit_network_generalization`
+```text
+DEPOSIT:<depositId>:CREDIT
+```
 
-Current local read-only status already confirmed:
+Therefore repeated accounting requests are idempotent and cannot duplicate the financial credit.
 
-- 9 migrations are present;
-- `0008` is applied;
-- only `0009_deposit_network_generalization` is pending.
+### WAL-01 database foundation
 
-The pending migration has now been revised to implement the payment-rail model. It:
+Migration:
 
-- creates `deposit_payment_rails`;
-- seeds deterministic USDT/TRC20/TRON rail data;
-- backfills existing 0008 accounts to that rail;
-- adds `paymentRailId` FK to receiving accounts;
-- removes old USDT/TRC20-only SQL constraints;
-- changes account uniqueness to rail + address;
-- expands transaction-ID storage;
-- snapshots `assignedValidationProfile` on deposits;
-- keeps historical 0008 rows intact.
+`0010_wallet_ledger_foundation`
 
-**Do not deploy 0009 until the revised full code gate is GREEN.**
+Creates:
 
-### DEP-01 behavior retained
+- `ledger_accounts`
+- `ledger_account_balances`
+- `ledger_transactions`
+- `ledger_entries`
+- wallet/ledger RBAC permissions
 
-- one open deposit per USER;
-- package price/currency backend-authoritative;
-- exact SQL DECIMAL;
-- immutable account/payment snapshots;
-- manual ADMIN/SUPER_ADMIN approval/rejection;
-- audited terminal facts;
-- no private key/seed/signing secret storage;
-- no automatic blockchain verification;
-- no wallet balance, ledger credit, package activation, commission, reward or trading side effect.
+Ledger entries are accounting source-of-truth. Balance rows are transactionally maintained read models.
 
-### Revised local acceptance sequence
+Balances use SQL `DECIMAL(20,8)`. Financial aggregation uses Prisma Decimal / SQL DECIMAL semantics, not JavaScript floating-point arithmetic.
 
-1. Pull latest `feature/deposits-foundation`.
+### Posting safety
+
+- only `APPROVED` deposits may be posted;
+- posting occurs under serializable transaction handling;
+- duplicate source key returns the already-posted transaction without creating new entries;
+- each new posting contains at least one debit and one credit;
+- debit total must equal credit total before transaction completion;
+- negative ledger-account balance updates are rejected;
+- USER account semantics are validated against deterministic account keys;
+- immutable audit evidence records actor, deposit, amount, currency, debit account, credit account and balanced state;
+- package activation, commissions and rewards are explicitly recorded as not applied by WAL-01.
+
+### WAL-01 APIs
+
+USER:
+
+- `GET /wallet/me`
+
+ADMIN:
+
+- `GET /admin/wallets`
+- `GET /admin/wallets/reconciliation`
+- `GET /admin/ledger`
+- `GET /admin/ledger/:transactionId`
+- `POST /admin/deposits/:depositId/post-accounting`
+
+Permissions:
+
+- `wallets.read`
+- `ledger.read`
+- `ledger.post`
+
+SUPER_ADMIN retains bypass behavior under the existing RBAC contract.
+
+### WAL-01 frontend
+
+USER:
+
+- `/user/wallet`
+- currency-scoped wallet total;
+- Main / Deposit, Package Earnings, Referral Commission and Rewards buckets;
+- immutable wallet activity readback.
+
+ADMIN:
+
+- `/wallets`
+- approved deposits waiting for accounting;
+- explicit `Post accounting` action;
+- USER wallet bucket table;
+- immutable ledger transaction list;
+- debit/credit entry inspection with balanced status.
+
+The Admin UI intentionally does not aggregate different currencies into one monetary total.
+
+### Automated gate checkpoint
+
+Feature-branch CI is GREEN after WAL-01 implementation and focused financial tests.
+
+Backend CI validates:
+
+- Prisma generate/validate;
+- formatting;
+- ESLint;
+- unit tests;
+- Nest build;
+- critical dependency audit.
+
+Focused WAL-01 tests cover:
+
+- rejection of non-approved deposits before accounting writes;
+- idempotent replay of already-posted deposit source keys;
+- balanced clearing debit + USER Main credit;
+- immutable audit metadata for successful posting.
+
+Admin CI validates:
+
+- lint;
+- typecheck;
+- Next build;
+- critical dependency audit.
+
+### WAL-01 local acceptance sequence
+
+1. Pull latest `feature/wallet-ledger-foundation`.
 2. Regenerate Prisma client.
-3. Run full backend + admin `verify:local`.
-4. Confirm migration status still shows only `0009` pending.
-5. Deploy `0009` only after code gate GREEN.
-6. Confirm database schema up to date.
-7. In Admin `/deposits`, verify seeded USDT/TRC20 rail and create one real public ACTIVE account + matching QR.
-8. Run DEP-01 combined Postman acceptance.
-9. Verify `/deposits` and `/user/deposits` together in browser/PWA.
-10. Verify SQL/audit readback.
-11. Run `npm run verify:milestone`.
+3. Run root `npm run verify:local`.
+4. Confirm migration status shows `0010_wallet_ledger_foundation` pending and no unexpected migration drift.
+5. Deploy migration `0010` only after local code gate is GREEN.
+6. Confirm DB migration status is fully up to date.
+7. Start backend + frontend locally.
+8. Run **frontend-first** WAL-01 acceptance:
+   - USER Wallet page before accounting shows no credited Main balance for an unposted approved deposit;
+   - ADMIN Wallets & Ledger shows that approved deposit under Accounting Pending;
+   - ADMIN posts accounting once;
+   - USER Wallet refresh shows the exact approved amount only in Main / Deposit;
+   - other WAL-01 buckets remain zero;
+   - ADMIN ledger detail shows equal debit and credit entries and Balanced status;
+   - repeating the accounting action cannot duplicate the credit.
+9. If a UI function fails, debug only that specific API/Postman flow.
+10. Run SQL/audit readback for transaction, entries, balance and audit evidence.
+11. Run final milestone verification.
 12. Confirm clean working tree.
+13. Mark WAL-01 complete only after Founder accepts the combined backend/frontend behavior.
 
-No PR to `main` until every gate is GREEN and Founder explicitly approves.
+No PR to `main` until every WAL-01 gate is GREEN and Founder explicitly approves.
 
 ## Product Scope Correction — LOCKED
 
@@ -173,17 +215,16 @@ FixTradeZone does not execute real trades and will not implement AI/broker/excha
 
 ## Current V1 Sequence
 
-1. DEP-01 payment rails + receiving accounts + manual deposit review — acceptance pending
-2. Wallet / Ledger foundation + controlled accounting credit
-3. Package subscription / activation from approved payment
-4. Referral commissions on legitimate package/payment events
-5. Rewards / caps / lifecycle accounting
-6. Simulated Trade Activity display only
-7. Minimal v1 landing/template controls
-8. Remaining USER/ADMIN operational slices
-9. Notifications/reports required for launch
-10. QA/security/release hardening
-11. Production deployment
+1. WAL-01 Wallet / immutable ledger foundation — local acceptance pending
+2. Package subscription / activation from approved payment
+3. Referral commissions on legitimate package/payment events
+4. Rewards / caps / lifecycle accounting
+5. Simulated Trade Activity display only
+6. Minimal v1 landing/template controls
+7. Remaining USER/ADMIN operational slices
+8. Notifications/reports required for launch
+9. QA/security/release hardening
+10. Production deployment
 
 ## Infrastructure / Data Ownership
 
@@ -199,9 +240,10 @@ FixTradeZone does not execute real trades and will not implement AI/broker/excha
 4. Complete focused automated regression coverage.
 5. Pull completed slice locally.
 6. Run code gate + explicit migration status/deploy.
-7. Run Postman/API + frontend/PWA integrated acceptance together.
-8. Run SQL/audit readback + milestone verification.
-9. Update final acceptance docs/state.
-10. Open PR only after local gates are GREEN and Founder approves.
+7. Run **frontend/UI acceptance first**.
+8. If a UI function fails, inspect/debug only that specific API/Postman flow.
+9. Run SQL/audit readback + milestone verification.
+10. Update final acceptance docs/state.
+11. Open PR only after local gates are GREEN and Founder explicitly approves.
 
 Production deployment remains HOLD until required v1 milestones and local acceptance are complete.
