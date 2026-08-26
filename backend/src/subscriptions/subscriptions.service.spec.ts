@@ -11,6 +11,21 @@ const DEFINITION_ID = '99999999-9999-4999-8999-999999999999';
 const ACCOUNTING_TRANSACTION_ID = '55555555-5555-4555-8555-555555555555';
 const FUNDING_TRANSACTION_ID = '66666666-6666-4666-8666-666666666666';
 
+interface AuditCreateCall {
+  data: {
+    action: string;
+    entityType: string;
+    metadata: {
+      balanced: boolean;
+      depositId: string;
+      amount: string;
+      currency: string;
+      referralCommissionApplied: boolean;
+      rewardsApplied: boolean;
+    };
+  };
+}
+
 const actor: AuthenticatedUser = {
   id: '33333333-3333-4333-8333-333333333333',
   email: 'admin@example.com',
@@ -256,21 +271,21 @@ describe('SubscriptionsService', () => {
       },
     });
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(8);
-    expect(transaction.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'ACTIVATE',
-          entityType: 'UserPackageSubscription',
-          metadata: expect.objectContaining({
-            balanced: true,
-            depositId: DEPOSIT_ID,
-            amount: '5.00000000',
-            currency: 'USDT',
-            referralCommissionApplied: false,
-            rewardsApplied: false,
-          }),
-        }),
-      }),
-    );
+    expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
+
+    const rawAuditCall: unknown = transaction.auditLog.create.mock.calls[0]?.[0];
+    const auditCall = rawAuditCall as AuditCreateCall;
+
+    expect(auditCall.data.action).toBe('ACTIVATE');
+    expect(auditCall.data.entityType).toBe('UserPackageSubscription');
+    expect(auditCall.data.metadata).toEqual({
+      expect: undefined,
+    });
+    expect(auditCall.data.metadata.balanced).toBe(true);
+    expect(auditCall.data.metadata.depositId).toBe(DEPOSIT_ID);
+    expect(auditCall.data.metadata.amount).toBe('5.00000000');
+    expect(auditCall.data.metadata.currency).toBe('USDT');
+    expect(auditCall.data.metadata.referralCommissionApplied).toBe(false);
+    expect(auditCall.data.metadata.rewardsApplied).toBe(false);
   });
 });
