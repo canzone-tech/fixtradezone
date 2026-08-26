@@ -344,8 +344,8 @@ export default function UserDepositsClient() {
 
               {selectedPackage ? (
                 <div className={`${styles.notice} ${styles.full}`}>
-                  The backend will use the published price of{" ""}
-                  <strong>{compactDecimal(selectedPackage.price)} USDT</strong>{" ""}
+                  The backend will use the published price of{" "}
+                  <strong>{compactDecimal(selectedPackage.price)} USDT</strong>{" "}
                   and randomly assign an active TRC20 receiving account. You
                   cannot choose or override the payment address.
                 </div>
