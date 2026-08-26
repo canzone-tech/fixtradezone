@@ -1,28 +1,46 @@
 # FixTradeZone Postman Verification
 
-Import both JSON files and select **FixTradeZone Local**.
+Import the required collection JSON plus `FixTradeZone.local.postman_environment.json` and select **FixTradeZone Local**.
 
-1. Review, back up, and apply `0002_auth_sessions` locally with `prisma migrate deploy`.
-2. Set `testEmail` and a unique local-only `testPassword` of 12–128 characters.
-3. Run Health, then Register founder.
-4. Run `npm run admin:bootstrap -- <testEmail>` from `backend/`.
-5. Run Login, Current user, Refresh and rotate, Current user again, Logout, then Refresh after logout is rejected.
-6. The Security checks request intentionally reuses the pre-rotation refresh token. It revokes all active sessions, so run it last and sign in again afterward.
-
-Login and Refresh automatically update the environment access/refresh tokens. No exported environment file may contain real credentials or tokens.
+Login/Refresh collections automatically update their token variables where documented. No exported environment file may contain real credentials or tokens.
 
 ## PKG-01 Packages / Plan Foundation
 
-`FixTradeZone-PKG-01.postman_collection.json` is the focused backend acceptance
-runner for migration `0007_package_plan_foundation`.
+`FixTradeZone-PKG-01.postman_collection.json` and the accepted MASTER v13 runner cover migration `0007_package_plan_foundation` and PKG-01 package publication/draft behavior.
 
-Before running it:
-1. complete `npm run db:deploy` and `npm run verify:milestone` locally;
-2. sign in as SUPER_ADMIN through the current MASTER collection so the local
-   environment has a fresh `accessToken`;
-3. follow `docs/LOCAL-VERIFY-PACKAGES.md` exactly;
-4. run the 13 PKG-01 requests once, in order.
+PKG-01 has already passed its local API, SQL, UI and milestone gate. Do not blindly replay historical write requests such as package publication against an already-accepted database.
 
-The package runner performs intentional local database writes, including V1
-publication and V2 draft cloning. Do not run it against staging/production or
-blindly rerun it after publication.
+## DEP-01 Combined Acceptance
+
+Use:
+
+`FixTradeZone-DEP-01-COMBINED-ACCEPTANCE.postman_collection.json`
+
+This runner is intentionally used **after the complete backend + frontend DEP-01 vertical slice is pulled locally**, not as an intermediate development checkpoint.
+
+Prerequisites:
+
+1. local code gate is GREEN;
+2. migration `0008_deposit_foundation` has been explicitly deployed after a read-only migration-status check;
+3. a real public USDT TRC20 receiving account and matching QR have been created in Admin `/deposits` and left ACTIVE;
+4. `adminIdentifier` / `adminPassword` point to a SUPER_ADMIN or delegated ADMIN with deposit permissions;
+5. `userIdentifier` / `userPassword` point to an ACTIVE ordinary USER;
+6. CAPTCHA is configured consistently with the local login test environment.
+
+The runner performs LOCAL QA writes:
+
+- verifies an active account exists;
+- logs in as USER;
+- reads the effective published package catalogue;
+- creates a deposit request;
+- proves the one-open-deposit guard;
+- proves invalid TXID rejection;
+- submits a synthetic local QA TXID;
+- verifies ADMIN pending review visibility;
+- approves the first QA deposit;
+- creates a second QA deposit;
+- submits a second synthetic TXID;
+- rejects the second QA deposit;
+- verifies USER history contains both reviewed outcomes.
+
+Synthetic TXIDs in this collection are local test data only. DEP-01 does not perform blockchain credit, wallet balance changes or package activation. Never run this collection against production.
