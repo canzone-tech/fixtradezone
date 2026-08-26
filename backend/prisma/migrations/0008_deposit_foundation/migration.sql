@@ -89,8 +89,12 @@ CREATE TABLE `deposits` (
   CONSTRAINT `deposits_amount_check` CHECK (`amount` > 0),
   CONSTRAINT `deposits_currency_check` CHECK (`currency` = 'USDT'),
   CONSTRAINT `deposits_network_check` CHECK (`assignedNetwork` = 'TRC20'),
+  -- MySQL does not allow a CHECK to reference userId here because userId also
+  -- participates in an FK with referential actions. Service writes still set
+  -- openKey=userId for open states; this CHECK enforces the DB-safe nullability
+  -- half of that invariant while the unique index prevents parallel open rows.
   CONSTRAINT `deposits_open_key_check` CHECK (
-    (`status` IN ('AWAITING_TXID', 'PENDING_REVIEW') AND `openKey` = `userId`)
+    (`status` IN ('AWAITING_TXID', 'PENDING_REVIEW') AND `openKey` IS NOT NULL)
     OR
     (`status` IN ('APPROVED', 'REJECTED') AND `openKey` IS NULL)
   ),
