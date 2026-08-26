@@ -67,11 +67,14 @@ jobs:
       - name: Apply backend formatting
         run: npm run format
 
-      - name: Verify formatting on PR and main
+      - name: Apply safe ESLint autofixes
+        run: npm run lint -- --fix
+
+      - name: Verify committed style on PR and main
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
         run: git diff --exit-code -- .
 
-      - name: Lint
+      - name: Verify lint
         run: npm run lint
 
       - name: Run unit tests
@@ -83,15 +86,15 @@ jobs:
       - name: Block critical dependency advisories
         run: npm audit --audit-level=critical
 
-      - name: Commit formatting-only changes on feature branch
+      - name: Commit safe style fixes on feature branch
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/')
         run: |
           if git diff --quiet -- src test scripts; then
-            echo "No backend formatting changes to commit."
+            echo "No backend style changes to commit."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src test scripts
-          git commit -m "style: apply backend formatting"
+          git commit -m "style: apply backend formatter and lint autofixes"
           git push
