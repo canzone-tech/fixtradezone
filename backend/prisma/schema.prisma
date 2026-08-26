@@ -594,7 +594,7 @@ model DepositAccount {
   label           String   @db.VarChar(100)
   asset           String   @default("USDT") @db.VarChar(10)
   network         String   @default("TRC20") @db.VarChar(20)
-  walletAddress   String   @unique @db.VarChar(100)
+  walletAddress   String   @db.VarChar(100)
   qrCodeDataUrl   String   @db.MediumText
   isActive        Boolean  @default(true)
   revision        Int      @default(1)
@@ -607,6 +607,8 @@ model DepositAccount {
   updatedBy User?     @relation("DepositAccountUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   deposits  Deposit[]
 
+  @@unique([asset, network, walletAddress])
+  @@index([asset, network, isActive])
   @@index([isActive])
   @@index([createdByUserId])
   @@index([updatedByUserId])
@@ -629,7 +631,7 @@ model Deposit {
   assignedWalletAddress    String        @db.VarChar(100)
   assignedNetwork          String        @db.VarChar(20)
   assignedQrCodeDataUrl    String        @db.MediumText
-  txid                     String?       @unique @db.Char(64)
+  txid                     String?       @db.VarChar(191)
   submittedAt              DateTime?     @db.DateTime(3)
   reviewedByUserId         String?       @db.Char(36)
   reviewedAt               DateTime?     @db.DateTime(3)
@@ -643,6 +645,7 @@ model Deposit {
   assignedDepositAccount DepositAccount     @relation(fields: [assignedDepositAccountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   reviewedBy             User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  @@unique([assignedNetwork, txid])
   @@index([userId, createdAt])
   @@index([status, createdAt])
   @@index([packagePlanVersionId])
