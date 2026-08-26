@@ -6,11 +6,24 @@ export type DepositStatus =
   | "APPROVED"
   | "REJECTED";
 
+export const DEPOSIT_NETWORKS = [
+  "TRC20",
+  "ERC20",
+  "BEP20",
+  "POLYGON",
+  "ARBITRUM",
+  "BASE",
+  "OPTIMISM",
+  "SOLANA",
+] as const;
+
+export type DepositNetwork = (typeof DEPOSIT_NETWORKS)[number];
+
 export interface DepositAccount {
   id: string;
   label: string;
-  asset: "USDT";
-  network: "TRC20";
+  asset: string;
+  network: DepositNetwork;
   walletAddress: string;
   qrCodeDataUrl: string;
   isActive: boolean;
@@ -42,7 +55,7 @@ export interface Deposit {
   assignedDepositAccountId: string;
   assignedAccountLabel: string;
   assignedWalletAddress: string;
-  assignedNetwork: string;
+  assignedNetwork: DepositNetwork;
   assignedQrCodeDataUrl: string;
   txid: string | null;
   submittedAt: string | null;
