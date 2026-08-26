@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import FlashMessage from "@/components/ui/flash-message";
 import styles from "./user-subscriptions-panel.module.css";
 
 interface Subscription {
@@ -74,6 +75,14 @@ export default function UserSubscriptionsPanel() {
 
   return (
     <section className={styles.panel}>
+      {error ? (
+        <FlashMessage
+          message={error}
+          type="error"
+          onClose={() => setError("")}
+        />
+      ) : null}
+
       <div className={styles.header}>
         <div>
           <span>SUB-01 / MY PACKAGE</span>
@@ -87,8 +96,6 @@ export default function UserSubscriptionsPanel() {
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
-
-      {error ? <div className={styles.error}>{error}</div> : null}
 
       {!loading && active.length === 0 ? (
         <div className={styles.empty}>
