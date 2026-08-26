@@ -2,13 +2,13 @@
 
 Import the required collection JSON plus `FixTradeZone.local.postman_environment.json` and select **FixTradeZone Local**.
 
-Login/Refresh collections automatically update their token variables where documented. No exported environment file may contain real credentials or tokens.
+Login/Refresh collections automatically update token variables where documented. No exported environment file may contain real credentials or tokens.
 
 ## PKG-01 Packages / Plan Foundation
 
 `FixTradeZone-PKG-01.postman_collection.json` and the accepted MASTER v13 runner cover migration `0007_package_plan_foundation` and PKG-01 package publication/draft behavior.
 
-PKG-01 has already passed its local API, SQL, UI and milestone gate. Do not blindly replay historical write requests such as package publication against an already-accepted database.
+PKG-01 has already passed local API, SQL, UI and milestone gates. Do not blindly replay historical package-publication writes against the accepted database.
 
 ## DEP-01 Combined Acceptance
 
@@ -16,34 +16,36 @@ Use:
 
 `FixTradeZone-DEP-01-COMBINED-ACCEPTANCE.postman_collection.json`
 
-This runner is intentionally used **after the complete backend + frontend DEP-01 vertical slice is pulled locally**, not as an intermediate development checkpoint.
+Run it only after the complete backend + frontend vertical slice is locally green.
 
-The receiving-account foundation is network-aware after `0009_deposit_network_generalization`, but the current deterministic DEP-01 acceptance lane deliberately remains **USDT / TRC20**. Other supported networks are validated by focused automated tests and can receive dedicated acceptance packs when their product flow is enabled.
+### Prerequisites
 
-Prerequisites:
+1. `npm run verify:local` is GREEN.
+2. `0008_deposit_foundation` is applied.
+3. `0009_deposit_network_generalization` is applied only after the green code gate.
+4. Admin `/deposits` shows the seeded ACTIVE payment rail `USDT on TRON (TRC20)`.
+5. That rail has at least one real public ACTIVE receiving account with a matching QR.
+6. `adminIdentifier` / `adminPassword` point to SUPER_ADMIN or delegated ADMIN with deposit permissions.
+7. `userIdentifier` / `userPassword` point to an ACTIVE ordinary USER.
+8. CAPTCHA configuration matches the local login test environment.
 
-1. local code gate is GREEN;
-2. migrations `0008_deposit_foundation` and `0009_deposit_network_generalization` are explicitly deployed after a read-only migration-status check;
-3. a real public USDT TRC20 receiving account and matching QR have been created in Admin `/deposits` and left ACTIVE;
-4. for this QA run, avoid other ACTIVE USDT networks so random server assignment remains deterministically TRC20;
-5. `adminIdentifier` / `adminPassword` point to a SUPER_ADMIN or delegated ADMIN with deposit permissions;
-6. `userIdentifier` / `userPassword` point to an ACTIVE ordinary USER;
-7. CAPTCHA is configured consistently with the local login test environment.
+The runner discovers `depositPaymentRailId` from the active account preflight; do not hardcode a rail UUID in Postman.
 
-The runner performs LOCAL QA writes:
+### What the runner proves
 
-- verifies an active USDT/TRC20 account exists;
-- logs in as USER;
-- reads the effective published package catalogue;
-- creates a deposit request;
-- proves the one-open-deposit guard;
-- proves invalid TRC20 transaction-ID rejection;
-- submits a synthetic local QA transaction ID;
-- verifies ADMIN pending review visibility;
-- approves the first QA deposit;
-- creates a second QA deposit;
-- submits a second synthetic transaction ID;
-- rejects the second QA deposit;
-- verifies USER history contains both reviewed outcomes.
+- Admin authentication.
+- Active USDT/TRC20 payment rail + account preflight.
+- USER authentication.
+- Effective published package catalogue.
+- Deposit creation using `packagePlanItemId + paymentRailId`.
+- One-open-deposit HTTP 409 guard.
+- Invalid network transaction-ID HTTP 400 guard.
+- Valid local synthetic transaction submission.
+- ADMIN pending-review visibility.
+- APPROVED lifecycle + USER readback.
+- Second deposit lifecycle ending REJECTED.
+- Final USER history contains both terminal outcomes.
 
-Synthetic transaction IDs in this collection are local test data only. DEP-01 does not perform blockchain credit, wallet balance changes or package activation. Never run this collection against production.
+The current deterministic acceptance lane uses USDT/TRC20/TRON. That is test data, not a platform-wide network hardcode.
+
+Synthetic transaction IDs are local QA data only. DEP-01 does not perform blockchain credit, wallet balance changes or package activation. Never run this collection against production.
