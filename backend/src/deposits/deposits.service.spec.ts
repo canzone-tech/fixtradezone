@@ -148,16 +148,20 @@ describe('DepositsService', () => {
         ],
       },
     ]);
-    transaction.depositAccount.findMany.mockResolvedValue([]);
+
+    let accountLookup: { where?: Record<string, unknown> } | null = null;
+    transaction.depositAccount.findMany.mockImplementation(
+      (args: { where?: Record<string, unknown> }) => {
+        accountLookup = args;
+        return Promise.resolve([]);
+      },
+    );
 
     await expect(
       service.createDeposit({ packagePlanItemId: ITEM_ID }, actor),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
 
-    const findManyArgs = transaction.depositAccount.findMany.mock.calls[0]?.[0] as
-      | { where?: Record<string, unknown> }
-      | undefined;
-    expect(findManyArgs?.where).toMatchObject({
+    expect(accountLookup?.where).toMatchObject({
       isActive: true,
       asset: 'USDT',
     });
@@ -232,7 +236,14 @@ describe('DepositsService', () => {
         assignedWalletAddress: '0x1111111111111111111111111111111111111111',
       }),
     );
-    transaction.deposit.updateMany.mockResolvedValue({ count: 1 });
+
+    let txUpdate: { data?: Record<string, unknown> } | null = null;
+    transaction.deposit.updateMany.mockImplementation(
+      (args: { data?: Record<string, unknown> }) => {
+        txUpdate = args;
+        return Promise.resolve({ count: 1 });
+      },
+    );
     transaction.deposit.findUniqueOrThrow.mockResolvedValue(
       deposit({
         assignedNetwork: 'ERC20',
@@ -248,10 +259,7 @@ describe('DepositsService', () => {
       actor,
     );
 
-    const updateArgs = transaction.deposit.updateMany.mock.calls[0]?.[0] as
-      | { data?: Record<string, unknown> }
-      | undefined;
-    expect(updateArgs?.data).toMatchObject({
+    expect(txUpdate?.data).toMatchObject({
       txid: TXID,
       status: 'PENDING_REVIEW',
     });
