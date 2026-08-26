@@ -26,8 +26,7 @@ Do not create additional application databases unless explicitly approved.
 - UTC timestamps
 - `createdAt` + `updatedAt` where mutable state exists
 - Financial values: SQL `DECIMAL`; never FLOAT/DOUBLE
-- Explicit status enums where lifecycle integrity matters
-- Password hashes only; no plaintext password
+- Explicit lifecycle enums where integrity matters
 - Secrets remain in env/secret management, never business tables
 - Important admin/financial actions are audited
 - Historical financial/business facts are not silently rewritten or deleted
@@ -49,10 +48,10 @@ Configurable identifiers/auth/registration and system sequence foundation.
 Relational referral profiles, sponsor history and referral configuration.
 
 ### `0007_package_plan_foundation`
-Versioned package catalogue, definitions, plan versions/items and exact decimal economics. PKG-01 local acceptance is GREEN.
+Versioned package catalogue and exact decimal economics. PKG-01 local acceptance is GREEN.
 
 ### `0008_deposit_foundation`
-Applied locally on 2026-08-26 after resolving the MySQL-compatible open-key CHECK design. This migration is now immutable history.
+Applied locally on 2026-08-26 after correcting the MySQL-compatible open-key CHECK. It is immutable migration history.
 
 It introduced:
 
@@ -63,49 +62,89 @@ It introduced:
 - manual payment review states;
 - deposit RBAC permissions.
 
-The original migration established the current USDT/TRC20 launch lane. Its applied file must never be rewritten to generalize later behavior.
+The applied 0008 file must never be rewritten.
 
-## Deposit Network Generalization — Migration `0009_deposit_network_generalization`
+## Pending Migration — `0009_deposit_network_generalization`
 
-Status: **SOURCE IMPLEMENTED / LOCAL CODE + MIGRATION ACCEPTANCE PENDING**.
+Status: **SOURCE IMPLEMENTED AS DATA-DRIVEN PAYMENT-RAIL HARDENING / LOCAL CODE GATE PENDING**.
 
-This forward-only migration removes the global USDT/TRC20 database restriction while retaining the current USDT/TRC20 QA lane.
+Read-only local migration status has already confirmed 9 migrations with only `0009` pending. Do not deploy it until the revised code gate is GREEN.
 
-### `deposit_accounts`
+### `deposit_payment_rails`
 
-After `0009`, each receiving account keeps:
+`0009` creates first-class payment-route configuration:
 
-- immutable asset/token code;
-- immutable network;
-- immutable public address;
-- QR snapshot/configuration;
-- active state and revision;
-- actor/timestamps.
+```text
+id
+asset
+networkCode
+displayName
+validationProfile
+isActive
+revision
+createdByUserId
+updatedByUserId
+createdAt
+updatedAt
+```
+
+Integrity:
+
+- unique `(asset, networkCode)`;
+- asset/network-code shape checks;
+- positive revision;
+- actor FKs preserve auditability;
+- protocol profile is typed as `TRON`, `EVM`, or `SOLANA`.
+
+A deterministic V1 rail is seeded:
+
+```text
+id                = 00000000-0000-4000-8000-000000000901
+asset             = USDT
+networkCode       = TRC20
+displayName       = USDT on TRON (TRC20)
+validationProfile = TRON
+```
+
+This is launch configuration, not a global schema restriction.
+
+### `deposit_accounts` after 0009
+
+A receiving account references a configured rail with mandatory `paymentRailId`.
+
+Existing 0008 USDT/TRC20 rows are backfilled to the deterministic seeded rail before the FK becomes NOT NULL.
+
+The existing `asset` and `network` columns remain immutable assignment snapshots populated from the selected rail. They are not freehand Admin input.
 
 Uniqueness becomes:
 
 ```text
-(asset, network, walletAddress)
+(paymentRailId, walletAddress)
 ```
 
-An index on `(asset, network, isActive)` supports authoritative receiving-pool lookup.
+Lookup index:
 
-The `0008` CHECK constraints that fixed every account to USDT/TRC20 are removed by `0009`.
+```text
+(paymentRailId, isActive)
+```
+
+The old 0008 checks forcing every account to USDT/TRC20 are removed.
 
 No private key, seed phrase, signing key or custody secret is stored.
 
-### `deposits`
+### `deposits` after 0009
 
-The immutable deposit snapshot continues to record:
+The deposit fact keeps exact `DECIMAL(20,8)` amount and immutable assignment snapshots.
 
-- package/version/item identity;
-- exact `DECIMAL(20,8)` amount;
-- package currency;
-- assigned receiving account;
-- assigned network/address/QR;
-- transaction identifier and review history.
+`0009` adds:
 
-`0009` expands `txid` from `CHAR(64)` to `VARCHAR(191)` so network-specific transaction identifiers can be stored.
+```text
+assignedValidationProfile
+```
+
+Existing TRC20 deposits are backfilled as `TRON` before this field becomes NOT NULL.
+
+Transaction storage expands from `CHAR(64)` to `VARCHAR(191)` for protocol-specific identifiers.
 
 Transaction uniqueness becomes:
 
@@ -113,45 +152,35 @@ Transaction uniqueness becomes:
 (assignedNetwork, txid)
 ```
 
-This preserves duplicate protection without assuming every network uses one global 64-hex namespace.
+Validation uses the immutable `assignedValidationProfile` snapshot. A later Admin rail change therefore cannot reinterpret a historical deposit.
 
-### Validation authority
+### Network and validator ownership
 
-The database stores the selected network; application validation enforces address/transaction format according to that network.
+Network names are **data**, stored in `deposit_payment_rails.networkCode`; they are not a hardcoded application list.
 
-Current supported registry:
+Protocol validator families remain code because address and transaction validation is security-sensitive:
 
-```text
-TRC20
-ERC20
-BEP20
-POLYGON
-ARBITRUM
-BASE
-OPTIMISM
-SOLANA
-```
+- `TRON`: Base58Check public address + 64-hex transaction ID;
+- `EVM`: 20-byte `0x` address + 32-byte transaction hash;
+- `SOLANA`: Base58 structural public key/signature validation.
 
-Current application rules:
+A new network using an existing protocol profile can be configured as data. A genuinely new protocol family requires reviewed validator code before activation.
 
-- TRC20 public address: TRON Base58Check with checksum validation;
-- EVM public address: `0x` + 40 hexadecimal characters;
-- SOLANA public address: Base58 structural validation;
-- TRC20 transaction ID: 64 hex;
-- EVM transaction hash: 64 hex with optional `0x` prefix;
-- SOLANA transaction signature: Base58 structural validation.
+### Payment routing rule
 
-Unknown networks are rejected until their validator is deliberately added.
+A package determines authoritative `amount + currency`.
 
-### One-open-deposit DB guard
+The USER chooses an ACTIVE payment rail whose `asset` matches that currency. The backend then randomly assigns an ACTIVE receiving account **within that exact rail**.
+
+This prevents random cross-network assignment and wrong-chain ambiguity.
+
+### One-open-deposit guard
 
 `openKey` remains nullable and unique.
 
-Open states require non-null `openKey`; service writes `openKey = userId`. Terminal review releases it to `NULL`. This preserves one-open-deposit-per-user under concurrent requests.
+Open states require non-null `openKey`; service writes `openKey = userId`. Terminal review releases it to `NULL`.
 
-### Financial/history rules unchanged
-
-Deposit ownership, package references and assigned receiving account use restrictive history-preserving foreign keys. Review facts remain auditable.
+### Deferred accounting
 
 DEP-01 still does **not** create:
 
@@ -163,20 +192,18 @@ DEP-01 still does **not** create:
 - withdrawal/payout;
 - blockchain custody/signing state.
 
-Later Wallet/Ledger and package-activation milestones must consume approved-deposit facts idempotently.
+Later modules must consume approved deposit facts idempotently.
 
-## Local migration rule
+## Local Migration Rule
 
-Before any new migration is deployed locally:
+1. Run repository code gate.
+2. Run read-only `npm run db:status`.
+3. Inspect exact pending migration.
+4. Apply only with explicit `npm run db:deploy` after code gate GREEN.
+5. Rerun migration status and module SQL/audit acceptance.
+6. Never rewrite an already-applied migration.
+7. Never reset the real application database merely to bypass a failed migration.
 
-1. run the repository code gate;
-2. run read-only `npm run db:status`;
-3. inspect the exact pending migration;
-4. apply only with explicit `npm run db:deploy`;
-5. rerun migration status and module SQL/audit acceptance;
-6. never rewrite an already-applied migration;
-7. never reset the real application database merely to bypass a failed migration.
+Current local DB: `0008` applied; `0009` pending.
 
-Current local database has `0008` applied. `0009` must remain pending until the generalized code gate is GREEN.
-
-Production migration status is unknown and production deployment remains on HOLD.
+Production migration status is unknown and production deployment remains HOLD.
