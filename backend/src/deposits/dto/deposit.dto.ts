@@ -13,9 +13,9 @@ import {
   Min,
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
+import { IsValidTronAddress } from '../deposit.validation';
 import { DEPOSIT_STATUSES, type DepositStatus } from '../deposits.constants';
 
-const TRON_ADDRESS_PATTERN = /^T[1-9A-HJ-NP-Za-km-z]{33}$/;
 const TXID_PATTERN = /^[0-9a-f]{64}$/;
 const QR_DATA_URL_PATTERN =
   /^data:image\/(?:png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -31,9 +31,7 @@ export class CreateDepositAccountDto {
 
   @Transform(trimString)
   @IsString()
-  @Matches(TRON_ADDRESS_PATTERN, {
-    message: 'walletAddress must be a valid TRON public address.',
-  })
+  @IsValidTronAddress()
   walletAddress!: string;
 
   @Transform(trimString)
