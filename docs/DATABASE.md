@@ -8,7 +8,7 @@
 - MySQL: 8.0.46
 - Runtime user: `fixtradezone`
 
-Do not create additional application databases.
+Do not create additional application databases unless explicitly approved.
 
 ## Prisma
 
@@ -16,248 +16,214 @@ Do not create additional application databases.
 - Generator: `prisma-client`
 - Output: `src/generated/prisma`
 - moduleFormat: `cjs`
-- Datasource provider: mysql
+- Datasource provider: MySQL
 - URL configured via `prisma.config.ts`
-- MySQL connectivity uses `@prisma/adapter-mariadb`
-- Local adapter currently uses `allowPublicKeyRetrieval=true`, connectionLimit=10, connectTimeout=5000, acquireTimeout=10000.
+- Runtime connectivity uses `@prisma/adapter-mariadb`
 
-## Conventions
+## Database Conventions
 
-- UUID IDs stored as CHAR(36)
+- UUID IDs: `CHAR(36)`
 - UTC timestamps
-- createdAt + updatedAt
-- Financial values DECIMAL; example DECIMAL(20,8) for USDT/crypto
-- Soft delete only when justified
-- Explicit status enums
-- Password hashes only
-- Secrets via env/secret manager
-- Important admin/financial actions audited
+- `createdAt` + `updatedAt` where mutable state exists
+- Financial values: SQL `DECIMAL`; never FLOAT/DOUBLE
+- Explicit status enums where lifecycle integrity matters
+- Password hashes only; no plaintext password
+- Secrets remain in env/secret management, never business tables
+- Important admin/financial actions are audited
+- Historical financial/business facts are not silently rewritten or deleted
+- Reversals/adjustments are separate linked events in later accounting modules
+- Migration application is explicit; do not use `prisma migrate dev` without shadow-DB approval
 
-## Initial Auth/RBAC Schema
+## Core Auth / RBAC / Audit
 
-Models:
+Primary models include:
 
-- User
-- Role
-- Permission
-- UserRole
-- RolePermission
-- AuditLog
-- AuthSession
+- `User`
+- `Role`
+- `Permission`
+- `UserRole`
+- `RolePermission`
+- `AuditLog`
+- `AuthSession`
+- `ImpersonationSession`
+- authentication/registration/security singleton configuration models
+- `UserIdentifierClaim`
+- `SystemSequence`
 
-### User
+Auth sessions store only the SHA-256 refresh-token hash. Raw refresh tokens are never stored.
 
-id, email unique, username optional unique, phone optional unique, passwordHash, firstName, lastName, status (ACTIVE/SUSPENDED/BLOCKED/PENDING), emailVerifiedAt, lastLoginAt, createdAt, updatedAt.
+Audit logs retain actor, action, entity, description, metadata, IP/user-agent context and timestamp. Actor FK deletion uses `SET NULL` so history survives account removal where removal is permitted.
 
-### Role
+## Applied Migration History
 
-name unique, description, status (ACTIVE/INACTIVE).
+### `0001_foundation_auth_rbac`
 
-### Permission
+Foundation users/RBAC/audit schema. Applied locally after a pre-apply backup and verified through `_prisma_migrations` and FK inspection.
 
-code unique, description.
+### `0002_auth_sessions` through `0004`
 
-### UserRole
+Authentication session and security/impersonation foundation. Applied and locally accepted as part of the reusable backend foundation.
 
-Composite primary key userId + roleId, assignedAt.
+### `0005_configurable_auth_registration`
 
-### RolePermission
+Applied and verified locally on 2026-08-23.
 
-Composite primary key roleId + permissionId.
+Key changes:
 
-### AuditLog
+- username required/unique;
+- email/mobile conditional claim model;
+- `user_identifier_claims` for single-account uniqueness;
+- `system_auth_config`;
+- `system_registration_config`;
+- `system_sequences` race-safe counters;
+- required temporary-password state.
 
-actorUserId nullable, action enum:
-CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, SUSPEND, ACTIVATE, BLOCK, UNBLOCK, PASSWORD_CHANGE, ROLE_CHANGE, PERMISSION_CHANGE; plus entityType, entityId, description, metadata JSON, IP, userAgent, createdAt.
+CAPTCHA challenge state is intentionally transient and does not use a MySQL business table.
 
-### AuthSession
+### `0006_referral_foundation`
 
-id (also used as refresh JWT `jti`), userId, SHA-256 refreshTokenHash unique, expiresAt, revokedAt, revocationReason, rotatedToSessionId, createdAt, updatedAt. Raw refresh tokens are never stored.
+Applied and accepted with MLM-01. Relational referral profiles, sponsor relationship/history and system referral configuration are MySQL source-of-truth data.
 
-### FK behaviors
+## Package / Plan Foundation — Migration `0007_package_plan_foundation`
 
-- user -> user_roles: CASCADE
-- user_roles -> role: RESTRICT
-- role_permissions -> role/permission: CASCADE
-- audit actor -> user: SET NULL
-- user -> auth_sessions: CASCADE
+PKG-01 introduced:
 
-## Migration State
+### `package_definitions`
 
-`prisma/migrations/0001_foundation_auth_rbac/migration.sql` was generated with `prisma migrate diff --from-empty --to-schema ... --script` and reviewed before application.
+Immutable stable package identity (`code`) only. Commercial terms do not live here.
 
-On 2026-08-18 it was applied with `prisma migrate deploy` to the local development MySQL `fixtradezone` database after a pre-apply database dump.
+### `package_plan_versions`
 
-Verification confirmed:
+Versioned plan aggregate containing status/revision, package lifecycle settings, migration/renewal behavior, settlement timezone, effective range and publication/clone actor references.
 
-- Prisma reports the database schema is up to date.
-- `_prisma_migrations` records `0001_foundation_auth_rbac` as finished, not rolled back, with one applied step.
-- `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, and `audit_logs` exist.
-- All five reviewed foreign keys and their delete/update rules match the migration.
+### `package_plan_items`
 
-This verification applies only to the local development database. It does not imply that staging or production has been migrated.
+Typed versioned commercial terms including:
 
-`0002_auth_sessions` through `0006_referral_foundation` are applied and locally
-verified in the latest merged-main checkpoint. The next reviewed source migration
-is `0007_package_plan_foundation`; its local deployment/acceptance status is
-tracked separately below.
+- stable definition reference, display identity and availability;
+- `DECIMAL(20,8)` price and USDT currency;
+- typed reward-rate fields using `DECIMAL(9,6)`;
+- typed cap basis and `DECIMAL(10,4)` multiplier;
+- goal/cycle durations and lifecycle actions.
 
-## RBAC Bootstrap and Registration Verification
+Unique/check constraints protect intra-plan uniqueness, positive amounts, valid percentage/rate shape and package duration rules.
 
-The API idempotently upserts the default `USER` role as an active system invariant. Registration also ensures that role inside the same transaction used to create the user and audit event.
+`0007` seeds the nine stable package definitions and the Founder-approved V1 draft. PKG-01 was subsequently published/cloned through the accepted API workflow.
 
-Local Postman and SQL verification confirmed:
+Local PKG-01 acceptance is GREEN:
 
-- a new user is created with `PENDING` status;
-- the password is stored as an Argon2id hash;
-- the `USER` role is assigned through `user_roles`;
-- a `CREATE` audit event with source `SELF_REGISTRATION` is recorded;
-- duplicate registration returns HTTP 409 without a second user or audit event.
+- seven migrations applied/schema current;
+- Postman API gate GREEN;
+- SQL package/audit readback GREEN;
+- integrated ADMIN/USER package UI GREEN;
+- milestone verification GREEN.
 
-Do not use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue using reviewed migrations and `prisma migrate deploy` for authorized environments.
+PKG-01 creates no user balance, earning, deposit, subscription or ledger state.
 
-## Founder Administrator Bootstrap
+## Deposit Foundation — Migration `0008_deposit_foundation`
 
-The API idempotently ensures `USER`, `ADMIN`, and `SUPER_ADMIN` roles exist. The
-one-time `super-admin:bootstrap` CLI uses a serializable transaction to activate
-the registered founder account and assign founder authority. It records
-system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role
-assignments require the normal audited RBAC workflow.
+Status: **SOURCE IMPLEMENTED / LOCAL DEPLOYMENT AND ACCEPTANCE PENDING**.
 
-## Configurable Auth/Registration Schema — Migration 0005
+Canonical business contract: `docs/DEPOSITS-FOUNDATION.md`.
 
-Migration `0005_configurable_auth_registration` was applied and verified locally on 2026-08-23.
+### `deposit_accounts`
 
-### Updated User Identifier Rules
+Stores only public receiving-account data:
 
-Current `users` identifier columns:
+- immutable UUID;
+- operator label;
+- asset fixed to `USDT`;
+- network fixed to `TRC20`;
+- unique public TRON address;
+- QR image data-URL payload;
+- active/inactive assignment state;
+- optimistic revision;
+- create/update actor references and timestamps.
 
-- `username` — required and unique.
-- `email` — nullable, indexed, not directly unique.
-- `phone` — nullable, indexed, not directly unique.
-- `phoneVerifiedAt` — nullable verification timestamp.
-- `mustChangePassword` — required boolean, default false.
+No private key, seed phrase, signing key or custody secret is stored.
 
-Conditional single-account uniqueness is implemented through `user_identifier_claims`, rather than permanent direct unique indexes on email/mobile.
+Application DTO validation performs TRON Base58Check checksum validation before account creation. The SQL layer additionally constrains asset/network and revision invariants.
 
-### UserIdentifierClaim
+Receiving addresses are immutable through the application contract. Replacement requires disabling the historical account and creating a new account.
 
-Stores the normalized EMAIL or MOBILE identifier claimed by a user while that identifier type operates in single-account mode.
+### `deposits`
 
-The `(type, normalizedValue)` uniqueness constraint prevents duplicate single-account identifiers.
+Stores the manual payment-review fact and immutable assignment snapshots:
 
-When a configuration moves to multiple-account mode, claims for that identifier type are removed.
+- USER owner;
+- lifecycle status: `AWAITING_TXID`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`;
+- package-plan/version/item references;
+- package code/name snapshot;
+- exact `DECIMAL(20,8)` amount and currency;
+- assigned receiving-account reference;
+- assigned account label/address/network/QR snapshots;
+- globally unique normalized TXID;
+- submit/review timestamps, reviewer and required terminal review note.
 
-When configuration moves back to single-account mode:
+### One-open-deposit DB guard
 
-1. existing users are checked for duplicates;
-2. the transition is rejected if duplicates exist;
-3. claims are rebuilt transactionally if the data is safe.
+`openKey` is nullable and unique.
 
-### SystemAuthConfig
+For open states:
 
-Singleton authentication configuration containing:
+```text
+AWAITING_TXID
+PENDING_REVIEW
+```
 
-- loginWithUsername
-- loginWithEmail
-- loginWithMobile
-- captchaOnLoginEnabled
-- captchaOnRegistrationEnabled
-- updatedByUserId
-- createdAt
-- updatedAt
+`openKey = userId`.
 
-### SystemRegistrationConfig
+For terminal states:
 
-Singleton registration configuration containing:
+```text
+APPROVED
+REJECTED
+```
 
-- publicRegistrationEnabled
-- superAdminRegistrationEnabled
-- adminRegistrationEnabled
-- authorizedUserRegistrationEnabled
-- emailRequired
-- mobileRequired
-- passwordMode
-- usernameMode
-- usernamePrefixEnabled
-- usernamePrefix
-- allowMultipleAccountsPerEmail
-- allowMultipleAccountsPerMobile
-- updatedByUserId
-- createdAt
-- updatedAt
+`openKey = NULL`.
 
-### SystemSequence
+This makes one-open-deposit-per-user a database-enforced invariant even under concurrent requests. MySQL permits multiple `NULL` values in the unique index, so historical terminal deposits remain unlimited.
 
-`system_sequences` provides race-safe transactional counters.
+### TXID / state SQL checks
 
-Current sequence:
+Database checks require:
 
-- `username`
-- initial/verified local `nextValue`: `100001`
+- amount > 0;
+- currency = USDT;
+- assigned network = TRC20;
+- TXID absent while `AWAITING_TXID`;
+- TXID + submitted timestamp present from `PENDING_REVIEW` onward;
+- review timestamp/note absent before terminal review;
+- review timestamp/note present for `APPROVED`/`REJECTED`;
+- terminal rows have `openKey = NULL`.
 
-### Local Verification
+TXID has a global unique index; duplicate submission therefore fails even if two requests race.
 
-Verified after migration:
+### Foreign-key behavior
 
-- migration record finished successfully and is not rolled back;
-- all new tables exist;
-- username unique index exists;
-- email and phone non-unique indexes exist;
-- configuration singleton records exist;
-- username sequence exists;
-- existing EMAIL and MOBILE claims were backfilled.
+Deposit ownership, package references and assigned receiving account use `RESTRICT` so historical payment facts cannot be orphaned by deletion. Reviewer references may use `SET NULL` while the audit/review timestamp/note remain preserved.
 
-CAPTCHA does not require a MySQL table or migration because challenge state is intentionally short-lived Redis state.
+### DEP-01 intentionally does not create
 
-## Package / Plan Foundation — Migration 0007
+- wallet balance;
+- accounting ledger credit;
+- package subscription/activation;
+- referral commission;
+- reward/cap consumption;
+- withdrawal/payout;
+- blockchain custody or signing state.
 
-`0007_package_plan_foundation` introduces three MySQL source-of-truth tables:
+Later Wallet/Ledger and package-activation milestones must consume the immutable approved-deposit fact idempotently rather than rewriting DEP-01 history.
 
-### PackageDefinition
+## Local migration rule
 
-`package_definitions` stores immutable stable identity (`code`) only. It contains
-no price, rate, cap, duration or other commercial term.
+Before any new migration is deployed locally:
 
-### PackagePlanVersion
+1. run the repository code gate;
+2. run read-only `npm run db:status`;
+3. inspect the exact pending migration;
+4. apply only with explicit `npm run db:deploy`;
+5. rerun migration status and the module's SQL/audit acceptance;
+6. never reset the real application database merely to bypass a failed migration.
 
-`package_plan_versions` stores:
-
-- unique integer version number and `DRAFT`/`PUBLISHED` status;
-- whole-plan optimistic `revision`;
-- active-package mode/basis;
-- activation trigger and plan migration mode;
-- renewal mode and upgrade switch;
-- settlement timezone and UTC effective range;
-- publication, clone and administrator audit references.
-
-### PackagePlanItem
-
-`package_plan_items` stores versioned typed terms:
-
-- definition, display name, slug, sort order and availability;
-- `DECIMAL(20,8)` price and explicit `USDT` currency;
-- rate mode plus nullable `DECIMAL(9,6)` fixed/min/max percentage fields;
-- rate meaning, cap basis, `DECIMAL(10,4)` multiplier and principal treatment;
-- goal/cycle day counts and reward/cycle action modes.
-
-Unique constraints prevent duplicate definition, slug or sort order inside one
-plan. SQL checks enforce positive price/multiplier, valid rate-field shape,
-percentage bounds, USDT currency, positive durations and cycle not exceeding
-goal.
-
-The migration seeds:
-
-- nine stable package definitions;
-- V1 as an intentionally unpublished revision-1 draft;
-- the nine Founder-approved initial items;
-- a system-attributed migration audit row.
-
-It does not create `UserPackage`, balances, earnings, cap consumption, deposits
-or ledger records.
-
-Source/schema/static gates are GREEN. The operator took a verified pre-0007
-backup, deployed `0007_package_plan_foundation`, and confirmed seven migrations
-with the local schema up to date through `npm run verify:milestone`. The ordered
-Postman mutation/readback and final SQL/audit acceptance remain required under
-`docs/LOCAL-VERIFY-PACKAGES.md` before PKG-01 is accepted end to end.
+Production migration status is unknown and production deployment remains on HOLD.
