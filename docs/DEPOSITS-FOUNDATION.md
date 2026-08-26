@@ -1,113 +1,157 @@
 # FixTradeZone — DEP-01 Deposit Foundation
 
-**Status:** LOCKED IMPLEMENTATION CONTRACT — NETWORK-AWARE HARDENING PENDING LOCAL ACCEPTANCE  
-**Scope:** DEP-01A receiving-account management + DEP-01B deposit request/transaction-ID/manual review  
-**Current acceptance lane:** USDT on TRON / TRC20  
-**Foundation rule:** receiving accounts are asset + network aware; TRC20 is not a global platform constraint.
+**Status:** LOCKED IMPLEMENTATION CONTRACT — PAYMENT-RAIL HARDENING PENDING LOCAL ACCEPTANCE  
+**Scope:** payment-rail master + receiving accounts + deposit request + transaction ID + manual review  
+**Current QA lane:** USDT on TRON / TRC20  
+**Foundation rule:** asset/network support is data-driven. TRC20 is a seeded rail, not a platform-wide hardcode.
 
 ## 1. Purpose
 
-DEP-01 creates the launch-critical manual deposit workflow without introducing a wallet ledger, package activation, automated blockchain verification, private-key custody or trading behavior.
-
-The accepted flow is:
+DEP-01 creates the launch-critical manual deposit workflow without wallet balance, ledger credit, package activation, blockchain automation, private-key custody or trading behavior.
 
 ```text
-USER selects an available package
-→ backend validates the currently effective published package item
-→ backend derives the authoritative package amount + currency
-→ backend randomly assigns one ACTIVE receiving account whose asset matches that currency
-→ USER receives exact amount + assigned network + public address + QR image
-→ USER pays externally
-→ USER submits the transaction identifier for the assigned network
-→ deposit becomes PENDING_REVIEW
-→ authorized ADMIN/SUPER_ADMIN manually APPROVES or REJECTS
-→ approval is recorded as an immutable reviewed payment fact
-→ ledger credit/package activation remain deferred to later milestones
+ADMIN configures supported payment rail (asset + network + validator profile)
+→ ADMIN attaches one or more public receiving accounts to that rail
+→ USER selects an available package
+→ backend derives authoritative package amount + currency
+→ USER selects an ACTIVE compatible payment rail for that currency
+→ backend randomly assigns one ACTIVE receiving account inside that rail
+→ USER receives exact amount + network + public address + matching QR
+→ USER pays externally on that exact network
+→ USER submits that network's transaction identifier
+→ PENDING_REVIEW
+→ authorized ADMIN/SUPER_ADMIN APPROVES or REJECTS
+→ immutable reviewed payment fact is retained
+→ accounting credit/package activation remain later milestones
 ```
 
-The current local/Postman acceptance lane remains USDT/TRC20. That does not make TRC20 a global schema or UI rule.
+## 2. Why payment rails are first-class data
 
-## 2. Non-negotiable integrity rules
+Receiving accounts do not accept arbitrary asset/network strings. A receiving account references a configured `DepositPaymentRail`.
 
-- Backend is authoritative for package, amount, account assignment, assigned network and status transitions.
-- USER never chooses or overrides a receiving account or network after a deposit request is created.
-- Assignment is random across currently ACTIVE receiving accounts matching the package currency/asset.
-- Only public receiving addresses and QR images are stored. **No private key, seed phrase, signing key or wallet secret may be stored.**
-- Receiving-account asset, network and address are immutable after creation. To replace any of them, disable the old account and create another account.
-- Historical deposits preserve an assignment snapshot even if the receiving account is later renamed, QR-updated or disabled.
-- Address validation is selected by network, never by one global hardcoded format.
-- Transaction-identifier validation is selected by the deposit's assigned network.
-- Transaction identifiers are unique within their assigned network.
-- Money uses exact SQL `DECIMAL`; never JavaScript floating point for authoritative values.
-- Financial/admin transitions are auditable.
-- Approval/rejection is state-safe: only `PENDING_REVIEW` may transition to `APPROVED` or `REJECTED`.
-- Approval does **not** create balance, ledger, earnings, commission or package activation in DEP-01.
-- Rejected deposits are terminal for DEP-01; the USER creates a new deposit request for another payment attempt.
-- No automatic blockchain/RPC/explorer verification in DEP-01. Manual review is the v1 authority.
-- All API responses containing deposit/account state use `Cache-Control: no-store`.
-
-## 3. Receiving-account model
-
-Each receiving account stores:
-
-- immutable UUID
-- operator label
-- immutable asset/token code, normalized uppercase
-- immutable supported network
-- immutable public receiving address validated for that network
-- QR image data URL (`image/png`, `image/jpeg`, `image/webp` or `image/svg+xml`), maximum 256 KiB client file size
-- active/inactive state
-- optimistic `revision`
-- created/updated actor and timestamps
-
-Account identity/uniqueness is:
-
-```text
-asset + network + walletAddress
-```
-
-This intentionally permits the same underlying public wallet address to be configured for different assets where operationally valid, while preventing duplicate rows for the same asset/network/address tuple.
-
-Supported network registry in the current foundation:
-
-```text
-TRC20
-ERC20
-BEP20
-POLYGON
-ARBITRUM
-BASE
-OPTIMISM
-SOLANA
-```
-
-Network validation rules currently include:
-
-- TRC20: TRON Base58Check mainnet address including checksum validation.
-- EVM networks (`ERC20`, `BEP20`, `POLYGON`, `ARBITRUM`, `BASE`, `OPTIMISM`): `0x` + 40 hexadecimal address structure.
-- SOLANA: Base58 public-address structure.
-
-Adding a future network requires an explicit registry + validator addition; unknown networks are not silently accepted.
-
-Initial account creation requires a QR image so every active account is immediately usable by the USER flow.
-
-Allowed account update fields:
-
-```text
-label
-qrCodeDataUrl
-isActive
-```
-
-Not editable:
+A payment rail defines:
 
 ```text
 asset
-network
-walletAddress
+networkCode
+displayName
+validationProfile
+isActive
+revision
+created/updated actor + timestamps
 ```
 
-## 4. Deposit model and lifecycle
+Examples of data, not hardcoded application enums:
+
+```text
+USDT + TRC20
+USDT + ETHEREUM
+USDC + ETHEREUM
+USDC + SOLANA
+```
+
+Adding another asset/network pair does not require changing the receiving-account schema or adding another frontend hardcoded network option.
+
+## 3. Validator profiles
+
+Protocol parsing remains versioned code because address and transaction validation is security-sensitive. Payment rails select one supported validator profile:
+
+```text
+TRON
+EVM
+SOLANA
+```
+
+The network code is data-driven; the profile selects the protocol implementation.
+
+V1 validators:
+
+- `TRON`: Base58Check mainnet address; 64-hex transaction ID.
+- `EVM`: `0x` + 40-hex address; 32-byte transaction hash, `0x` prefix accepted and normalized away.
+- `SOLANA`: Base58 public-key/signature shape validation.
+
+A network code already used with one validator profile may not be created with a conflicting profile through the service contract.
+
+New protocol families require reviewed code support before an Admin can safely use them. Unknown validation semantics are never silently accepted.
+
+## 4. Payment-rail mutability
+
+Immutable after rail creation:
+
+```text
+asset
+networkCode
+validationProfile
+```
+
+Mutable with optimistic revision + audit reason:
+
+```text
+displayName
+isActive
+```
+
+Changing protocol identity requires a new rail. Historical payment facts are never reinterpreted.
+
+## 5. Receiving-account integrity
+
+Each account stores:
+
+```text
+id
+label
+paymentRailId
+asset snapshot
+network snapshot
+public walletAddress
+matching qrCodeDataUrl
+isActive
+revision
+created/updated actor + timestamps
+```
+
+Rules:
+
+- No private key, seed phrase, signing key or wallet secret may be stored.
+- Address is immutable after account creation.
+- Replacement means disable old account and create another.
+- Account address is validated using its payment rail's validator profile.
+- An account cannot be activated while its payment rail is inactive.
+- Uniqueness is `paymentRailId + walletAddress`, not wallet address globally.
+- Multiple active accounts may exist on one rail for random assignment.
+- Historical deposits keep their own account/network/validation snapshots.
+
+## 6. USER network choice and server account assignment
+
+If a currency has more than one ACTIVE payment rail, the USER chooses the payment network. The backend never randomly chooses a blockchain/network for the USER.
+
+After the USER chooses the rail, the backend randomly assigns an ACTIVE account **within that exact rail**.
+
+This prevents wrong-chain payment ambiguity while retaining account-pool distribution.
+
+## 7. Package authority
+
+Deposit creation accepts:
+
+```json
+{
+  "packagePlanItemId": "uuid",
+  "paymentRailId": "uuid"
+}
+```
+
+The backend validates the currently effective published package and derives:
+
+```text
+amount = PackagePlanItem.price
+currency = PackagePlanItem.currency
+```
+
+The selected payment rail must be ACTIVE and `rail.asset == package currency`.
+
+The client cannot override amount, currency, assigned address or QR.
+
+## 8. Deposit lifecycle
 
 Statuses:
 
@@ -118,7 +162,7 @@ APPROVED
 REJECTED
 ```
 
-Creation stores an immutable snapshot of:
+Creation stores immutable snapshots including:
 
 ```text
 userId
@@ -132,10 +176,11 @@ assignedDepositAccountId
 assignedAccountLabel
 assignedWalletAddress
 assignedNetwork
+assignedValidationProfile
 assignedQrCodeDataUrl
 ```
 
-Mutable review fields are limited to:
+Only these lifecycle/review fields mutate:
 
 ```text
 txid
@@ -144,68 +189,55 @@ reviewedByUserId
 reviewedAt
 reviewNote
 status
+openKey
 ```
 
-## 5. Open-request rule
+## 9. One-open-deposit rule
 
-A USER may have only one open deposit at a time where status is:
+A USER may have only one open deposit where status is:
 
 ```text
 AWAITING_TXID
 PENDING_REVIEW
 ```
 
-Service writes `openKey = userId` for open states and releases it on terminal states. The unique open key prevents parallel open deposits for one user.
+`openKey` is unique while open and becomes `NULL` on terminal review. Service writes `openKey = userId`; database uniqueness prevents concurrent open requests.
 
-## 6. Package and receiving-account matching
+## 10. Transaction-ID integrity
 
-Deposit creation accepts only `packagePlanItemId` from the currently effective published package plan.
+Transaction IDs are validated and normalized using the **immutable `assignedValidationProfile` snapshot**, not mutable rail configuration.
 
-The backend derives:
+Database uniqueness is scoped by `assignedNetwork + txid` so the same network transaction cannot be reused across deposit requests.
 
-```text
-amount = PackagePlanItem.price
-currency = PackagePlanItem.currency
-```
+Invalid protocol-specific transaction identifiers return HTTP 400. Duplicate identifiers return HTTP 409.
 
-The client cannot override amount/currency.
+## 11. Manual review
 
-Only package items with `availability = AVAILABLE` are eligible.
-
-The receiving-account pool is filtered by:
+Only `PENDING_REVIEW` may transition to:
 
 ```text
-isActive = true
-asset = PackagePlanItem.currency
+APPROVED
+REJECTED
 ```
 
-If several active networks/accounts exist for that asset, the backend randomly assigns one and snapshots its network/address/QR. Therefore the USER cannot select a cheaper/different network or substitute an address after creation.
+Both require a review note and actor/timestamp audit trail.
 
-For current DEP-01 acceptance, configure only an ACTIVE `USDT / TRC20` account so the QA lane is deterministic while retaining the generalized foundation.
+Approval records the payment fact only. DEP-01 does **not** create:
 
-## 7. Transaction identifier validation
+- wallet balance;
+- ledger credit;
+- package activation;
+- referral commission;
+- rewards/cap consumption;
+- withdrawal/payout;
+- blockchain custody/signing;
+- real or simulated trade accounting.
 
-Validation is performed after the deposit is loaded, using its immutable `assignedNetwork`.
+Later modules must consume an approved deposit idempotently rather than rewriting DEP-01 history.
 
-Current rules:
+## 12. RBAC
 
-```text
-TRC20   → exactly 64 hexadecimal characters, normalized lowercase
-EVM     → 64 hexadecimal hash characters, optional 0x prefix, normalized lowercase without prefix
-SOLANA  → Base58 transaction signature structure
-```
-
-Database uniqueness is scoped by:
-
-```text
-assignedNetwork + txid
-```
-
-Service-level conflict handling returns HTTP 409 for duplicates on that network.
-
-## 8. RBAC
-
-Permissions:
+Existing deposit permissions remain:
 
 ```text
 deposits.accounts.read
@@ -214,41 +246,27 @@ deposits.read
 deposits.review
 ```
 
-SUPER_ADMIN keeps platform-wide bypass authority through the existing permission guard.
+Payment-rail configuration is part of deposit-account management in DEP-01 and uses `deposits.accounts.manage`.
 
-ADMIN receives no implicit deposit authority. Permissions are delegated through existing RBAC configuration.
+SUPER_ADMIN retains existing platform-wide bypass. ADMIN receives no implicit financial authority.
 
-USER endpoints are authenticated standard-user endpoints and may only access the current USER's own deposits.
-
-## 9. API contract
+## 13. API contract
 
 ### USER
 
 ```text
+GET  /deposits/payment-rails?asset=USDT
 GET  /deposits/me
 POST /deposits
 POST /deposits/:depositId/txid
 ```
 
-`POST /deposits`
-
-```json
-{
-  "packagePlanItemId": "uuid"
-}
-```
-
-`POST /deposits/:depositId/txid`
-
-```json
-{
-  "txid": "network-specific transaction identifier"
-}
-```
-
 ### ADMIN / SUPER_ADMIN
 
 ```text
+GET   /admin/deposit-payment-rails
+POST  /admin/deposit-payment-rails
+PATCH /admin/deposit-payment-rails/:railId
 GET   /admin/deposit-accounts
 POST  /admin/deposit-accounts
 PATCH /admin/deposit-accounts/:accountId
@@ -258,106 +276,53 @@ POST  /admin/deposits/:depositId/approve
 POST  /admin/deposits/:depositId/reject
 ```
 
-Create-account payload includes:
+All deposit/payment-rail/account state responses use `Cache-Control: no-store`.
 
-```json
-{
-  "label": "Treasury A",
-  "asset": "USDT",
-  "network": "TRC20",
-  "walletAddress": "public network address",
-  "qrCodeDataUrl": "data:image/...;base64,...",
-  "isActive": true,
-  "reason": "Initial receiving account"
-}
-```
+## 14. Migration history
 
-`asset` and `network` default to `USDT` / `TRC20` for backward-compatible current QA when omitted, but are persisted explicitly.
+`0008_deposit_foundation` is historical and already applied locally. It must never be rewritten.
 
-Review payload:
+`0009_deposit_network_generalization` is the forward hardening migration and is still pending local deployment. It:
 
-```json
-{
-  "note": "Manual review note"
-}
-```
+- creates `deposit_payment_rails`;
+- seeds the deterministic V1 USDT/TRC20/TRON rail;
+- backfills existing 0008 receiving accounts to that rail;
+- makes accounts reference a rail;
+- removes TRC20/USDT SQL hard constraints that would block future rails;
+- expands transaction-ID storage;
+- snapshots `assignedValidationProfile` on deposits;
+- preserves historical 0008 data.
 
-`note` is required for both approval and rejection for auditability.
+Do not deploy `0009` until the complete code gate is GREEN.
 
-## 10. Database migrations
+## 15. Frontend contract
 
-```text
-0008_deposit_foundation
-0009_deposit_network_generalization
-```
+ADMIN `/deposits`:
 
-`0008` is immutable migration history after application.
+- configure payment rails;
+- choose only a configured rail when creating a receiving account;
+- upload matching QR;
+- manage active/inactive rail/account state;
+- review deposits with required notes.
 
-`0009` performs forward-only generalization:
+USER `/user/deposits`:
 
-- removes USDT-only/TRC20-only DB CHECK constraints;
-- replaces global wallet-address uniqueness with `(asset, network, walletAddress)` uniqueness;
-- adds asset/network/active lookup index;
-- expands `deposits.txid` for network-specific identifiers;
-- replaces global TXID uniqueness with `(assignedNetwork, txid)` uniqueness.
+- choose package;
+- choose an eligible payment network for that package currency;
+- receive backend-assigned address/QR from that network's pool;
+- submit the network-specific transaction identifier;
+- view immutable status/history.
 
-Never rewrite applied `0008` to achieve the generalized model.
+Browser authentication remains same-origin BFF + HttpOnly/SameSite cookies. Browser JavaScript never owns backend bearer/refresh tokens.
 
-## 11. Audit operations
+## 16. Current QA lane
 
-Audit entries use existing `audit_logs` and record request context when available.
-
-Operations:
+The first combined local/Postman acceptance continues to use the seeded:
 
 ```text
-CREATE_DEPOSIT_ACCOUNT
-UPDATE_DEPOSIT_ACCOUNT
-CREATE_DEPOSIT_REQUEST
-SUBMIT_DEPOSIT_TXID
-APPROVE_DEPOSIT
-REJECT_DEPOSIT
+asset: USDT
+networkCode: TRC20
+validationProfile: TRON
 ```
 
-Audit metadata must not include secrets. Public wallet address/transaction identifier may be included where required for traceability.
-
-## 12. Frontend / BFF
-
-Browser auth stays same-origin BFF + HttpOnly/SameSite cookies.
-
-ADMIN `/deposits` includes:
-
-- asset/token input
-- supported-network selector
-- public receiving address without a hardcoded TRON browser pattern
-- QR file selection converted client-side to a validated data URL
-- active/inactive controls
-- deposit review queue
-- approve/reject controls with required note
-- exact amount/network/transaction-ID/account display
-
-USER `/user/deposits` includes:
-
-- available effective package selector
-- server-assigned asset/network/address
-- scannable stored QR image
-- copy address
-- network-aware transaction-ID submission
-- personal deposit history/status
-
-Existing `/user/packages` remains catalogue-only in PKG-01. DEP-01 does not mark a package active.
-
-## 13. Deferred by design
-
-Not part of DEP-01:
-
-- wallet balance
-- immutable accounting ledger
-- blockchain confirmation automation
-- hot-wallet custody
-- package subscription/activation
-- referral commission generation
-- reward generation
-- withdrawals/payouts
-- real or simulated trade accounting
-
-These require later dedicated milestones and must consume the approved deposit fact idempotently rather than mutating DEP-01 history.
+That is a test/launch configuration, not a global platform limitation.
