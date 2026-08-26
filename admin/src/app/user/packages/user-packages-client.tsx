@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
@@ -13,6 +14,7 @@ import {
   type ApiErrorPayload,
   type PackageCatalogue,
 } from "@/lib/packages";
+import UserSubscriptionsPanel from "./user-subscriptions-panel";
 import styles from "./user-packages.module.css";
 
 export default function UserPackagesClient() {
@@ -27,8 +29,6 @@ export default function UserPackagesClient() {
 
     async function load() {
       try {
-        // Resolve/refresh the USER session before the dependent catalogue call
-        // so the rotating refresh token is never raced by this page.
         const sessionResponse = await fetch("/api/user/session", {
           cache: "no-store",
         });
@@ -138,19 +138,21 @@ export default function UserPackagesClient() {
             <span>VERSIONED USDT CATALOGUE</span>
             <h2>Choose with clarity</h2>
             <p>
-              Exact published package terms are shown here. Rates are the
-              user/net percentages before any future activation workflow.
+              Exact published package terms are shown here. Package activation
+              is funded through the audited deposit/payment workflow.
             </p>
           </div>
 
           <div className={styles.headerStatus}>
             <i className="iconoir-shield-check" />
             <span>
-              <strong>CATALOGUE READ ONLY</strong>
-              <small>Activation is not available in PKG-01</small>
+              <strong>PACKAGE ACTIVATION LIVE</strong>
+              <small>Approved + accounted payment activates exactly once</small>
             </span>
           </div>
         </header>
+
+        <UserSubscriptionsPanel />
 
         {!catalogue.catalogueAvailable || !catalogue.plan ? (
           <section className={styles.emptyState}>
@@ -186,7 +188,7 @@ export default function UserPackagesClient() {
               </div>
               <div>
                 <small>ACTIVATION</small>
-                <strong className={styles.deferred}>COMING NEXT</strong>
+                <strong>{enumLabel(catalogue.plan.activationTrigger)}</strong>
               </div>
             </section>
 
@@ -273,15 +275,26 @@ export default function UserPackagesClient() {
                   </dl>
 
                   <div className={styles.activationNotice}>
-                    <i className="iconoir-lock" />
+                    <i className="iconoir-wallet" />
                     <span>
-                      <strong>Activation unavailable</strong>
+                      <strong>
+                        {item.availability === "AVAILABLE"
+                          ? "Fund through Deposits"
+                          : "Closed to new activation"}
+                      </strong>
                       <small>
-                        Payment and subscription workflow will be delivered in a
-                        later audited milestone.
+                        {item.availability === "AVAILABLE"
+                          ? "Create a deposit request for this package. Approval + accounting activates it exactly once."
+                          : "This package cannot accept a new activation under the current plan."}
                       </small>
                     </span>
                   </div>
+
+                  {item.availability === "AVAILABLE" ? (
+                    <Link href="/user/deposits" className={styles.depositLink}>
+                      Open Deposits <i className="iconoir-arrow-right" />
+                    </Link>
+                  ) : null}
                 </article>
               ))}
             </section>
@@ -292,10 +305,10 @@ export default function UserPackagesClient() {
                 <strong>How these values are governed</strong>
                 <p>
                   Prices, percentages and caps come directly from one effective
-                  published plan version. Financial values are transported as
-                  exact decimal strings; historical activations will retain
-                  their original plan-item reference when that later lifecycle
-                  exists.
+                  published plan version. Financial values are exact decimal
+                  strings. Each activation snapshots its source plan and
+                  payment references so later plan changes never rewrite
+                  history.
                 </p>
               </div>
             </section>
