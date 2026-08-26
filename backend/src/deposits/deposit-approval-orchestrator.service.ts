@@ -45,11 +45,35 @@ export class DepositApprovalOrchestratorService {
       };
     }
 
-    const accounting = await this.walletLedgerService.reconcileApprovedDeposit(
-      depositId,
-      actor,
-      context,
-    );
+    let accounting: Awaited<
+      ReturnType<WalletLedgerService['reconcileApprovedDeposit']>
+    >;
+
+    try {
+      accounting = await this.walletLedgerService.reconcileApprovedDeposit(
+        depositId,
+        actor,
+        context,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error
+          ? error.message
+          : 'Deposit accounting requires reconciliation.';
+      this.logger.warn(
+        `Deposit ${depositId} was approved but accounting is pending: ${reason}`,
+      );
+
+      return {
+        ...approval,
+        message:
+          'Deposit approved. Accounting and package activation are pending reconciliation.',
+        accountingPostingMode: postingMode,
+        accountingPosted: false,
+        accountingPendingReason: reason,
+        packageActivated: false,
+      };
+    }
 
     try {
       const activation =
