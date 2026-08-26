@@ -166,6 +166,13 @@ enum PackageCapReachedAction {
   PAUSE
 }
 
+enum DepositStatus {
+  AWAITING_TXID
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -230,6 +237,11 @@ model User {
   packagePlansCreated   PackagePlanVersion[] @relation("PackagePlanCreatedBy")
   packagePlansUpdated   PackagePlanVersion[] @relation("PackagePlanUpdatedBy")
   packagePlansPublished PackagePlanVersion[] @relation("PackagePlanPublishedBy")
+
+  depositAccountsCreated DepositAccount[] @relation("DepositAccountCreatedBy")
+  depositAccountsUpdated DepositAccount[] @relation("DepositAccountUpdatedBy")
+  deposits                Deposit[]        @relation("DepositOwner")
+  depositsReviewed        Deposit[]        @relation("DepositReviewer")
 
   @@index([status])
   @@index([createdAt])
@@ -409,10 +421,10 @@ model SystemRegistrationConfig {
   passwordMode                      PasswordCreationMode @default(MANUAL)
   usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
   usernamePrefixEnabled             Boolean              @default(false)
-  usernamePrefix                    String?              @db.VarChar(20)
+  usernamePrefix                    String?               @db.VarChar(20)
   allowMultipleAccountsPerEmail     Boolean              @default(false)
   allowMultipleAccountsPerMobile    Boolean              @default(false)
-  updatedByUserId                   String?              @db.Char(36)
+  updatedByUserId                   String?               @db.Char(36)
   createdAt                         DateTime             @default(now()) @db.DateTime(3)
   updatedAt                         DateTime             @updatedAt @db.DateTime(3)
 
@@ -521,6 +533,7 @@ model PackagePlanVersion {
   updatedAt                  DateTime                   @updatedAt @db.DateTime(3)
 
   items       PackagePlanItem[]
+  deposits    Deposit[]
   clonedFrom  PackagePlanVersion?  @relation("PackagePlanClone", fields: [clonedFromPlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   clones      PackagePlanVersion[] @relation("PackagePlanClone")
   createdBy   User?                @relation("PackagePlanCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -566,6 +579,7 @@ model PackagePlanItem {
 
   planVersion       PackagePlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   packageDefinition PackageDefinition  @relation(fields: [packageDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deposits          Deposit[]
 
   @@unique([planVersionId, packageDefinitionId])
   @@unique([planVersionId, slug])
@@ -573,6 +587,69 @@ model PackagePlanItem {
   @@index([packageDefinitionId])
   @@index([planVersionId, availability, sortOrder])
   @@map("package_plan_items")
+}
+
+model DepositAccount {
+  id              String   @id @default(uuid()) @db.Char(36)
+  label           String   @db.VarChar(100)
+  asset           String   @default("USDT") @db.VarChar(10)
+  network         String   @default("TRC20") @db.VarChar(20)
+  walletAddress   String   @unique @db.VarChar(100)
+  qrCodeDataUrl   String   @db.MediumText
+  isActive        Boolean  @default(true)
+  revision        Int      @default(1)
+  createdByUserId String?  @db.Char(36)
+  updatedByUserId String?  @db.Char(36)
+  createdAt       DateTime @default(now()) @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @db.DateTime(3)
+
+  createdBy User?     @relation("DepositAccountCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy User?     @relation("DepositAccountUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  deposits  Deposit[]
+
+  @@index([isActive])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@map("deposit_accounts")
+}
+
+model Deposit {
+  id                       String        @id @default(uuid()) @db.Char(36)
+  userId                   String        @db.Char(36)
+  openKey                  String?       @unique @db.Char(36)
+  status                   DepositStatus @default(AWAITING_TXID)
+  packagePlanVersionId     String        @db.Char(36)
+  packagePlanItemId        String        @db.Char(36)
+  packageCode              String        @db.VarChar(64)
+  packageDisplayName       String        @db.VarChar(100)
+  amount                   Decimal       @db.Decimal(20, 8)
+  currency                 String        @db.VarChar(10)
+  assignedDepositAccountId String        @db.Char(36)
+  assignedAccountLabel     String        @db.VarChar(100)
+  assignedWalletAddress    String        @db.VarChar(100)
+  assignedNetwork          String        @db.VarChar(20)
+  assignedQrCodeDataUrl    String        @db.MediumText
+  txid                     String?       @unique @db.Char(64)
+  submittedAt              DateTime?     @db.DateTime(3)
+  reviewedByUserId         String?       @db.Char(36)
+  reviewedAt               DateTime?     @db.DateTime(3)
+  reviewNote               String?       @db.VarChar(1000)
+  createdAt                DateTime      @default(now()) @db.DateTime(3)
+  updatedAt                DateTime      @updatedAt @db.DateTime(3)
+
+  user                   User               @relation("DepositOwner", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  packagePlanVersion     PackagePlanVersion @relation(fields: [packagePlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  packagePlanItem        PackagePlanItem    @relation(fields: [packagePlanItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignedDepositAccount DepositAccount     @relation(fields: [assignedDepositAccountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reviewedBy             User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([packagePlanVersionId])
+  @@index([packagePlanItemId])
+  @@index([assignedDepositAccountId])
+  @@index([reviewedByUserId])
+  @@map("deposits")
 }
 
 model SystemSequence {
