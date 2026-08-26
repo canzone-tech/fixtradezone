@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/wallet/wallet.module.css";
 import { resolveAdminSession } from "@/lib/admin-session-client";
@@ -114,15 +114,7 @@ export default function WalletsClient() {
   const canReadWallets = user !== null && hasPermission(user, "wallets.read");
   const canReadLedger = user !== null && hasPermission(user, "ledger.read");
   const canPostLedger = user !== null && hasPermission(user, "ledger.post");
-
-  const totalWalletValue = useMemo(
-    () =>
-      wallets.wallets.reduce(
-        (sum, wallet) => sum + Number.parseFloat(wallet.totalWallet || "0"),
-        0,
-      ),
-    [wallets.wallets],
-  );
+  const currencyCount = new Set(wallets.wallets.map((wallet) => wallet.currency)).size;
 
   function applyWorkspace(workspace: AdminWalletWorkspace) {
     setUser(workspace.user);
@@ -305,13 +297,17 @@ export default function WalletsClient() {
           <div className={styles.cardHeader}>
             <div>
               <p className={styles.eyebrow}>Control Totals</p>
-              <h2>Wallet state</h2>
+              <h2>Accounting state</h2>
             </div>
           </div>
           <div className={styles.metrics}>
             <div className={styles.metric} data-primary="true">
               <small>Wallet rows</small>
               <strong>{wallets.total}</strong>
+            </div>
+            <div className={styles.metric}>
+              <small>Currencies</small>
+              <strong>{currencyCount}</strong>
             </div>
             <div className={styles.metric}>
               <small>Ledger transactions</small>
@@ -321,10 +317,10 @@ export default function WalletsClient() {
               <small>Pending accounting</small>
               <strong>{reconciliation.total}</strong>
             </div>
-            <div className={styles.metric}>
-              <small>Displayed total</small>
-              <strong>{totalWalletValue.toFixed(2)}</strong>
-            </div>
+          </div>
+          <div className={styles.notice}>
+            Financial values are never aggregated across currencies. Exact per-currency
+            totals remain in the wallet table and immutable ledger.
           </div>
         </div>
       </section>
