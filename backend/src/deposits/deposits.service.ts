@@ -10,6 +10,9 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import {
+  normalizeDepositTransactionId,
+} from './deposit.validation';
 import type {
   AdminDepositQueryDto,
   CreateDepositAccountDto,
@@ -19,9 +22,8 @@ import type {
   UpdateDepositAccountDto,
 } from './dto/deposit.dto';
 import {
-  DEPOSIT_ASSET,
   DEPOSIT_AUDIT_OPERATIONS,
-  DEPOSIT_NETWORK,
+  type DepositNetwork,
   type DepositStatus,
 } from './deposits.constants';
 
@@ -81,8 +83,8 @@ export class DepositsService {
       const account = await transaction.depositAccount.create({
         data: {
           label: dto.label,
-          asset: DEPOSIT_ASSET,
-          network: DEPOSIT_NETWORK,
+          asset: dto.asset,
+          network: dto.network,
           walletAddress: dto.walletAddress,
           qrCodeDataUrl: dto.qrCodeDataUrl,
           isActive: dto.isActive ?? true,
@@ -98,7 +100,7 @@ export class DepositsService {
           action: 'CREATE',
           entityType: 'DepositAccount',
           entityId: account.id,
-          description: 'Administrator created a USDT TRC20 receiving account.',
+          description: `Administrator created a ${account.asset} ${account.network} receiving account.`,
           metadata: {
             source: 'ADMIN_DEPOSIT_ACCOUNT',
             operation: DEPOSIT_AUDIT_OPERATIONS.CREATE_ACCOUNT,
@@ -183,7 +185,7 @@ export class DepositsService {
           action: 'UPDATE',
           entityType: 'DepositAccount',
           entityId: accountId,
-          description: 'Administrator updated a USDT TRC20 receiving account.',
+          description: `Administrator updated a ${after.asset} ${after.network} receiving account.`,
           metadata: {
             source: 'ADMIN_DEPOSIT_ACCOUNT',
             operation: DEPOSIT_AUDIT_OPERATIONS.UPDATE_ACCOUNT,
@@ -272,17 +274,10 @@ export class DepositsService {
         );
       }
 
-      if (item.currency !== DEPOSIT_ASSET) {
-        throw new BadRequestException(
-          'Selected package is not payable through the USDT deposit flow.',
-        );
-      }
-
       const accounts = await transaction.depositAccount.findMany({
         where: {
           isActive: true,
-          asset: DEPOSIT_ASSET,
-          network: DEPOSIT_NETWORK,
+          asset: item.currency,
         },
         select: DEPOSIT_ACCOUNT_SELECT,
         orderBy: { id: 'asc' },
@@ -290,7 +285,7 @@ export class DepositsService {
 
       if (accounts.length === 0) {
         throw new ServiceUnavailableException(
-          'No active USDT TRC20 receiving account is currently available.',
+          `No active ${item.currency} receiving account is currently available.`,
         );
       }
 
@@ -369,6 +364,17 @@ export class DepositsService {
         );
       }
 
+      const normalizedTxid = normalizeDepositTransactionId(
+        deposit.assignedNetwork as DepositNetwork,
+        dto.txid,
+      );
+
+      if (!normalizedTxid) {
+        throw new BadRequestException(
+          `Transaction ID is invalid for ${deposit.assignedNetwork}.`,
+        );
+      }
+
       const submittedAt = new Date();
       const updated = await transaction.deposit.updateMany({
         where: {
@@ -378,7 +384,7 @@ export class DepositsService {
           txid: null,
         },
         data: {
-          txid: dto.txid,
+          txid: normalizedTxid,
           submittedAt,
           status: 'PENDING_REVIEW',
         },
@@ -405,7 +411,8 @@ export class DepositsService {
           metadata: {
             source: 'USER_DEPOSIT',
             operation: DEPOSIT_AUDIT_OPERATIONS.SUBMIT_TXID,
-            txid: dto.txid,
+            txid: normalizedTxid,
+            network: deposit.assignedNetwork,
             submittedAt: submittedAt.toISOString(),
           },
           ipAddress: context.ipAddress,
@@ -549,6 +556,7 @@ export class DepositsService {
             currency: before.currency,
             assignedDepositAccountId: before.assignedDepositAccountId,
             assignedWalletAddress: before.assignedWalletAddress,
+            assignedNetwork: before.assignedNetwork,
             reviewedAt: reviewedAt.toISOString(),
             downstreamAccountingApplied: false,
             packageActivationApplied: false,
@@ -678,7 +686,7 @@ export class DepositsService {
 
         if (target.includes('txid')) {
           throw new ConflictException(
-            'This transaction ID has already been submitted.',
+            'This transaction ID has already been submitted on this network.',
           );
         }
 
@@ -690,7 +698,7 @@ export class DepositsService {
 
         if (target.includes('walletAddress')) {
           throw new ConflictException(
-            'This receiving wallet address already exists.',
+            'This asset/network receiving wallet already exists.',
           );
         }
 
