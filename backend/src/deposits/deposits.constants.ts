@@ -1,5 +1,18 @@
-export const DEPOSIT_ASSET = 'USDT' as const;
-export const DEPOSIT_NETWORK = 'TRC20' as const;
+export const DEFAULT_DEPOSIT_ASSET = 'USDT' as const;
+export const DEFAULT_DEPOSIT_NETWORK = 'TRC20' as const;
+
+export const DEPOSIT_NETWORKS = [
+  'TRC20',
+  'ERC20',
+  'BEP20',
+  'POLYGON',
+  'ARBITRUM',
+  'BASE',
+  'OPTIMISM',
+  'SOLANA',
+] as const;
+
+export type DepositNetwork = (typeof DEPOSIT_NETWORKS)[number];
 
 export const DEPOSIT_STATUSES = [
   'AWAITING_TXID',
