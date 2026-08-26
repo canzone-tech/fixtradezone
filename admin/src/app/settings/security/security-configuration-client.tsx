@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
+import PlatformSettingsNav from "../platform-settings-nav";
 import styles from "../platform-configuration.module.css";
 
 interface SecurityConfiguration {
@@ -233,6 +234,8 @@ export default function SecurityConfigurationClient() {
           {fullUserImpersonationEnabled ? "FULL IMPERSONATION" : "LIMITED MODE"}
         </div>
       </header>
+
+      <PlatformSettingsNav active="security" />
 
       {error ? (
         <div className={styles.error} role="alert">
