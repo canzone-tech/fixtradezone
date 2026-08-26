@@ -1,5 +1,6 @@
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { AccountingConfigService } from '../platform-config/accounting-config.service';
+import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
 import type { DepositsService } from './deposits.service';
@@ -30,6 +31,9 @@ describe('DepositApprovalOrchestratorService', () => {
   const walletLedgerService = {
     reconcileApprovedDeposit: jest.fn(),
   };
+  const subscriptionsService = {
+    activateFromApprovedDeposit: jest.fn(),
+  };
 
   let service: DepositApprovalOrchestratorService;
 
@@ -43,15 +47,21 @@ describe('DepositApprovalOrchestratorService', () => {
       message: 'Approved deposit posted to Main / Deposit Balance.',
       transaction: { id: 'ledger-transaction-id' },
     });
+    subscriptionsService.activateFromApprovedDeposit.mockResolvedValue({
+      created: true,
+      message: 'Package activated.',
+      subscription: { id: 'subscription-id', status: 'ACTIVE' },
+    });
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
       accountingConfigService as unknown as AccountingConfigService,
       walletLedgerService as unknown as WalletLedgerService,
+      subscriptionsService as unknown as SubscriptionsService,
     );
   });
 
-  it('automatically posts accounting after approval when policy is AUTO_ON_APPROVAL', async () => {
+  it('automatically posts accounting and activates the package in AUTO mode', async () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'AUTO_ON_APPROVAL',
     );
@@ -68,13 +78,18 @@ describe('DepositApprovalOrchestratorService', () => {
       actor,
       {},
     );
+    expect(
+      subscriptionsService.activateFromApprovedDeposit,
+    ).toHaveBeenCalledWith(DEPOSIT_ID, actor, {});
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: true,
+      packageActivated: true,
+      subscription: { id: 'subscription-id', status: 'ACTIVE' },
     });
   });
 
-  it('keeps approved deposits pending accounting when policy is MANUAL_RECONCILIATION', async () => {
+  it('keeps approved deposits pending accounting and activation in MANUAL mode', async () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'MANUAL_RECONCILIATION',
     );
@@ -87,13 +102,17 @@ describe('DepositApprovalOrchestratorService', () => {
 
     expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
     expect(walletLedgerService.reconcileApprovedDeposit).not.toHaveBeenCalled();
+    expect(
+      subscriptionsService.activateFromApprovedDeposit,
+    ).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'MANUAL_RECONCILIATION',
       accountingPosted: false,
+      packageActivated: false,
     });
   });
 
-  it('surfaces an automatic-posting failure after approval so reconciliation can recover it', async () => {
+  it('surfaces an accounting failure after approval so reconciliation can recover it', async () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'AUTO_ON_APPROVAL',
     );
@@ -109,5 +128,30 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledTimes(
       1,
     );
+    expect(
+      subscriptionsService.activateFromApprovedDeposit,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('keeps approval/accounting successful when package activation needs reconciliation', async () => {
+    accountingConfigService.getDepositPostingMode.mockResolvedValue(
+      'AUTO_ON_APPROVAL',
+    );
+    subscriptionsService.activateFromApprovedDeposit.mockRejectedValue(
+      new Error('This plan allows only one active package for the USER.'),
+    );
+
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'verified' },
+      actor,
+    );
+
+    expect(result).toMatchObject({
+      accountingPosted: true,
+      packageActivated: false,
+      packageActivationPendingReason:
+        'This plan allows only one active package for the USER.',
+    });
   });
 });
