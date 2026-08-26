@@ -145,6 +145,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 <span>Deposits</span>
               </Link>
 
+              <Link
+                href="/user/wallet"
+                className={`ftz-nav-link ${
+                  isActive("/user/wallet") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-bank" />
+                <span>Wallet</span>
+              </Link>
+
               <span
                 className={`ftz-nav-link ${styles.disabledNav}`}
                 aria-disabled="true"
