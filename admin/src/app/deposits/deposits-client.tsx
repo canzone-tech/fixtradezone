@@ -5,6 +5,7 @@ import styles from "@/components/deposits/deposits.module.css";
 import { resolveAdminSession } from "@/lib/admin-session-client";
 import type { AdminUser } from "@/lib/auth";
 import {
+  DEPOSIT_NETWORKS,
   type ApiMessagePayload,
   type Deposit,
   type DepositAccount,
@@ -225,6 +226,8 @@ export default function DepositsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label: String(formData.get("label") ?? ""),
+          asset: String(formData.get("asset") ?? ""),
+          network: String(formData.get("network") ?? ""),
           walletAddress: String(formData.get("walletAddress") ?? ""),
           qrCodeDataUrl,
           isActive: formData.get("isActive") === "on",
@@ -351,12 +354,12 @@ export default function DepositsClient() {
     <div className={styles.page}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>DEP-01 / USDT TRC20</p>
+          <p className={styles.eyebrow}>DEP-01 / NETWORK-AWARE</p>
           <h1>Deposit Operations</h1>
           <p>
-            Manage public receiving accounts and manually review submitted TXIDs.
-            Approval records the payment fact only; wallet credit and package
-            activation are intentionally handled by later milestones.
+            Manage public receiving accounts by asset and network, then manually
+            review submitted transaction IDs. Approval records the payment fact
+            only; wallet credit and package activation are handled later.
           </p>
         </div>
         <span className={styles.badge} data-tone="warning">
@@ -373,7 +376,7 @@ export default function DepositsClient() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.eyebrow}>Receiving Accounts</p>
-                <h2>Create USDT TRC20 account</h2>
+                <h2>Create receiving account</h2>
               </div>
             </div>
 
@@ -391,17 +394,51 @@ export default function DepositsClient() {
                   />
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="account-address">TRON public address</label>
+                  <label htmlFor="account-asset">Asset / token</label>
                   <input
                     className={styles.input}
-                    id="account-address"
-                    name="walletAddress"
-                    pattern="T[1-9A-HJ-NP-Za-km-z]{33}"
+                    id="account-asset"
+                    name="asset"
+                    defaultValue="USDT"
+                    pattern="[A-Za-z0-9]{2,10}"
+                    maxLength={10}
+                    autoCapitalize="characters"
                     required
                   />
                 </div>
                 <div className={styles.field}>
-                  <label htmlFor="account-qr">QR image</label>
+                  <label htmlFor="account-network">Network</label>
+                  <select
+                    className={styles.select}
+                    id="account-network"
+                    name="network"
+                    defaultValue="TRC20"
+                    required
+                  >
+                    {DEPOSIT_NETWORKS.map((network) => (
+                      <option key={network} value={network}>
+                        {network}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="account-address">Public receiving address</label>
+                  <input
+                    className={styles.input}
+                    id="account-address"
+                    name="walletAddress"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    required
+                  />
+                  <small className={styles.muted}>
+                    Address validation follows the selected network on the backend.
+                  </small>
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="account-qr">Matching QR image</label>
                   <input
                     className={styles.input}
                     id="account-qr"
@@ -615,7 +652,7 @@ export default function DepositsClient() {
 
                   <div className={styles.kv}>
                     <div>
-                      <small>TXID</small>
+                      <small>Transaction ID</small>
                       <strong className={styles.mono}>
                         {deposit.txid ?? "Not submitted"}
                       </strong>
@@ -623,6 +660,10 @@ export default function DepositsClient() {
                     <div>
                       <small>Assigned account</small>
                       <strong>{deposit.assignedAccountLabel}</strong>
+                    </div>
+                    <div>
+                      <small>Network</small>
+                      <strong>{deposit.assignedNetwork}</strong>
                     </div>
                     <div>
                       <small>Receiving address</small>
