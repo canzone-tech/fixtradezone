@@ -547,6 +547,7 @@ export class DepositsService {
             txid: before.txid,
             amount: before.amount.toString(),
             currency: before.currency,
+            assignedDepositAccountId: before.assignedDepositAccountId,
             assignedWalletAddress: before.assignedWalletAddress,
             reviewedAt: reviewedAt.toISOString(),
             downstreamAccountingApplied: false,
@@ -560,7 +561,7 @@ export class DepositsService {
       return {
         message:
           targetStatus === 'APPROVED'
-            ? 'Deposit approved. Accounting credit and package activation remain deferred.'
+            ? 'Deposit approved. Accounting credit is deferred.'
             : 'Deposit rejected.',
         deposit: this.depositSnapshot(after),
       };
@@ -589,14 +590,14 @@ export class DepositsService {
     reviewNote: string | null;
     createdAt: Date;
     updatedAt: Date;
-    user?: {
+    user: {
       id: string;
       username: string;
       email: string | null;
       firstName: string | null;
       lastName: string | null;
     };
-    reviewedBy?: {
+    reviewedBy: {
       id: string;
       username: string;
       email: string | null;
@@ -610,7 +611,7 @@ export class DepositsService {
       packagePlanItemId: deposit.packagePlanItemId,
       packageCode: deposit.packageCode,
       packageDisplayName: deposit.packageDisplayName,
-      amount: deposit.amount.toString(),
+      amount: this.decimalString(deposit.amount),
       currency: deposit.currency,
       assignedDepositAccountId: deposit.assignedDepositAccountId,
       assignedAccountLabel: deposit.assignedAccountLabel,
@@ -627,6 +628,10 @@ export class DepositsService {
       user: deposit.user,
       reviewedBy: deposit.reviewedBy,
     };
+  }
+
+  private decimalString(value: Prisma.Decimal): string {
+    return value.toFixed(8).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
   }
 
   private accountAuditSnapshot(account: {
@@ -662,7 +667,14 @@ export class DepositsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const target = String(error.meta?.target ?? '');
+        const targetMeta = error.meta?.target;
+        const target = Array.isArray(targetMeta)
+          ? targetMeta
+              .filter((value): value is string => typeof value === 'string')
+              .join(',')
+          : typeof targetMeta === 'string'
+            ? targetMeta
+            : '';
 
         if (target.includes('txid')) {
           throw new ConflictException(
@@ -678,7 +690,7 @@ export class DepositsService {
 
         if (target.includes('walletAddress')) {
           throw new ConflictException(
-            'This USDT TRC20 receiving address already exists.',
+            'This receiving wallet address already exists.',
           );
         }
 
