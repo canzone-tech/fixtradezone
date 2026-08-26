@@ -54,6 +54,11 @@ interface ApiError {
   message?: string | string[];
 }
 
+interface SubscriptionSnapshot {
+  pending: PendingActivation[];
+  subscriptions: Subscription[];
+}
+
 function apiMessage(payload: ApiError, fallback: string) {
   if (typeof payload.message === "string") return payload.message;
   if (Array.isArray(payload.message)) return payload.message[0] ?? fallback;
@@ -68,6 +73,36 @@ function dateLabel(value: string | null) {
   }).format(new Date(value));
 }
 
+async function fetchSubscriptionSnapshot(): Promise<SubscriptionSnapshot> {
+  const pendingResponse = await fetch(
+    "/api/admin/subscriptions/activation-pending?limit=100",
+    { cache: "no-store" },
+  );
+  const pendingPayload = (await pendingResponse
+    .json()
+    .catch(() => ({}))) as PendingResponse & ApiError;
+  if (!pendingResponse.ok) {
+    throw new Error(
+      apiMessage(pendingPayload, "Unable to load activation queue."),
+    );
+  }
+
+  const listResponse = await fetch("/api/admin/subscriptions?limit=100", {
+    cache: "no-store",
+  });
+  const listPayload = (await listResponse
+    .json()
+    .catch(() => ({}))) as ListResponse & ApiError;
+  if (!listResponse.ok) {
+    throw new Error(apiMessage(listPayload, "Unable to load subscriptions."));
+  }
+
+  return {
+    pending: pendingPayload.deposits ?? [],
+    subscriptions: listPayload.subscriptions ?? [],
+  };
+}
+
 export default function SubscriptionsClient() {
   const [loading, setLoading] = useState(true);
   const [busyDepositId, setBusyDepositId] = useState<string | null>(null);
@@ -80,33 +115,9 @@ export default function SubscriptionsClient() {
     setLoading(true);
     setError(null);
     try {
-      const pendingResponse = await fetch(
-        "/api/admin/subscriptions/activation-pending?limit=100",
-        { cache: "no-store" },
-      );
-      const pendingPayload = (await pendingResponse
-        .json()
-        .catch(() => ({}))) as PendingResponse & ApiError;
-      if (!pendingResponse.ok) {
-        throw new Error(
-          apiMessage(pendingPayload, "Unable to load activation queue."),
-        );
-      }
-
-      const listResponse = await fetch("/api/admin/subscriptions?limit=100", {
-        cache: "no-store",
-      });
-      const listPayload = (await listResponse
-        .json()
-        .catch(() => ({}))) as ListResponse & ApiError;
-      if (!listResponse.ok) {
-        throw new Error(
-          apiMessage(listPayload, "Unable to load subscriptions."),
-        );
-      }
-
-      setPending(pendingPayload.deposits ?? []);
-      setSubscriptions(listPayload.subscriptions ?? []);
+      const snapshot = await fetchSubscriptionSnapshot();
+      setPending(snapshot.pending);
+      setSubscriptions(snapshot.subscriptions);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -119,8 +130,32 @@ export default function SubscriptionsClient() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let mounted = true;
+
+    async function loadInitialSnapshot() {
+      try {
+        const snapshot = await fetchSubscriptionSnapshot();
+        if (!mounted) return;
+        setPending(snapshot.pending);
+        setSubscriptions(snapshot.subscriptions);
+      } catch (caught) {
+        if (!mounted) return;
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load package subscriptions.",
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitialSnapshot();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function reconcile(depositId: string) {
     setBusyDepositId(depositId);
