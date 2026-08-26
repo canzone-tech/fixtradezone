@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import styles from "@/components/deposits/deposits.module.css";
 import { resolveAdminSession } from "@/lib/admin-session-client";
 import type { AdminUser } from "@/lib/auth";
@@ -27,6 +27,14 @@ const QR_TYPES = new Set([
   "image/webp",
   "image/svg+xml",
 ]);
+
+type DepositFilter = DepositStatus | "ALL";
+
+interface AdminDepositWorkspace {
+  user: AdminUser;
+  accounts: DepositAccount[];
+  deposits: Deposit[];
+}
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -56,108 +64,144 @@ async function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
+function isSuperAdmin(user: AdminUser): boolean {
+  return user.roles.includes("SUPER_ADMIN");
+}
+
+function hasPermission(user: AdminUser, permission: string): boolean {
+  return isSuperAdmin(user) || user.permissions.includes(permission);
+}
+
+async function fetchAdminDepositWorkspace(
+  filter: DepositFilter,
+): Promise<AdminDepositWorkspace> {
+  const session = await resolveAdminSession();
+
+  if (!session.user) {
+    throw new Error(session.message ?? "Administrator session is unavailable.");
+  }
+
+  const user = session.user;
+  const canReadAccounts = hasPermission(user, "deposits.accounts.read");
+  const canReadDeposits = hasPermission(user, "deposits.read");
+
+  const accountRequest = canReadAccounts
+    ? fetch("/api/admin/deposit-accounts", { cache: "no-store" })
+    : Promise.resolve(null);
+
+  const query = filter === "ALL" ? "" : `?status=${filter}`;
+  const depositRequest = canReadDeposits
+    ? fetch(`/api/admin/deposits${query}`, { cache: "no-store" })
+    : Promise.resolve(null);
+
+  const [accountResponse, depositResponse] = await Promise.all([
+    accountRequest,
+    depositRequest,
+  ]);
+
+  let accounts: DepositAccount[] = [];
+  let deposits: Deposit[] = [];
+
+  if (accountResponse) {
+    const payload = await readJson<DepositAccountsResponse & ApiMessagePayload>(
+      accountResponse,
+    );
+
+    if (!accountResponse.ok || !payload) {
+      throw new Error(messageFrom(payload, "Could not load deposit accounts."));
+    }
+
+    accounts = payload.accounts;
+  }
+
+  if (depositResponse) {
+    const payload = await readJson<DepositsResponse & ApiMessagePayload>(
+      depositResponse,
+    );
+
+    if (!depositResponse.ok || !payload) {
+      throw new Error(messageFrom(payload, "Could not load deposits."));
+    }
+
+    deposits = payload.deposits;
+  }
+
+  return { user, accounts, deposits };
+}
+
 export default function DepositsClient() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [accounts, setAccounts] = useState<DepositAccount[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [filter, setFilter] = useState<DepositStatus | "ALL">("PENDING_REVIEW");
+  const [filter, setFilter] = useState<DepositFilter>("PENDING_REVIEW");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
-  const isSuperAdmin = user?.roles.includes("SUPER_ADMIN") ?? false;
   const canReadAccounts =
-    isSuperAdmin || user?.permissions.includes("deposits.accounts.read") === true;
+    user !== null && hasPermission(user, "deposits.accounts.read");
   const canManageAccounts =
-    isSuperAdmin ||
-    user?.permissions.includes("deposits.accounts.manage") === true;
+    user !== null && hasPermission(user, "deposits.accounts.manage");
   const canReadDeposits =
-    isSuperAdmin || user?.permissions.includes("deposits.read") === true;
-  const canReview =
-    isSuperAdmin || user?.permissions.includes("deposits.review") === true;
+    user !== null && hasPermission(user, "deposits.read");
+  const canReview = user !== null && hasPermission(user, "deposits.review");
 
   const pendingCount = useMemo(
     () => deposits.filter((deposit) => deposit.status === "PENDING_REVIEW").length,
     [deposits],
   );
 
-  const load = useCallback(async () => {
+  function applyWorkspace(workspace: AdminDepositWorkspace) {
+    setUser(workspace.user);
+    setAccounts(workspace.accounts);
+    setDeposits(workspace.deposits);
+  }
+
+  async function reloadWorkspace() {
     setLoading(true);
     setError(null);
 
-    const session = await resolveAdminSession();
-    if (!session.user) {
-      setLoading(false);
-      setError("Administrator session is unavailable.");
-      return;
-    }
-
-    setUser(session.user);
-    const superAdmin = session.user.roles.includes("SUPER_ADMIN");
-    const readAccounts =
-      superAdmin || session.user.permissions.includes("deposits.accounts.read");
-    const readDeposits =
-      superAdmin || session.user.permissions.includes("deposits.read");
-
-    const tasks: Promise<void>[] = [];
-
-    if (readAccounts) {
-      tasks.push(
-        fetch("/api/admin/deposit-accounts", { cache: "no-store" }).then(
-          async (response) => {
-            const payload = await readJson<DepositAccountsResponse & ApiMessagePayload>(
-              response,
-            );
-            if (!response.ok || !payload) {
-              throw new Error(
-                messageFrom(payload, "Could not load deposit accounts."),
-              );
-            }
-            setAccounts(payload.accounts);
-          },
-        ),
-      );
-    } else {
-      setAccounts([]);
-    }
-
-    if (readDeposits) {
-      const query = filter === "ALL" ? "" : `?status=${filter}`;
-      tasks.push(
-        fetch(`/api/admin/deposits${query}`, { cache: "no-store" }).then(
-          async (response) => {
-            const payload = await readJson<DepositsResponse & ApiMessagePayload>(
-              response,
-            );
-            if (!response.ok || !payload) {
-              throw new Error(messageFrom(payload, "Could not load deposits."));
-            }
-            setDeposits(payload.deposits);
-          },
-        ),
-      );
-    } else {
-      setDeposits([]);
-    }
-
     try {
-      await Promise.all(tasks);
-    } catch (loadError) {
+      applyWorkspace(await fetchAdminDepositWorkspace(filter));
+    } catch (caught) {
       setError(
-        loadError instanceof Error
-          ? loadError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not load deposit workspace.",
       );
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let mounted = true;
+
+    async function loadInitialWorkspace() {
+      try {
+        const workspace = await fetchAdminDepositWorkspace(filter);
+        if (mounted) applyWorkspace(workspace);
+      } catch (caught) {
+        if (mounted) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load deposit workspace.",
+          );
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitialWorkspace();
+
+    return () => {
+      mounted = false;
+    };
+  }, [filter]);
 
   async function createAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,11 +241,11 @@ export default function DepositsClient() {
 
       form.reset();
       setNotice(payload.message);
-      await load();
-    } catch (createError) {
+      await reloadWorkspace();
+    } catch (caught) {
       setError(
-        createError instanceof Error
-          ? createError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not create deposit account.",
       );
     } finally {
@@ -214,8 +258,7 @@ export default function DepositsClient() {
     account: DepositAccount,
   ) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData(event.currentTarget);
     const qrFile = formData.get("qr") as File | null;
 
     setBusy(`account-${account.id}`);
@@ -248,11 +291,11 @@ export default function DepositsClient() {
       }
 
       setNotice(payload.message);
-      await load();
-    } catch (updateError) {
+      await reloadWorkspace();
+    } catch (caught) {
       setError(
-        updateError instanceof Error
-          ? updateError.message
+        caught instanceof Error
+          ? caught.message
           : "Could not update deposit account.",
       );
     } finally {
@@ -265,6 +308,7 @@ export default function DepositsClient() {
     action: "approve" | "reject",
   ) {
     const note = (reviewNotes[deposit.id] ?? "").trim();
+
     if (note.length < 3) {
       setError("A review note of at least 3 characters is required.");
       return;
@@ -293,12 +337,10 @@ export default function DepositsClient() {
 
       setReviewNotes((current) => ({ ...current, [deposit.id]: "" }));
       setNotice(payload.message);
-      await load();
-    } catch (reviewError) {
+      await reloadWorkspace();
+    } catch (caught) {
       setError(
-        reviewError instanceof Error
-          ? reviewError.message
-          : `Could not ${action} deposit.`,
+        caught instanceof Error ? caught.message : `Could not ${action} deposit.`,
       );
     } finally {
       setBusy(null);
@@ -525,9 +567,7 @@ export default function DepositsClient() {
               <select
                 className={styles.select}
                 value={filter}
-                onChange={(event) =>
-                  setFilter(event.target.value as DepositStatus | "ALL")
-                }
+                onChange={(event) => setFilter(event.target.value as DepositFilter)}
               >
                 <option value="PENDING_REVIEW">Pending review</option>
                 <option value="AWAITING_TXID">Awaiting TXID</option>
@@ -538,7 +578,7 @@ export default function DepositsClient() {
               <button
                 className={styles.buttonSecondary}
                 type="button"
-                onClick={() => void load()}
+                onClick={() => void reloadWorkspace()}
                 disabled={loading}
               >
                 Refresh
@@ -557,10 +597,12 @@ export default function DepositsClient() {
                   <div className={styles.rowTop}>
                     <div className={styles.rowTitle}>
                       <strong>
-                        {deposit.packageDisplayName} · {compactDecimal(deposit.amount)} {deposit.currency}
+                        {deposit.packageDisplayName} · {compactDecimal(deposit.amount)}{" "}
+                        {deposit.currency}
                       </strong>
                       <small>
-                        {deposit.user?.username ?? deposit.userId} · created {formatDate(deposit.createdAt)}
+                        {deposit.user?.username ?? deposit.userId} · created{" "}
+                        {formatDate(deposit.createdAt)}
                       </small>
                     </div>
                     <span
@@ -574,7 +616,9 @@ export default function DepositsClient() {
                   <div className={styles.kv}>
                     <div>
                       <small>TXID</small>
-                      <strong className={styles.mono}>{deposit.txid ?? "Not submitted"}</strong>
+                      <strong className={styles.mono}>
+                        {deposit.txid ?? "Not submitted"}
+                      </strong>
                     </div>
                     <div>
                       <small>Assigned account</small>
