@@ -10,24 +10,45 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
-import { normalizeDepositTransactionId } from './deposit.validation';
+import {
+  isValidDepositAddress,
+  normalizeDepositTransactionId,
+} from './deposit.validation';
 import type {
   AdminDepositQueryDto,
   CreateDepositAccountDto,
   CreateDepositDto,
+  CreateDepositPaymentRailDto,
+  DepositPaymentRailQueryDto,
   ReviewDepositDto,
   SubmitDepositTxidDto,
   UpdateDepositAccountDto,
+  UpdateDepositPaymentRailDto,
 } from './dto/deposit.dto';
 import {
   DEPOSIT_AUDIT_OPERATIONS,
-  type DepositNetwork,
   type DepositStatus,
+  type DepositValidationProfile,
 } from './deposits.constants';
+
+const PAYMENT_RAIL_SELECT = {
+  id: true,
+  asset: true,
+  networkCode: true,
+  displayName: true,
+  validationProfile: true,
+  isActive: true,
+  revision: true,
+  createdByUserId: true,
+  updatedByUserId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 const DEPOSIT_ACCOUNT_SELECT = {
   id: true,
   label: true,
+  paymentRailId: true,
   asset: true,
   network: true,
   walletAddress: true,
@@ -38,6 +59,9 @@ const DEPOSIT_ACCOUNT_SELECT = {
   updatedByUserId: true,
   createdAt: true,
   updatedAt: true,
+  paymentRail: {
+    select: PAYMENT_RAIL_SELECT,
+  },
 } as const;
 
 const DEPOSIT_INCLUDE = {
@@ -63,6 +87,183 @@ const DEPOSIT_INCLUDE = {
 export class DepositsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listDepositPaymentRails(query: DepositPaymentRailQueryDto) {
+    const rails = await this.prisma.depositPaymentRail.findMany({
+      where: {
+        asset: query.asset,
+      },
+      select: PAYMENT_RAIL_SELECT,
+      orderBy: [{ asset: 'asc' }, { networkCode: 'asc' }],
+    });
+
+    return { rails };
+  }
+
+  async listAvailableDepositPaymentRails(query: DepositPaymentRailQueryDto) {
+    const rails = await this.prisma.depositPaymentRail.findMany({
+      where: {
+        asset: query.asset,
+        isActive: true,
+        accounts: {
+          some: {
+            isActive: true,
+          },
+        },
+      },
+      select: PAYMENT_RAIL_SELECT,
+      orderBy: [{ asset: 'asc' }, { networkCode: 'asc' }],
+    });
+
+    return { rails };
+  }
+
+  async createDepositPaymentRail(
+    dto: CreateDepositPaymentRailDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    return this.runSerializable(async (transaction) => {
+      const existingNetwork = await transaction.depositPaymentRail.findFirst({
+        where: { networkCode: dto.networkCode },
+        select: {
+          id: true,
+          validationProfile: true,
+        },
+      });
+
+      if (
+        existingNetwork &&
+        existingNetwork.validationProfile !== dto.validationProfile
+      ) {
+        throw new ConflictException(
+          `Network ${dto.networkCode} is already bound to validator profile ${existingNetwork.validationProfile}.`,
+        );
+      }
+
+      const rail = await transaction.depositPaymentRail.create({
+        data: {
+          asset: dto.asset,
+          networkCode: dto.networkCode,
+          displayName: dto.displayName,
+          validationProfile: dto.validationProfile,
+          isActive: dto.isActive ?? true,
+          createdByUserId: actor.id,
+          updatedByUserId: actor.id,
+        },
+        select: PAYMENT_RAIL_SELECT,
+      });
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: 'CREATE',
+          entityType: 'DepositPaymentRail',
+          entityId: rail.id,
+          description: `Administrator created deposit payment rail ${rail.asset}/${rail.networkCode}.`,
+          metadata: {
+            source: 'ADMIN_DEPOSIT_PAYMENT_RAIL',
+            operation: DEPOSIT_AUDIT_OPERATIONS.CREATE_PAYMENT_RAIL,
+            reason: dto.reason,
+            after: this.paymentRailAuditSnapshot(rail),
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+
+      return {
+        message: 'Deposit payment rail created.',
+        rail,
+      };
+    });
+  }
+
+  async updateDepositPaymentRail(
+    railId: string,
+    dto: UpdateDepositPaymentRailDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    const suppliedFields = Object.entries(dto)
+      .filter(
+        ([key, value]) =>
+          key !== 'expectedRevision' && key !== 'reason' && value !== undefined,
+      )
+      .map(([key]) => key);
+
+    if (suppliedFields.length === 0) {
+      throw new BadRequestException(
+        'At least one payment-rail setting must be supplied.',
+      );
+    }
+
+    return this.runSerializable(async (transaction) => {
+      const before = await transaction.depositPaymentRail.findUnique({
+        where: { id: railId },
+        select: PAYMENT_RAIL_SELECT,
+      });
+
+      if (!before) {
+        throw new NotFoundException('Deposit payment rail was not found.');
+      }
+
+      if (before.revision !== dto.expectedRevision) {
+        throw new ConflictException(
+          `Payment rail revision is stale. Current revision is ${before.revision}.`,
+        );
+      }
+
+      const updated = await transaction.depositPaymentRail.updateMany({
+        where: {
+          id: railId,
+          revision: dto.expectedRevision,
+        },
+        data: {
+          displayName: dto.displayName,
+          isActive: dto.isActive,
+          revision: { increment: 1 },
+          updatedByUserId: actor.id,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Payment rail changed concurrently; reload and retry.',
+        );
+      }
+
+      const after = await transaction.depositPaymentRail.findUniqueOrThrow({
+        where: { id: railId },
+        select: PAYMENT_RAIL_SELECT,
+      });
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: 'UPDATE',
+          entityType: 'DepositPaymentRail',
+          entityId: railId,
+          description: `Administrator updated deposit payment rail ${after.asset}/${after.networkCode}.`,
+          metadata: {
+            source: 'ADMIN_DEPOSIT_PAYMENT_RAIL',
+            operation: DEPOSIT_AUDIT_OPERATIONS.UPDATE_PAYMENT_RAIL,
+            reason: dto.reason,
+            changedFields: suppliedFields,
+            before: this.paymentRailAuditSnapshot(before),
+            after: this.paymentRailAuditSnapshot(after),
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+
+      return {
+        message: 'Deposit payment rail updated.',
+        rail: after,
+      };
+    });
+  }
+
   async listDepositAccounts() {
     const accounts = await this.prisma.depositAccount.findMany({
       select: DEPOSIT_ACCOUNT_SELECT,
@@ -78,11 +279,38 @@ export class DepositsService {
     context: RequestContext = {},
   ) {
     return this.runSerializable(async (transaction) => {
+      const rail = await transaction.depositPaymentRail.findUnique({
+        where: { id: dto.paymentRailId },
+        select: PAYMENT_RAIL_SELECT,
+      });
+
+      if (!rail) {
+        throw new BadRequestException('Selected payment rail does not exist.');
+      }
+
+      if ((dto.isActive ?? true) && !rail.isActive) {
+        throw new BadRequestException(
+          'An active receiving account cannot be created on an inactive payment rail.',
+        );
+      }
+
+      if (
+        !isValidDepositAddress(
+          rail.validationProfile as DepositValidationProfile,
+          dto.walletAddress,
+        )
+      ) {
+        throw new BadRequestException(
+          `Receiving address is invalid for ${rail.networkCode}.`,
+        );
+      }
+
       const account = await transaction.depositAccount.create({
         data: {
           label: dto.label,
-          asset: dto.asset,
-          network: dto.network,
+          paymentRailId: rail.id,
+          asset: rail.asset,
+          network: rail.networkCode,
           walletAddress: dto.walletAddress,
           qrCodeDataUrl: dto.qrCodeDataUrl,
           isActive: dto.isActive ?? true,
@@ -149,6 +377,12 @@ export class DepositsService {
       if (before.revision !== dto.expectedRevision) {
         throw new ConflictException(
           `Deposit account revision is stale. Current revision is ${before.revision}.`,
+        );
+      }
+
+      if (dto.isActive === true && !before.paymentRail.isActive) {
+        throw new BadRequestException(
+          'An account cannot be activated while its payment rail is inactive.',
         );
       }
 
@@ -272,10 +506,25 @@ export class DepositsService {
         );
       }
 
+      const rail = await transaction.depositPaymentRail.findFirst({
+        where: {
+          id: dto.paymentRailId,
+          asset: item.currency,
+          isActive: true,
+        },
+        select: PAYMENT_RAIL_SELECT,
+      });
+
+      if (!rail) {
+        throw new BadRequestException(
+          'Selected payment rail is not available for this package currency.',
+        );
+      }
+
       const accounts = await transaction.depositAccount.findMany({
         where: {
+          paymentRailId: rail.id,
           isActive: true,
-          asset: item.currency,
         },
         select: DEPOSIT_ACCOUNT_SELECT,
         orderBy: { id: 'asc' },
@@ -283,7 +532,7 @@ export class DepositsService {
 
       if (accounts.length === 0) {
         throw new ServiceUnavailableException(
-          `No active ${item.currency} receiving account is currently available.`,
+          `No active receiving account is configured for ${rail.displayName}.`,
         );
       }
 
@@ -303,7 +552,8 @@ export class DepositsService {
           assignedDepositAccountId: assignedAccount.id,
           assignedAccountLabel: assignedAccount.label,
           assignedWalletAddress: assignedAccount.walletAddress,
-          assignedNetwork: assignedAccount.network,
+          assignedNetwork: rail.networkCode,
+          assignedValidationProfile: rail.validationProfile,
           assignedQrCodeDataUrl: assignedAccount.qrCodeDataUrl,
         },
         include: DEPOSIT_INCLUDE,
@@ -324,9 +574,11 @@ export class DepositsService {
             packageCode: item.packageDefinition.code,
             amount: item.price.toString(),
             currency: item.currency,
+            paymentRailId: rail.id,
             assignedDepositAccountId: assignedAccount.id,
             assignedWalletAddress: assignedAccount.walletAddress,
-            assignedNetwork: assignedAccount.network,
+            assignedNetwork: rail.networkCode,
+            assignedValidationProfile: rail.validationProfile,
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -363,7 +615,7 @@ export class DepositsService {
       }
 
       const normalizedTxid = normalizeDepositTransactionId(
-        deposit.assignedNetwork as DepositNetwork,
+        deposit.assignedValidationProfile as DepositValidationProfile,
         dto.txid,
       );
 
@@ -411,6 +663,7 @@ export class DepositsService {
             operation: DEPOSIT_AUDIT_OPERATIONS.SUBMIT_TXID,
             txid: normalizedTxid,
             network: deposit.assignedNetwork,
+            validationProfile: deposit.assignedValidationProfile,
             submittedAt: submittedAt.toISOString(),
           },
           ipAddress: context.ipAddress,
@@ -555,6 +808,7 @@ export class DepositsService {
             assignedDepositAccountId: before.assignedDepositAccountId,
             assignedWalletAddress: before.assignedWalletAddress,
             assignedNetwork: before.assignedNetwork,
+            assignedValidationProfile: before.assignedValidationProfile,
             reviewedAt: reviewedAt.toISOString(),
             downstreamAccountingApplied: false,
             packageActivationApplied: false,
@@ -588,6 +842,7 @@ export class DepositsService {
     assignedAccountLabel: string;
     assignedWalletAddress: string;
     assignedNetwork: string;
+    assignedValidationProfile: DepositValidationProfile;
     assignedQrCodeDataUrl: string;
     txid: string | null;
     submittedAt: Date | null;
@@ -623,6 +878,7 @@ export class DepositsService {
       assignedAccountLabel: deposit.assignedAccountLabel,
       assignedWalletAddress: deposit.assignedWalletAddress,
       assignedNetwork: deposit.assignedNetwork,
+      assignedValidationProfile: deposit.assignedValidationProfile,
       assignedQrCodeDataUrl: deposit.assignedQrCodeDataUrl,
       txid: deposit.txid,
       submittedAt: deposit.submittedAt,
@@ -640,9 +896,30 @@ export class DepositsService {
     return value.toFixed(8).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
   }
 
+  private paymentRailAuditSnapshot(rail: {
+    id: string;
+    asset: string;
+    networkCode: string;
+    displayName: string;
+    validationProfile: DepositValidationProfile;
+    isActive: boolean;
+    revision: number;
+  }) {
+    return {
+      id: rail.id,
+      asset: rail.asset,
+      networkCode: rail.networkCode,
+      displayName: rail.displayName,
+      validationProfile: rail.validationProfile,
+      isActive: rail.isActive,
+      revision: rail.revision,
+    };
+  }
+
   private accountAuditSnapshot(account: {
     id: string;
     label: string;
+    paymentRailId: string;
     asset: string;
     network: string;
     walletAddress: string;
@@ -652,6 +929,7 @@ export class DepositsService {
     return {
       id: account.id,
       label: account.label,
+      paymentRailId: account.paymentRailId,
       asset: account.asset,
       network: account.network,
       walletAddress: account.walletAddress,
@@ -694,9 +972,21 @@ export class DepositsService {
           );
         }
 
-        if (target.includes('walletAddress')) {
+        if (
+          target.includes('paymentRailId') &&
+          target.includes('walletAddress')
+        ) {
           throw new ConflictException(
-            'This asset/network receiving wallet already exists.',
+            'This receiving wallet already exists on the selected payment rail.',
+          );
+        }
+
+        if (
+          target.includes('asset') &&
+          target.includes('networkCode')
+        ) {
+          throw new ConflictException(
+            'This asset/network payment rail already exists.',
           );
         }
 
