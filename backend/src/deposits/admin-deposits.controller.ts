@@ -32,9 +32,7 @@ export class AdminDepositsController {
   @Get(':depositId')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.DEPOSITS_READ)
-  getDeposit(
-    @Param('depositId', new ParseUUIDPipe()) depositId: string,
-  ) {
+  getDeposit(@Param('depositId', new ParseUUIDPipe()) depositId: string) {
     return this.depositsService.getDeposit(depositId);
   }
 
