@@ -15,12 +15,16 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
 import { AdminDepositQueryDto, ReviewDepositDto } from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
 
 @Controller('admin/deposits')
 export class AdminDepositsController {
-  constructor(private readonly depositsService: DepositsService) {}
+  constructor(
+    private readonly depositsService: DepositsService,
+    private readonly depositApprovalOrchestrator: DepositApprovalOrchestratorService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -45,7 +49,7 @@ export class AdminDepositsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.depositsService.approveDeposit(
+    return this.depositApprovalOrchestrator.approveDeposit(
       depositId,
       dto,
       actor,
