@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import {
+  registerDecorator,
+  type ValidationArguments,
+  type ValidationOptions,
+} from 'class-validator';
 
 const BASE58_ALPHABET =
   '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -44,11 +49,29 @@ export function isValidTronAddress(value: string): boolean {
   const payload = decoded.subarray(0, 21);
   const checksum = decoded.subarray(21);
 
-  // TRON mainnet account payloads start with 0x41.
   if (payload[0] !== 0x41) {
     return false;
   }
 
   const expectedChecksum = sha256(sha256(payload)).subarray(0, 4);
   return checksum.equals(expectedChecksum);
+}
+
+export function IsValidTronAddress(validationOptions?: ValidationOptions) {
+  return (object: object, propertyName: string) => {
+    registerDecorator({
+      name: 'isValidTronAddress',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(value: unknown) {
+          return typeof value === 'string' && isValidTronAddress(value);
+        },
+        defaultMessage(args: ValidationArguments) {
+          return `${args.property} must be a valid TRON Base58Check mainnet address.`;
+        },
+      },
+    });
+  };
 }
