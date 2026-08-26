@@ -18,18 +18,7 @@ Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
 Accepted implementation includes migration `0007_package_plan_foundation`, immutable package definitions, atomic versioned plan/items, nine-package V1 configuration, audited draft/update/clone/publish lifecycle, SUPER_ADMIN publication controls, exact decimal economics, protected APIs, same-origin BFF routes, Dark Neo ADMIN/USER package pages and the full-app PWA/local HTTPS foundation.
 
-Final local PKG-01 acceptance:
-
-- ordered Postman API run: GREEN;
-- SQL package/audit readback: GREEN;
-- 7 migrations / schema up to date;
-- backend Prisma/Prettier/ESLint/build: GREEN;
-- backend Jest: 26/26 suites, 148/148 tests;
-- admin ESLint/TypeScript/Next production build: GREEN, 44 routes;
-- PWA/mobile HTTPS acceptance: GREEN;
-- local working tree clean at the accepted checkpoint.
-
-PKG-01 intentionally contains no purchase, activation, balance, earning, deposit, subscription or ledger mutation.
+PKG-01 local API/SQL/UI/milestone acceptance is GREEN. It intentionally contains no purchase, activation, balance, earning, deposit, subscription or ledger mutation.
 
 ## Active Development Branch
 
@@ -37,75 +26,100 @@ PKG-01 intentionally contains no purchase, activation, balance, earning, deposit
 
 Created from the accepted `feature/packages-foundation` head so DEP-01 can be completed as one backend + BFF + ADMIN + USER vertical slice before local acceptance.
 
-## DEP-01 — USDT TRC20 Deposit Foundation
+## DEP-01 — Deposit Foundation
 
-Status: **IMPLEMENTATION COMPLETE ON FEATURE BRANCH / LOCAL COMBINED ACCEPTANCE PENDING**.
+Status: **NETWORK-AWARE HARDENING IMPLEMENTED ON FEATURE BRANCH / REVERIFICATION + 0009 DEPLOYMENT + COMBINED ACCEPTANCE PENDING**.
 
 Canonical contract: `docs/DEPOSITS-FOUNDATION.md`.
 
-### DEP-01A — Receiving Accounts
+### Local gates already achieved before the network-generalization correction
 
-Implemented:
+- complete backend/admin code gate was GREEN;
+- migration `0008_deposit_foundation` initially hit MySQL CHECK/FK error 3823;
+- the open-key CHECK was corrected before successful application;
+- failed partial 0008 state was cleanly rolled back/resolved and redeployed;
+- local database confirmed 8 migrations and schema up to date.
 
-- migration `0008_deposit_foundation`;
-- `deposit_accounts` MySQL model;
-- USDT/TRC20-only integrity constraints;
-- immutable public receiving address after creation;
-- QR image snapshot support;
-- ACTIVE/INACTIVE assignment lifecycle;
-- optimistic account revision;
-- created/updated actor tracking;
-- audit events for account create/update;
-- `deposits.accounts.read` and `deposits.accounts.manage` permissions;
-- ADMIN/SUPER_ADMIN account APIs;
-- same-origin BFF routes;
-- Dark Neo `/deposits` receiving-account management UI.
+`0008` is now immutable applied history.
 
-No private key, seed phrase, signing key or custody secret is stored.
+### Founder architecture correction during UI acceptance
 
-### DEP-01B — Deposit Request / TXID / Manual Review
+The Admin receiving-account form exposed a hardcoded TRON browser address pattern. Founder correctly rejected this as a global platform rule because future assets/tokens may use other networks.
 
-Implemented:
+The foundation has therefore been hardened before DEP-01 acceptance:
 
-- `deposits` MySQL model with exact `DECIMAL(20,8)` amount;
-- immutable package/payment/account assignment snapshots;
-- current effective published package validation;
-- backend-derived amount/currency;
-- random backend selection from ACTIVE USDT TRC20 receiving accounts;
-- DB-enforced one-open-deposit-per-user key;
-- statuses `AWAITING_TXID`, `PENDING_REVIEW`, `APPROVED`, `REJECTED`;
-- normalized globally unique 64-hex TXID;
-- manual ADMIN/SUPER_ADMIN approval/rejection with required note;
-- terminal review state and reviewer/timestamp history;
-- serializable mutation boundaries and concurrency conflict handling;
-- audit operations for request creation, TXID submission and review;
-- `deposits.read` and `deposits.review` permissions;
-- USER `/deposits/me`, create and TXID APIs;
-- ADMIN list/detail/review APIs;
-- same-origin ADMIN/USER BFF routes;
-- Dark Neo `/deposits` review queue;
-- Dark Neo `/user/deposits` package selection, assigned address/QR, copy-address, TXID submission and history UI;
-- ADMIN/USER navigation integration;
-- focused DTO/service regression tests.
+- receiving accounts are explicitly asset + network aware;
+- current QA still defaults to USDT/TRC20;
+- Admin account creation exposes asset/token + supported network;
+- no hardcoded `T...` browser pattern exists on the generic address field;
+- backend address validation is selected by network;
+- asset/network/address are immutable after account creation;
+- receiving-account uniqueness is `(asset, network, walletAddress)`;
+- package deposits select ACTIVE receiving accounts matching the package currency/asset;
+- server randomly assigns the concrete account/network and snapshots it;
+- USER cannot override network/address;
+- transaction-ID validation is selected by the assigned network;
+- transaction uniqueness is `(assignedNetwork, txid)`;
+- transaction storage is widened for non-64-character network identifiers.
 
-Approval in DEP-01 records a reviewed payment fact only. It deliberately does **not** create wallet balance, ledger entries, package activation, commission, reward or trading state.
+Supported network registry currently includes:
 
-### DEP-01 Local Acceptance Still Required
+```text
+TRC20
+ERC20
+BEP20
+POLYGON
+ARBITRUM
+BASE
+OPTIMISM
+SOLANA
+```
 
-Do not mark DEP-01 accepted until the Founder runs the combined local gate:
+Unknown networks remain rejected until a deliberate validator is added.
 
-1. pull/switch to `feature/deposits-foundation`;
+### New forward migration
+
+`0009_deposit_network_generalization` is implemented in source but **must not be deployed until the revised full code gate is GREEN**.
+
+It:
+
+- removes USDT-only/TRC20-only CHECK constraints from receiving/deposit rows;
+- replaces global wallet-address uniqueness with asset/network/address uniqueness;
+- adds asset/network/active lookup indexing;
+- expands transaction identifier storage;
+- replaces global TXID uniqueness with network-scoped uniqueness.
+
+### DEP-01 behavior retained
+
+- one open deposit per USER;
+- backend authoritative package amount/currency;
+- random server-side account assignment;
+- immutable assignment snapshot;
+- manual ADMIN/SUPER_ADMIN review;
+- terminal `APPROVED` / `REJECTED` facts;
+- audited transitions;
+- no private key/seed/signing secret storage;
+- no automatic blockchain verification;
+- no wallet balance, ledger credit, package activation, commission, reward or trading side effect.
+
+### Revised local acceptance sequence
+
+Do not mark DEP-01 accepted until the Founder completes:
+
+1. pull latest `feature/deposits-foundation`;
 2. regenerate Prisma client;
-3. run full backend + admin code verification;
-4. inspect migration status read-only;
-5. explicitly deploy `0008_deposit_foundation`;
-6. run DEP-01 Postman API flow;
-7. verify `/deposits` and `/user/deposits` together in the browser/PWA;
-8. verify SQL/audit readback;
-9. run `npm run verify:milestone`;
-10. confirm clean working tree.
+3. rerun full backend + admin `verify:local` after network-aware hardening;
+4. inspect migration status read-only and confirm 9 migrations with only `0009_deposit_network_generalization` pending;
+5. explicitly deploy `0009`;
+6. rerun migration status and confirm schema up to date;
+7. configure at least one real public ACTIVE USDT/TRC20 receiving account with matching QR for the current QA lane;
+8. run DEP-01 Postman combined acceptance;
+9. verify `/deposits` and `/user/deposits` together in browser/PWA;
+10. verify SQL/audit readback;
+11. run `npm run verify:milestone`;
+12. confirm clean working tree.
 
-No PR to `main` is opened until that combined gate is GREEN and explicitly approved.
+No PR to `main` is opened until this complete gate is GREEN and explicitly approved.
 
 ## Product Scope Correction — LOCKED
 
@@ -117,8 +131,8 @@ Future trade-like presentation is limited to explicitly labelled **Simulated Tra
 
 ## Current V1 Sequence
 
-1. DEP-01A Deposit Accounts — implementation complete, acceptance pending
-2. DEP-01B Deposits / TXID / Approval — implementation complete, acceptance pending
+1. DEP-01A Deposit Accounts — network-aware hardening acceptance pending
+2. DEP-01B Deposits / transaction ID / Approval — combined acceptance pending
 3. Wallet / Ledger foundation + controlled accounting credit
 4. Package subscription / activation from approved payment
 5. Referral commissions on legitimate package/payment events
