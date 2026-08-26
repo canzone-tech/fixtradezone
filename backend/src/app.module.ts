@@ -12,6 +12,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { RedisModule } from './redis/redis.module';
 import { PackagesModule } from './packages/packages.module';
+import { DepositsModule } from './deposits/deposits.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PackagesModule } from './packages/packages.module';
     SecurityConfigModule,
     PlatformConfigModule,
     PackagesModule,
+    DepositsModule,
     DashboardModule,
     HealthModule,
   ],
