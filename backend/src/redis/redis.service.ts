@@ -1,20 +1,15 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationShutdown,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
-export class RedisService implements OnModuleInit, OnApplicationShutdown {
+export class RedisService implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisService.name);
   private readonly client: Redis;
 
   constructor(private readonly configService: ConfigService) {
-    const host = this.configService.getOrThrow<string>('REDIS_HOST');
-    const port = this.configService.getOrThrow<number>('REDIS_PORT');
+    const host = this.configService.get<string>('REDIS_HOST') ?? '127.0.0.1';
+    const port = this.configService.get<number>('REDIS_PORT') ?? 6379;
     const password =
       this.configService.get<string>('REDIS_PASSWORD') || undefined;
 
@@ -33,18 +28,6 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
     this.client.on('error', (error: Error) => {
       this.logger.error(`Redis connection error: ${error.message}`);
     });
-  }
-
-  async onModuleInit(): Promise<void> {
-    await this.client.connect();
-
-    const response = await this.client.ping();
-
-    if (response !== 'PONG') {
-      throw new Error('Redis health verification failed.');
-    }
-
-    this.logger.log('Redis connection established.');
   }
 
   async onApplicationShutdown(): Promise<void> {
