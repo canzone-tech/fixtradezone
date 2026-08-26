@@ -59,6 +59,8 @@ const sections: Array<{
         href: "/deposits",
         label: "Deposits",
         icon: "iconoir-wallet",
+        permission: "deposits.read",
+        enabled: true,
       },
       {
         href: "/payouts",
