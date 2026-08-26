@@ -38,6 +38,7 @@ function dateLabel(value: string) {
   }).format(new Date(value));
 }
 
+// Keep initial loading separate from manual refresh so React effects stay passive.
 async function fetchSubscriptions(): Promise<ResponsePayload> {
   const response = await fetch("/api/user/subscriptions?limit=100", {
     cache: "no-store",
