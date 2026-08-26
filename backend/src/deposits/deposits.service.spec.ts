@@ -254,7 +254,10 @@ describe('DepositsService', () => {
 
   it('normalizes transaction IDs from the immutable validation profile snapshot', async () => {
     transaction.deposit.findFirst.mockResolvedValue(
-      deposit({ assignedNetwork: 'ETHEREUM', assignedValidationProfile: 'EVM' }),
+      deposit({
+        assignedNetwork: 'ETHEREUM',
+        assignedValidationProfile: 'EVM',
+      }),
     );
 
     let txUpdate: { data?: Record<string, unknown> } | null = null;
