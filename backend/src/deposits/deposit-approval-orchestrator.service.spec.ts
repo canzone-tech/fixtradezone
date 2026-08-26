@@ -106,6 +106,8 @@ describe('DepositApprovalOrchestratorService', () => {
     ).rejects.toThrow('ledger unavailable');
 
     expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
-    expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledTimes(1);
+    expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledTimes(
+      1,
+    );
   });
 });
