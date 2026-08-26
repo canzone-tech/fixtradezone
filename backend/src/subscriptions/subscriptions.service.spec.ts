@@ -278,9 +278,6 @@ describe('SubscriptionsService', () => {
 
     expect(auditCall.data.action).toBe('ACTIVATE');
     expect(auditCall.data.entityType).toBe('UserPackageSubscription');
-    expect(auditCall.data.metadata).toEqual({
-      expect: undefined,
-    });
     expect(auditCall.data.metadata.balanced).toBe(true);
     expect(auditCall.data.metadata.depositId).toBe(DEPOSIT_ID);
     expect(auditCall.data.metadata.amount).toBe('5.00000000');
