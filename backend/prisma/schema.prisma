@@ -173,6 +173,12 @@ enum DepositStatus {
   REJECTED
 }
 
+enum DepositValidationProfile {
+  TRON
+  EVM
+  SOLANA
+}
+
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -238,10 +244,12 @@ model User {
   packagePlansUpdated   PackagePlanVersion[] @relation("PackagePlanUpdatedBy")
   packagePlansPublished PackagePlanVersion[] @relation("PackagePlanPublishedBy")
 
-  depositAccountsCreated DepositAccount[] @relation("DepositAccountCreatedBy")
-  depositAccountsUpdated DepositAccount[] @relation("DepositAccountUpdatedBy")
-  deposits                Deposit[]        @relation("DepositOwner")
-  depositsReviewed        Deposit[]        @relation("DepositReviewer")
+  depositPaymentRailsCreated DepositPaymentRail[] @relation("DepositPaymentRailCreatedBy")
+  depositPaymentRailsUpdated DepositPaymentRail[] @relation("DepositPaymentRailUpdatedBy")
+  depositAccountsCreated     DepositAccount[]     @relation("DepositAccountCreatedBy")
+  depositAccountsUpdated     DepositAccount[]     @relation("DepositAccountUpdatedBy")
+  deposits                   Deposit[]            @relation("DepositOwner")
+  depositsReviewed           Deposit[]            @relation("DepositReviewer")
 
   @@index([status])
   @@index([createdAt])
@@ -589,9 +597,34 @@ model PackagePlanItem {
   @@map("package_plan_items")
 }
 
+model DepositPaymentRail {
+  id                String                   @id @default(uuid()) @db.Char(36)
+  asset             String                   @db.VarChar(10)
+  networkCode       String                   @db.VarChar(40)
+  displayName       String                   @db.VarChar(100)
+  validationProfile DepositValidationProfile
+  isActive          Boolean                  @default(true)
+  revision          Int                      @default(1)
+  createdByUserId   String?                  @db.Char(36)
+  updatedByUserId   String?                  @db.Char(36)
+  createdAt         DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt         DateTime                 @updatedAt @db.DateTime(3)
+
+  createdBy User?            @relation("DepositPaymentRailCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy User?            @relation("DepositPaymentRailUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  accounts  DepositAccount[]
+
+  @@unique([asset, networkCode])
+  @@index([asset, isActive])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@map("deposit_payment_rails")
+}
+
 model DepositAccount {
   id              String   @id @default(uuid()) @db.Char(36)
   label           String   @db.VarChar(100)
+  paymentRailId   String   @db.Char(36)
   asset           String   @default("USDT") @db.VarChar(10)
   network         String   @default("TRC20") @db.VarChar(20)
   walletAddress   String   @db.VarChar(100)
@@ -603,12 +636,13 @@ model DepositAccount {
   createdAt       DateTime @default(now()) @db.DateTime(3)
   updatedAt       DateTime @updatedAt @db.DateTime(3)
 
-  createdBy User?     @relation("DepositAccountCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  updatedBy User?     @relation("DepositAccountUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  deposits  Deposit[]
+  paymentRail DepositPaymentRail @relation(fields: [paymentRailId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy   User?              @relation("DepositAccountCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy   User?              @relation("DepositAccountUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  deposits    Deposit[]
 
-  @@unique([asset, network, walletAddress])
-  @@index([asset, network, isActive])
+  @@unique([paymentRailId, walletAddress])
+  @@index([paymentRailId, isActive])
   @@index([isActive])
   @@index([createdByUserId])
   @@index([updatedByUserId])
@@ -616,28 +650,29 @@ model DepositAccount {
 }
 
 model Deposit {
-  id                       String        @id @default(uuid()) @db.Char(36)
-  userId                   String        @db.Char(36)
-  openKey                  String?       @unique @db.Char(36)
-  status                   DepositStatus @default(AWAITING_TXID)
-  packagePlanVersionId     String        @db.Char(36)
-  packagePlanItemId        String        @db.Char(36)
-  packageCode              String        @db.VarChar(64)
-  packageDisplayName       String        @db.VarChar(100)
-  amount                   Decimal       @db.Decimal(20, 8)
-  currency                 String        @db.VarChar(10)
-  assignedDepositAccountId String        @db.Char(36)
-  assignedAccountLabel     String        @db.VarChar(100)
-  assignedWalletAddress    String        @db.VarChar(100)
-  assignedNetwork          String        @db.VarChar(20)
-  assignedQrCodeDataUrl    String        @db.MediumText
-  txid                     String?       @db.VarChar(191)
-  submittedAt              DateTime?     @db.DateTime(3)
-  reviewedByUserId         String?       @db.Char(36)
-  reviewedAt               DateTime?     @db.DateTime(3)
-  reviewNote               String?       @db.VarChar(1000)
-  createdAt                DateTime      @default(now()) @db.DateTime(3)
-  updatedAt                DateTime      @updatedAt @db.DateTime(3)
+  id                        String                   @id @default(uuid()) @db.Char(36)
+  userId                    String                   @db.Char(36)
+  openKey                   String?                  @unique @db.Char(36)
+  status                    DepositStatus            @default(AWAITING_TXID)
+  packagePlanVersionId      String                   @db.Char(36)
+  packagePlanItemId         String                   @db.Char(36)
+  packageCode               String                   @db.VarChar(64)
+  packageDisplayName        String                   @db.VarChar(100)
+  amount                    Decimal                  @db.Decimal(20, 8)
+  currency                  String                   @db.VarChar(10)
+  assignedDepositAccountId  String                   @db.Char(36)
+  assignedAccountLabel      String                   @db.VarChar(100)
+  assignedWalletAddress     String                   @db.VarChar(100)
+  assignedNetwork           String                   @db.VarChar(20)
+  assignedValidationProfile DepositValidationProfile
+  assignedQrCodeDataUrl     String                   @db.MediumText
+  txid                      String?                  @db.VarChar(191)
+  submittedAt               DateTime?                @db.DateTime(3)
+  reviewedByUserId          String?                  @db.Char(36)
+  reviewedAt                DateTime?                @db.DateTime(3)
+  reviewNote                String?                  @db.VarChar(1000)
+  createdAt                 DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt                 DateTime                 @updatedAt @db.DateTime(3)
 
   user                   User               @relation("DepositOwner", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   packagePlanVersion     PackagePlanVersion @relation(fields: [packagePlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
