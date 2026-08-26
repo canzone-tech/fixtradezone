@@ -136,7 +136,9 @@ export class WalletLedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyWallet(userId: string, query: WalletPageQueryDto) {
-    const bucketRows = await this.prisma.$queryRaw<WalletBucketRow[]>(Prisma.sql`
+    const bucketRows = await this.prisma.$queryRaw<
+      WalletBucketRow[]
+    >(Prisma.sql`
       SELECT
         la.bucket,
         la.currency,
@@ -156,7 +158,9 @@ export class WalletLedgerService {
     `);
 
     const skip = (query.page - 1) * query.limit;
-    const activity = await this.prisma.$queryRaw<WalletActivityRow[]>(Prisma.sql`
+    const activity = await this.prisma.$queryRaw<
+      WalletActivityRow[]
+    >(Prisma.sql`
       SELECT
         lt.id AS transactionId,
         lt.kind,
@@ -280,9 +284,7 @@ export class WalletLedgerService {
         buckets: {
           main: this.decimalString(row.mainBalance),
           packageEarnings: this.decimalString(row.packageEarningsBalance),
-          referralCommission: this.decimalString(
-            row.referralCommissionBalance,
-          ),
+          referralCommission: this.decimalString(row.referralCommissionBalance),
           rewards: this.decimalString(row.rewardsBalance),
         },
         totalWallet: this.decimalString(row.totalBalance),
@@ -457,7 +459,9 @@ export class WalletLedgerService {
     const currency = deposit.currency.toUpperCase();
     const amount = deposit.amount.toFixed(8);
     if (new Prisma.Decimal(amount).lte(0)) {
-      throw new ConflictException('Deposit accounting amount must be positive.');
+      throw new ConflictException(
+        'Deposit accounting amount must be positive.',
+      );
     }
 
     const sourceKey = depositCreditSourceKey(deposit.id);
@@ -794,14 +798,12 @@ export class WalletLedgerService {
     >();
 
     for (const row of rows) {
-      const buckets =
-        currencies.get(row.currency) ??
-        {
-          MAIN: new Prisma.Decimal(0),
-          PACKAGE_EARNINGS: new Prisma.Decimal(0),
-          REFERRAL_COMMISSION: new Prisma.Decimal(0),
-          REWARDS: new Prisma.Decimal(0),
-        };
+      const buckets = currencies.get(row.currency) ?? {
+        MAIN: new Prisma.Decimal(0),
+        PACKAGE_EARNINGS: new Prisma.Decimal(0),
+        REFERRAL_COMMISSION: new Prisma.Decimal(0),
+        REWARDS: new Prisma.Decimal(0),
+      };
       buckets[row.bucket] = new Prisma.Decimal(row.balance);
       currencies.set(row.currency, buckets);
     }
@@ -859,9 +861,7 @@ export class WalletLedgerService {
   private decimalString(value: DecimalValue): string {
     const decimal =
       value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
-    return decimal
-      .toFixed(8)
-      .replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
+    return decimal.toFixed(8).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
   }
 
   private countNumber(value: bigint | number | string | undefined): number {

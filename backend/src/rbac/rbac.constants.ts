@@ -62,7 +62,8 @@ export const SYSTEM_PERMISSIONS = [
   },
   {
     code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE,
-    description: 'Create and manage deposit payment rails and receiving accounts',
+    description:
+      'Create and manage deposit payment rails and receiving accounts',
   },
   {
     code: PERMISSIONS.DEPOSITS_READ,
