@@ -1,0 +1,205 @@
+.panel {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 20px;
+  border: 1px solid rgba(73, 128, 196, 0.22);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(7, 20, 46, 0.95), rgba(3, 12, 31, 0.97));
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.14);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.header span {
+  color: #35efe2;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.header h3 {
+  margin: 5px 0 6px;
+  color: #f5f8ff;
+  font-size: 22px;
+}
+
+.header p {
+  max-width: 760px;
+  margin: 0;
+  color: #8395ad;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.header button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid rgba(36, 220, 211, 0.35);
+  border-radius: 9px;
+  color: #dffffb;
+  background: rgba(7, 98, 107, 0.24);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.header button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.activeCard {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.7fr);
+  gap: 18px;
+  padding: 17px;
+  border: 1px solid rgba(31, 222, 174, 0.22);
+  border-radius: 13px;
+  background: radial-gradient(circle at top left, rgba(15, 196, 173, 0.09), transparent 30%), rgba(5, 18, 38, 0.75);
+}
+
+.identity {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.identity span,
+.identity small {
+  color: #6e87a5;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.identity h4 {
+  margin: 0;
+  color: #eff7ff;
+  font-size: 18px;
+}
+
+.identity strong {
+  color: #6ef0c5;
+  font-size: 16px;
+}
+
+.activeCard dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.activeCard dl div {
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(95, 136, 184, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.activeCard dt {
+  margin-bottom: 4px;
+  color: #7087a2;
+  font-size: 9px;
+}
+
+.activeCard dd {
+  margin: 0;
+  color: #dce9f7;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  color: #70e9bf !important;
+  font-weight: 800;
+}
+
+.source {
+  grid-column: 1 / -1;
+  color: #7187a0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  border: 1px dashed rgba(89, 135, 188, 0.18);
+  border-radius: 12px;
+  color: #7f92aa;
+}
+
+.empty i {
+  color: #37e7dc;
+  font-size: 24px;
+}
+
+.empty div {
+  display: grid;
+  gap: 3px;
+}
+
+.empty strong {
+  color: #eaf3fc;
+  font-size: 12px;
+}
+
+.empty span {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.error {
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 88, 111, 0.3);
+  border-radius: 10px;
+  color: #ff9aaa;
+  background: rgba(81, 17, 35, 0.23);
+  font-size: 10px;
+}
+
+.historyNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #7d91a9;
+  font-size: 10px;
+}
+
+.historyNote i {
+  color: #32ded4;
+}
+
+@media (max-width: 900px) {
+  .activeCard,
+  .activeCard dl {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 15px;
+  }
+
+  .header,
+  .activeCard,
+  .activeCard dl {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+  }
+}
