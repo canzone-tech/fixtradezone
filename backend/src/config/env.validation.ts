@@ -21,7 +21,7 @@ export const envValidationSchema = Joi.object({
 
   MYSQL_PASSWORD: Joi.string().required(),
 
-  REDIS_HOST: Joi.string().hostname().required(),
+  REDIS_HOST: Joi.string().hostname().default('127.0.0.1'),
 
   REDIS_PORT: Joi.number().port().default(6379),
 
