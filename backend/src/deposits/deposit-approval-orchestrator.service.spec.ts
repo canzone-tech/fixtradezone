@@ -1,4 +1,5 @@
 import type { AuthenticatedUser } from '../auth/auth-user';
+import type { CommissionsService } from '../commissions/commissions.service';
 import type { AccountingConfigService } from '../platform-config/accounting-config.service';
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
@@ -34,6 +35,9 @@ describe('DepositApprovalOrchestratorService', () => {
   const subscriptionsService = {
     activateAutomaticallyAfterAccounting: jest.fn(),
   };
+  const commissionsService = {
+    processSubscriptionSafely: jest.fn(),
+  };
 
   let service: DepositApprovalOrchestratorService;
 
@@ -59,16 +63,23 @@ describe('DepositApprovalOrchestratorService', () => {
         subscription: { id: 'subscription-id', status: 'ACTIVE' },
       },
     );
+    commissionsService.processSubscriptionSafely.mockResolvedValue({
+      processingStatus: 'PROCESSED',
+      created: true,
+      run: { id: 'commission-run-id', outcome: 'PROCESSED' },
+      events: [],
+    });
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
       accountingConfigService as unknown as AccountingConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
+      commissionsService as unknown as CommissionsService,
     );
   });
 
-  it('automatically posts accounting and activates the package in AUTO mode', async () => {
+  it('automatically posts accounting, activates the package, and processes commission in AUTO mode', async () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'AUTO_ON_APPROVAL',
     );
@@ -88,6 +99,11 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).toHaveBeenCalledWith(DEPOSIT_ID, actor, {});
+    expect(commissionsService.processSubscriptionSafely).toHaveBeenCalledWith(
+      'subscription-id',
+      actor,
+      {},
+    );
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: true,
@@ -96,6 +112,10 @@ describe('DepositApprovalOrchestratorService', () => {
       packageActivationTrigger: 'PAYMENT_APPROVED',
       packageActivationRequired: false,
       subscription: { id: 'subscription-id', status: 'ACTIVE' },
+      referralCommission: {
+        processingStatus: 'PROCESSED',
+        run: { id: 'commission-run-id', outcome: 'PROCESSED' },
+      },
     });
   });
 
@@ -115,6 +135,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
+    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'MANUAL_RECONCILIATION',
       accountingPosted: false,
@@ -143,6 +164,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
+    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: false,
@@ -166,6 +188,7 @@ describe('DepositApprovalOrchestratorService', () => {
       actor,
     );
 
+    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPosted: true,
       packageActivated: false,
