@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import { resolveAdminSession } from "@/lib/admin-session-client";
 import type {
@@ -21,20 +21,15 @@ interface PlanListResponse {
 
 interface EventListResponse {
   commissions: CommissionEvent[];
-  total: number;
 }
 
 interface ReconciliationResponse {
   subscriptions: CommissionReconciliationItem[];
-  total: number;
 }
 
 interface ProcessResponse {
   created: boolean;
-  run: {
-    id: string;
-    outcome: string;
-  };
+  run: { id: string; outcome: string };
   events: CommissionEvent[];
 }
 
@@ -82,6 +77,7 @@ type DraftState = ReturnType<typeof draftSnapshot>;
 export default function CommissionsClient() {
   const [plans, setPlans] = useState<CommissionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
+  const selectedPlanIdRef = useRef("");
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [events, setEvents] = useState<CommissionEvent[]>([]);
   const [pending, setPending] = useState<CommissionReconciliationItem[]>([]);
@@ -141,16 +137,19 @@ export default function CommissionsClient() {
     }
 
     const nextPlans = planPayload.plans ?? [];
+    const nextSelected =
+      nextPlans.find((plan) => plan.id === selectedPlanIdRef.current) ??
+      nextPlans[0] ??
+      null;
+
     setPlans(nextPlans);
     setEvents(eventPayload.commissions ?? []);
     setPending(
       reconciliationResponse.ok ? reconciliationPayload.subscriptions ?? [] : [],
     );
-    setSelectedPlanId((current) =>
-      nextPlans.some((plan) => plan.id === current)
-        ? current
-        : (nextPlans[0]?.id ?? ""),
-    );
+    selectedPlanIdRef.current = nextSelected?.id ?? "";
+    setSelectedPlanId(nextSelected?.id ?? "");
+    setDraft(nextSelected ? draftSnapshot(nextSelected) : null);
   }, []);
 
   useEffect(() => {
@@ -188,17 +187,17 @@ export default function CommissionsClient() {
     };
   }, [load]);
 
-  useEffect(() => {
-    if (selectedPlan) setDraft(draftSnapshot(selectedPlan));
-    else setDraft(null);
-  }, [selectedPlan]);
-
   function selectPlan(planId: string) {
     if (dirty) {
-      setError("Save or discard the current commission draft changes before switching versions.");
+      setError(
+        "Save or discard the current commission draft changes before switching versions.",
+      );
       return;
     }
+    const next = plans.find((plan) => plan.id === planId) ?? null;
+    selectedPlanIdRef.current = planId;
     setSelectedPlanId(planId);
+    setDraft(next ? draftSnapshot(next) : null);
     setError(null);
   }
 
@@ -238,7 +237,9 @@ export default function CommissionsClient() {
       if (!response.ok) {
         throw new Error(apiMessage(payload as ApiError, "Unable to save draft."));
       }
-      setSuccess(`Commission plan V${(payload as CommissionPlan).versionNumber} draft updated.`);
+      const saved = payload as CommissionPlan;
+      selectedPlanIdRef.current = saved.id;
+      setSuccess(`Commission plan V${saved.versionNumber} draft updated.`);
       await load();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save draft.");
@@ -250,7 +251,9 @@ export default function CommissionsClient() {
   async function publishDraft() {
     if (!selectedPlan || selectedPlan.status !== "DRAFT") return;
     if (dirty) {
-      setError("Publication blocked: save all commission draft changes before publishing.");
+      setError(
+        "Publication blocked: save all commission draft changes before publishing.",
+      );
       return;
     }
     setBusy("publish");
@@ -272,12 +275,18 @@ export default function CommissionsClient() {
         | CommissionPlan
         | ApiError;
       if (!response.ok) {
-        throw new Error(apiMessage(payload as ApiError, "Unable to publish plan."));
+        throw new Error(
+          apiMessage(payload as ApiError, "Unable to publish plan."),
+        );
       }
-      setSuccess(`Commission plan V${(payload as CommissionPlan).versionNumber} published.`);
+      const published = payload as CommissionPlan;
+      selectedPlanIdRef.current = published.id;
+      setSuccess(`Commission plan V${published.versionNumber} published.`);
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to publish plan.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to publish plan.",
+      );
     } finally {
       setBusy(null);
     }
@@ -302,9 +311,10 @@ export default function CommissionsClient() {
       if (!response.ok) {
         throw new Error(apiMessage(payload as ApiError, "Unable to clone draft."));
       }
-      setSuccess(`Commission plan V${(payload as CommissionPlan).versionNumber} draft created.`);
+      const created = payload as CommissionPlan;
+      selectedPlanIdRef.current = created.id;
+      setSuccess(`Commission plan V${created.versionNumber} draft created.`);
       await load();
-      setSelectedPlanId((payload as CommissionPlan).id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to clone draft.");
     } finally {
@@ -348,7 +358,9 @@ export default function CommissionsClient() {
   }
 
   if (loading) {
-    return <div className={styles.loading}>Loading referral commission workspace…</div>;
+    return (
+      <div className={styles.loading}>Loading referral commission workspace…</div>
+    );
   }
 
   return (
@@ -374,9 +386,18 @@ export default function CommissionsClient() {
           </p>
         </div>
         <div className={styles.heroStats}>
-          <article><small>PLANS</small><strong>{plans.length}</strong></article>
-          <article><small>EVENTS</small><strong>{events.length}</strong></article>
-          <article><small>RECONCILIATION</small><strong>{pending.length}</strong></article>
+          <article>
+            <small>PLANS</small>
+            <strong>{plans.length}</strong>
+          </article>
+          <article>
+            <small>EVENTS</small>
+            <strong>{events.length}</strong>
+          </article>
+          <article>
+            <small>RECONCILIATION</small>
+            <strong>{pending.length}</strong>
+          </article>
         </div>
       </section>
 
@@ -390,7 +411,9 @@ export default function CommissionsClient() {
             <button
               type="button"
               key={plan.id}
-              className={plan.id === selectedPlan?.id ? styles.versionActive : ""}
+              className={
+                plan.id === selectedPlan?.id ? styles.versionActive : ""
+              }
               onClick={() => selectPlan(plan.id)}
             >
               <strong>V{plan.versionNumber}</strong>
@@ -420,14 +443,25 @@ export default function CommissionsClient() {
                     <button
                       type="button"
                       onClick={() => void cloneDraft(selectedPlan)}
-                      disabled={Boolean(busy) || plans.some((plan) => plan.status === "DRAFT")}
+                      disabled={
+                        Boolean(busy) ||
+                        plans.some((plan) => plan.status === "DRAFT")
+                      }
                     >
                       Clone draft
                     </button>
                   ) : null}
                   {selectedPlan.status === "DRAFT" && canManage ? (
-                    <button type="button" onClick={() => void saveDraft()} disabled={Boolean(busy) || !dirty}>
-                      {busy === "save" ? "Saving…" : dirty ? "Save draft · UNSAVED" : "Draft saved"}
+                    <button
+                      type="button"
+                      onClick={() => void saveDraft()}
+                      disabled={Boolean(busy) || !dirty}
+                    >
+                      {busy === "save"
+                        ? "Saving…"
+                        : dirty
+                          ? "Save draft · UNSAVED"
+                          : "Draft saved"}
                     </button>
                   ) : null}
                   {selectedPlan.status === "DRAFT" && isSuperAdmin ? (
@@ -437,7 +471,11 @@ export default function CommissionsClient() {
                       onClick={() => void publishDraft()}
                       disabled={Boolean(busy) || dirty}
                     >
-                      {dirty ? "Save changes before publishing" : busy === "publish" ? "Publishing…" : "Publish plan"}
+                      {dirty
+                        ? "Save changes before publishing"
+                        : busy === "publish"
+                          ? "Publishing…"
+                          : "Publish plan"}
                     </button>
                   ) : null}
                 </div>
@@ -450,7 +488,12 @@ export default function CommissionsClient() {
                     type="checkbox"
                     checked={draft.firstPurchaseEnabled}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, firstPurchaseEnabled: event.target.checked })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        firstPurchaseEnabled: event.target.checked,
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -459,7 +502,12 @@ export default function CommissionsClient() {
                     type="checkbox"
                     checked={draft.newPurchaseEnabled}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, newPurchaseEnabled: event.target.checked })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        newPurchaseEnabled: event.target.checked,
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -468,7 +516,12 @@ export default function CommissionsClient() {
                     type="checkbox"
                     checked={draft.activePackageRequired}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, activePackageRequired: event.target.checked })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        activePackageRequired: event.target.checked,
+                      })
+                    }
                   />
                 </label>
                 <label>
@@ -476,7 +529,13 @@ export default function CommissionsClient() {
                   <select
                     value={draft.inactiveUplineAction}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, inactiveUplineAction: event.target.value as DraftState["inactiveUplineAction"] })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        inactiveUplineAction: event.target
+                          .value as DraftState["inactiveUplineAction"],
+                      })
+                    }
                   >
                     <option value="LOST">Lost</option>
                     <option value="PENDING">Pending · engine deferred</option>
@@ -488,11 +547,21 @@ export default function CommissionsClient() {
                   <select
                     value={draft.compressionMode}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, compressionMode: event.target.value as DraftState["compressionMode"] })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        compressionMode: event.target
+                          .value as DraftState["compressionMode"],
+                      })
+                    }
                   >
                     <option value="SKIP">Skip</option>
-                    <option value="PASS_SAME_LEVEL">Pass same level · deferred</option>
-                    <option value="COMPRESS_LEVELS">Compress levels · deferred</option>
+                    <option value="PASS_SAME_LEVEL">
+                      Pass same level · deferred
+                    </option>
+                    <option value="COMPRESS_LEVELS">
+                      Compress levels · deferred
+                    </option>
                     <option value="PENDING">Pending · deferred</option>
                   </select>
                 </label>
@@ -501,12 +570,22 @@ export default function CommissionsClient() {
                   <select
                     value={draft.releaseMode}
                     disabled={selectedPlan.status !== "DRAFT" || !canManage}
-                    onChange={(event) => setDraft({ ...draft, releaseMode: event.target.value as DraftState["releaseMode"] })}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        releaseMode: event.target
+                          .value as DraftState["releaseMode"],
+                      })
+                    }
                   >
                     <option value="IMMEDIATE">Immediate</option>
                     <option value="HOLD_PERIOD">Hold period · deferred</option>
-                    <option value="MANUAL_APPROVAL">Manual approval · deferred</option>
-                    <option value="CONDITION_BASED">Condition based · deferred</option>
+                    <option value="MANUAL_APPROVAL">
+                      Manual approval · deferred
+                    </option>
+                    <option value="CONDITION_BASED">
+                      Condition based · deferred
+                    </option>
                   </select>
                 </label>
               </div>
@@ -518,14 +597,60 @@ export default function CommissionsClient() {
                 </div>
                 <div className={styles.tableWrap}>
                   <table>
-                    <thead><tr><th>Level</th><th>Enabled</th><th>Rate %</th><th>Matching</th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th>Level</th>
+                        <th>Enabled</th>
+                        <th>Rate %</th>
+                        <th>Matching</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {draft.levels.map((level, index) => (
                         <tr key={level.level}>
                           <td>L{level.level}</td>
-                          <td><input type="checkbox" checked={level.enabled} disabled={selectedPlan.status !== "DRAFT" || !canManage} onChange={(event) => updateLevel(index, { enabled: event.target.checked })} /></td>
-                          <td><input type="text" value={level.ratePercent} disabled={selectedPlan.status !== "DRAFT" || !canManage} onChange={(event) => updateLevel(index, { ratePercent: event.target.value })} /></td>
-                          <td><input type="checkbox" checked={level.packageMatchingEnabled} disabled={selectedPlan.status !== "DRAFT" || !canManage} onChange={(event) => updateLevel(index, { packageMatchingEnabled: event.target.checked })} /></td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={level.enabled}
+                              disabled={
+                                selectedPlan.status !== "DRAFT" || !canManage
+                              }
+                              onChange={(event) =>
+                                updateLevel(index, {
+                                  enabled: event.target.checked,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              value={level.ratePercent}
+                              disabled={
+                                selectedPlan.status !== "DRAFT" || !canManage
+                              }
+                              onChange={(event) =>
+                                updateLevel(index, {
+                                  ratePercent: event.target.value,
+                                })
+                              }
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={level.packageMatchingEnabled}
+                              disabled={
+                                selectedPlan.status !== "DRAFT" || !canManage
+                              }
+                              onChange={(event) =>
+                                updateLevel(index, {
+                                  packageMatchingEnabled: event.target.checked,
+                                })
+                              }
+                            />
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -539,21 +664,51 @@ export default function CommissionsClient() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <div><span>RECOVERY</span><h3>Commission reconciliation</h3></div>
+          <div>
+            <span>RECOVERY</span>
+            <h3>Commission reconciliation</h3>
+          </div>
           <b>{pending.length} pending</b>
         </div>
-        {pending.length === 0 ? <div className={styles.empty}>No unprocessed package subscriptions.</div> : (
+        {pending.length === 0 ? (
+          <div className={styles.empty}>No unprocessed package subscriptions.</div>
+        ) : (
           <div className={styles.tableWrap}>
             <table>
-              <thead><tr><th>USER</th><th>Package</th><th>Activated</th><th>Action</th></tr></thead>
-              <tbody>{pending.map((item) => (
-                <tr key={item.subscriptionId}>
-                  <td><strong>@{item.username}</strong><small>{item.email ?? "—"}</small></td>
-                  <td>{item.packageDisplayName}<small>{amountLabel(item.price, item.currency)}</small></td>
-                  <td>{dateLabel(item.activatedAt)}</td>
-                  <td><button type="button" disabled={!canReconcile || Boolean(busy)} onClick={() => void reconcile(item.subscriptionId)}>{busy === `reconcile:${item.subscriptionId}` ? "Processing…" : "Process commission"}</button></td>
+              <thead>
+                <tr>
+                  <th>USER</th>
+                  <th>Package</th>
+                  <th>Activated</th>
+                  <th>Action</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {pending.map((item) => (
+                  <tr key={item.subscriptionId}>
+                    <td>
+                      <strong>@{item.username}</strong>
+                      <small>{item.email ?? "—"}</small>
+                    </td>
+                    <td>
+                      {item.packageDisplayName}
+                      <small>{amountLabel(item.price, item.currency)}</small>
+                    </td>
+                    <td>{dateLabel(item.activatedAt)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        disabled={!canReconcile || Boolean(busy)}
+                        onClick={() => void reconcile(item.subscriptionId)}
+                      >
+                        {busy === `reconcile:${item.subscriptionId}`
+                          ? "Processing…"
+                          : "Process commission"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
@@ -561,24 +716,61 @@ export default function CommissionsClient() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <div><span>IMMUTABLE HISTORY</span><h3>Referral commission events</h3></div>
+          <div>
+            <span>IMMUTABLE HISTORY</span>
+            <h3>Referral commission events</h3>
+          </div>
           <b>{events.length} loaded</b>
         </div>
-        {events.length === 0 ? <div className={styles.empty}>No referral commission events yet.</div> : (
+        {events.length === 0 ? (
+          <div className={styles.empty}>No referral commission events yet.</div>
+        ) : (
           <div className={styles.tableWrap}>
             <table>
-              <thead><tr><th>Receiver</th><th>Source</th><th>Level</th><th>Eligible base</th><th>Rate</th><th>Commission</th><th>Status</th></tr></thead>
-              <tbody>{events.map((event) => (
-                <tr key={event.id}>
-                  <td><strong>@{event.receiverUsername ?? event.receiverUserId}</strong><small>{event.receiverEmail ?? "—"}</small></td>
-                  <td>{event.sourcePackageDisplayName ?? "Package"}<small>@{event.purchaserUsername ?? event.purchaserUserId}</small></td>
-                  <td>L{event.level}</td>
-                  <td>{amountLabel(event.eligibleBase, event.currency)}</td>
-                  <td>{event.ratePercent}%</td>
-                  <td>{amountLabel(event.commissionAmount, event.currency)}</td>
-                  <td><span className={event.status === "AVAILABLE" ? styles.goodBadge : styles.neutralBadge}>{event.status}</span></td>
+              <thead>
+                <tr>
+                  <th>Receiver</th>
+                  <th>Source</th>
+                  <th>Level</th>
+                  <th>Eligible base</th>
+                  <th>Rate</th>
+                  <th>Commission</th>
+                  <th>Status</th>
                 </tr>
-              ))}</tbody>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id}>
+                    <td>
+                      <strong>
+                        @{event.receiverUsername ?? event.receiverUserId}
+                      </strong>
+                      <small>{event.receiverEmail ?? "—"}</small>
+                    </td>
+                    <td>
+                      {event.sourcePackageDisplayName ?? "Package"}
+                      <small>
+                        @{event.purchaserUsername ?? event.purchaserUserId}
+                      </small>
+                    </td>
+                    <td>L{event.level}</td>
+                    <td>{amountLabel(event.eligibleBase, event.currency)}</td>
+                    <td>{event.ratePercent}%</td>
+                    <td>{amountLabel(event.commissionAmount, event.currency)}</td>
+                    <td>
+                      <span
+                        className={
+                          event.status === "AVAILABLE"
+                            ? styles.goodBadge
+                            : styles.neutralBadge
+                        }
+                      >
+                        {event.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         )}
