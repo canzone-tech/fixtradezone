@@ -366,8 +366,20 @@ export default function CommissionsClient() {
   return (
     <div className={styles.page}>
       <div className={styles.flashStack}>
-        {error ? <FlashMessage type="error" message={error} /> : null}
-        {success ? <FlashMessage type="success" message={success} /> : null}
+        {error ? (
+          <FlashMessage
+            type="error"
+            message={error}
+            onClose={() => setError(null)}
+          />
+        ) : null}
+        {success ? (
+          <FlashMessage
+            type="success"
+            message={success}
+            onClose={() => setSuccess(null)}
+          />
+        ) : null}
         {dirty ? (
           <div className={styles.unsavedBanner}>
             <strong>UNSAVED COMMISSION DRAFT CHANGES</strong>
