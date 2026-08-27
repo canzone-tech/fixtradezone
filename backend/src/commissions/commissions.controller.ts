@@ -10,18 +10,10 @@ export class CommissionsController {
 
   @Get('me')
   @Header('Cache-Control', 'no-store')
-  async getMyCommissions(
+  getMyCommissions(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: CommissionPageQueryDto,
   ) {
-    const result = await this.commissionsService.getMyCommissions(user.id, query);
-
-    return {
-      ...result,
-      events: result.events.map(
-        ({ purchaserEmail: _purchaserEmail, receiverEmail: _receiverEmail, ...event }) =>
-          event,
-      ),
-    };
+    return this.commissionsService.getMyCommissions(user.id, query);
   }
 }
