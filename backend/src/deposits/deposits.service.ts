@@ -501,6 +501,15 @@ export class DepositsService {
         );
       }
 
+      if (
+        plan.activationTrigger !== 'PAYMENT_APPROVED' &&
+        plan.activationTrigger !== 'MANUAL_ACTIVATION'
+      ) {
+        throw new BadRequestException(
+          `Package activation trigger ${plan.activationTrigger} is not available for deposit-funded activation yet.`,
+        );
+      }
+
       const rail = await transaction.depositPaymentRail.findFirst({
         where: {
           id: dto.paymentRailId,

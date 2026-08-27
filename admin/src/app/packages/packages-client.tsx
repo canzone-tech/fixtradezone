@@ -244,6 +244,26 @@ export default function PackagesClient() {
     [plan, selectedItemId],
   );
 
+  const settingsDirty = useMemo(() => {
+    if (!plan || !settings || plan.status !== "DRAFT") {
+      return false;
+    }
+
+    return JSON.stringify(settings) !== JSON.stringify(settingsFromPlan(plan));
+  }, [plan, settings]);
+
+  const itemDirty = useMemo(() => {
+    if (!plan || !selectedItem || !itemForm || plan.status !== "DRAFT") {
+      return false;
+    }
+
+    return (
+      JSON.stringify(itemForm) !== JSON.stringify(itemFromPlan(selectedItem))
+    );
+  }, [itemForm, plan, selectedItem]);
+
+  const hasUnsavedDraftChanges = settingsDirty || itemDirty;
+
   function applyPlan(nextPlan: PackagePlan) {
     setPlan(nextPlan);
     setSelectedPlanId(nextPlan.id);
@@ -400,6 +420,14 @@ export default function PackagesClient() {
       return;
     }
 
+    if (hasUnsavedDraftChanges) {
+      setSuccess("");
+      setError(
+        "Unsaved draft changes detected. Save the draft before switching plan versions.",
+      );
+      return;
+    }
+
     setLoadingPlan(true);
     setError("");
     setSuccess("");
@@ -417,6 +445,14 @@ export default function PackagesClient() {
   }
 
   function selectItem(item: PackagePlanItem) {
+    if (item.id !== selectedItemId && itemDirty) {
+      setSuccess("");
+      setError(
+        "Unsaved package-item changes detected. Save the current package item before switching.",
+      );
+      return;
+    }
+
     setSelectedItemId(item.id);
     setItemForm(itemFromPlan(item));
     setItemReason("");
@@ -594,6 +630,14 @@ export default function PackagesClient() {
       return;
     }
 
+    if (hasUnsavedDraftChanges) {
+      setSuccess("");
+      setError(
+        "Publication blocked: save all draft changes before publishing this package plan.",
+      );
+      return;
+    }
+
     const effectiveFrom = utcInputToIso(publishFrom);
     const effectiveTo = utcInputToIso(publishTo);
 
@@ -683,7 +727,7 @@ export default function PackagesClient() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <span>PKG-01 FOUNDATION</span>
+          <span>PKG-02 / ACTIVATION POLICY</span>
           <h2>Package Plan Control</h2>
           <p>
             Review exact USDT terms, manage one audited draft and publish a
@@ -692,15 +736,45 @@ export default function PackagesClient() {
         </div>
 
         <div className={styles.headerBadges}>
-          <span className={styles.boundaryBadge}>ACTIVATION DEFERRED</span>
+          <span className={styles.boundaryBadge}>
+            {plan?.activationTrigger === "PAYMENT_APPROVED"
+              ? "AUTO ACTIVATION"
+              : plan?.activationTrigger === "MANUAL_ACTIVATION"
+                ? "MANUAL ACTIVATION"
+                : "ENGINE DEFERRED"}
+          </span>
           <span className={styles.roleBadge}>
             {isSuperAdmin ? "SUPER_ADMIN" : "DELEGATED ADMIN"}
           </span>
         </div>
       </header>
 
-      {error ? <div className={styles.errorBanner}>{error}</div> : null}
-      {success ? <div className={styles.successBanner}>{success}</div> : null}
+      {error ||
+      success ||
+      (plan?.status === "DRAFT" && hasUnsavedDraftChanges) ? (
+        <div
+          className={styles.flashStack}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {error ? <div className={styles.errorBanner}>{error}</div> : null}
+
+          {success ? (
+            <div className={styles.successBanner}>{success}</div>
+          ) : null}
+
+          {plan?.status === "DRAFT" && hasUnsavedDraftChanges ? (
+            <div className={styles.unsavedBanner}>
+              <strong>UNSAVED DRAFT CHANGES</strong>
+              <span>
+                {settingsDirty ? " Lifecycle settings changed." : ""}
+                {itemDirty ? " Package-item terms changed." : ""} Save before
+                switching versions or publishing.
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className={styles.workspace}>
         <aside className={styles.versionPanel}>
@@ -740,9 +814,11 @@ export default function PackagesClient() {
           <div className={styles.guardrail}>
             <i className="iconoir-shield-check" />
             <div>
-              <strong>Ledger-safe boundary</strong>
+              <strong>Ledger-safe activation boundary</strong>
               <p>
-                No purchase, activation, balance or earning mutation exists.
+                Package funding uses the audited deposit, accounting and
+                subscription workflow. Reward and commission engines remain
+                separate downstream modules.
               </p>
             </div>
           </div>
@@ -844,6 +920,26 @@ export default function PackagesClient() {
                         setSettings({ ...settings, activationTrigger: value })
                       }
                     />
+                    <div className={styles.guardrail}>
+                      <i className="iconoir-shield-check" />
+                      <div>
+                        <strong>
+                          {settings.activationTrigger === "PAYMENT_APPROVED"
+                            ? "Automatic activation after accounting"
+                            : settings.activationTrigger === "MANUAL_ACTIVATION"
+                              ? "Authorized manual activation"
+                              : "Activation engine deferred"}
+                        </strong>
+                        <p>
+                          {settings.activationTrigger === "PAYMENT_APPROVED"
+                            ? "Approved payment is posted to accounting first, then the purchased package activates automatically and idempotently."
+                            : settings.activationTrigger === "MANUAL_ACTIVATION"
+                              ? "Approved payment is posted to accounting first, then an authorized operator completes package activation."
+                              : "This trigger may be stored in a future plan, but new deposit funding is blocked until its dedicated engine is implemented."}
+                        </p>
+                      </div>
+                    </div>
+
                     <SelectField
                       label="Migration mode"
                       value={settings.migrationMode}
@@ -922,7 +1018,11 @@ export default function PackagesClient() {
                           busy !== "" || settingsReason.trim().length < 3
                         }
                       >
-                        {busy === "settings" ? "Saving…" : "Save plan settings"}
+                        {busy === "settings"
+                          ? "Saving…"
+                          : settingsDirty
+                            ? "Save plan settings · UNSAVED"
+                            : "Save plan settings"}
                       </button>
                     </div>
                   ) : null}
@@ -1325,12 +1425,16 @@ export default function PackagesClient() {
                         <button
                           type="submit"
                           disabled={
-                            busy !== "" || publishReason.trim().length < 3
+                            busy !== "" ||
+                            publishReason.trim().length < 3 ||
+                            hasUnsavedDraftChanges
                           }
                         >
                           {busy === "publish"
                             ? "Publishing…"
-                            : "Publish atomically"}
+                            : hasUnsavedDraftChanges
+                              ? "Save draft changes before publishing"
+                              : "Publish atomically"}
                         </button>
                       </form>
                     )}

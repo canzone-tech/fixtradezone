@@ -183,7 +183,14 @@ describe('PackagesService', () => {
       new Date('2026-08-25T01:00:00.000Z'),
     );
 
-    expect(result.catalogueAvailable).toBe(true);
+    expect(result).toMatchObject({
+      catalogueAvailable: true,
+      activationAvailable: true,
+      reason: 'PACKAGE_ACTIVATION_AVAILABLE',
+      plan: {
+        activationTrigger: 'PAYMENT_APPROVED',
+      },
+    });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       price: '5.00000000',
@@ -191,6 +198,54 @@ describe('PackagesService', () => {
       capMultiplier: '2.0000',
       maximumTotalReturn: '10.00000000',
       maximumProfit: '5.00000000',
+    });
+  });
+
+  it('exposes MANUAL_ACTIVATION as a live deposit-funded activation mode', async () => {
+    prisma.packagePlanVersion.findMany.mockResolvedValue([
+      packagePlan({
+        status: 'PUBLISHED',
+        activationTrigger: 'MANUAL_ACTIVATION',
+        effectiveFrom: new Date('2026-08-25T00:00:00.000Z'),
+        publishedAt: new Date('2026-08-25T00:00:00.000Z'),
+      }),
+    ]);
+
+    const result = await service.getEffectiveCatalogue(
+      new Date('2026-08-25T01:00:00.000Z'),
+    );
+
+    expect(result).toMatchObject({
+      catalogueAvailable: true,
+      activationAvailable: true,
+      reason: 'PACKAGE_ACTIVATION_AVAILABLE',
+      plan: {
+        activationTrigger: 'MANUAL_ACTIVATION',
+      },
+    });
+  });
+
+  it('keeps unsupported activation engines visible but blocks new funding', async () => {
+    prisma.packagePlanVersion.findMany.mockResolvedValue([
+      packagePlan({
+        status: 'PUBLISHED',
+        activationTrigger: 'RULE_BASED',
+        effectiveFrom: new Date('2026-08-25T00:00:00.000Z'),
+        publishedAt: new Date('2026-08-25T00:00:00.000Z'),
+      }),
+    ]);
+
+    const result = await service.getEffectiveCatalogue(
+      new Date('2026-08-25T01:00:00.000Z'),
+    );
+
+    expect(result).toMatchObject({
+      catalogueAvailable: true,
+      activationAvailable: false,
+      reason: 'PACKAGE_ACTIVATION_ENGINE_DEFERRED',
+      plan: {
+        activationTrigger: 'RULE_BASED',
+      },
     });
   });
 

@@ -9,6 +9,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import type { PackageActivationTrigger } from '../packages/packages.constants';
 import {
   depositCreditSourceKey,
   packageActivationSourceKey,
@@ -26,6 +27,11 @@ const MAX_SERIALIZABLE_ATTEMPTS = 3;
 type DecimalValue = Prisma.Decimal | number | string;
 type SubscriptionAuditOperation =
   (typeof SUBSCRIPTION_AUDIT_OPERATIONS)[keyof typeof SUBSCRIPTION_AUDIT_OPERATIONS];
+
+type SupportedPackageActivationTrigger = Extract<
+  PackageActivationTrigger,
+  'PAYMENT_APPROVED' | 'MANUAL_ACTIVATION'
+>;
 
 interface CountRow {
   total: bigint | number | string;
@@ -125,6 +131,8 @@ interface ActivationPendingRow {
   currency: string;
   reviewedAt: Date | null;
   accountingTransactionId: string;
+  activePackageMode: string;
+  activationTrigger: string;
 }
 
 @Injectable()
@@ -228,9 +236,13 @@ export class SubscriptionsService {
         d.amount,
         d.currency,
         d.reviewedAt,
-        credit.id AS accountingTransactionId
+        credit.id AS accountingTransactionId,
+        ppv.activePackageMode,
+        ppv.activationTrigger
       FROM deposits d
       INNER JOIN users u ON u.id = d.userId
+      INNER JOIN package_plan_versions ppv
+        ON ppv.id = d.packagePlanVersionId
       INNER JOIN ledger_transactions credit
         ON credit.sourceKey = CONCAT('DEPOSIT:', d.id, ':CREDIT')
       LEFT JOIN user_package_subscriptions ups
@@ -267,6 +279,9 @@ export class SubscriptionsService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
     operation: SubscriptionAuditOperation = SUBSCRIPTION_AUDIT_OPERATIONS.ACTIVATE_FROM_DEPOSIT,
+    allowedTriggers: readonly SupportedPackageActivationTrigger[] = [
+      'PAYMENT_APPROVED',
+    ],
   ) {
     return this.runSerializable(async (transaction) => {
       await transaction.$queryRaw(Prisma.sql`
@@ -350,9 +365,13 @@ export class SubscriptionsService {
           'Deposit amount/currency does not match its immutable package source.',
         );
       }
-      if (planItem.planVersion.activationTrigger !== 'PAYMENT_APPROVED') {
+      if (
+        !allowedTriggers.some(
+          (trigger) => trigger === planItem.planVersion.activationTrigger,
+        )
+      ) {
         throw new ConflictException(
-          `Package plan activation trigger ${planItem.planVersion.activationTrigger} is not supported by SUB-01 automatic payment activation.`,
+          `Package plan activation trigger ${planItem.planVersion.activationTrigger} is not allowed for ${operation}.`,
         );
       }
 
@@ -616,6 +635,86 @@ export class SubscriptionsService {
     });
   }
 
+  async activateAutomaticallyAfterAccounting(
+    depositId: string,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    const deposit = await this.prisma.deposit.findUnique({
+      where: { id: depositId },
+      select: {
+        id: true,
+        status: true,
+        packagePlanVersionId: true,
+      },
+    });
+
+    if (!deposit) {
+      throw new NotFoundException('Deposit was not found.');
+    }
+
+    if (deposit.status !== 'APPROVED') {
+      throw new ConflictException(
+        'Only an approved deposit may be evaluated for package activation.',
+      );
+    }
+
+    const planVersion = await this.prisma.packagePlanVersion.findUnique({
+      where: { id: deposit.packagePlanVersionId },
+      select: {
+        id: true,
+        activePackageMode: true,
+        activationTrigger: true,
+      },
+    });
+
+    if (!planVersion) {
+      throw new ConflictException(
+        'Deposit package plan version no longer exists.',
+      );
+    }
+
+    if (planVersion.activationTrigger === 'MANUAL_ACTIVATION') {
+      return {
+        activationMode: 'MANUAL' as const,
+        activationTrigger: planVersion.activationTrigger,
+        activePackageMode: planVersion.activePackageMode,
+        activationApplied: false,
+        activationRequired: true,
+        message:
+          'Deposit accounting posted. Package is configured for authorized manual activation.',
+      };
+    }
+
+    if (planVersion.activationTrigger !== 'PAYMENT_APPROVED') {
+      return {
+        activationMode: 'DEFERRED' as const,
+        activationTrigger: planVersion.activationTrigger,
+        activePackageMode: planVersion.activePackageMode,
+        activationApplied: false,
+        activationRequired: true,
+        message: `Package activation trigger ${planVersion.activationTrigger} requires its dedicated rule engine.`,
+      };
+    }
+
+    const activation = await this.activateFromApprovedDeposit(
+      depositId,
+      actor,
+      context,
+      SUBSCRIPTION_AUDIT_OPERATIONS.AUTO_ACTIVATE_AFTER_ACCOUNTING,
+      ['PAYMENT_APPROVED'],
+    );
+
+    return {
+      activationMode: 'AUTO' as const,
+      activationTrigger: planVersion.activationTrigger,
+      activePackageMode: planVersion.activePackageMode,
+      activationApplied: true,
+      activationRequired: false,
+      ...activation,
+    };
+  }
+
   async reconcileActivation(
     depositId: string,
     actor: AuthenticatedUser,
@@ -626,6 +725,7 @@ export class SubscriptionsService {
       actor,
       context,
       SUBSCRIPTION_AUDIT_OPERATIONS.RECONCILE_ACTIVATION,
+      ['PAYMENT_APPROVED', 'MANUAL_ACTIVATION'],
     );
   }
 

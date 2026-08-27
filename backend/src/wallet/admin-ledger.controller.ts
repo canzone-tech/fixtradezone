@@ -14,6 +14,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AdminLedgerQueryDto } from './dto/wallet.dto';
 import { WalletLedgerService } from './wallet-ledger.service';
 
@@ -40,20 +41,37 @@ export class AdminLedgerController {
 
 @Controller('admin/deposits')
 export class AdminDepositAccountingController {
-  constructor(private readonly walletLedgerService: WalletLedgerService) {}
+  constructor(
+    private readonly walletLedgerService: WalletLedgerService,
+    private readonly subscriptionsService: SubscriptionsService,
+  ) {}
 
   @Post(':depositId/post-accounting')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.LEDGER_POST)
-  postApprovedDeposit(
+  async postApprovedDeposit(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.walletLedgerService.reconcileApprovedDeposit(
+    const context = getRequestContext(request);
+
+    const accounting = await this.walletLedgerService.reconcileApprovedDeposit(
       depositId,
       actor,
-      getRequestContext(request),
+      context,
     );
+
+    const packageActivation =
+      await this.subscriptionsService.activateAutomaticallyAfterAccounting(
+        depositId,
+        actor,
+        context,
+      );
+
+    return {
+      ...accounting,
+      packageActivation,
+    };
   }
 }

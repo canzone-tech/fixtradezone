@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
+import { enumLabel } from "@/lib/packages";
 import styles from "./subscriptions.module.css";
 
 type SubscriptionStatus = "ACTIVE" | "COMPLETED" | "SUPERSEDED" | "CANCELLED";
@@ -38,6 +39,8 @@ interface PendingActivation {
   currency: string;
   reviewedAt: string | null;
   accountingTransactionId: string;
+  activePackageMode: string;
+  activationTrigger: string;
 }
 
 interface ListResponse {
@@ -71,6 +74,16 @@ function dateLabel(value: string | null) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function activationActionEnabled(trigger: string) {
+  return trigger === "MANUAL_ACTIVATION" || trigger === "PAYMENT_APPROVED";
+}
+
+function activationActionLabel(trigger: string) {
+  if (trigger === "MANUAL_ACTIVATION") return "Activate package";
+  if (trigger === "PAYMENT_APPROVED") return "Reconcile activation";
+  return "Awaiting activation engine";
 }
 
 async function fetchSubscriptionSnapshot(): Promise<SubscriptionSnapshot> {
@@ -167,8 +180,7 @@ export default function SubscriptionsClient() {
         { method: "POST" },
       );
       const payload = (await response.json().catch(() => ({}))) as
-        | { message?: string }
-        | ApiError;
+        { message?: string } | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(payload as ApiError, "Package activation failed."),
@@ -212,8 +224,8 @@ export default function SubscriptionsClient() {
           <span>SUB-01 / PACKAGE LIFECYCLE</span>
           <h1>Subscriptions</h1>
           <p>
-            Reconcile accounted payments into immutable package activations and
-            inspect the exact package snapshot retained for each USER.
+            Manage policy-driven package activations and inspect the exact
+            immutable package snapshot retained for each USER.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>
@@ -225,7 +237,9 @@ export default function SubscriptionsClient() {
         <article>
           <small>Activation Pending</small>
           <strong>{pending.length}</strong>
-          <span>Approved + accounted, not yet activated</span>
+          <span>
+            Approved + accounted, waiting on configured activation policy
+          </span>
         </article>
         <article>
           <small>Subscriptions</small>
@@ -248,8 +262,9 @@ export default function SubscriptionsClient() {
             <h2>Activation Pending</h2>
           </div>
           <small>
-            Manual action calls the same idempotent activation service used by
-            automatic approval orchestration.
+            MANUAL_ACTIVATION is an intentional operator step. PAYMENT_APPROVED
+            entries here are recovery cases. Rule-driven triggers remain
+            disabled until their dedicated activation engine is implemented.
           </small>
         </div>
 
@@ -264,6 +279,10 @@ export default function SubscriptionsClient() {
                     {item.username} · {item.packageDisplayName}
                   </strong>
                   <span>{item.email ?? item.userId}</span>
+                  <small>
+                    {enumLabel(item.activePackageMode)} ·{" "}
+                    {enumLabel(item.activationTrigger)}
+                  </small>
                 </div>
                 <div>
                   <small>Principal</small>
@@ -277,12 +296,15 @@ export default function SubscriptionsClient() {
                 </div>
                 <button
                   type="button"
-                  disabled={busyDepositId === item.depositId}
+                  disabled={
+                    busyDepositId === item.depositId ||
+                    !activationActionEnabled(item.activationTrigger)
+                  }
                   onClick={() => void reconcile(item.depositId)}
                 >
                   {busyDepositId === item.depositId
                     ? "Activating…"
-                    : "Reconcile activation"}
+                    : activationActionLabel(item.activationTrigger)}
                 </button>
               </article>
             ))}
@@ -313,6 +335,8 @@ export default function SubscriptionsClient() {
                   <th>PACKAGE</th>
                   <th>PRINCIPAL</th>
                   <th>STATUS</th>
+                  <th>PACKAGE MODE</th>
+                  <th>ACTIVATION</th>
                   <th>ACTIVATED</th>
                   <th>SCHEDULED END</th>
                   <th>SOURCE DEPOSIT</th>
@@ -335,6 +359,8 @@ export default function SubscriptionsClient() {
                     <td>
                       <span className={styles.status}>{item.status}</span>
                     </td>
+                    <td>{enumLabel(item.activePackageMode)}</td>
+                    <td>{enumLabel(item.activationTrigger)}</td>
                     <td>{dateLabel(item.activatedAt)}</td>
                     <td>{dateLabel(item.scheduledEndAt)}</td>
                     <td className={styles.mono}>{item.sourceDepositId}</td>

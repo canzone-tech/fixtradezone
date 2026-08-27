@@ -101,10 +101,17 @@ function deposit(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function packagePlan() {
+function packagePlan(
+  activationTrigger:
+    | 'PAYMENT_APPROVED'
+    | 'MANUAL_ACTIVATION'
+    | 'RULE_BASED'
+    | 'PAYMENT_SUBMITTED' = 'PAYMENT_APPROVED',
+) {
   return [
     {
       id: PLAN_ID,
+      activationTrigger,
       items: [
         {
           id: ITEM_ID,
@@ -194,6 +201,50 @@ describe('DepositsService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(transaction.packagePlanVersion.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects deposit funding when the configured activation engine is not live', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(
+      packagePlan('RULE_BASED'),
+    );
+
+    await expect(
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Package activation trigger RULE_BASED is not available for deposit-funded activation yet.',
+    );
+
+    expect(transaction.depositPaymentRail.findFirst).not.toHaveBeenCalled();
+    expect(transaction.depositAccount.findMany).not.toHaveBeenCalled();
+    expect(transaction.deposit.create).not.toHaveBeenCalled();
+  });
+
+  it('allows deposit funding for authorized manual package activation', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(
+      packagePlan('MANUAL_ACTIVATION'),
+    );
+    transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
+    transaction.depositAccount.findMany.mockResolvedValue([account]);
+    transaction.deposit.create.mockResolvedValue(deposit());
+    transaction.auditLog.create.mockResolvedValue({});
+
+    await expect(
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).resolves.toMatchObject({
+      deposit: {
+        id: DEPOSIT_ID,
+        status: 'AWAITING_TXID',
+      },
+    });
+
+    expect(transaction.depositPaymentRail.findFirst).toHaveBeenCalled();
+    expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a payment rail that does not match the package currency', async () => {

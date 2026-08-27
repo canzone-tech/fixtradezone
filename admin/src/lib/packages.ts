@@ -162,8 +162,11 @@ export interface PackagePlan extends Omit<PackagePlanSummary, "itemCount"> {
 
 export interface PackageCatalogue {
   catalogueAvailable: boolean;
-  activationAvailable: false;
-  reason: "NO_EFFECTIVE_PUBLISHED_PLAN" | "PACKAGE_ACTIVATION_DEFERRED";
+  activationAvailable: boolean;
+  reason:
+    | "NO_EFFECTIVE_PUBLISHED_PLAN"
+    | "PACKAGE_ACTIVATION_AVAILABLE"
+    | "PACKAGE_ACTIVATION_ENGINE_DEFERRED";
   plan: Omit<
     PackagePlan,
     | "status"

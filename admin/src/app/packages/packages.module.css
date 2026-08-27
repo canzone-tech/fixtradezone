@@ -97,12 +97,22 @@
   background: rgba(91, 55, 6, 0.35);
 }
 
+.flashStack {
+  position: sticky;
+  top: calc(var(--ftz-topbar) + 10px);
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+}
+
 .errorBanner,
-.successBanner {
+.successBanner,
+.unsavedBanner {
   padding: 13px 16px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 700;
+  backdrop-filter: blur(14px);
 }
 
 .errorBanner {
@@ -115,6 +125,21 @@
   border: 1px solid rgba(20, 229, 154, 0.35);
   color: #65f3bb;
   background: rgba(11, 81, 61, 0.35);
+}
+
+.unsavedBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 184, 71, 0.42);
+  color: #ffd994;
+  background: rgba(91, 55, 6, 0.74);
+}
+
+.unsavedBanner strong {
+  flex: 0 0 auto;
+  color: #ffc868;
+  letter-spacing: 0.04em;
 }
 
 .workspace {

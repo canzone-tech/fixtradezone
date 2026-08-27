@@ -7,9 +7,7 @@ import type { AdminUser } from "@/lib/auth";
 import PlatformSettingsNav from "../platform-settings-nav";
 import styles from "../platform-configuration.module.css";
 
-type DepositPostingMode =
-  | "AUTO_ON_APPROVAL"
-  | "MANUAL_RECONCILIATION";
+type DepositPostingMode = "AUTO_ON_APPROVAL" | "MANUAL_RECONCILIATION";
 
 interface AccountingConfiguration {
   depositPostingMode: DepositPostingMode;
@@ -33,8 +31,7 @@ export default function AccountingConfigurationClient() {
   const [saving, setSaving] = useState(false);
   const [savedMode, setSavedMode] =
     useState<DepositPostingMode>("AUTO_ON_APPROVAL");
-  const [mode, setMode] =
-    useState<DepositPostingMode>("AUTO_ON_APPROVAL");
+  const [mode, setMode] = useState<DepositPostingMode>("AUTO_ON_APPROVAL");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -63,8 +60,7 @@ export default function AccountingConfigurationClient() {
           cache: "no-store",
         });
         const payload = (await response.json().catch(() => ({}))) as
-          | AccountingConfiguration
-          | ApiError;
+          AccountingConfiguration | ApiError;
 
         if (response.status === 401) {
           router.replace("/login");
@@ -118,8 +114,7 @@ export default function AccountingConfigurationClient() {
         body: JSON.stringify({ depositPostingMode: mode }),
       });
       const payload = (await response.json().catch(() => ({}))) as
-        | AccountingConfiguration
-        | ApiError;
+        AccountingConfiguration | ApiError;
 
       if (response.status === 401) {
         router.replace("/login");
@@ -197,8 +192,10 @@ export default function AccountingConfigurationClient() {
           </div>
           <h2>Deposit Accounting</h2>
           <p>
-            Select one posting mode for approved deposits. The modes are
-            mutually exclusive and apply only to future approvals.
+            Select the ledger-posting mode for approved deposits. This is
+            independent from package activation policy: accounting may be
+            automatic or manual, while each package plan separately controls
+            AUTO or authorized MANUAL activation.
           </p>
         </div>
 
@@ -257,7 +254,9 @@ export default function AccountingConfigurationClient() {
           <strong>SUPER_ADMIN only · audited</strong>
           <p>
             Changing this policy never rewrites or reposts existing immutable
-            ledger transactions. The selected mode applies to future approvals.
+            ledger transactions. Package activation mode is configured
+            separately in Package Plan Control and is preserved by each
+            deposit&apos;s source plan snapshot.
           </p>
         </div>
         <div className={styles.actions}>

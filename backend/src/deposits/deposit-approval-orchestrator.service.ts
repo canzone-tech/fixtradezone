@@ -77,11 +77,25 @@ export class DepositApprovalOrchestratorService {
 
     try {
       const activation =
-        await this.subscriptionsService.activateFromApprovedDeposit(
+        await this.subscriptionsService.activateAutomaticallyAfterAccounting(
           depositId,
           actor,
           context,
         );
+
+      if (activation.activationMode !== 'AUTO') {
+        return {
+          ...approval,
+          message: activation.message,
+          accountingPostingMode: postingMode,
+          accountingPosted: true,
+          ledgerTransaction: accounting.transaction,
+          packageActivated: false,
+          packageActivationMode: activation.activationMode,
+          packageActivationTrigger: activation.activationTrigger,
+          packageActivationRequired: activation.activationRequired,
+        };
+      }
 
       return {
         ...approval,
@@ -91,6 +105,9 @@ export class DepositApprovalOrchestratorService {
         accountingPosted: true,
         ledgerTransaction: accounting.transaction,
         packageActivated: true,
+        packageActivationMode: activation.activationMode,
+        packageActivationTrigger: activation.activationTrigger,
+        packageActivationRequired: activation.activationRequired,
         subscription: activation.subscription,
       };
     } catch (error) {

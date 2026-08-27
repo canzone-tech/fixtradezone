@@ -32,7 +32,7 @@ describe('DepositApprovalOrchestratorService', () => {
     reconcileApprovedDeposit: jest.fn(),
   };
   const subscriptionsService = {
-    activateFromApprovedDeposit: jest.fn(),
+    activateAutomaticallyAfterAccounting: jest.fn(),
   };
 
   let service: DepositApprovalOrchestratorService;
@@ -47,11 +47,18 @@ describe('DepositApprovalOrchestratorService', () => {
       message: 'Approved deposit posted to Main / Deposit Balance.',
       transaction: { id: 'ledger-transaction-id' },
     });
-    subscriptionsService.activateFromApprovedDeposit.mockResolvedValue({
-      created: true,
-      message: 'Package activated.',
-      subscription: { id: 'subscription-id', status: 'ACTIVE' },
-    });
+    subscriptionsService.activateAutomaticallyAfterAccounting.mockResolvedValue(
+      {
+        activationMode: 'AUTO',
+        activationTrigger: 'PAYMENT_APPROVED',
+        activePackageMode: 'MULTIPLE_ACTIVE',
+        activationApplied: true,
+        activationRequired: false,
+        created: true,
+        message: 'Package activated.',
+        subscription: { id: 'subscription-id', status: 'ACTIVE' },
+      },
+    );
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
@@ -79,12 +86,15 @@ describe('DepositApprovalOrchestratorService', () => {
       {},
     );
     expect(
-      subscriptionsService.activateFromApprovedDeposit,
+      subscriptionsService.activateAutomaticallyAfterAccounting,
     ).toHaveBeenCalledWith(DEPOSIT_ID, actor, {});
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: true,
       packageActivated: true,
+      packageActivationMode: 'AUTO',
+      packageActivationTrigger: 'PAYMENT_APPROVED',
+      packageActivationRequired: false,
       subscription: { id: 'subscription-id', status: 'ACTIVE' },
     });
   });
@@ -103,7 +113,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
     expect(walletLedgerService.reconcileApprovedDeposit).not.toHaveBeenCalled();
     expect(
-      subscriptionsService.activateFromApprovedDeposit,
+      subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'MANUAL_RECONCILIATION',
@@ -131,7 +141,7 @@ describe('DepositApprovalOrchestratorService', () => {
       1,
     );
     expect(
-      subscriptionsService.activateFromApprovedDeposit,
+      subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
@@ -146,7 +156,7 @@ describe('DepositApprovalOrchestratorService', () => {
     accountingConfigService.getDepositPostingMode.mockResolvedValue(
       'AUTO_ON_APPROVAL',
     );
-    subscriptionsService.activateFromApprovedDeposit.mockRejectedValue(
+    subscriptionsService.activateAutomaticallyAfterAccounting.mockRejectedValue(
       new Error('This plan allows only one active package for the USER.'),
     );
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
+import { enumLabel } from "@/lib/packages";
 import styles from "./user-subscriptions-panel.module.css";
 
 interface Subscription {
@@ -11,6 +12,9 @@ interface Subscription {
   packageDisplayName: string;
   price: string;
   currency: string;
+  activePackageMode: string;
+  multipleActivePackageBasis: string;
+  activationTrigger: string;
   status: string;
   activatedAt: string;
   scheduledEndAt: string;
@@ -113,8 +117,8 @@ export default function UserSubscriptionsPanel() {
 
       <div className={styles.header}>
         <div>
-          <span>SUB-01 / MY PACKAGE</span>
-          <h3>My Active Package</h3>
+          <span>SUB-02 / MY PACKAGES</span>
+          <h3>My Active Packages</h3>
           <p>
             Activated package principal is held in package accounting and is no
             longer part of freely available Main / Deposit balance.
@@ -129,10 +133,10 @@ export default function UserSubscriptionsPanel() {
         <div className={styles.empty}>
           <i className="iconoir-box" />
           <div>
-            <strong>No active package</strong>
+            <strong>No active packages</strong>
             <span>
-              An eligible approved and accounted payment activates its package
-              through the audited subscription workflow.
+              Package activation follows the exact policy snapshot of the
+              published plan used for the payment.
             </span>
           </div>
         </div>
@@ -165,6 +169,14 @@ export default function UserSubscriptionsPanel() {
               <dd>
                 {item.goalDays}d / {item.cycleDays}d
               </dd>
+            </div>
+            <div>
+              <dt>Package mode</dt>
+              <dd>{enumLabel(item.activePackageMode)}</dd>
+            </div>
+            <div>
+              <dt>Activation</dt>
+              <dd>{enumLabel(item.activationTrigger)}</dd>
             </div>
           </dl>
           <small className={styles.source}>

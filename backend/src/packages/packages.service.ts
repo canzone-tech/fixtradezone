@@ -69,10 +69,16 @@ export class PackagesService {
       };
     }
 
+    const activationAvailable =
+      plan.activationTrigger === 'PAYMENT_APPROVED' ||
+      plan.activationTrigger === 'MANUAL_ACTIVATION';
+
     return {
       catalogueAvailable: true,
-      activationAvailable: false,
-      reason: 'PACKAGE_ACTIVATION_DEFERRED' as const,
+      activationAvailable,
+      reason: activationAvailable
+        ? ('PACKAGE_ACTIVATION_AVAILABLE' as const)
+        : ('PACKAGE_ACTIVATION_ENGINE_DEFERRED' as const),
       plan: toPublicPlanSnapshot(plan),
       items: plan.items
         .filter((item) => item.availability !== 'HIDDEN')

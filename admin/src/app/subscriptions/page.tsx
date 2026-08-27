@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import SubscriptionsClient from "./subscriptions-client";
+
+export const metadata: Metadata = {
+  title: "Subscriptions | FixTradeZone",
+};
 
 export default async function SubscriptionsPage() {
   const cookieStore = await cookies();

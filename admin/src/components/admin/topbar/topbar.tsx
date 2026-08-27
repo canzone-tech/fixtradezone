@@ -14,6 +14,16 @@ const routeHeadings: Array<{
   subtitle: string;
 }> = [
   {
+    path: "/deposits",
+    title: "Deposits",
+    subtitle: "Payment rails, receiving accounts and deposit review",
+  },
+  {
+    path: "/subscriptions",
+    title: "Subscriptions",
+    subtitle: "Package activation queue and immutable lifecycle history",
+  },
+  {
     path: "/packages",
     title: "Package Plans",
     subtitle: "Versioned catalogue and publication controls",

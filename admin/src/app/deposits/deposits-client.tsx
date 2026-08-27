@@ -11,6 +11,7 @@ import {
   type DepositAccount,
   type DepositAccountMutationResponse,
   type DepositAccountsResponse,
+  type DepositAccountingResponse,
   type DepositMutationResponse,
   type DepositPaymentRail,
   type DepositPaymentRailMutationResponse,
@@ -110,9 +111,9 @@ async function fetchAdminDepositWorkspace(
   let deposits: Deposit[] = [];
 
   if (railResponse) {
-    const payload = await readJson<DepositPaymentRailsResponse & ApiMessagePayload>(
-      railResponse,
-    );
+    const payload = await readJson<
+      DepositPaymentRailsResponse & ApiMessagePayload
+    >(railResponse);
     if (!railResponse.ok || !payload) {
       throw new Error(messageFrom(payload, "Could not load payment rails."));
     }
@@ -158,16 +159,17 @@ export default function DepositsClient() {
     user !== null && hasPermission(user, "deposits.accounts.read");
   const canManageAccounts =
     user !== null && hasPermission(user, "deposits.accounts.manage");
-  const canReadDeposits =
-    user !== null && hasPermission(user, "deposits.read");
+  const canReadDeposits = user !== null && hasPermission(user, "deposits.read");
   const canReview = user !== null && hasPermission(user, "deposits.review");
+  const canPostAccounting = user !== null && hasPermission(user, "ledger.post");
 
   const activeRails = useMemo(
     () => rails.filter((rail) => rail.isActive),
     [rails],
   );
   const pendingCount = useMemo(
-    () => deposits.filter((deposit) => deposit.status === "PENDING_REVIEW").length,
+    () =>
+      deposits.filter((deposit) => deposit.status === "PENDING_REVIEW").length,
     [deposits],
   );
 
@@ -253,7 +255,9 @@ export default function DepositsClient() {
       await reloadWorkspace();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not create payment rail.",
+        caught instanceof Error
+          ? caught.message
+          : "Could not create payment rail.",
       );
     } finally {
       setBusy(null);
@@ -271,16 +275,19 @@ export default function DepositsClient() {
     setNotice(null);
 
     try {
-      const response = await fetch(`/api/admin/deposit-payment-rails/${rail.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expectedRevision: rail.revision,
-          displayName: String(formData.get("displayName") ?? ""),
-          isActive: formData.get("isActive") === "on",
-          reason: String(formData.get("reason") ?? ""),
-        }),
-      });
+      const response = await fetch(
+        `/api/admin/deposit-payment-rails/${rail.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expectedRevision: rail.revision,
+            displayName: String(formData.get("displayName") ?? ""),
+            isActive: formData.get("isActive") === "on",
+            reason: String(formData.get("reason") ?? ""),
+          }),
+        },
+      );
       const payload = await readJson<
         DepositPaymentRailMutationResponse & ApiMessagePayload
       >(response);
@@ -292,7 +299,9 @@ export default function DepositsClient() {
       await reloadWorkspace();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not update payment rail.",
+        caught instanceof Error
+          ? caught.message
+          : "Could not update payment rail.",
       );
     } finally {
       setBusy(null);
@@ -332,7 +341,9 @@ export default function DepositsClient() {
         DepositAccountMutationResponse & ApiMessagePayload
       >(response);
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not create deposit account."));
+        throw new Error(
+          messageFrom(payload, "Could not create deposit account."),
+        );
       }
 
       form.reset();
@@ -371,16 +382,21 @@ export default function DepositsClient() {
         body.qrCodeDataUrl = await fileToDataUrl(qrFile);
       }
 
-      const response = await fetch(`/api/admin/deposit-accounts/${account.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(
+        `/api/admin/deposit-accounts/${account.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
       const payload = await readJson<
         DepositAccountMutationResponse & ApiMessagePayload
       >(response);
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not update deposit account."));
+        throw new Error(
+          messageFrom(payload, "Could not update deposit account."),
+        );
       }
 
       setNotice(payload.message);
@@ -396,10 +412,51 @@ export default function DepositsClient() {
     }
   }
 
-  async function reviewDeposit(
-    deposit: Deposit,
-    action: "approve" | "reject",
-  ) {
+  async function postAccounting(deposit: Deposit) {
+    setBusy(`accounting-${deposit.id}`);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/deposits/${deposit.id}/post-accounting`,
+        { method: "POST" },
+      );
+
+      const payload = await readJson<DepositAccountingResponse>(response);
+
+      if (!response.ok || !payload) {
+        throw new Error(
+          messageFrom(payload, "Could not post deposit accounting."),
+        );
+      }
+
+      const accountingMessage = messageFrom(
+        payload,
+        "Deposit accounting completed.",
+      );
+
+      const activationMessage = payload.packageActivation?.message;
+
+      setNotice(
+        activationMessage
+          ? `${accountingMessage} ${activationMessage}`
+          : accountingMessage,
+      );
+
+      await reloadWorkspace();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not post deposit accounting.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function reviewDeposit(deposit: Deposit, action: "approve" | "reject") {
     const note = (reviewNotes[deposit.id] ?? "").trim();
     if (note.length < 3) {
       setError("A review note of at least 3 characters is required.");
@@ -418,19 +475,33 @@ export default function DepositsClient() {
           body: JSON.stringify({ note }),
         },
       );
-      const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
-        response,
-      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
       if (!response.ok || !payload) {
         throw new Error(messageFrom(payload, `Could not ${action} deposit.`));
       }
 
       setReviewNotes((current) => ({ ...current, [deposit.id]: "" }));
-      setNotice(payload.message);
+
+      const policyResult =
+        action === "approve" && payload.packageActivationMode
+          ? ` Package activation: ${payload.packageActivationMode
+              .split("_")
+              .join(" ")}${
+              payload.packageActivationTrigger
+                ? ` · ${payload.packageActivationTrigger.split("_").join(" ")}`
+                : ""
+            }.`
+          : "";
+
+      setNotice(`${payload.message}${policyResult}`);
       await reloadWorkspace();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : `Could not ${action} deposit.`,
+        caught instanceof Error
+          ? caught.message
+          : `Could not ${action} deposit.`,
       );
     } finally {
       setBusy(null);
@@ -444,10 +515,10 @@ export default function DepositsClient() {
           <p className={styles.eyebrow}>DEP-01 / PAYMENT RAILS</p>
           <h1>Deposit Operations</h1>
           <p>
-            Configure supported asset/network rails first, attach public receiving
-            accounts to those rails, then review submitted transaction IDs. Network
-            validation is protocol-profile driven; account assignment stays inside
-            the USER-selected rail.
+            Configure supported asset/network rails first, attach public
+            receiving accounts to those rails, then review submitted transaction
+            IDs. Network validation is protocol-profile driven; account
+            assignment stays inside the USER-selected rail.
           </p>
         </div>
         <span className={styles.badge} data-tone="warning">
@@ -536,7 +607,8 @@ export default function DepositsClient() {
                   <label className={`${styles.field} ${styles.full}`}>
                     <span>Initial state</span>
                     <span className={styles.actions}>
-                      <input name="isActive" type="checkbox" defaultChecked /> Active
+                      <input name="isActive" type="checkbox" defaultChecked />{" "}
+                      Active
                     </span>
                   </label>
                   <div className={`${styles.actions} ${styles.full}`}>
@@ -545,12 +617,16 @@ export default function DepositsClient() {
                       type="submit"
                       disabled={busy === "create-rail"}
                     >
-                      {busy === "create-rail" ? "Creating…" : "Create payment rail"}
+                      {busy === "create-rail"
+                        ? "Creating…"
+                        : "Create payment rail"}
                     </button>
                   </div>
                 </form>
               ) : (
-                <div className={styles.notice}>Payment-rail management is read-only.</div>
+                <div className={styles.notice}>
+                  Payment-rail management is read-only.
+                </div>
               )}
             </div>
 
@@ -563,7 +639,9 @@ export default function DepositsClient() {
               </div>
               <div className={styles.list}>
                 {rails.length === 0 ? (
-                  <div className={styles.empty}>No payment rails configured.</div>
+                  <div className={styles.empty}>
+                    No payment rails configured.
+                  </div>
                 ) : (
                   rails.map((rail) => (
                     <div className={styles.row} key={rail.id}>
@@ -571,7 +649,8 @@ export default function DepositsClient() {
                         <div className={styles.rowTitle}>
                           <strong>{rail.displayName}</strong>
                           <small>
-                            {rail.asset} · {rail.networkCode} · {rail.validationProfile}
+                            {rail.asset} · {rail.networkCode} ·{" "}
+                            {rail.validationProfile}
                             {" · revision "}
                             {rail.revision}
                           </small>
@@ -628,7 +707,9 @@ export default function DepositsClient() {
                                 type="submit"
                                 disabled={busy === `rail-${rail.id}`}
                               >
-                                {busy === `rail-${rail.id}` ? "Saving…" : "Save rail"}
+                                {busy === `rail-${rail.id}`
+                                  ? "Saving…"
+                                  : "Save rail"}
                               </button>
                             </div>
                           </form>
@@ -653,7 +734,8 @@ export default function DepositsClient() {
               {canManageAccounts ? (
                 activeRails.length === 0 ? (
                   <div className={styles.notice}>
-                    Create or activate a payment rail before creating an account.
+                    Create or activate a payment rail before creating an
+                    account.
                   </div>
                 ) : (
                   <form className={styles.formGrid} onSubmit={createAccount}>
@@ -685,7 +767,9 @@ export default function DepositsClient() {
                       </select>
                     </div>
                     <div className={`${styles.field} ${styles.full}`}>
-                      <label htmlFor="account-address">Public receiving address</label>
+                      <label htmlFor="account-address">
+                        Public receiving address
+                      </label>
                       <input
                         className={styles.input}
                         id="account-address"
@@ -698,8 +782,8 @@ export default function DepositsClient() {
                         required
                       />
                       <small className={styles.muted}>
-                        Backend validates this address using the selected rail&apos;s
-                        protocol profile.
+                        Backend validates this address using the selected
+                        rail&apos;s protocol profile.
                       </small>
                     </div>
                     <div className={styles.field}>
@@ -727,7 +811,8 @@ export default function DepositsClient() {
                     <label className={`${styles.field} ${styles.full}`}>
                       <span>Initial state</span>
                       <span className={styles.actions}>
-                        <input name="isActive" type="checkbox" defaultChecked /> Active
+                        <input name="isActive" type="checkbox" defaultChecked />{" "}
+                        Active
                       </span>
                     </label>
                     <div className={`${styles.actions} ${styles.full}`}>
@@ -736,13 +821,17 @@ export default function DepositsClient() {
                         type="submit"
                         disabled={busy === "create-account"}
                       >
-                        {busy === "create-account" ? "Creating…" : "Create account"}
+                        {busy === "create-account"
+                          ? "Creating…"
+                          : "Create account"}
                       </button>
                     </div>
                   </form>
                 )
               ) : (
-                <div className={styles.notice}>Receiving-account management is read-only.</div>
+                <div className={styles.notice}>
+                  Receiving-account management is read-only.
+                </div>
               )}
             </div>
 
@@ -755,7 +844,9 @@ export default function DepositsClient() {
               </div>
               <div className={styles.list}>
                 {accounts.length === 0 ? (
-                  <div className={styles.empty}>No receiving accounts configured.</div>
+                  <div className={styles.empty}>
+                    No receiving accounts configured.
+                  </div>
                 ) : (
                   accounts.map((account) => (
                     <div className={styles.row} key={account.id}>
@@ -763,7 +854,8 @@ export default function DepositsClient() {
                         <div className={styles.rowTitle}>
                           <strong>{account.label}</strong>
                           <small>
-                            {account.paymentRail.displayName} · revision {account.revision}
+                            {account.paymentRail.displayName} · revision{" "}
+                            {account.revision}
                           </small>
                         </div>
                         <span
@@ -782,7 +874,9 @@ export default function DepositsClient() {
                         </div>
                         <div>
                           <small>Public address</small>
-                          <strong className={styles.mono}>{account.walletAddress}</strong>
+                          <strong className={styles.mono}>
+                            {account.walletAddress}
+                          </strong>
                         </div>
                         <div>
                           <small>Updated</small>
@@ -791,7 +885,9 @@ export default function DepositsClient() {
                       </div>
                       {canManageAccounts ? (
                         <details>
-                          <summary className={styles.muted}>Edit account</summary>
+                          <summary className={styles.muted}>
+                            Edit account
+                          </summary>
                           <form
                             className={styles.formGrid}
                             onSubmit={(event) => updateAccount(event, account)}
@@ -871,7 +967,9 @@ export default function DepositsClient() {
               <select
                 className={styles.select}
                 value={filter}
-                onChange={(event) => setFilter(event.target.value as DepositFilter)}
+                onChange={(event) =>
+                  setFilter(event.target.value as DepositFilter)
+                }
               >
                 <option value="PENDING_REVIEW">Pending review</option>
                 <option value="AWAITING_TXID">Awaiting transaction ID</option>
@@ -901,8 +999,8 @@ export default function DepositsClient() {
                   <div className={styles.rowTop}>
                     <div className={styles.rowTitle}>
                       <strong>
-                        {deposit.packageDisplayName} · {compactDecimal(deposit.amount)}{" "}
-                        {deposit.currency}
+                        {deposit.packageDisplayName} ·{" "}
+                        {compactDecimal(deposit.amount)} {deposit.currency}
                       </strong>
                       <small>
                         {deposit.user?.username ?? deposit.userId} · created{" "}
@@ -940,13 +1038,40 @@ export default function DepositsClient() {
                   </div>
                   {deposit.reviewNote ? (
                     <div className={styles.notice}>
-                      Review: {deposit.reviewNote} · {formatDate(deposit.reviewedAt)}
+                      Review: {deposit.reviewNote} ·{" "}
+                      {formatDate(deposit.reviewedAt)}
                     </div>
                   ) : null}
+                  {deposit.status === "APPROVED" && canPostAccounting ? (
+                    <div className={styles.notice}>
+                      <strong>Accounting / activation recovery</strong>
+                      <p>
+                        Posting is idempotent: an already-posted deposit is not
+                        double-credited. After accounting, package activation
+                        follows this deposit&apos;s immutable AUTO or MANUAL
+                        plan policy.
+                      </p>
+                      <div className={styles.actions}>
+                        <button
+                          className={styles.buttonSecondary}
+                          type="button"
+                          disabled={busy !== null}
+                          onClick={() => void postAccounting(deposit)}
+                        >
+                          {busy === `accounting-${deposit.id}`
+                            ? "Posting…"
+                            : "Post / reconcile accounting"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {deposit.status === "PENDING_REVIEW" && canReview ? (
                     <div className={styles.formGrid}>
                       <div className={`${styles.field} ${styles.full}`}>
-                        <label htmlFor={`review-${deposit.id}`}>Review note</label>
+                        <label htmlFor={`review-${deposit.id}`}>
+                          Review note
+                        </label>
                         <textarea
                           className={styles.textarea}
                           id={`review-${deposit.id}`}
@@ -968,7 +1093,9 @@ export default function DepositsClient() {
                           disabled={busy !== null}
                           onClick={() => void reviewDeposit(deposit, "approve")}
                         >
-                          {busy === `approve-${deposit.id}` ? "Approving…" : "Approve"}
+                          {busy === `approve-${deposit.id}`
+                            ? "Approving…"
+                            : "Approve"}
                         </button>
                         <button
                           className={styles.buttonDanger}
@@ -976,7 +1103,9 @@ export default function DepositsClient() {
                           disabled={busy !== null}
                           onClick={() => void reviewDeposit(deposit, "reject")}
                         >
-                          {busy === `reject-${deposit.id}` ? "Rejecting…" : "Reject"}
+                          {busy === `reject-${deposit.id}`
+                            ? "Rejecting…"
+                            : "Reject"}
                         </button>
                       </div>
                     </div>

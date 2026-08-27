@@ -17,6 +17,30 @@ import {
 import UserSubscriptionsPanel from "./user-subscriptions-panel";
 import styles from "./user-packages.module.css";
 
+function activationPolicyCopy(trigger: string, available: boolean) {
+  if (!available) {
+    return {
+      headline: "ACTIVATION ENGINE DEFERRED",
+      detail:
+        "This published trigger requires an activation engine that is not live yet. New funding is disabled for safety.",
+    };
+  }
+
+  if (trigger === "MANUAL_ACTIVATION") {
+    return {
+      headline: "AUTHORIZED MANUAL ACTIVATION",
+      detail:
+        "After payment approval and accounting, an authorized administrator completes package activation.",
+    };
+  }
+
+  return {
+    headline: "AUTO ACTIVATION ON APPROVAL",
+    detail:
+      "Approved and accounted payment activates the purchased package exactly once.",
+  };
+}
+
 export default function UserPackagesClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
@@ -130,6 +154,13 @@ export default function UserPackagesClient() {
     );
   }
 
+  const activationPolicy = catalogue.plan
+    ? activationPolicyCopy(
+        catalogue.plan.activationTrigger,
+        catalogue.activationAvailable,
+      )
+    : null;
+
   return (
     <UserShell session={session}>
       <div className={styles.page}>
@@ -146,8 +177,13 @@ export default function UserPackagesClient() {
           <div className={styles.headerStatus}>
             <i className="iconoir-shield-check" />
             <span>
-              <strong>PACKAGE ACTIVATION LIVE</strong>
-              <small>Approved + accounted payment activates exactly once</small>
+              <strong>
+                {activationPolicy?.headline ?? "PACKAGE ACTIVATION UNAVAILABLE"}
+              </strong>
+              <small>
+                {activationPolicy?.detail ??
+                  "No effective package activation policy is available."}
+              </small>
             </span>
           </div>
         </header>
@@ -278,19 +314,24 @@ export default function UserPackagesClient() {
                     <i className="iconoir-wallet" />
                     <span>
                       <strong>
-                        {item.availability === "AVAILABLE"
-                          ? "Fund through Deposits"
-                          : "Closed to new activation"}
+                        {item.availability !== "AVAILABLE"
+                          ? "Closed to new activation"
+                          : catalogue.activationAvailable
+                            ? activationPolicy?.headline
+                            : "Activation engine deferred"}
                       </strong>
                       <small>
-                        {item.availability === "AVAILABLE"
-                          ? "Create a deposit request for this package. Approval + accounting activates it exactly once."
-                          : "This package cannot accept a new activation under the current plan."}
+                        {item.availability !== "AVAILABLE"
+                          ? "This package cannot accept a new activation under the current plan."
+                          : catalogue.activationAvailable
+                            ? activationPolicy?.detail
+                            : "Funding is disabled until this plan's configured activation engine is available."}
                       </small>
                     </span>
                   </div>
 
-                  {item.availability === "AVAILABLE" ? (
+                  {item.availability === "AVAILABLE" &&
+                  catalogue.activationAvailable ? (
                     <Link href="/user/deposits" className={styles.depositLink}>
                       Open Deposits <i className="iconoir-arrow-right" />
                     </Link>
@@ -306,9 +347,8 @@ export default function UserPackagesClient() {
                 <p>
                   Prices, percentages and caps come directly from one effective
                   published plan version. Financial values are exact decimal
-                  strings. Each activation snapshots its source plan and
-                  payment references so later plan changes never rewrite
-                  history.
+                  strings. Each activation snapshots its source plan and payment
+                  references so later plan changes never rewrite history.
                 </p>
               </div>
             </section>

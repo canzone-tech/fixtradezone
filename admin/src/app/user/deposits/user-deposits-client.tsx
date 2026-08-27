@@ -24,6 +24,7 @@ import type { UserDirectSession } from "@/lib/user-session";
 
 interface UserDepositWorkspace {
   session: UserDirectSession;
+  plan: PackageCatalogue["plan"];
   packages: PackagePlanItem[];
   rails: DepositPaymentRail[];
   deposits: Deposit[];
@@ -46,6 +47,18 @@ function formatDate(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function activationPolicyText(trigger: string): string {
+  if (trigger === "MANUAL_ACTIVATION") {
+    return "Payment approval posts accounting first; an authorized administrator then activates the package.";
+  }
+
+  if (trigger === "PAYMENT_APPROVED") {
+    return "Payment approval posts accounting and automatically activates the package exactly once.";
+  }
+
+  return "This package activation engine is not available for new funding yet.";
 }
 
 function redirectFor(error: unknown): string | null {
@@ -78,7 +91,9 @@ async function checkedUserJson<T extends ApiMessagePayload>(
 async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
   // Keep requests sequential so a rotating refresh token can never be raced by
   // parallel BFF calls.
-  const sessionResponse = await fetch("/api/user/session", { cache: "no-store" });
+  const sessionResponse = await fetch("/api/user/session", {
+    cache: "no-store",
+  });
   const session = await checkedUserJson<UserDirectSession & ApiMessagePayload>(
     sessionResponse,
     "USER session is unavailable.",
@@ -87,11 +102,12 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
     throw new Error("USER session is incomplete.");
   }
 
-  const packageResponse = await fetch("/api/user/packages", { cache: "no-store" });
-  const packagePayload = await checkedUserJson<PackageCatalogue & ApiMessagePayload>(
-    packageResponse,
-    "Could not load available packages.",
-  );
+  const packageResponse = await fetch("/api/user/packages", {
+    cache: "no-store",
+  });
+  const packagePayload = await checkedUserJson<
+    PackageCatalogue & ApiMessagePayload
+  >(packageResponse, "Could not load available packages.");
 
   const railResponse = await fetch("/api/user/deposit-payment-rails", {
     cache: "no-store",
@@ -100,17 +116,22 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
     DepositPaymentRailsResponse & ApiMessagePayload
   >(railResponse, "Could not load available payment networks.");
 
-  const depositResponse = await fetch("/api/user/deposits", { cache: "no-store" });
-  const depositPayload = await checkedUserJson<DepositsResponse & ApiMessagePayload>(
-    depositResponse,
-    "Could not load deposit history.",
-  );
+  const depositResponse = await fetch("/api/user/deposits", {
+    cache: "no-store",
+  });
+  const depositPayload = await checkedUserJson<
+    DepositsResponse & ApiMessagePayload
+  >(depositResponse, "Could not load deposit history.");
 
   return {
     session,
-    packages: packagePayload.catalogueAvailable
-      ? packagePayload.items.filter((item) => item.availability === "AVAILABLE")
-      : [],
+    plan: packagePayload.plan,
+    packages:
+      packagePayload.catalogueAvailable && packagePayload.activationAvailable
+        ? packagePayload.items.filter(
+            (item) => item.availability === "AVAILABLE",
+          )
+        : [],
     rails: railPayload.rails,
     deposits: depositPayload.deposits,
   };
@@ -119,6 +140,8 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
 export default function UserDepositsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
+  const [packagePlan, setPackagePlan] =
+    useState<PackageCatalogue["plan"]>(null);
   const [packages, setPackages] = useState<PackagePlanItem[]>([]);
   const [rails, setRails] = useState<DepositPaymentRail[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
@@ -148,7 +171,9 @@ export default function UserDepositsClient() {
   const eligibleRails = useMemo(
     () =>
       selectedPackage
-        ? rails.filter((rail) => rail.asset === selectedPackage.currency && rail.isActive)
+        ? rails.filter(
+            (rail) => rail.asset === selectedPackage.currency && rail.isActive,
+          )
         : [],
     [rails, selectedPackage],
   );
@@ -160,6 +185,7 @@ export default function UserDepositsClient() {
 
   function applyWorkspace(workspace: UserDepositWorkspace) {
     setSession(workspace.session);
+    setPackagePlan(workspace.plan);
     setPackages(workspace.packages);
     setRails(workspace.rails);
     setDeposits(workspace.deposits);
@@ -245,11 +271,13 @@ export default function UserDepositsClient() {
           paymentRailId: selectedRailId,
         }),
       });
-      const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
-        response,
-      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not create deposit request."));
+        throw new Error(
+          messageFrom(payload, "Could not create deposit request."),
+        );
       }
 
       setNotice(payload.message);
@@ -284,11 +312,13 @@ export default function UserDepositsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txid: normalized }),
       });
-      const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
-        response,
-      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not submit transaction ID."));
+        throw new Error(
+          messageFrom(payload, "Could not submit transaction ID."),
+        );
       }
 
       setTxid("");
@@ -322,13 +352,17 @@ export default function UserDepositsClient() {
             <p className={styles.eyebrow}>CONFIGURED PAYMENT NETWORKS</p>
             <h1>Deposits</h1>
             <p>
-              Select a package and one supported payment network for its currency.
-              The backend then randomly assigns an active public receiving account
-              inside that exact network. Never send funds on a different network.
+              Select a package and one supported payment network for its
+              currency. The backend then randomly assigns an active public
+              receiving account inside that exact network. Never send funds on a
+              different network.
             </p>
           </div>
           {openDeposit ? (
-            <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
+            <span
+              className={styles.badge}
+              data-tone={statusTone(openDeposit.status)}
+            >
               {statusLabel(openDeposit.status)}
             </span>
           ) : null}
@@ -336,6 +370,16 @@ export default function UserDepositsClient() {
 
         {notice ? <div className={styles.success}>{notice}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
+
+        {packagePlan ? (
+          <div className={styles.notice}>
+            <strong>Package policy:</strong>{" "}
+            {packagePlan.activePackageMode === "MULTIPLE_ACTIVE"
+              ? "Multiple purchased packages may remain active simultaneously. "
+              : "Only one package may remain active at a time. "}
+            {activationPolicyText(packagePlan.activationTrigger)}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className={styles.card}>
@@ -348,7 +392,10 @@ export default function UserDepositsClient() {
                 <p className={styles.eyebrow}>Open Deposit</p>
                 <h2>{openDeposit.packageDisplayName}</h2>
               </div>
-              <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
+              <span
+                className={styles.badge}
+                data-tone={statusTone(openDeposit.status)}
+              >
                 {statusLabel(openDeposit.status)}
               </span>
             </div>
@@ -365,7 +412,8 @@ export default function UserDepositsClient() {
                   <div>
                     <small>Exact amount</small>
                     <strong>
-                      {compactDecimal(openDeposit.amount)} {openDeposit.currency}
+                      {compactDecimal(openDeposit.amount)}{" "}
+                      {openDeposit.currency}
                     </strong>
                   </div>
                   <div>
@@ -383,7 +431,9 @@ export default function UserDepositsClient() {
                   <button
                     className={styles.buttonSecondary}
                     type="button"
-                    onClick={() => void copyAddress(openDeposit.assignedWalletAddress)}
+                    onClick={() =>
+                      void copyAddress(openDeposit.assignedWalletAddress)
+                    }
                   >
                     Copy address
                   </button>
@@ -427,8 +477,9 @@ export default function UserDepositsClient() {
               </div>
             ) : (
               <div className={styles.notice}>
-                Transaction ID <span className={styles.mono}>{openDeposit.txid}</span>{" "}
-                was submitted {formatDate(openDeposit.submittedAt)}. Manual review
+                Transaction ID{" "}
+                <span className={styles.mono}>{openDeposit.txid}</span> was
+                submitted {formatDate(openDeposit.submittedAt)}. Manual review
                 is pending; do not send another payment for this request.
               </div>
             )}
@@ -443,7 +494,9 @@ export default function UserDepositsClient() {
             </div>
 
             {packages.length === 0 ? (
-              <div className={styles.empty}>No package is currently available.</div>
+              <div className={styles.empty}>
+                No package is currently available.
+              </div>
             ) : (
               <div className={styles.formGrid}>
                 <div className={styles.field}>
@@ -452,11 +505,14 @@ export default function UserDepositsClient() {
                     className={styles.select}
                     id="deposit-package"
                     value={selectedPackageId}
-                    onChange={(event) => setSelectedPackageId(event.target.value)}
+                    onChange={(event) =>
+                      setSelectedPackageId(event.target.value)
+                    }
                   >
                     {packages.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.displayName} — {compactDecimal(item.price)} {item.currency}
+                        {item.displayName} — {compactDecimal(item.price)}{" "}
+                        {item.currency}
                       </option>
                     ))}
                   </select>
@@ -486,11 +542,12 @@ export default function UserDepositsClient() {
                   <div className={`${styles.notice} ${styles.full}`}>
                     Pay exactly{" "}
                     <strong>
-                      {compactDecimal(selectedPackage.price)} {selectedPackage.currency}
+                      {compactDecimal(selectedPackage.price)}{" "}
+                      {selectedPackage.currency}
                     </strong>{" "}
-                    on <strong>{selectedRail.networkCode}</strong>. The receiving
-                    address will be assigned by the backend from that rail&apos;s active
-                    account pool.
+                    on <strong>{selectedRail.networkCode}</strong>. The
+                    receiving address will be assigned by the backend from that
+                    rail&apos;s active account pool.
                   </div>
                 ) : null}
 
@@ -498,7 +555,9 @@ export default function UserDepositsClient() {
                   <button
                     className={styles.button}
                     type="button"
-                    disabled={!selectedPackageId || !selectedRailId || busy !== null}
+                    disabled={
+                      !selectedPackageId || !selectedRailId || busy !== null
+                    }
                     onClick={() => void createDeposit()}
                   >
                     {busy === "create" ? "Creating…" : "Create deposit request"}

@@ -1,10 +1,7 @@
 import type { PackagePlanItem } from "@/lib/packages";
 
 export type DepositStatus =
-  | "AWAITING_TXID"
-  | "PENDING_REVIEW"
-  | "APPROVED"
-  | "REJECTED";
+  "AWAITING_TXID" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
 
 export type DepositValidationProfile = "TRON" | "EVM" | "SOLANA";
 
@@ -99,9 +96,38 @@ export interface DepositsResponse {
   total?: number;
 }
 
+export interface PackageActivationOutcome {
+  activationMode?: "AUTO" | "MANUAL" | "DEFERRED";
+  activationTrigger?: string;
+  activePackageMode?: string;
+  activationApplied?: boolean;
+  activationRequired?: boolean;
+  message?: string;
+  subscription?: {
+    id: string;
+    status: string;
+    packageDisplayName?: string;
+  };
+}
+
 export interface DepositMutationResponse {
   message: string;
   deposit: Deposit;
+  accountingPostingMode?: "AUTO_ON_APPROVAL" | "MANUAL_RECONCILIATION";
+  accountingPosted?: boolean;
+  packageActivated?: boolean;
+  packageActivationMode?: "AUTO" | "MANUAL" | "DEFERRED";
+  packageActivationTrigger?: string;
+  packageActivationRequired?: boolean;
+  subscription?: {
+    id: string;
+    status: string;
+    packageDisplayName?: string;
+  };
+}
+
+export interface DepositAccountingResponse extends ApiMessagePayload {
+  packageActivation?: PackageActivationOutcome;
 }
 
 export interface DepositAccountMutationResponse {
