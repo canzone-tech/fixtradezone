@@ -227,7 +227,7 @@ describe('SubscriptionsService', () => {
       currency: 'USDT',
       normalSide: 'CREDIT',
     };
-    let auditCall: AuditCreateCall | null = null;
+    const auditCalls: AuditCreateCall[] = [];
 
     transaction.$queryRaw
       .mockResolvedValueOnce([{ id: USER_ID }])
@@ -256,14 +256,18 @@ describe('SubscriptionsService', () => {
     transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
     transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
     transaction.auditLog.create.mockImplementation((input: AuditCreateCall) => {
-      auditCall = input;
+      auditCalls.push(input);
       return Promise.resolve({ id: 'audit-id' });
     });
 
-    const result = await service.activateFromApprovedDeposit(DEPOSIT_ID, actor, {
-      ipAddress: '127.0.0.1',
-      userAgent: 'jest',
-    });
+    const result = await service.activateFromApprovedDeposit(
+      DEPOSIT_ID,
+      actor,
+      {
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+      },
+    );
 
     expect(result).toMatchObject({
       created: true,
@@ -278,6 +282,7 @@ describe('SubscriptionsService', () => {
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(8);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
 
+    const auditCall = auditCalls.at(0);
     if (!auditCall) {
       throw new Error('Expected package activation audit call.');
     }

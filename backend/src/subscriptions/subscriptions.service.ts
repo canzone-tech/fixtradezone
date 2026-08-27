@@ -24,6 +24,8 @@ import { SUBSCRIPTION_AUDIT_OPERATIONS } from './subscriptions.constants';
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
 type DecimalValue = Prisma.Decimal | number | string;
+type SubscriptionAuditOperation =
+  (typeof SUBSCRIPTION_AUDIT_OPERATIONS)[keyof typeof SUBSCRIPTION_AUDIT_OPERATIONS];
 
 interface CountRow {
   total: bigint | number | string;
@@ -264,7 +266,7 @@ export class SubscriptionsService {
     depositId: string,
     actor: AuthenticatedUser,
     context: RequestContext = {},
-    operation = SUBSCRIPTION_AUDIT_OPERATIONS.ACTIVATE_FROM_DEPOSIT,
+    operation: SubscriptionAuditOperation = SUBSCRIPTION_AUDIT_OPERATIONS.ACTIVATE_FROM_DEPOSIT,
   ) {
     return this.runSerializable(async (transaction) => {
       await transaction.$queryRaw(Prisma.sql`
@@ -332,7 +334,10 @@ export class SubscriptionsService {
           packageDefinition: true,
         },
       });
-      if (!planItem || planItem.planVersionId !== deposit.packagePlanVersionId) {
+      if (
+        !planItem ||
+        planItem.planVersionId !== deposit.packagePlanVersionId
+      ) {
         throw new ConflictException(
           'Deposit package snapshot no longer resolves to its source plan item.',
         );
@@ -474,12 +479,7 @@ export class SubscriptionsService {
         fundingTransaction.id,
       );
       await this.applyBalance(transaction, mainAccount, 'DEBIT', amount);
-      await this.applyBalance(
-        transaction,
-        principalAccount,
-        'CREDIT',
-        amount,
-      );
+      await this.applyBalance(transaction, principalAccount, 'CREDIT', amount);
 
       const activatedAt = new Date();
       const scheduledEndAt = new Date(
@@ -610,8 +610,7 @@ export class SubscriptionsService {
 
       return {
         created: true,
-        message:
-          'Package activated and principal moved from Main / Deposit.',
+        message: 'Package activated and principal moved from Main / Deposit.',
         subscription: this.snapshot(created),
       };
     });
@@ -858,11 +857,7 @@ export class SubscriptionsService {
     work: (transaction: Prisma.TransactionClient) => Promise<T>,
   ) {
     let lastError: unknown;
-    for (
-      let attempt = 1;
-      attempt <= MAX_SERIALIZABLE_ATTEMPTS;
-      attempt += 1
-    ) {
+    for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
         return await this.prisma.$transaction(work, {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
