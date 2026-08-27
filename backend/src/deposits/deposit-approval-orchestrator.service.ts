@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
+import { CommissionsService } from '../commissions/commissions.service';
 import { AccountingConfigService } from '../platform-config/accounting-config.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
@@ -16,6 +17,7 @@ export class DepositApprovalOrchestratorService {
     private readonly accountingConfigService: AccountingConfigService,
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly commissionsService: CommissionsService,
   ) {}
 
   async approveDeposit(
@@ -97,6 +99,13 @@ export class DepositApprovalOrchestratorService {
         };
       }
 
+      const referralCommission =
+        await this.commissionsService.processSubscriptionSafely(
+          activation.subscription.id,
+          actor,
+          context,
+        );
+
       return {
         ...approval,
         message:
@@ -109,6 +118,7 @@ export class DepositApprovalOrchestratorService {
         packageActivationTrigger: activation.activationTrigger,
         packageActivationRequired: activation.activationRequired,
         subscription: activation.subscription,
+        referralCommission,
       };
     } catch (error) {
       const reason =
