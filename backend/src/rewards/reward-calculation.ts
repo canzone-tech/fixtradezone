@@ -73,10 +73,7 @@ export function localCalendarDayDifference(
   return Math.round((end - start) / DAY_MS);
 }
 
-export function localDateStartUtc(
-  localDate: string,
-  timeZone: string,
-): Date {
+export function localDateStartUtc(localDate: string, timeZone: string): Date {
   // Resolve local 00:00 through the IANA timezone using a small fixed-point
   // iteration. This handles non-integer offsets and DST without introducing a
   // second date/time library into the financial core.
@@ -211,7 +208,9 @@ function part(
 ): string {
   const value = parts.find((candidate) => candidate.type === type)?.value;
   if (!value) {
-    throw new BadRequestException(`Unable to resolve timezone date part ${type}.`);
+    throw new BadRequestException(
+      `Unable to resolve timezone date part ${type}.`,
+    );
   }
   return value;
 }
