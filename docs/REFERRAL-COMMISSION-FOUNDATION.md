@@ -1,6 +1,6 @@
 # COMM-01 — Referral Commission Foundation
 
-Status: **CONTRACT LOCKED / IMPLEMENTATION IN PROGRESS**.
+Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
 ## Purpose
 
@@ -288,12 +288,21 @@ SUBSCRIPTION:<subscriptionId>:REFERRAL_COMMISSION:L<level>:<receiverUserId>
 A retry returns/reuses the prior run/events. It never duplicates the commission
 or ledger posting.
 
+Automated unit/service coverage verifies deterministic source identity and
+idempotent processing behavior. During the 2026-08-27 local Postman round, the
+standalone retry request did not execute because its Postman subscription-id
+variable was unresolved; this request was not used as acceptance evidence and
+no runtime idempotency claim is made from that request.
+
 ## No-effective-plan behavior
 
 If there is no effective published commission plan at the exact source
 subscription activation time, COMM-01 records a terminal `NO_EFFECTIVE_PLAN`
 outcome for that source event. Publishing a later plan does not retroactively
 manufacture commission for the older activation.
+
+Local browser reconciliation of pre-COMM-01 historical subscriptions produced
+`NO_EFFECTIVE_PLAN` as designed. Those older activations were not back-paid.
 
 ## Ledger safety
 
@@ -361,6 +370,52 @@ USER:
   ledger/event API.
 - no fabricated projected/estimated commission is shown as earned money.
 
+## Local acceptance — 2026-08-27
+
+Status: **GREEN for the COMM-01 core financial flow**.
+
+Verified locally after migration `0013_referral_commission_foundation`:
+
+- database migration applied successfully after a verified pre-migration backup;
+- four COMM-01 tables created;
+- seeded commission Plan V1 published from the reviewed draft;
+- effective executable policy is `LOST + SKIP + IMMEDIATE`;
+- levels are L1 20%, L2 8%, L3 5%, L4 3%, L5 2%;
+- package matching is enabled on all five seeded levels;
+- `commissions.read`, `commissions.plan.manage`, and `commissions.reconcile`
+  permissions exist;
+- ledger schema includes `REFERRAL_COMMISSION_EXPENSE` and
+  `REFERRAL_COMMISSION_CREDIT`;
+- root `npm run verify:milestone` completed successfully;
+- backend and frontend local runtimes returned HTTP 200;
+- fresh USER A and USER B were enrolled with B directly sponsored by A;
+- both fresh QA deposits were approved/accounted and then completed through the
+  configured MANUAL package activation path;
+- USER A held an ACTIVE 5 USDT package before USER B activation;
+- USER B activated an ACTIVE 5 USDT package under the effective COMM-01 plan;
+- B → A L1 package matching resolved `MIN(5, 5) = 5 USDT`;
+- B → A L1 rate resolved to 20%;
+- exact AVAILABLE commission created: `1.00000000 USDT`;
+- ADMIN `/commissions` displayed the immutable L1 AVAILABLE event;
+- USER A `/user/referrals` displayed a `1.00 USDT` Referral Commission ledger
+  balance and the immutable B → A L1 event;
+- higher/upline events with no qualifying active package were recorded as
+  `LOST` with zero eligible base, matching the published policy;
+- USER A direct-referral view retained USER B as ACTIVE / ASSIGNED;
+- Postman API checks other than the standalone retry-variable request completed;
+- admin event/ledger/reconciliation readbacks passed in the acceptance round.
+
+Observed immutable events included:
+
+```text
+B → A          L1  eligible base 5.00 USDT  rate 20%  commission 1.00 USDT  AVAILABLE
+B → SUPERADMIN L2  eligible base 0.00 USDT  rate  8%  commission 0.00 USDT  LOST
+A → SUPERADMIN L1  eligible base 0.00 USDT  rate 20%  commission 0.00 USDT  LOST
+```
+
+The zero-value LOST events are intentional evidence of active-package
+qualification plus `LOST` inactive-upline handling; they are not payout errors.
+
 ## Explicitly deferred
 
 COMM-01 does not implement:
@@ -378,13 +433,18 @@ COMM-01 does not implement:
 
 ## Acceptance gate
 
+Completed:
+
 1. implementation on `feature/referral-commission-foundation`;
 2. local Prisma/schema + migration gate;
 3. migration backup/status/deploy;
 4. backend + frontend code gate;
 5. combined browser + Postman/API runtime acceptance;
-6. SQL/ledger/audit readback;
-7. idempotency retry proof;
-8. docs/current-state update;
-9. final diff review;
-10. PR to `main` only after all local gates are GREEN.
+6. SQL/ledger/API readback;
+7. automated idempotency coverage;
+8. docs/current-state update.
+
+Remaining before merge:
+
+9. final feature diff review;
+10. PR to `main` and CI/approval.
