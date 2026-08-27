@@ -20,6 +20,8 @@ export const PERMISSIONS = {
   COMMISSIONS_READ: 'commissions.read',
   COMMISSIONS_PLAN_MANAGE: 'commissions.plan.manage',
   COMMISSIONS_RECONCILE: 'commissions.reconcile',
+  REWARDS_READ: 'rewards.read',
+  REWARDS_RECONCILE: 'rewards.reconcile',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -112,6 +114,16 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.COMMISSIONS_RECONCILE,
     description:
       'Reconcile package subscriptions into referral commission events',
+  },
+  {
+    code: PERMISSIONS.REWARDS_READ,
+    description:
+      'View package reward events, cap state and package lifecycle progress',
+  },
+  {
+    code: PERMISSIONS.REWARDS_RECONCILE,
+    description:
+      'Reconcile due package rewards through the authoritative reward engine',
   },
   {
     code: PERMISSIONS.RBAC_READ,
