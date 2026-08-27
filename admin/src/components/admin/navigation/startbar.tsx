@@ -84,6 +84,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/rewards",
+        label: "Rewards & Caps",
+        icon: "iconoir-trophy",
+        permission: "rewards.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
@@ -170,30 +177,20 @@ export default function Startbar() {
           {sections.map((section) => {
             const visibleItems = user
               ? section.items.filter((item) => {
-                  if (isSuperAdmin) {
-                    return true;
-                  }
-
-                  if (!item.enabled || !item.permission) {
-                    return false;
-                  }
-
+                  if (isSuperAdmin) return true;
+                  if (!item.enabled || !item.permission) return false;
                   return user.permissions.includes(item.permission);
                 })
               : [];
 
-            if (visibleItems.length === 0) {
-              return null;
-            }
+            if (visibleItems.length === 0) return null;
 
             return (
               <div className="ftz-nav-section" key={section.label}>
                 <div className="ftz-nav-label">{section.label}</div>
-
                 {visibleItems.map((item) => {
                   const active =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                    pathname === item.href || pathname.startsWith(`${item.href}/`);
 
                   if (!item.enabled) {
                     return (
@@ -229,12 +226,10 @@ export default function Startbar() {
           <div className="ftz-profile-shield">
             <i className="iconoir-shield-check" />
           </div>
-
           <div>
             <strong>{isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}</strong>
             <small>{isSuperAdmin ? "All Access" : "RBAC Access"}</small>
           </div>
-
           {isSuperAdmin ? (
             <Link
               href="/settings/security"
