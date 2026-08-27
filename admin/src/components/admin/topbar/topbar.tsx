@@ -24,6 +24,11 @@ const routeHeadings: Array<{
     subtitle: "Package activation queue and immutable lifecycle history",
   },
   {
+    path: "/commissions",
+    title: "Referral Commissions",
+    subtitle: "Versioned matching rules and immutable commission accounting",
+  },
+  {
     path: "/packages",
     title: "Package Plans",
     subtitle: "Versioned catalogue and publication controls",
