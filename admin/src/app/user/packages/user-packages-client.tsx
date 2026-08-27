@@ -14,6 +14,7 @@ import {
   type ApiErrorPayload,
   type PackageCatalogue,
 } from "@/lib/packages";
+import UserRewardProgressPanel from "./user-reward-progress-panel";
 import UserSubscriptionsPanel from "./user-subscriptions-panel";
 import styles from "./user-packages.module.css";
 
@@ -189,6 +190,7 @@ export default function UserPackagesClient() {
         </header>
 
         <UserSubscriptionsPanel />
+        <UserRewardProgressPanel />
 
         {!catalogue.catalogueAvailable || !catalogue.plan ? (
           <section className={styles.emptyState}>
