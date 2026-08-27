@@ -56,14 +56,11 @@ describe('RWD-01 reward calculation helpers', () => {
     expect(localDateStartUtc('2026-08-29', 'UTC').toISOString()).toBe(
       '2026-08-29T00:00:00.000Z',
     );
+    expect(localDateStartUtc('2026-08-29', 'Asia/Kolkata').toISOString()).toBe(
+      '2026-08-28T18:30:00.000Z',
+    );
     expect(
-      localDateStartUtc('2026-08-29', 'Asia/Kolkata').toISOString(),
-    ).toBe('2026-08-28T18:30:00.000Z');
-    expect(
-      localDateForInstant(
-        new Date('2026-08-28T18:30:00.000Z'),
-        'Asia/Kolkata',
-      ),
+      localDateForInstant(new Date('2026-08-28T18:30:00.000Z'), 'Asia/Kolkata'),
     ).toBe('2026-08-29');
   });
 });

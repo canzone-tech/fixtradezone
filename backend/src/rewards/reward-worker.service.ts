@@ -14,7 +14,9 @@ import {
 import { RewardsService } from './rewards.service';
 
 @Injectable()
-export class RewardWorkerService implements OnModuleInit, OnApplicationShutdown {
+export class RewardWorkerService
+  implements OnModuleInit, OnApplicationShutdown
+{
   private readonly logger = new Logger(RewardWorkerService.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
@@ -36,7 +38,9 @@ export class RewardWorkerService implements OnModuleInit, OnApplicationShutdown 
       void this.runOnce();
     }, intervalMs);
     this.timer.unref();
-    this.logger.log(`Package reward worker enabled at ${intervalMs}ms interval.`);
+    this.logger.log(
+      `Package reward worker enabled at ${intervalMs}ms interval.`,
+    );
   }
 
   onApplicationShutdown() {
@@ -64,7 +68,11 @@ export class RewardWorkerService implements OnModuleInit, OnApplicationShutdown 
 
       try {
         this.rewardsService.noteWorkerStart();
-        const summary = await this.rewardsService.processDueBatch(null, {}, true);
+        const summary = await this.rewardsService.processDueBatch(
+          null,
+          {},
+          true,
+        );
         this.rewardsService.noteWorkerSuccess(summary);
         if (summary.createdEvents > 0 || summary.initialized > 0) {
           this.logger.log(

@@ -108,10 +108,7 @@ interface RewardSubscriptionRow {
     | 'CONFIGURED_START_TIME'
     | 'NEXT_CYCLE_START';
   rewardFrequency:
-    | 'DAILY_CALENDAR'
-    | 'CONFIGURED_DAYS'
-    | 'PER_CYCLE'
-    | 'PER_EVENT';
+    'DAILY_CALENDAR' | 'CONFIGURED_DAYS' | 'PER_CYCLE' | 'PER_EVENT';
   cycleDayMode: 'CALENDAR_DAYS' | 'ELIGIBLE_EARNING_DAYS';
   rewardDayMode: 'EVERY_DAY' | 'SELECTED_WEEKDAYS' | 'CUSTOM_CALENDAR';
   cycleEndAction:
@@ -408,7 +405,9 @@ export class RewardsService {
         true,
       );
       if (current.status !== 'DRAFT') {
-        throw new ConflictException('Published reward/cap policy is immutable.');
+        throw new ConflictException(
+          'Published reward/cap policy is immutable.',
+        );
       }
       if (current.revision !== dto.expectedRevision) {
         throw new ConflictException(
@@ -514,10 +513,14 @@ export class RewardsService {
         );
       }
       if (effectiveTo && effectiveTo <= effectiveFrom) {
-        throw new BadRequestException('effectiveTo must be after effectiveFrom.');
+        throw new BadRequestException(
+          'effectiveTo must be after effectiveFrom.',
+        );
       }
 
-      const overlaps = await transaction.$queryRaw<RewardPolicyRow[]>(Prisma.sql`
+      const overlaps = await transaction.$queryRaw<
+        RewardPolicyRow[]
+      >(Prisma.sql`
         SELECT *
         FROM reward_cap_policy_versions
         WHERE status = 'PUBLISHED'
@@ -820,7 +823,9 @@ export class RewardsService {
     let completedSubscriptions = 0;
     let blockedSubscriptions = 0;
 
-    const uninitialized = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    const uninitialized = await this.prisma.$queryRaw<
+      { id: string }[]
+    >(Prisma.sql`
       SELECT ups.id
       FROM user_package_subscriptions ups
       LEFT JOIN package_reward_states prs ON prs.subscriptionId = ups.id
@@ -993,11 +998,7 @@ export class RewardsService {
         return { state: null, initialized: false, noEffectivePolicy: true };
       }
 
-      const initialization = this.buildInitialState(
-        subscription,
-        policy,
-        asOf,
-      );
+      const initialization = this.buildInitialState(subscription, policy, asOf);
 
       await transaction.$executeRaw(Prisma.sql`
         INSERT INTO package_reward_states (
@@ -1226,7 +1227,10 @@ export class RewardsService {
         false,
       );
       this.assertExecutablePolicy(policy);
-      const blockedReason = this.subscriptionBlockedReason(subscription, policy);
+      const blockedReason = this.subscriptionBlockedReason(
+        subscription,
+        policy,
+      );
       if (blockedReason) {
         await this.blockState(transaction, state, blockedReason);
         return {
@@ -1306,12 +1310,13 @@ export class RewardsService {
       }
 
       const postedReward = Prisma.Decimal.min(calculatedReward, headroom);
-      const capAfter = Boolean(state.packageRewardCountsTowardCap)
+      const capAfter = state.packageRewardCountsTowardCap
         ? capBefore.plus(postedReward)
         : capBefore;
       const clippedToCap = postedReward.lt(calculatedReward);
       const capReached = capAfter.gte(capLimit);
-      const lifetimeReached = state.nextRewardDayNumber >= subscription.goalDays;
+      const lifetimeReached =
+        state.nextRewardDayNumber >= subscription.goalDays;
       const completionReason: PackageRewardCompletionReason | null = capReached
         ? 'CAP_REACHED'
         : lifetimeReached
@@ -1462,7 +1467,9 @@ export class RewardsService {
         },
       });
 
-      const eventRows = await transaction.$queryRaw<RewardEventRow[]>(Prisma.sql`
+      const eventRows = await transaction.$queryRaw<
+        RewardEventRow[]
+      >(Prisma.sql`
         SELECT *
         FROM package_reward_events
         WHERE id = ${eventId}
@@ -1607,7 +1614,9 @@ export class RewardsService {
     `);
     const account = rows[0];
     if (!account) {
-      throw new ServiceUnavailableException('Reward ledger account is missing.');
+      throw new ServiceUnavailableException(
+        'Reward ledger account is missing.',
+      );
     }
     if (
       account.ownerType !== ownerType ||
@@ -1800,7 +1809,9 @@ export class RewardsService {
     try {
       this.assertExecutablePolicy(policy);
     } catch (error) {
-      return error instanceof Error ? error.message.slice(0, 120) : 'POLICY_BLOCKED';
+      return error instanceof Error
+        ? error.message.slice(0, 120)
+        : 'POLICY_BLOCKED';
     }
 
     if (
@@ -1816,7 +1827,9 @@ export class RewardsService {
     ) {
       return `UNSUPPORTED_RATE_MEANING:${subscription.rewardRateMeaning}`;
     }
-    if (subscription.capBasis !== RWD01_EXECUTABLE_SUBSCRIPTION_TERMS.capBasis) {
+    if (
+      subscription.capBasis !== RWD01_EXECUTABLE_SUBSCRIPTION_TERMS.capBasis
+    ) {
       return `UNSUPPORTED_CAP_BASIS:${subscription.capBasis}`;
     }
     if (
@@ -1890,7 +1903,9 @@ export class RewardsService {
     activatedAt: Date,
     asOf: Date,
   ) {
-    const activationRows = await transaction.$queryRaw<RewardPolicyRow[]>(Prisma.sql`
+    const activationRows = await transaction.$queryRaw<
+      RewardPolicyRow[]
+    >(Prisma.sql`
       SELECT *
       FROM reward_cap_policy_versions
       WHERE status = 'PUBLISHED'
@@ -1901,7 +1916,9 @@ export class RewardsService {
     `);
     if (activationRows[0]) return activationRows[0];
 
-    const firstLaterRows = await transaction.$queryRaw<RewardPolicyRow[]>(Prisma.sql`
+    const firstLaterRows = await transaction.$queryRaw<
+      RewardPolicyRow[]
+    >(Prisma.sql`
       SELECT *
       FROM reward_cap_policy_versions
       WHERE status = 'PUBLISHED'
@@ -1919,7 +1936,9 @@ export class RewardsService {
     forUpdate: boolean,
   ) {
     const lock = forUpdate ? Prisma.sql`FOR UPDATE` : Prisma.empty;
-    const rows = await transaction.$queryRaw<RewardSubscriptionRow[]>(Prisma.sql`
+    const rows = await transaction.$queryRaw<
+      RewardSubscriptionRow[]
+    >(Prisma.sql`
       SELECT
         id, userId, packagePlanVersionId, packagePlanItemId,
         packageCode, packageDisplayName, price, currency,
@@ -1935,7 +1954,8 @@ export class RewardsService {
       ${lock}
     `);
     const row = rows[0];
-    if (!row) throw new NotFoundException('Package subscription was not found.');
+    if (!row)
+      throw new NotFoundException('Package subscription was not found.');
     return row;
   }
 
@@ -1962,7 +1982,9 @@ export class RewardsService {
   ) {
     const row = await this.findState(transaction, subscriptionId, forUpdate);
     if (!row) {
-      throw new NotFoundException('Package reward lifecycle state was not found.');
+      throw new NotFoundException(
+        'Package reward lifecycle state was not found.',
+      );
     }
     return row;
   }
@@ -2051,9 +2073,7 @@ export class RewardsService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
-    return admin
-      ? { ...base, username: row.username, email: row.email }
-      : base;
+    return admin ? { ...base, username: row.username, email: row.email } : base;
   }
 
   private eventSnapshot(row: RewardEventRow, admin: boolean) {
