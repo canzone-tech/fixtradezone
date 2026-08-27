@@ -29,6 +29,24 @@ import {
 } from './dto/reward.dto';
 import { RewardsService } from './rewards.service';
 
+interface RewardBatchSummaryResponse {
+  asOf: string;
+  initialized: number;
+  processedSubscriptions: number;
+  createdEvents: number;
+  completedSubscriptions: number;
+  blockedSubscriptions: number;
+  remainingDue: number;
+}
+
+interface RewardWorkerHealthResponse {
+  lastStartedAt: Date | null;
+  lastCompletedAt: Date | null;
+  lastErrorAt: Date | null;
+  lastError: string | null;
+  lastSummary: RewardBatchSummaryResponse | null;
+}
+
 @Controller('admin/reward-policies')
 export class AdminRewardPoliciesController {
   constructor(private readonly rewardsService: RewardsService) {}
@@ -129,7 +147,7 @@ export class AdminRewardsController {
   @Get('worker-health')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.REWARDS_READ)
-  getWorkerHealth() {
+  getWorkerHealth(): RewardWorkerHealthResponse {
     return this.rewardsService.getWorkerHealth();
   }
 
@@ -140,7 +158,7 @@ export class AdminRewardsController {
   processDue(
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
+  ): Promise<RewardBatchSummaryResponse> {
     return this.rewardsService.processDueBatch(
       actor,
       getRequestContext(request),
