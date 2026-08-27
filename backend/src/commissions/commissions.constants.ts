@@ -32,7 +32,6 @@ export const COMMISSION_RUN_OUTCOMES = [
   'PROCESSED',
   'NO_EFFECTIVE_PLAN',
   'NO_SPONSOR',
-  'TRIGGER_DISABLED',
 ] as const;
 export type CommissionRunOutcome = (typeof COMMISSION_RUN_OUTCOMES)[number];
 
