@@ -77,6 +77,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/commissions",
+        label: "Referral Commissions",
+        icon: "iconoir-coins",
+        permission: "commissions.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
