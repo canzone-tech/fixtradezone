@@ -13,6 +13,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { CommissionsService } from '../commissions/commissions.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import {
   AdminSubscriptionQueryDto,
@@ -50,20 +51,35 @@ export class AdminSubscriptionsController {
 
 @Controller('admin/deposits')
 export class AdminDepositSubscriptionController {
-  constructor(private readonly subscriptionsService: SubscriptionsService) {}
+  constructor(
+    private readonly subscriptionsService: SubscriptionsService,
+    private readonly commissionsService: CommissionsService,
+  ) {}
 
   @Post(':depositId/activate-package')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SUBSCRIPTIONS_ACTIVATE)
-  activatePackage(
+  async activatePackage(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.subscriptionsService.reconcileActivation(
+    const context = getRequestContext(request);
+    const activation = await this.subscriptionsService.reconcileActivation(
       depositId,
       actor,
-      getRequestContext(request),
+      context,
     );
+    const referralCommission =
+      await this.commissionsService.processSubscriptionSafely(
+        activation.subscription.id,
+        actor,
+        context,
+      );
+
+    return {
+      ...activation,
+      referralCommission,
+    };
   }
 }

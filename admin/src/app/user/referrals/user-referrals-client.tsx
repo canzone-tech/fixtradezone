@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import type { MyCommissionsResponse } from "@/lib/commissions";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./user-referrals.module.css";
 
@@ -62,11 +63,27 @@ function displayName(user: {
   return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username;
 }
 
+function amountLabel(value: string, currency: string) {
+  return `${Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 8,
+  })} ${currency}`;
+}
+
+function dateLabel(value: string | null) {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 export default function UserReferralsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [profile, setProfile] = useState<ReferralProfile | null>(null);
   const [direct, setDirect] = useState<DirectResponse | null>(null);
+  const [commissions, setCommissions] = useState<MyCommissionsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -76,7 +93,7 @@ export default function UserReferralsClient() {
 
     async function load() {
       try {
-        // Validate/refresh the browser session first. Referral data requests are
+        // Validate/refresh the browser session first. Business-data requests are
         // intentionally issued only after this completes so rotating refresh
         // tokens cannot be consumed concurrently by multiple BFF requests.
         const sessionResponse = await fetch("/api/user/session", {
@@ -110,14 +127,21 @@ export default function UserReferralsClient() {
           throw new Error(sessionPayload?.message || "Unable to load USER session.");
         }
 
-        const [profileResponse, directResponse] = await Promise.all([
+        const [profileResponse, directResponse, commissionResponse] = await Promise.all([
           fetch("/api/user/referrals", { cache: "no-store" }),
           fetch("/api/user/referrals/direct?page=1&limit=20", {
             cache: "no-store",
           }),
+          fetch("/api/user/commissions?page=1&limit=50", {
+            cache: "no-store",
+          }),
         ]);
 
-        if (profileResponse.status === 401 || directResponse.status === 401) {
+        if (
+          profileResponse.status === 401 ||
+          directResponse.status === 401 ||
+          commissionResponse.status === 401
+        ) {
           router.replace("/login");
           router.refresh();
           return;
@@ -129,6 +153,9 @@ export default function UserReferralsClient() {
         const directPayload = await readPayload<DirectResponse & ErrorPayload>(
           directResponse,
         );
+        const commissionPayload = await readPayload<
+          MyCommissionsResponse & ErrorPayload
+        >(commissionResponse);
 
         if (!profileResponse.ok || !profilePayload) {
           throw new Error(
@@ -142,10 +169,17 @@ export default function UserReferralsClient() {
           );
         }
 
+        if (!commissionResponse.ok || !commissionPayload) {
+          throw new Error(
+            commissionPayload?.message || "Unable to load referral commissions.",
+          );
+        }
+
         if (mounted) {
           setSession(sessionPayload);
           setProfile(profilePayload);
           setDirect(directPayload);
+          setCommissions(commissionPayload);
         }
       } catch (caught) {
         if (mounted) {
@@ -170,9 +204,7 @@ export default function UserReferralsClient() {
   }, [router]);
 
   async function copyInviteLink() {
-    if (!profile?.referralCode) {
-      return;
-    }
+    if (!profile?.referralCode) return;
 
     const inviteUrl = new URL("/register", window.location.origin);
     inviteUrl.searchParams.set("ref", profile.referralCode);
@@ -193,7 +225,7 @@ export default function UserReferralsClient() {
     );
   }
 
-  if (!session || !profile || !direct) {
+  if (!session || !profile || !direct || !commissions) {
     return (
       <UserShell session={session}>
         <div className={styles.errorState}>
@@ -210,11 +242,10 @@ export default function UserReferralsClient() {
       <div className={styles.page}>
         <header className={styles.header}>
           <div>
-            <span>NETWORK</span>
+            <span>NETWORK + COMMISSIONS</span>
             <h2>My Referrals</h2>
             <p>
-              Your referral identity and direct network are loaded from the live
-              referral API.
+              Referral identity, direct network and ledger-backed commission history.
             </p>
           </div>
           <div className={styles.status}>{profile.assignmentStatus}</div>
@@ -265,6 +296,87 @@ export default function UserReferralsClient() {
           </article>
         </section>
 
+        <section className={styles.commissionBalances}>
+          <div className={styles.tableHead}>
+            <div>
+              <span>LEDGER BALANCE</span>
+              <h3>Referral Commission</h3>
+            </div>
+            <b>{commissions.total} immutable event(s)</b>
+          </div>
+          <div className={styles.balanceGrid}>
+            {commissions.balances.length === 0 ? (
+              <article className={styles.balanceCard}>
+                <small>NO AVAILABLE COMMISSION</small>
+                <strong>0.00</strong>
+                <span>Only settled ledger-backed commission appears here.</span>
+              </article>
+            ) : (
+              commissions.balances.map((balance) => (
+                <article className={styles.balanceCard} key={balance.currency}>
+                  <small>{balance.currency} · AVAILABLE</small>
+                  <strong>
+                    {amountLabel(balance.referralCommission, balance.currency)}
+                  </strong>
+                  <span>Referral Commission wallet bucket</span>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className={styles.tableCard}>
+          <div className={styles.tableHead}>
+            <div>
+              <span>IMMUTABLE HISTORY</span>
+              <h3>Commission events</h3>
+            </div>
+            <b>{commissions.total} total</b>
+          </div>
+
+          {commissions.events.length === 0 ? (
+            <div className={styles.emptyState}>
+              <i className="iconoir-coins" />
+              <strong>No referral commission events yet</strong>
+              <p>
+                Earned commissions appear only after an eligible ACTIVE package
+                subscription is processed under an effective published plan.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.tableWrap}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Source member</th>
+                    <th>Package</th>
+                    <th>Level</th>
+                    <th>Eligible base</th>
+                    <th>Rate</th>
+                    <th>Commission</th>
+                    <th>Status</th>
+                    <th>Recorded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissions.events.map((event) => (
+                    <tr key={event.id}>
+                      <td>@{event.purchaserUsername ?? event.purchaserUserId}</td>
+                      <td>{event.sourcePackageDisplayName ?? "Package"}</td>
+                      <td>L{event.level}</td>
+                      <td>{amountLabel(event.eligibleBase, event.currency)}</td>
+                      <td>{event.ratePercent}%</td>
+                      <td>{amountLabel(event.commissionAmount, event.currency)}</td>
+                      <td><span className={styles.badge}>{event.status}</span></td>
+                      <td>{dateLabel(event.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <section className={styles.tableCard}>
           <div className={styles.tableHead}>
             <div>
@@ -300,13 +412,9 @@ export default function UserReferralsClient() {
                     <tr key={member.id}>
                       <td>{displayName(member)}</td>
                       <td>@{member.username}</td>
-                      <td>
-                        <span className={styles.badge}>{member.status}</span>
-                      </td>
+                      <td><span className={styles.badge}>{member.status}</span></td>
                       <td>{member.assignmentStatus}</td>
-                      <td>
-                        {new Date(member.referralJoinedAt).toLocaleDateString()}
-                      </td>
+                      <td>{new Date(member.referralJoinedAt).toLocaleDateString()}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CommissionsModule } from '../commissions/commissions.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import {
   AdminDepositAccountingController,
@@ -9,7 +10,7 @@ import { WalletLedgerService } from './wallet-ledger.service';
 import { WalletController } from './wallet.controller';
 
 @Module({
-  imports: [SubscriptionsModule],
+  imports: [SubscriptionsModule, CommissionsModule],
   controllers: [
     WalletController,
     AdminWalletsController,

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CommissionsModule } from '../commissions/commissions.module';
 import {
   AdminDepositSubscriptionController,
   AdminSubscriptionsController,
@@ -7,6 +8,7 @@ import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
 
 @Module({
+  imports: [CommissionsModule],
   controllers: [
     SubscriptionsController,
     AdminSubscriptionsController,
