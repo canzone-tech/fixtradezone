@@ -13,6 +13,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { CommissionsService } from '../commissions/commissions.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { AdminLedgerQueryDto } from './dto/wallet.dto';
@@ -44,6 +45,7 @@ export class AdminDepositAccountingController {
   constructor(
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
+    private readonly commissionsService: CommissionsService,
   ) {}
 
   @Post(':depositId/post-accounting')
@@ -69,9 +71,27 @@ export class AdminDepositAccountingController {
         context,
       );
 
+    if (
+      packageActivation.activationMode !== 'AUTO' ||
+      !packageActivation.subscription
+    ) {
+      return {
+        ...accounting,
+        packageActivation,
+      };
+    }
+
+    const referralCommission =
+      await this.commissionsService.processSubscriptionSafely(
+        packageActivation.subscription.id,
+        actor,
+        context,
+      );
+
     return {
       ...accounting,
       packageActivation,
+      referralCommission,
     };
   }
 }
