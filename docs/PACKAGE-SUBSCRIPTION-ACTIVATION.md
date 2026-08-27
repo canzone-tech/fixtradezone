@@ -1,53 +1,82 @@
-# SUB-01 — Package Subscription / Activation
+# SUB-02 — Package Subscription / Activation
 
-Status: **CONTRACT LOCKED / IMPLEMENTATION IN PROGRESS**.
+Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
 ## Purpose
 
-SUB-01 converts an eligible, approved and accounted package payment into one immutable USER package activation and moves the exact package principal out of the freely available Main / Deposit wallet into package-principal accounting.
+SUB-02 converts an eligible approved/accounted package payment into an immutable USER package activation and consumes the exact package principal through the immutable ledger.
 
-This milestone consumes the existing PKG-01, DEP-01 and WAL-01 foundations. It does **not** calculate referral commission, package rewards, caps, simulated activity, withdrawals or renewals/upgrades.
+This milestone consumes PKG-01, DEP-01 and WAL-01. It does not implement referral commissions, reward accrual/caps, renewals/upgrades, withdrawals or simulated-trade accounting.
 
 ## Source-of-truth chain
 
 ```text
 Published package plan/item
-→ USER selects package during DEP-01 deposit creation
-→ deposit snapshots package/amount/currency
+→ USER selects package during deposit creation
+→ deposit snapshots package/amount/currency/policy
 → payment TXID submitted
 → authorized review APPROVES deposit
-→ WAL-01 posts DEPOSIT:<depositId>:CREDIT
-→ SUB-01 activates package exactly once
+→ WAL-01 posts approved-deposit accounting
+→ SUB-02 activates package according to the immutable source-plan policy
 ```
 
-The configured initial activation trigger remains `PAYMENT_APPROVED`, but financial activation also requires the approved deposit to have been posted into WAL-01 accounting. This settlement prerequisite prevents an ACTIVE package and a freely spendable duplicate Main Wallet principal from co-existing.
+A package may never become ACTIVE before approved-deposit accounting exists.
 
-If deposit accounting is temporarily in `MANUAL_RECONCILIATION`, package activation waits in Activation Pending until the deposit credit exists.
+## Supported activation engines
 
-## Initial locked package rules consumed by SUB-01
+### PAYMENT_APPROVED — automatic activation
 
-- activation trigger: `PAYMENT_APPROVED`;
-- active-package mode: `SINGLE_ACTIVE`;
-- multiple-active basis if later enabled: `HIGHEST_ACTIVE_PACKAGE`;
-- upgrades: disabled in the current published plan;
-- renewal: `MANUAL_AFTER_TERMINAL`;
-- principal treatment: `INCLUDED_IN_TOTAL_RETURN`;
-- cap basis: `TOTAL_RETURN`;
-- plan migration mode: `NEW_PACKAGE_ACTIVATIONS`;
-- currency: package-item/deposit snapshot, currently USDT.
+For a deposit whose source plan snapshots `PAYMENT_APPROVED`:
 
-Historical package terms are never re-read from a later plan after activation. SUB-01 snapshots the applicable commercial terms into the USER package record.
+1. authorized review transitions the deposit to APPROVED;
+2. approved-deposit accounting posts according to the global accounting policy;
+3. once accounting exists, SUB-02 activates the package automatically;
+4. the same idempotent activation service is used by orchestration and recovery.
+
+### MANUAL_ACTIVATION — authorized manual activation
+
+For a deposit whose source plan snapshots `MANUAL_ACTIVATION`:
+
+1. authorized review transitions the deposit to APPROVED;
+2. approved-deposit accounting posts first;
+3. the deposit remains visible in Activation Pending;
+4. an actor with `subscriptions.activate` explicitly completes package activation.
+
+This manual action is a controlled reconciliation step, not an alternate purchase path.
+
+### Deferred execution engines
+
+Configuration values such as `PAYMENT_SUBMITTED` and `RULE_BASED` remain part of the package-plan model, but new deposit funding fails closed while their execution engines are not implemented.
+
+The UI may explain these policies, but it must not allow a user to create a package-funding deposit that cannot be fulfilled safely.
+
+## Accounting policy is independent
+
+Global approved-deposit accounting policy is independent from package activation policy.
+
+Supported accounting modes:
+
+- `AUTO_ON_APPROVAL`
+- `MANUAL_RECONCILIATION`
+
+Therefore:
+
+- AUTO accounting + PAYMENT_APPROVED → approve, account, activate;
+- AUTO accounting + MANUAL_ACTIVATION → approve, account, wait for authorized activation;
+- MANUAL accounting → approval completes first, then accounting/recovery occurs, then package activation follows the source-plan trigger.
+
+No activation path may bypass WAL-01 accounting.
 
 ## Package principal accounting
 
-An approved deposit is first credited by WAL-01:
+Approved-deposit accounting first credits USER Main / Deposit:
 
 ```text
 DEBIT   SYSTEM:DEPOSIT_CLEARING:<currency>
 CREDIT  USER:<userId>:MAIN:<currency>
 ```
 
-Package activation then consumes the same package principal:
+Package activation then consumes the exact package principal:
 
 ```text
 LedgerTransaction(
@@ -59,9 +88,7 @@ DEBIT   USER:<userId>:MAIN:<currency>          <package amount>
 CREDIT  SYSTEM:PACKAGE_PRINCIPAL:<currency>    <package amount>
 ```
 
-This means the package amount is no longer shown as freely available Main Wallet balance after activation. The ACTIVE package itself carries the immutable principal snapshot.
-
-The activation funding transaction and USER package creation commit together or not at all.
+The funding transaction and USER subscription creation commit together or not at all.
 
 ## Idempotency
 
@@ -73,34 +100,49 @@ Deterministic source key:
 DEPOSIT:<depositId>:PACKAGE_ACTIVATION
 ```
 
-The USER package record also has a unique source-deposit relationship. Repeated orchestration or manual reconciliation returns the existing activation and never consumes Main Wallet twice.
+The USER package record also has a unique source-deposit relationship.
 
-## USER package lifecycle
+Repeated activation for an already-activated deposit returns the existing subscription and never consumes Main Wallet twice.
 
-SUB-01 introduces lifecycle states required for the current and already-locked future package rules:
+Verified local retry response contract:
 
-```text
-ACTIVE
-COMPLETED
-SUPERSEDED
-CANCELLED
+```json
+{
+  "created": false,
+  "message": "Package was already activated from this deposit.",
+  "subscription": {
+    "id": "<original-subscription-id>",
+    "sourceDepositId": "<same-deposit-id>",
+    "status": "ACTIVE"
+  }
+}
 ```
 
-SUB-01 creates only `ACTIVE` records. Later milestones own completion, upgrade supersession, cancellation/reversal and renewal events.
+## Active-package modes
 
-A record is never edited to represent a different package purchase. Renewals/upgrades create linked new records under their own future event contracts.
+### SINGLE_ACTIVE
 
-## SINGLE_ACTIVE enforcement
+If the immutable source plan uses `SINGLE_ACTIVE`, activation enforces the single-active boundary transactionally.
 
-The current published plan uses `SINGLE_ACTIVE`.
+The schema does not use a permanent global unique constraint because future/effective plans may legitimately permit multiple active packages.
 
-Activation runs under a serializable transaction and locks the USER activation boundary before checking active packages. If one ACTIVE package already exists, another ordinary package activation is rejected/pended rather than silently replacing history.
+### MULTIPLE_ACTIVE
 
-The schema does not hard-code SINGLE_ACTIVE as a permanent global unique constraint because a future published plan may legitimately enable `MULTIPLE_ACTIVE`. The service enforces the applicable plan snapshot transactionally.
+`MULTIPLE_ACTIVE` is operational.
 
-## Activation snapshots
+A USER may retain more than one ACTIVE package subscription simultaneously when the immutable source plan permits it.
 
-The USER package stores immutable source and commercial snapshots including at minimum:
+Local acceptance proved three simultaneously ACTIVE subscriptions whose immutable snapshots retained different historical policies:
+
+- an older SINGLE_ACTIVE / PAYMENT_APPROVED activation;
+- a newer MULTIPLE_ACTIVE / PAYMENT_APPROVED activation;
+- a newer MULTIPLE_ACTIVE / MANUAL_ACTIVATION activation.
+
+No effective-plan change rewrites an existing subscription snapshot.
+
+## Immutable activation snapshots
+
+Each USER package stores the source and commercial terms required to reproduce the activation decision without reading a later package plan, including:
 
 ```text
 userId
@@ -139,47 +181,24 @@ scheduledEndAt
 status
 ```
 
-All money/rates use exact SQL DECIMAL semantics. JSON APIs return monetary values as strings.
-
-## Automatic orchestration
-
-For a new deposit approved under the current `PAYMENT_APPROVED` plan:
-
-1. DEP-01 review transitions the deposit to APPROVED.
-2. WAL-01 approval orchestration attempts deposit accounting according to its policy.
-3. If the deposit credit exists, SUB-01 attempts package activation using the same idempotent activation service.
-4. If accounting or activation cannot complete, the approved payment remains recoverable through explicit queues; no financial event is silently lost.
-
-Automatic orchestration never bypasses the subscription service or creates a second accounting path.
-
-## Reconciliation
-
-ADMIN/SUPER_ADMIN accounting/package operations expose approved deposits that are:
-
-- accounting-posted;
-- package-linked;
-- not yet activated;
-- eligible under the package snapshot;
-- not blocked by SINGLE_ACTIVE.
-
-Authorized reconciliation calls the same idempotent activation service used by automatic orchestration.
-
-Historical approved/accounted deposits are not auto-mutated by migration. They become visible in Activation Pending for controlled local/operational reconciliation.
+Money/rate values retain exact SQL DECIMAL semantics and monetary JSON values are strings.
 
 ## RBAC
 
-SUB-01 introduces:
+SUB-02 uses:
 
 ```text
 subscriptions.read
 subscriptions.activate
+ledger.post
 ```
 
-`subscriptions.read` allows delegated ADMIN read access when explicitly assigned.
-`subscriptions.activate` controls manual activation reconciliation.
-SUPER_ADMIN retains the existing permission bypass.
+- `subscriptions.read` controls delegated subscription reads.
+- `subscriptions.activate` controls manual activation/reconciliation.
+- `ledger.post` controls explicit approved-deposit accounting recovery.
+- SUPER_ADMIN retains the existing RBAC bypass contract.
 
-No arbitrary edit-balance or arbitrary create-active-package endpoint exists.
+No arbitrary balance editor or arbitrary create-active-package endpoint exists.
 
 ## API surface
 
@@ -191,47 +210,82 @@ GET /subscriptions/me
 
 Returns current ACTIVE package(s) plus immutable package history.
 
-### ADMIN
+### ADMIN / SUPER_ADMIN
 
 ```text
 GET  /admin/subscriptions
 GET  /admin/subscriptions/activation-pending
 GET  /admin/subscriptions/:subscriptionId
 POST /admin/deposits/:depositId/activate-package
+POST /admin/deposits/:depositId/post-accounting
 ```
 
-The activation POST is recovery/reconciliation, not an alternate package-purchase path.
+Accounting configuration:
+
+```text
+GET   /admin/settings/accounting
+PATCH /admin/settings/accounting
+```
 
 ## Frontend acceptance surface
 
-### USER `/user/packages`
+### USER
 
-The existing package catalogue remains. SUB-01 adds:
+`/user/packages` and `/user/deposits`:
 
-- My Active Package;
-- principal amount/currency;
-- activation date;
-- scheduled package end date;
-- package status;
-- immutable source/payment reference;
-- package history;
-- no reward/profit values invented before the reward milestone.
+- display the effective active-package mode;
+- display the effective activation trigger;
+- explain AUTO vs authorized MANUAL behavior;
+- block funding for unsupported execution engines;
+- display multiple simultaneous ACTIVE subscriptions independently;
+- retain historical policy snapshots on existing subscription records.
 
-After activation, Main Wallet decreases by the exact package principal while Package Earnings / Referral Commission / Rewards remain unchanged.
+### ADMIN
 
-### ADMIN `/subscriptions`
+`/packages`:
 
-- Activation Pending queue;
-- USER package/subscription list;
-- source deposit/payment reference;
-- current status;
-- package snapshot summary;
-- manual Reconcile activation action where authorized;
-- shared right-side `FlashMessage` feedback.
+- activation policy is visible and editable only on DRAFT plans;
+- AUTO vs MANUAL behavior is explicitly explained;
+- unsaved lifecycle/item changes are visibly flagged;
+- publication is disabled until local draft changes are explicitly saved;
+- success/error/unsaved feedback remains viewport-visible on the long workspace.
+
+`/deposits`:
+
+- approval result distinguishes activation completed vs activation pending;
+- authorized accounting recovery is available only where applicable.
+
+`/subscriptions`:
+
+- Activation Pending shows immutable source plan mode/trigger;
+- MANUAL_ACTIVATION exposes `Activate package`;
+- automatic-policy recovery is distinguished from intentional manual activation.
+
+Admin Deposits and Subscriptions also have explicit topbar route headings rather than the generic Dashboard fallback.
+
+## Local acceptance evidence — 2026-08-27
+
+GREEN through combined backend + frontend testing:
+
+- AUTO `PAYMENT_APPROVED` browser flow;
+- `MULTIPLE_ACTIVE` simultaneous package behavior;
+- USER/Admin immutable policy snapshot display;
+- authorized `MANUAL_ACTIVATION` browser flow;
+- approval/accounting completing without premature MANUAL activation;
+- Activation Pending before manual action;
+- pending-queue removal after successful manual action;
+- Postman/API effective-policy readback;
+- Postman/API three-active-subscription readback;
+- manual activation idempotency retry returning `created: false` and the original subscription identity;
+- backend tests/build/format/lint;
+- Prisma validation and migration status;
+- admin lint/typecheck/Next.js production build;
+- root milestone verification;
+- unstaged and staged diff checks.
 
 ## Explicitly deferred
 
-SUB-01 does not implement:
+SUB-02 does not implement:
 
 - referral commission generation;
 - team-business volume;
@@ -242,18 +296,14 @@ SUB-01 does not implement:
 - renewal execution;
 - refund/chargeback/cancellation reversals;
 - withdrawal/payout;
-- arbitrary ADMIN package assignment.
+- arbitrary ADMIN package assignment;
+- PAYMENT_SUBMITTED execution engine;
+- RULE_BASED execution engine.
 
-Those later milestones must consume immutable SUB-01 records and WAL-01 ledger events rather than rewrite package/payment history.
+Later milestones must consume immutable SUB-02 records and WAL-01 ledger events rather than rewrite package/payment history.
 
-## Acceptance order
+## Delivery state
 
-1. backend + frontend implementation complete;
-2. backend/admin CI green;
-3. forward migration status/deploy green;
-4. frontend-first acceptance;
-5. API/Postman only for a failing UI/business path;
-6. SQL/audit/ledger/subscription readback;
-7. final milestone verification;
-8. Founder acceptance;
-9. PR only after explicit Founder approval.
+Implementation and local acceptance are complete on `feature/package-subscription-activation`.
+
+The branch must not merge to `main` until the complete feature diff is reviewed, the repository checkpoint is committed/pushed, and the PR is approved.
