@@ -101,7 +101,8 @@ export const SYSTEM_PERMISSIONS = [
   },
   {
     code: PERMISSIONS.COMMISSIONS_READ,
-    description: 'View referral commission plans, events and reconciliation state',
+    description:
+      'View referral commission plans, events and reconciliation state',
   },
   {
     code: PERMISSIONS.COMMISSIONS_PLAN_MANAGE,
@@ -109,7 +110,8 @@ export const SYSTEM_PERMISSIONS = [
   },
   {
     code: PERMISSIONS.COMMISSIONS_RECONCILE,
-    description: 'Reconcile package subscriptions into referral commission events',
+    description:
+      'Reconcile package subscriptions into referral commission events',
   },
   {
     code: PERMISSIONS.RBAC_READ,

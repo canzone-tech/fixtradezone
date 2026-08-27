@@ -25,7 +25,11 @@ export const COMMISSION_RELEASE_MODES = [
 ] as const;
 export type CommissionReleaseMode = (typeof COMMISSION_RELEASE_MODES)[number];
 
-export const COMMISSION_EVENT_STATUSES = ['AVAILABLE', 'PENDING', 'LOST'] as const;
+export const COMMISSION_EVENT_STATUSES = [
+  'AVAILABLE',
+  'PENDING',
+  'LOST',
+] as const;
 export type CommissionEventStatus = (typeof COMMISSION_EVENT_STATUSES)[number];
 
 export const COMMISSION_RUN_OUTCOMES = [
