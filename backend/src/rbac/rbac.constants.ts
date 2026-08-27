@@ -17,6 +17,9 @@ export const PERMISSIONS = {
   LEDGER_POST: 'ledger.post',
   SUBSCRIPTIONS_READ: 'subscriptions.read',
   SUBSCRIPTIONS_ACTIVATE: 'subscriptions.activate',
+  COMMISSIONS_READ: 'commissions.read',
+  COMMISSIONS_PLAN_MANAGE: 'commissions.plan.manage',
+  COMMISSIONS_RECONCILE: 'commissions.reconcile',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -95,6 +98,18 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.SUBSCRIPTIONS_ACTIVATE,
     description:
       'Reconcile eligible approved and accounted deposits into package activation',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_READ,
+    description: 'View referral commission plans, events and reconciliation state',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_PLAN_MANAGE,
+    description: 'Create, edit and publish versioned referral commission plans',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_RECONCILE,
+    description: 'Reconcile package subscriptions into referral commission events',
   },
   {
     code: PERMISSIONS.RBAC_READ,
