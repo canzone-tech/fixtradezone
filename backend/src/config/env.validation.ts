@@ -27,6 +27,14 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+  REWARD_WORKER_ENABLED: Joi.boolean().truthy('true').falsy('false').default(true),
+
+  REWARD_WORKER_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .max(3_600_000)
+    .default(60_000),
+
   CAPTCHA_HMAC_SECRET: Joi.string().min(32).required(),
 
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),
