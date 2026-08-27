@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { PrismaService } from '../database/prisma.service';
+import type { Prisma } from '../generated/prisma/client';
 import { referralCommissionSourceKey } from '../wallet/wallet.constants';
 import { CommissionsService } from './commissions.service';
 
@@ -22,96 +23,109 @@ const actor: AuthenticatedUser = {
   permissions: [],
 };
 
-type PlanValidationInput = {
-  firstPurchaseEnabled: boolean;
-  newPurchaseEnabled: boolean;
-  renewalEnabled: boolean;
-  upgradeEnabled: boolean;
-  upgradeBaseMode: 'FULL' | 'INCREMENTAL';
-  activePackageRequired: boolean;
-  inactiveUplineAction: 'LOST' | 'PENDING' | 'PASS_UP';
-  compressionMode: 'SKIP' | 'PASS_SAME_LEVEL' | 'COMPRESS_LEVELS' | 'PENDING';
-  releaseMode: 'IMMEDIATE' | 'HOLD_PERIOD' | 'MANUAL_APPROVAL' | 'CONDITION_BASED';
-  holdPeriodHours: number;
+const draftPlan = {
+  id: '11111111-1111-4111-8111-111111111111',
+  versionNumber: 1,
+  status: 'DRAFT',
+  revision: 1,
+  firstPurchaseEnabled: true,
+  newPurchaseEnabled: true,
+  renewalEnabled: false,
+  upgradeEnabled: false,
+  upgradeBaseMode: 'INCREMENTAL',
+  activePackageRequired: true,
+  inactiveUplineAction: 'LOST',
+  compressionMode: 'SKIP',
+  releaseMode: 'IMMEDIATE',
+  holdPeriodHours: 0,
+  effectiveFrom: null,
+  effectiveTo: null,
+  publishedAt: null,
+  clonedFromPlanVersionId: null,
+  createdByUserId: actor.id,
+  updatedByUserId: actor.id,
+  publishedByUserId: null,
+  createdAt: new Date('2026-08-27T00:00:00.000Z'),
+  updatedAt: new Date('2026-08-27T00:00:00.000Z'),
 };
-
-type TestableService = CommissionsService & {
-  validatePlanConfiguration: (
-    plan: PlanValidationInput,
-    levels: Array<{
-      level: number;
-      enabled: boolean;
-      ratePercent: string;
-      packageMatchingEnabled: boolean;
-    }>,
-    forPublication: boolean,
-  ) => void;
-};
-
-function executablePlan(): PlanValidationInput {
-  return {
-    firstPurchaseEnabled: true,
-    newPurchaseEnabled: true,
-    renewalEnabled: false,
-    upgradeEnabled: false,
-    upgradeBaseMode: 'INCREMENTAL',
-    activePackageRequired: true,
-    inactiveUplineAction: 'LOST',
-    compressionMode: 'SKIP',
-    releaseMode: 'IMMEDIATE',
-    holdPeriodHours: 0,
-  };
-}
 
 const levels = [
   {
+    id: '33333333-3333-4333-8333-333333333333',
+    planVersionId: draftPlan.id,
     level: 1,
     enabled: true,
     ratePercent: '20.000000',
     packageMatchingEnabled: true,
-  },
-  {
-    level: 2,
-    enabled: true,
-    ratePercent: '8.000000',
-    packageMatchingEnabled: true,
+    createdAt: new Date('2026-08-27T00:00:00.000Z'),
+    updatedAt: new Date('2026-08-27T00:00:00.000Z'),
   },
 ];
 
+type TransactionWork = (
+  transaction: Prisma.TransactionClient,
+) => Promise<unknown>;
+
+function publicationService(planPatch: Record<string, unknown> = {}) {
+  const transaction = {
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValueOnce([{ ...draftPlan, ...planPatch }])
+      .mockResolvedValueOnce(levels),
+    $executeRaw: jest.fn(),
+    auditLog: { create: jest.fn() },
+  };
+  const prisma = {
+    $transaction: jest.fn((work: TransactionWork) =>
+      work(transaction as unknown as Prisma.TransactionClient),
+    ),
+  };
+
+  return {
+    service: new CommissionsService(prisma as unknown as PrismaService),
+    transaction,
+  };
+}
+
 describe('CommissionsService', () => {
-  const service = new CommissionsService({} as PrismaService);
-  const testable = service as TestableService;
-
-  it('accepts only the initial executable LOST + SKIP + IMMEDIATE publication policy', () => {
-    expect(() =>
-      testable.validatePlanConfiguration(executablePlan(), levels, true),
-    ).not.toThrow();
-  });
-
   it.each([
-    ['inactive-upline pending', { inactiveUplineAction: 'PENDING' as const }],
-    ['pass-up', { inactiveUplineAction: 'PASS_UP' as const }],
-    ['level compression', { compressionMode: 'COMPRESS_LEVELS' as const }],
-    ['hold release', { releaseMode: 'HOLD_PERIOD' as const, holdPeriodHours: 24 }],
-    ['manual release', { releaseMode: 'MANUAL_APPROVAL' as const }],
-  ])('fails closed when %s requires a deferred engine', (_label, patch) => {
-    expect(() =>
-      testable.validatePlanConfiguration(
-        { ...executablePlan(), ...patch },
-        levels,
-        true,
+    ['inactive-upline pending', { inactiveUplineAction: 'PENDING' }],
+    ['pass-up', { inactiveUplineAction: 'PASS_UP' }],
+    ['level compression', { compressionMode: 'COMPRESS_LEVELS' }],
+    ['hold release', { releaseMode: 'HOLD_PERIOD', holdPeriodHours: 24 }],
+    ['manual release', { releaseMode: 'MANUAL_APPROVAL' }],
+  ])('fails closed at publication when %s requires a deferred engine', async (_label, patch) => {
+    const { service, transaction } = publicationService(patch);
+
+    await expect(
+      service.publishPlan(
+        draftPlan.id,
+        {
+          expectedRevision: 1,
+          reason: 'Founder reviewed COMM-01 plan.',
+        },
+        actor,
       ),
-    ).toThrow(BadRequestException);
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
-  it('rejects matching when active-package qualification is disabled', () => {
-    expect(() =>
-      testable.validatePlanConfiguration(
-        { ...executablePlan(), activePackageRequired: false },
-        levels,
-        false,
+  it('rejects package matching when active-package qualification is disabled', async () => {
+    const { service, transaction } = publicationService({
+      activePackageRequired: false,
+    });
+
+    await expect(
+      service.publishPlan(
+        draftPlan.id,
+        {
+          expectedRevision: 1,
+          reason: 'Founder reviewed COMM-01 plan.',
+        },
+        actor,
       ),
-    ).toThrow('Package matching requires active-package qualification.');
+    ).rejects.toThrow('Package matching requires active-package qualification.');
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
   it('builds deterministic per-level commission source keys', () => {
@@ -130,6 +144,7 @@ describe('CommissionsService', () => {
     new ConflictException('retry later'),
     new ServiceUnavailableException('route needs investigation'),
   ])('returns reconciliation state for recoverable commission failures', async (error) => {
+    const service = new CommissionsService({} as PrismaService);
     jest.spyOn(service, 'processSubscription').mockRejectedValueOnce(error);
 
     await expect(
@@ -143,6 +158,7 @@ describe('CommissionsService', () => {
   });
 
   it('does not hide non-recoverable validation failures', async () => {
+    const service = new CommissionsService({} as PrismaService);
     jest
       .spyOn(service, 'processSubscription')
       .mockRejectedValueOnce(new BadRequestException('invalid source state'));
