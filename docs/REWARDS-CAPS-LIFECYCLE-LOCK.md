@@ -4,6 +4,8 @@ Status: **R48–R58 LOCKED / APPROVED 2026-08-27**.
 
 This addendum records Founder approval of the RWD-01 execution boundary in `docs/REWARDS-CAPS-LIFECYCLE.md`.
 
+**Precedence:** this lock addendum supersedes any earlier `PROPOSED` / `FOUNDER LOCK REQUIRED` wording that remains in the original discovery/proposal document. The proposal document is retained as decision history; this file is the authoritative execution lock for RWD-01.
+
 The following are locked for RWD-01 implementation:
 
 - **R48:** immutable ACTIVE package-subscription snapshot is the reward source authority.
@@ -41,3 +43,7 @@ first payable boundary:  2026-08-29 local settlement time
 ```
 
 The published policy row is immutable historical authority for the state/events created under it.
+
+## Exact decimal settlement invariant
+
+RWD-01 keeps the existing exact-decimal financial standard. The selected reward rate is persisted at six decimal places. Calculated/postable money is settled at ledger precision `DECIMAL(20,8)` using **round-down** semantics before posting or cap consumption. This prevents hidden fractional dust from over-crediting the USER or exceeding the configured cap. The immutable event stores the selected rate, calculated reward, posted reward, cap-before and cap-after values used by the transaction.
