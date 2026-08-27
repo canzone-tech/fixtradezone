@@ -29,6 +29,11 @@ const routeHeadings: Array<{
     subtitle: "Versioned matching rules and immutable commission accounting",
   },
   {
+    path: "/rewards",
+    title: "Rewards, Caps & Lifecycle",
+    subtitle: "Daily package settlement, cap progress and lifecycle controls",
+  },
+  {
     path: "/packages",
     title: "Package Plans",
     subtitle: "Versioned catalogue and publication controls",
@@ -67,12 +72,10 @@ export default function Topbar() {
 
     async function loadSession() {
       const session = await resolveAdminSession();
-
       if (!session.user) {
         router.replace("/login");
         return;
       }
-
       if (mounted) setUser(session.user);
     }
 
@@ -86,7 +89,6 @@ export default function Topbar() {
     };
 
     window.addEventListener("keydown", onShortcut);
-
     return () => {
       mounted = false;
       window.removeEventListener("keydown", onShortcut);
@@ -95,7 +97,6 @@ export default function Topbar() {
 
   const displayName = useMemo(() => {
     if (!user) return "Super Admin";
-
     return (
       [user.firstName, user.lastName].filter(Boolean).join(" ") ||
       user.username ||
@@ -145,7 +146,6 @@ export default function Topbar() {
         >
           <i className="iconoir-menu-scale" />
         </button>
-
         <div>
           <h1>{heading.title}</h1>
           <p>{heading.subtitle}</p>
@@ -172,7 +172,6 @@ export default function Topbar() {
         >
           <i className="iconoir-star" />
         </button>
-
         <button
           type="button"
           className="ftz-icon-button ftz-notification"
@@ -185,7 +184,6 @@ export default function Topbar() {
 
         <div className="ftz-topbar-profile">
           <div className="ftz-avatar">{initials}</div>
-
           <div className="ftz-topbar-profile-copy">
             <strong>{displayName}</strong>
             <small>{user?.roles.join(" · ") ?? "SUPER_ADMIN"}</small>
@@ -201,7 +199,6 @@ export default function Topbar() {
           title="Sign out"
         >
           <i className="iconoir-log-out" />
-
           <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
         </button>
       </div>
