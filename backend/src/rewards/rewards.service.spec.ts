@@ -154,12 +154,18 @@ describe('RewardsService RWD-01 boundaries', () => {
           'RETROACTIVE_FROM_SUBSCRIPTION_SCHEDULE',
       },
     ],
-    ['package reward excluded from cap', { packageRewardCountsTowardCap: false }],
+    [
+      'package reward excluded from cap',
+      { packageRewardCountsTowardCap: false },
+    ],
     [
       'referral commission included in cap',
       { referralCommissionCountsTowardCap: true },
     ],
-    ['team commission included in cap', { teamCommissionCountsTowardCap: true }],
+    [
+      'team commission included in cap',
+      { teamCommissionCountsTowardCap: true },
+    ],
     ['award reward included in cap', { awardRewardCountsTowardCap: true }],
     ['other income included in cap', { otherIncomeCountsTowardCap: true }],
   ])(
