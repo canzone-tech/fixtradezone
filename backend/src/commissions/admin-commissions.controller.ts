@@ -57,9 +57,7 @@ export class AdminCommissionPlansController {
   @Get(':planVersionId')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.COMMISSIONS_READ)
-  getPlan(
-    @Param('planVersionId', new ParseUUIDPipe()) planVersionId: string,
-  ) {
+  getPlan(@Param('planVersionId', new ParseUUIDPipe()) planVersionId: string) {
     return this.commissionsService.getPlan(planVersionId);
   }
 
