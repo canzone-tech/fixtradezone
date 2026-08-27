@@ -2,7 +2,8 @@
 
 FixTradeZone is a template-driven platform for packages, subscriptions, deposits, wallet/ledger operations, referrals, rewards, and clearly labeled simulated trade activity.
 
-> Current status: Phase 3 — backend foundation and secure authentication.
+> Current status: MLM-01 is merged/accepted; PKG-01 Packages / Plan Foundation
+> backend is awaiting its local migration and Postman gate before BFF/UI work.
 >
 > FixTradeZone does not execute real trades. Any displayed trade activity must be explicitly labeled **Simulated Trade Activity**.
 
@@ -67,7 +68,7 @@ After the reviewed auth-session migration is applied and a founder account is re
 
 ```bash
 cd backend
-npm run admin:bootstrap -- founder@example.com
+npm run super-admin:bootstrap -- founder@example.com
 ```
 
 Start the admin application on port 3001:
@@ -96,14 +97,15 @@ npm run dev -- --port 3001
 
 ## Quality checks
 
-From `backend/`:
+From the repository root:
 
 ```bash
-npm run prisma:generate
-npm run lint
-npm test -- --runInBand
-npm run build
+npm run verify:local
+npm run verify:milestone
 ```
+
+Database deployment remains a separate explicit write: `npm run db:deploy`.
+For PKG-01 follow [`docs/LOCAL-VERIFY-PACKAGES.md`](docs/LOCAL-VERIFY-PACKAGES.md).
 
 ## Delivery workflow
 

@@ -1,0 +1,15 @@
+import { NextRequest } from "next/server";
+import { proxyAdminRequest } from "@/lib/admin-backend";
+
+export async function GET(
+  request: NextRequest,
+  context: { params: Promise<{ depositId: string }> },
+) {
+  const { depositId } = await context.params;
+
+  return proxyAdminRequest(
+    request,
+    `/admin/deposits/${encodeURIComponent(depositId)}`,
+    { method: "GET" },
+  );
+}

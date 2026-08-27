@@ -1,0 +1,217 @@
+{
+  "info": {
+    "_postman_id": "b210fbeb-7b71-4c17-95f4-6c55b7d8f001",
+    "name": "FixTradeZone DEP-01 Combined Acceptance",
+    "description": "Run only after migrations 0008 and 0009 are deployed and an ACTIVE USDT/TRC20 payment rail has at least one ACTIVE public receiving account. Uses blank local admin/user credentials. Synthetic TXIDs are LOCAL QA data only; DEP-01 never performs blockchain credit or package activation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Admin Login",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('admin login 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+          "pm.expect(body.user.roles).to.include.oneOf(['ADMIN', 'SUPER_ADMIN']);",
+          "pm.environment.set('adminAccessToken', body.accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"identifier\": \"{{adminIdentifier}}\",\n  \"password\": \"{{adminPassword}}\"\n}"},
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "02 Admin Active Payment Rail + Account Preflight",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('account list 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const active = (body.accounts || []).filter(a => a.isActive && a.asset === 'USDT' && a.network === 'TRC20' && a.paymentRail && a.paymentRail.isActive);",
+          "pm.test('active USDT/TRC20 rail and account exist', () => pm.expect(active.length, 'Configure the seeded USDT/TRC20 rail and create an active account in Admin /deposits first').to.be.above(0));",
+          "if (active.length) { const a = active[0]; pm.environment.set('depositPaymentRailId', a.paymentRailId); pm.environment.set('depositAccountId', a.id); pm.environment.set('depositAccountRevision', String(a.revision)); }"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
+        "url": "{{baseUrl}}/admin/deposit-accounts"
+      }
+    },
+    {
+      "name": "03 User Login",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('user login 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+          "pm.expect(body.user.roles).to.include('USER');",
+          "pm.environment.set('userAccessToken', body.accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"identifier\": \"{{userIdentifier}}\",\n  \"password\": \"{{userPassword}}\"\n}"},
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "04 User Effective Packages",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('catalogue 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const available = (body.items || []).filter(i => i.availability === 'AVAILABLE' && i.currency === 'USDT');",
+          "pm.test('available USDT package exists', () => pm.expect(available.length).to.be.above(0));",
+          "if (available.length) pm.environment.set('depositPackageItemId', available[0].id);"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
+        "url": "{{baseUrl}}/packages"
+      }
+    },
+    {
+      "name": "05 User Create Deposit A",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('deposit created 201', () => pm.response.to.have.status(201));",
+          "const d = pm.response.json().deposit;",
+          "pm.expect(d.status).to.eql('AWAITING_TXID');",
+          "pm.expect(d.currency).to.eql('USDT'); pm.expect(d.assignedNetwork).to.eql('TRC20'); pm.expect(d.assignedValidationProfile).to.eql('TRON');",
+          "pm.expect(d.assignedWalletAddress).to.be.a('string').and.not.empty;",
+          "pm.expect(d.assignedQrCodeDataUrl).to.match(/^data:image\//);",
+          "pm.environment.set('depositId', d.id);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"packagePlanItemId\": \"{{depositPackageItemId}}\",\n  \"paymentRailId\": \"{{depositPaymentRailId}}\"\n}"},
+        "url": "{{baseUrl}}/deposits"
+      }
+    },
+    {
+      "name": "06 Duplicate Open Deposit Blocked",
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('second open deposit is 409', () => pm.response.to.have.status(409));"]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"packagePlanItemId\": \"{{depositPackageItemId}}\",\n  \"paymentRailId\": \"{{depositPaymentRailId}}\"\n}"},
+        "url": "{{baseUrl}}/deposits"
+      }
+    },
+    {
+      "name": "07 Invalid Transaction ID Blocked",
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('invalid transaction ID is 400', () => pm.response.to.have.status(400));"]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"txid\": \"not-a-valid-txid\"\n}"},
+        "url": "{{baseUrl}}/deposits/{{depositId}}/txid"
+      }
+    },
+    {
+      "name": "08 Submit Transaction ID A",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('transaction ID submitted 201', () => pm.response.to.have.status(201));",
+          "const d = pm.response.json().deposit; pm.expect(d.status).to.eql('PENDING_REVIEW'); pm.expect(d.txid).to.eql(pm.environment.get('depositTxid').toLowerCase());"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"txid\": \"{{depositTxid}}\"\n}"},
+        "url": "{{baseUrl}}/deposits/{{depositId}}/txid"
+      }
+    },
+    {
+      "name": "09 Admin Pending Queue Sees Deposit A",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('pending queue 200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json(); const id = pm.environment.get('depositId'); const hit = (body.deposits || []).find(d => d.id === id);",
+        "pm.test('created deposit is pending', () => { pm.expect(hit).to.exist; pm.expect(hit.status).to.eql('PENDING_REVIEW'); });"
+      ]}}],
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}], "url": "{{baseUrl}}/admin/deposits?status=PENDING_REVIEW"}
+    },
+    {
+      "name": "10 Admin Approve Deposit A",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('approve 201', () => pm.response.to.have.status(201));",
+        "const d = pm.response.json().deposit; pm.expect(d.status).to.eql('APPROVED'); pm.expect(d.reviewNote).to.eql('LOCAL QA synthetic TXID approval');"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"note\": \"LOCAL QA synthetic TXID approval\"\n}"},
+        "url": "{{baseUrl}}/admin/deposits/{{depositId}}/approve"
+      }
+    },
+    {
+      "name": "11 User Approved Readback A",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('history 200', () => pm.response.to.have.status(200));",
+        "const body = pm.response.json(); const id = pm.environment.get('depositId'); const hit = (body.deposits || []).find(d => d.id === id);",
+        "pm.test('approved state persisted', () => { pm.expect(hit).to.exist; pm.expect(hit.status).to.eql('APPROVED'); });"
+      ]}}],
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}], "url": "{{baseUrl}}/deposits/me"}
+    },
+    {
+      "name": "12 User Create Deposit B",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('second lifecycle deposit created 201', () => pm.response.to.have.status(201));",
+        "pm.environment.set('depositId', pm.response.json().deposit.id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"packagePlanItemId\": \"{{depositPackageItemId}}\",\n  \"paymentRailId\": \"{{depositPaymentRailId}}\"\n}"},
+        "url": "{{baseUrl}}/deposits"
+      }
+    },
+    {
+      "name": "13 Submit Transaction ID B",
+      "event": [{"listen": "test", "script": {"exec": ["pm.test('second transaction ID submitted 201', () => pm.response.to.have.status(201));"]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"txid\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\n}"},
+        "url": "{{baseUrl}}/deposits/{{depositId}}/txid"
+      }
+    },
+    {
+      "name": "14 Admin Reject Deposit B",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('reject 201', () => pm.response.to.have.status(201));",
+        "const d = pm.response.json().deposit; pm.expect(d.status).to.eql('REJECTED'); pm.expect(d.reviewNote).to.eql('LOCAL QA rejection-path verification');"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}, {"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"note\": \"LOCAL QA rejection-path verification\"\n}"},
+        "url": "{{baseUrl}}/admin/deposits/{{depositId}}/reject"
+      }
+    },
+    {
+      "name": "15 Final User History",
+      "event": [{"listen": "test", "script": {"exec": [
+        "pm.test('final history 200', () => pm.response.to.have.status(200));",
+        "const deposits = pm.response.json().deposits || [];",
+        "pm.test('history contains approved and rejected QA paths', () => { pm.expect(deposits.some(d => d.status === 'APPROVED')).to.eql(true); pm.expect(deposits.some(d => d.status === 'REJECTED')).to.eql(true); });"
+      ]}}],
+      "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}], "url": "{{baseUrl}}/deposits/me"}
+    }
+  ]
+}

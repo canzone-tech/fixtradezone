@@ -41,7 +41,12 @@ function rejectSession(status = 401, redirectTo = "/login"): NextResponse {
           : "Session expired.",
       redirectTo,
     },
-    { status },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
   );
 
   if (status === 401) {
@@ -61,7 +66,12 @@ export async function proxyUserRequest(
       {
         message: "Cross-site USER requests are not allowed.",
       },
-      { status: 403 },
+      {
+        status: 403,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
     );
   }
 
@@ -139,7 +149,12 @@ export async function proxyUserRequest(
       {
         message: "USER API is temporarily unavailable.",
       },
-      { status: 503 },
+      {
+        status: 503,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
     );
   }
 }

@@ -11,6 +11,10 @@ import { SecurityConfigModule } from './security-config/security-config.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { RedisModule } from './redis/redis.module';
+import { PackagesModule } from './packages/packages.module';
+import { WalletModule } from './wallet/wallet.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { DepositsModule } from './deposits/deposits.module';
 
 @Module({
   imports: [
@@ -30,6 +34,10 @@ import { RedisModule } from './redis/redis.module';
     UsersModule,
     SecurityConfigModule,
     PlatformConfigModule,
+    PackagesModule,
+    WalletModule,
+    SubscriptionsModule,
+    DepositsModule,
     DashboardModule,
     HealthModule,
   ],

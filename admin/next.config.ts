@@ -1,6 +1,29 @@
+import { networkInterfaces } from "node:os";
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
+
+const configuredDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const detectedLanDevOrigins = isProduction
+  ? []
+  : Object.values(networkInterfaces())
+      .flatMap((interfaces) => interfaces ?? [])
+      .filter(
+        (network) =>
+          network.family === "IPv4" &&
+          !network.internal &&
+          network.address.length > 0,
+      )
+      .map((network) => network.address);
+
+const allowedDevOrigins = Array.from(
+  new Set([...configuredDevOrigins, ...detectedLanDevOrigins]),
+);
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
@@ -40,11 +63,31 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
   async headers() {
     return [
       {
         source: "/api/auth/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, no-store, must-revalidate",
+          },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, must-revalidate",
+          },
+        ],
       },
       {
         source: "/(.*)",

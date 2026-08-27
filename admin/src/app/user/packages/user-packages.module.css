@@ -1,0 +1,507 @@
+.page {
+  display: grid;
+  gap: 22px;
+  min-height: calc(100vh - var(--ftz-topbar));
+  padding: 24px;
+  background:
+    radial-gradient(
+      circle at 82% 2%,
+      rgba(20, 111, 150, 0.14),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 12% 70%,
+      rgba(54, 32, 144, 0.12),
+      transparent 30rem
+    ),
+    linear-gradient(180deg, rgba(2, 8, 24, 0.48), rgba(2, 7, 20, 0.75));
+}
+
+.header,
+.headerStatus,
+.cardTop,
+.price,
+.activationNotice,
+.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header > div:first-child {
+  max-width: 760px;
+}
+
+.header > div:first-child > span,
+.emptyState > span,
+.planStrip small,
+.packageCode,
+.rateBox small {
+  color: #43e9df;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.header h2 {
+  margin: 7px 0;
+  color: #f7faff;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.04em;
+}
+
+.header p,
+.emptyState p,
+.activationNotice small,
+.disclosure p {
+  margin: 0;
+  color: #8ea0bd;
+  line-height: 1.65;
+}
+
+.headerStatus {
+  justify-content: flex-start;
+  min-width: 265px;
+  padding: 13px 15px;
+  border: 1px solid rgba(20, 229, 154, 0.28);
+  border-radius: 13px;
+  background: rgba(7, 65, 52, 0.3);
+}
+
+.headerStatus > i {
+  flex: 0 0 auto;
+  color: #4cf0b5;
+  font-size: 24px;
+}
+
+.headerStatus > span,
+.activationNotice > span {
+  display: grid;
+  gap: 3px;
+}
+
+.headerStatus strong {
+  color: #ddfff2;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.headerStatus small {
+  color: #86bda9;
+  font-size: 9px;
+}
+
+.planStrip,
+.packageCard,
+.emptyState,
+.errorState,
+.disclosure {
+  border: 1px solid rgba(74, 129, 206, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(
+    145deg,
+    rgba(8, 23, 53, 0.93),
+    rgba(4, 13, 36, 0.95)
+  );
+  box-shadow: inset 0 0 24px rgba(0, 112, 255, 0.045);
+}
+
+.planStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.planStrip > div {
+  min-width: 0;
+  padding: 17px 20px;
+  border-right: 1px solid rgba(74, 129, 206, 0.18);
+}
+
+.planStrip > div:last-child {
+  border-right: 0;
+}
+
+.planStrip small,
+.planStrip strong {
+  display: block;
+}
+
+.planStrip small {
+  color: #7188a9;
+  font-size: 8px;
+}
+
+.planStrip strong {
+  overflow: hidden;
+  margin-top: 7px;
+  color: #e7effd;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.planStrip .deferred {
+  color: #ffc567;
+}
+
+.catalogueGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.packageCard {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.packageCard::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 90% 0,
+    rgba(21, 221, 212, 0.08),
+    transparent 14rem
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.premiumCard::before {
+  background:
+    radial-gradient(
+      circle at 90% 0,
+      rgba(157, 66, 255, 0.12),
+      transparent 15rem
+    ),
+    radial-gradient(
+      circle at 5% 100%,
+      rgba(22, 229, 224, 0.08),
+      transparent 12rem
+    );
+}
+
+.cardTop,
+.packageIcon,
+.packageCode,
+.packageCard h3,
+.price,
+.rateBox,
+.termList,
+.activationNotice,
+.depositLink {
+  position: relative;
+}
+
+.packageIndex {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 9px;
+  color: #58efe5;
+  background: rgba(11, 88, 98, 0.36);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.availability {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.available {
+  color: #64f2bb;
+  background: rgba(10, 91, 65, 0.35);
+}
+
+.closed {
+  color: #ffc66b;
+  background: rgba(97, 58, 6, 0.4);
+}
+
+.packageIcon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin: 18px 0 14px;
+  place-items: center;
+  border: 1px solid rgba(36, 244, 232, 0.26);
+  border-radius: 14px;
+  color: #22fff0;
+  background: linear-gradient(
+    145deg,
+    rgba(13, 112, 121, 0.45),
+    rgba(7, 40, 73, 0.44)
+  );
+  box-shadow: 0 0 22px rgba(13, 221, 213, 0.1);
+  font-size: 22px;
+}
+
+.packageCard h3 {
+  margin: 6px 0 14px;
+  color: #f5f8ff;
+  font-size: 18px;
+}
+
+.price {
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.price strong {
+  color: #ffffff;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+
+.price span {
+  padding: 4px 7px;
+  border-radius: 7px;
+  color: #5ff0e6;
+  background: rgba(10, 91, 100, 0.34);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.rateBox {
+  display: grid;
+  gap: 4px;
+  padding: 13px;
+  border: 1px solid rgba(22, 229, 224, 0.2);
+  border-radius: 12px;
+  background: rgba(6, 52, 66, 0.34);
+}
+
+.rateBox strong {
+  color: #5affec;
+  font-size: 19px;
+}
+
+.rateBox span {
+  color: #7f9cb5;
+  font-size: 8px;
+}
+
+.termList {
+  display: grid;
+  gap: 0;
+  margin: 16px 0;
+}
+
+.termList > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(74, 129, 206, 0.13);
+}
+
+.termList dt,
+.termList dd {
+  font-size: 9px;
+}
+
+.termList dt {
+  color: #7d90ad;
+}
+
+.termList dd {
+  margin: 0;
+  color: #d9e5f5;
+  text-align: right;
+  font-weight: 700;
+}
+
+.activationNotice {
+  justify-content: flex-start;
+  padding: 11px;
+  border: 1px solid rgba(255, 158, 0, 0.2);
+  border-radius: 11px;
+  background: rgba(80, 49, 7, 0.27);
+}
+
+.activationNotice > i {
+  flex: 0 0 auto;
+  color: #ffc25b;
+  font-size: 19px;
+}
+
+.activationNotice strong {
+  color: #ffe3ad;
+  font-size: 9px;
+}
+
+.activationNotice small {
+  font-size: 8px;
+}
+
+.depositLink {
+  display: inline-flex;
+  width: 100%;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+  border: 1px solid rgba(35, 223, 211, 0.3);
+  border-radius: 10px;
+  color: #dffffa;
+  background: rgba(6, 103, 111, 0.22);
+  text-decoration: none;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.depositLink:hover {
+  border-color: rgba(35, 223, 211, 0.5);
+  background: rgba(8, 126, 131, 0.3);
+}
+
+.emptyState,
+.errorState {
+  display: grid;
+  min-height: 430px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 44px;
+  text-align: center;
+}
+
+.emptyState h3 {
+  margin: 2px 0;
+  color: #f1f7ff;
+  font-size: 21px;
+}
+
+.emptyState p,
+.errorState p {
+  max-width: 620px;
+  font-size: 11px;
+}
+
+.emptyIcon {
+  display: grid;
+  width: 65px;
+  height: 65px;
+  margin-bottom: 5px;
+  place-items: center;
+  border: 1px solid rgba(22, 229, 224, 0.32);
+  border-radius: 20px;
+  color: #35eee1;
+  background: rgba(8, 79, 89, 0.32);
+  font-size: 29px;
+}
+
+.emptyGuardrail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 13px;
+  border: 1px solid rgba(20, 229, 154, 0.2);
+  border-radius: 10px;
+  color: #9fd9c2;
+  background: rgba(7, 58, 47, 0.28);
+  font-size: 9px;
+}
+
+.errorState {
+  margin: 24px;
+}
+
+.errorState i {
+  color: #ff778b;
+  font-size: 31px;
+}
+
+.errorState strong {
+  color: #f7faff;
+  font-size: 15px;
+}
+
+.disclosure {
+  justify-content: flex-start;
+  padding: 17px 20px;
+}
+
+.disclosure > i {
+  flex: 0 0 auto;
+  color: #42eade;
+  font-size: 24px;
+}
+
+.disclosure strong {
+  color: #e5eefc;
+  font-size: 11px;
+}
+
+.disclosure p {
+  margin-top: 4px;
+  font-size: 9px;
+}
+
+@media (max-width: 1260px) {
+  .catalogueGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .planStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planStrip > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .planStrip > div:nth-child(-n + 2) {
+    border-bottom: 1px solid rgba(74, 129, 206, 0.18);
+  }
+}
+
+@media (max-width: 650px) {
+  .page {
+    padding: 16px;
+  }
+
+  .headerStatus {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .catalogueGrid,
+  .planStrip {
+    grid-template-columns: 1fr;
+  }
+
+  .planStrip > div {
+    border-right: 0;
+    border-bottom: 1px solid rgba(74, 129, 206, 0.18);
+  }
+
+  .planStrip > div:last-child {
+    border-bottom: 0;
+  }
+
+  .emptyState,
+  .errorState {
+    min-height: 360px;
+    padding: 28px 20px;
+  }
+}

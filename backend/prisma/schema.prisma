@@ -60,6 +60,125 @@ enum ReferralSponsorChangeSource {
   ROOT_CONFIGURATION
 }
 
+enum PackagePlanStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ActivePackageMode {
+  SINGLE_ACTIVE
+  MULTIPLE_ACTIVE
+}
+
+enum MultipleActivePackageBasis {
+  HIGHEST_ACTIVE_PACKAGE
+  TOTAL_ACTIVE_PACKAGE_VALUE
+  PRIMARY_PACKAGE
+}
+
+enum PackageActivationTrigger {
+  PAYMENT_SUBMITTED
+  PAYMENT_APPROVED
+  MANUAL_ACTIVATION
+  RULE_BASED
+}
+
+enum PackagePlanMigrationMode {
+  NEW_ENROLLMENTS_ONLY
+  NEW_PACKAGE_ACTIVATIONS
+  ALL_FUTURE_EVENTS
+  EFFECTIVE_DATE
+}
+
+enum PackageRenewalMode {
+  MANUAL_AFTER_TERMINAL
+  AUTO_RENEWAL
+  DISABLED
+}
+
+enum PackageAvailability {
+  AVAILABLE
+  HIDDEN
+  CLOSED_TO_NEW_ACTIVATIONS
+}
+
+enum PackageRewardRateMode {
+  FIXED
+  RANDOM_RANGE
+  MANUAL
+  RULE_BASED
+}
+
+enum PackageRewardRateMeaning {
+  GROSS_BEFORE_SPLIT
+  USER_NET_AFTER_SPLIT
+}
+
+enum PackageCapBasis {
+  TOTAL_RETURN
+  PROFIT_ONLY
+}
+
+enum PackagePrincipalTreatment {
+  RETURN_SEPARATELY
+  INCLUDED_IN_TOTAL_RETURN
+  NON_REFUNDABLE_PACKAGE_VALUE
+}
+
+enum PackageRewardStartMode {
+  SAME_DAY
+  NEXT_CALENDAR_DAY
+  AFTER_FULL_INTERVAL
+  CONFIGURED_START_TIME
+  NEXT_CYCLE_START
+}
+
+enum PackageRewardFrequency {
+  DAILY_CALENDAR
+  CONFIGURED_DAYS
+  PER_CYCLE
+  PER_EVENT
+}
+
+enum PackageCycleDayMode {
+  CALENDAR_DAYS
+  ELIGIBLE_EARNING_DAYS
+}
+
+enum PackageRewardDayMode {
+  EVERY_DAY
+  SELECTED_WEEKDAYS
+  CUSTOM_CALENDAR
+}
+
+enum PackageCycleEndAction {
+  COMPLETE_PACKAGE
+  AUTO_START_NEXT_CYCLE
+  MANUAL_RESTART
+  PAUSE_UNTIL_CONDITION
+}
+
+enum PackageCapReachedAction {
+  COMPLETE_PACKAGE
+  STOP_EARNINGS_KEEP_ACTIVE
+  AUTO_RENEW
+  MANUAL_RENEW
+  PAUSE
+}
+
+enum DepositStatus {
+  AWAITING_TXID
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum DepositValidationProfile {
+  TRON
+  EVM
+  SOLANA
+}
+
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -120,6 +239,17 @@ model User {
   referralPrimaryRootConfigs    SystemReferralConfig[]   @relation("ReferralPrimaryRoot")
   referralDefaultSponsorConfigs SystemReferralConfig[]   @relation("ReferralDefaultSponsor")
   referralConfigUpdates         SystemReferralConfig[]   @relation("ReferralConfigUpdater")
+
+  packagePlansCreated   PackagePlanVersion[] @relation("PackagePlanCreatedBy")
+  packagePlansUpdated   PackagePlanVersion[] @relation("PackagePlanUpdatedBy")
+  packagePlansPublished PackagePlanVersion[] @relation("PackagePlanPublishedBy")
+
+  depositPaymentRailsCreated DepositPaymentRail[] @relation("DepositPaymentRailCreatedBy")
+  depositPaymentRailsUpdated DepositPaymentRail[] @relation("DepositPaymentRailUpdatedBy")
+  depositAccountsCreated     DepositAccount[]     @relation("DepositAccountCreatedBy")
+  depositAccountsUpdated     DepositAccount[]     @relation("DepositAccountUpdatedBy")
+  deposits                   Deposit[]            @relation("DepositOwner")
+  depositsReviewed           Deposit[]            @relation("DepositReviewer")
 
   @@index([status])
   @@index([createdAt])
@@ -299,10 +429,10 @@ model SystemRegistrationConfig {
   passwordMode                      PasswordCreationMode @default(MANUAL)
   usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
   usernamePrefixEnabled             Boolean              @default(false)
-  usernamePrefix                    String?              @db.VarChar(20)
+  usernamePrefix                    String?               @db.VarChar(20)
   allowMultipleAccountsPerEmail     Boolean              @default(false)
   allowMultipleAccountsPerMobile    Boolean              @default(false)
-  updatedByUserId                   String?              @db.Char(36)
+  updatedByUserId                   String?               @db.Char(36)
   createdAt                         DateTime             @default(now()) @db.DateTime(3)
   updatedAt                         DateTime             @updatedAt @db.DateTime(3)
 
@@ -355,18 +485,18 @@ model ReferralSponsorHistory {
 }
 
 model SystemReferralConfig {
-  id                        Int                                @id @default(1)
-  enrollmentEnabled         Boolean                            @default(false)
+  id                        Int                               @id @default(1)
+  enrollmentEnabled         Boolean                           @default(false)
   existingUserMigrationMode ExistingUserReferralMigrationMode @default(LEAVE_UNASSIGNED_FOR_REVIEW)
-  referralCodeMode          ReferralCodeMode                   @default(SYSTEM_RANDOM)
-  referralCodePrefix        String?                            @db.VarChar(20)
-  referralCodePattern       String?                            @db.VarChar(100)
-  adminSponsorChangeEnabled Boolean                            @default(false)
-  primaryRootUserId         String?                            @db.Char(36)
-  defaultSponsorUserId      String?                            @db.Char(36)
-  updatedByUserId           String?                            @db.Char(36)
-  createdAt                 DateTime                           @default(now()) @db.DateTime(3)
-  updatedAt                 DateTime                           @updatedAt @db.DateTime(3)
+  referralCodeMode          ReferralCodeMode                  @default(SYSTEM_RANDOM)
+  referralCodePrefix        String?                           @db.VarChar(20)
+  referralCodePattern       String?                           @db.VarChar(100)
+  adminSponsorChangeEnabled Boolean                           @default(false)
+  primaryRootUserId         String?                           @db.Char(36)
+  defaultSponsorUserId      String?                           @db.Char(36)
+  updatedByUserId           String?                           @db.Char(36)
+  createdAt                 DateTime                          @default(now()) @db.DateTime(3)
+  updatedAt                 DateTime                          @updatedAt @db.DateTime(3)
 
   primaryRoot    User? @relation("ReferralPrimaryRoot", fields: [primaryRootUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   defaultSponsor User? @relation("ReferralDefaultSponsor", fields: [defaultSponsorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -376,6 +506,188 @@ model SystemReferralConfig {
   @@index([defaultSponsorUserId])
   @@index([updatedByUserId])
   @@map("system_referral_config")
+}
+
+model PackageDefinition {
+  id        String   @id @default(uuid()) @db.Char(36)
+  code      String   @unique @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  planItems PackagePlanItem[]
+
+  @@map("package_definitions")
+}
+
+model PackagePlanVersion {
+  id                         String                     @id @default(uuid()) @db.Char(36)
+  versionNumber              Int                        @unique
+  status                     PackagePlanStatus          @default(DRAFT)
+  revision                   Int                        @default(1)
+  activePackageMode          ActivePackageMode          @default(SINGLE_ACTIVE)
+  multipleActivePackageBasis MultipleActivePackageBasis @default(HIGHEST_ACTIVE_PACKAGE)
+  activationTrigger          PackageActivationTrigger   @default(PAYMENT_APPROVED)
+  migrationMode              PackagePlanMigrationMode   @default(NEW_PACKAGE_ACTIVATIONS)
+  renewalMode                PackageRenewalMode         @default(MANUAL_AFTER_TERMINAL)
+  upgradesEnabled            Boolean                    @default(false)
+  settlementTimezone         String                     @default("UTC") @db.VarChar(64)
+  effectiveFrom              DateTime?                  @db.DateTime(3)
+  effectiveTo                DateTime?                  @db.DateTime(3)
+  publishedAt                DateTime?                  @db.DateTime(3)
+  clonedFromPlanVersionId    String?                    @db.Char(36)
+  createdByUserId            String?                    @db.Char(36)
+  updatedByUserId            String?                    @db.Char(36)
+  publishedByUserId          String?                    @db.Char(36)
+  createdAt                  DateTime                   @default(now()) @db.DateTime(3)
+  updatedAt                  DateTime                   @updatedAt @db.DateTime(3)
+
+  items       PackagePlanItem[]
+  deposits    Deposit[]
+  clonedFrom  PackagePlanVersion?  @relation("PackagePlanClone", fields: [clonedFromPlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  clones      PackagePlanVersion[] @relation("PackagePlanClone")
+  createdBy   User?                @relation("PackagePlanCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy   User?                @relation("PackagePlanUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  publishedBy User?                @relation("PackagePlanPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([status, effectiveFrom, effectiveTo])
+  @@index([clonedFromPlanVersionId])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@index([publishedByUserId])
+  @@map("package_plan_versions")
+}
+
+model PackagePlanItem {
+  id                  String                    @id @default(uuid()) @db.Char(36)
+  planVersionId       String                    @db.Char(36)
+  packageDefinitionId String                    @db.Char(36)
+  displayName         String                    @db.VarChar(100)
+  slug                String                    @db.VarChar(100)
+  sortOrder           Int
+  availability        PackageAvailability       @default(AVAILABLE)
+  price               Decimal                   @db.Decimal(20, 8)
+  currency            String                    @db.VarChar(10)
+  rewardRateMode      PackageRewardRateMode
+  fixedRewardRate     Decimal?                  @db.Decimal(9, 6)
+  minimumRewardRate   Decimal?                  @db.Decimal(9, 6)
+  maximumRewardRate   Decimal?                  @db.Decimal(9, 6)
+  rewardRateMeaning   PackageRewardRateMeaning
+  capBasis            PackageCapBasis
+  capMultiplier       Decimal                   @db.Decimal(10, 4)
+  principalTreatment  PackagePrincipalTreatment
+  goalDays            Int
+  cycleDays           Int
+  rewardStartMode     PackageRewardStartMode
+  rewardFrequency     PackageRewardFrequency
+  cycleDayMode        PackageCycleDayMode
+  rewardDayMode       PackageRewardDayMode
+  cycleEndAction      PackageCycleEndAction
+  capReachedAction    PackageCapReachedAction
+  createdAt           DateTime                  @default(now()) @db.DateTime(3)
+  updatedAt           DateTime                  @updatedAt @db.DateTime(3)
+
+  planVersion       PackagePlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  packageDefinition PackageDefinition  @relation(fields: [packageDefinitionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deposits          Deposit[]
+
+  @@unique([planVersionId, packageDefinitionId])
+  @@unique([planVersionId, slug])
+  @@unique([planVersionId, sortOrder])
+  @@index([packageDefinitionId])
+  @@index([planVersionId, availability, sortOrder])
+  @@map("package_plan_items")
+}
+
+model DepositPaymentRail {
+  id                String                   @id @default(uuid()) @db.Char(36)
+  asset             String                   @db.VarChar(10)
+  networkCode       String                   @db.VarChar(40)
+  displayName       String                   @db.VarChar(100)
+  validationProfile DepositValidationProfile
+  isActive          Boolean                  @default(true)
+  revision          Int                      @default(1)
+  createdByUserId   String?                  @db.Char(36)
+  updatedByUserId   String?                  @db.Char(36)
+  createdAt         DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt         DateTime                 @updatedAt @db.DateTime(3)
+
+  createdBy User?            @relation("DepositPaymentRailCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy User?            @relation("DepositPaymentRailUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  accounts  DepositAccount[]
+
+  @@unique([asset, networkCode])
+  @@index([asset, isActive])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@map("deposit_payment_rails")
+}
+
+model DepositAccount {
+  id              String   @id @default(uuid()) @db.Char(36)
+  label           String   @db.VarChar(100)
+  paymentRailId   String   @db.Char(36)
+  asset           String   @default("USDT") @db.VarChar(10)
+  network         String   @default("TRC20") @db.VarChar(20)
+  walletAddress   String   @db.VarChar(100)
+  qrCodeDataUrl   String   @db.MediumText
+  isActive        Boolean  @default(true)
+  revision        Int      @default(1)
+  createdByUserId String?  @db.Char(36)
+  updatedByUserId String?  @db.Char(36)
+  createdAt       DateTime @default(now()) @db.DateTime(3)
+  updatedAt       DateTime @updatedAt @db.DateTime(3)
+
+  paymentRail DepositPaymentRail @relation(fields: [paymentRailId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  createdBy   User?              @relation("DepositAccountCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy   User?              @relation("DepositAccountUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  deposits    Deposit[]
+
+  @@unique([paymentRailId, walletAddress])
+  @@index([paymentRailId, isActive])
+  @@index([isActive])
+  @@index([createdByUserId])
+  @@index([updatedByUserId])
+  @@map("deposit_accounts")
+}
+
+model Deposit {
+  id                        String                   @id @default(uuid()) @db.Char(36)
+  userId                    String                   @db.Char(36)
+  openKey                   String?                  @unique @db.Char(36)
+  status                    DepositStatus            @default(AWAITING_TXID)
+  packagePlanVersionId      String                   @db.Char(36)
+  packagePlanItemId         String                   @db.Char(36)
+  packageCode               String                   @db.VarChar(64)
+  packageDisplayName        String                   @db.VarChar(100)
+  amount                    Decimal                  @db.Decimal(20, 8)
+  currency                  String                   @db.VarChar(10)
+  assignedDepositAccountId  String                   @db.Char(36)
+  assignedAccountLabel      String                   @db.VarChar(100)
+  assignedWalletAddress     String                   @db.VarChar(100)
+  assignedNetwork           String                   @db.VarChar(20)
+  assignedValidationProfile DepositValidationProfile
+  assignedQrCodeDataUrl     String                   @db.MediumText
+  txid                      String?                  @db.VarChar(191)
+  submittedAt               DateTime?                @db.DateTime(3)
+  reviewedByUserId          String?                  @db.Char(36)
+  reviewedAt                DateTime?                @db.DateTime(3)
+  reviewNote                String?                  @db.VarChar(1000)
+  createdAt                 DateTime                 @default(now()) @db.DateTime(3)
+  updatedAt                 DateTime                 @updatedAt @db.DateTime(3)
+
+  user                   User               @relation("DepositOwner", fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  packagePlanVersion     PackagePlanVersion @relation(fields: [packagePlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  packagePlanItem        PackagePlanItem    @relation(fields: [packagePlanItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  assignedDepositAccount DepositAccount     @relation(fields: [assignedDepositAccountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reviewedBy             User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([assignedNetwork, txid])
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([packagePlanVersionId])
+  @@index([packagePlanItemId])
+  @@index([assignedDepositAccountId])
+  @@index([reviewedByUserId])
+  @@map("deposits")
 }
 
 model SystemSequence {

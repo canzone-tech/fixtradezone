@@ -1,7 +1,11 @@
 import Link from "next/link";
 import styles from "./platform-configuration.module.css";
 
-type PlatformSettingsSection = "authentication" | "registration" | "security";
+type PlatformSettingsSection =
+  | "authentication"
+  | "registration"
+  | "security"
+  | "accounting";
 
 interface PlatformSettingsNavProps {
   active: PlatformSettingsSection;
@@ -30,6 +34,12 @@ const sections: Array<{
     href: "/settings/security",
     label: "Security",
     icon: "iconoir-shield-check",
+  },
+  {
+    key: "accounting",
+    href: "/settings/accounting",
+    label: "Accounting",
+    icon: "iconoir-coins",
   },
 ];
 

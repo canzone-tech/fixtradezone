@@ -1,190 +1,209 @@
 # FixTradeZone — Database Standards & Current State
 
 ## Single Application Database
+
 - Host: 127.0.0.1
 - Port: 3306
 - Database: `fixtradezone`
 - MySQL: 8.0.46
 - Runtime user: `fixtradezone`
 
-Do not create additional application databases.
+Do not create additional application databases unless explicitly approved.
 
 ## Prisma
+
 - Prisma: 7.9.1
 - Generator: `prisma-client`
 - Output: `src/generated/prisma`
 - moduleFormat: `cjs`
-- Datasource provider: mysql
+- Datasource provider: MySQL
 - URL configured via `prisma.config.ts`
-- MySQL connectivity uses `@prisma/adapter-mariadb`
-- Local adapter currently uses `allowPublicKeyRetrieval=true`, connectionLimit=10, connectTimeout=5000, acquireTimeout=10000.
+- Runtime connectivity uses `@prisma/adapter-mariadb`
 
-## Conventions
-- UUID IDs stored as CHAR(36)
+## Database Conventions
+
+- UUID IDs: `CHAR(36)`
 - UTC timestamps
-- createdAt + updatedAt
-- Financial values DECIMAL; example DECIMAL(20,8) for USDT/crypto
-- Soft delete only when justified
-- Explicit status enums
-- Password hashes only
-- Secrets via env/secret manager
-- Important admin/financial actions audited
+- `createdAt` + `updatedAt` where mutable state exists
+- Financial values: SQL `DECIMAL`; never FLOAT/DOUBLE
+- Explicit lifecycle enums where integrity matters
+- Secrets remain in env/secret management, never business tables
+- Important admin/financial actions are audited
+- Historical financial/business facts are not silently rewritten or deleted
+- Reversals/adjustments are separate linked events in later accounting modules
+- Migration application is explicit; do not use `prisma migrate dev` without shadow-DB approval
 
-## Initial Auth/RBAC Schema
+## Applied Migration History
 
-Models:
-- User
-- Role
-- Permission
-- UserRole
-- RolePermission
-- AuditLog
-- AuthSession
+### `0001_foundation_auth_rbac`
+Foundation users/RBAC/audit schema.
 
-### User
-id, email unique, username optional unique, phone optional unique, passwordHash, firstName, lastName, status (ACTIVE/SUSPENDED/BLOCKED/PENDING), emailVerifiedAt, lastLoginAt, createdAt, updatedAt.
+### `0002_auth_sessions` through `0004`
+Authentication session and security/impersonation foundation.
 
-### Role
-name unique, description, status (ACTIVE/INACTIVE).
+### `0005_configurable_auth_registration`
+Configurable identifiers/auth/registration and system sequence foundation.
 
-### Permission
-code unique, description.
+### `0006_referral_foundation`
+Relational referral profiles, sponsor history and referral configuration.
 
-### UserRole
-Composite primary key userId + roleId, assignedAt.
+### `0007_package_plan_foundation`
+Versioned package catalogue and exact decimal economics. PKG-01 local acceptance is GREEN.
 
-### RolePermission
-Composite primary key roleId + permissionId.
+### `0008_deposit_foundation`
+Applied locally on 2026-08-26 after correcting the MySQL-compatible open-key CHECK. It is immutable migration history.
 
-### AuditLog
-actorUserId nullable, action enum:
-CREATE, UPDATE, DELETE, LOGIN, LOGOUT, APPROVE, REJECT, SUSPEND, ACTIVATE, BLOCK, UNBLOCK, PASSWORD_CHANGE, ROLE_CHANGE, PERMISSION_CHANGE; plus entityType, entityId, description, metadata JSON, IP, userAgent, createdAt.
+It introduced:
 
-### AuthSession
-id (also used as refresh JWT `jti`), userId, SHA-256 refreshTokenHash unique, expiresAt, revokedAt, revocationReason, rotatedToSessionId, createdAt, updatedAt. Raw refresh tokens are never stored.
+- `deposit_accounts`;
+- `deposits`;
+- one-open-deposit key;
+- package/payment/account snapshots;
+- manual payment review states;
+- deposit RBAC permissions.
 
-### FK behaviors
-- user -> user_roles: CASCADE
-- user_roles -> role: RESTRICT
-- role_permissions -> role/permission: CASCADE
-- audit actor -> user: SET NULL
-- user -> auth_sessions: CASCADE
+The applied 0008 file must never be rewritten.
 
-## Migration State
+## Pending Migration — `0009_deposit_network_generalization`
 
-`prisma/migrations/0001_foundation_auth_rbac/migration.sql` was generated with `prisma migrate diff --from-empty --to-schema ... --script` and reviewed before application.
+Status: **SOURCE IMPLEMENTED AS DATA-DRIVEN PAYMENT-RAIL HARDENING / LOCAL CODE GATE PENDING**.
 
-On 2026-08-18 it was applied with `prisma migrate deploy` to the local development MySQL `fixtradezone` database after a pre-apply database dump.
+Read-only local migration status has already confirmed 9 migrations with only `0009` pending. Do not deploy it until the revised code gate is GREEN.
 
-Verification confirmed:
-- Prisma reports the database schema is up to date.
-- `_prisma_migrations` records `0001_foundation_auth_rbac` as finished, not rolled back, with one applied step.
-- `users`, `roles`, `permissions`, `user_roles`, `role_permissions`, and `audit_logs` exist.
-- All five reviewed foreign keys and their delete/update rules match the migration.
+### `deposit_payment_rails`
 
-This verification applies only to the local development database. It does not imply that staging or production has been migrated.
+`0009` creates first-class payment-route configuration:
 
-`prisma/migrations/0002_auth_sessions/migration.sql` adds the database-backed refresh-session lifecycle. It is additive and has been source-reviewed. It must still be backed up, applied with `prisma migrate deploy`, and verified locally before a pull request, merge, or deployment.
+```text
+id
+asset
+networkCode
+displayName
+validationProfile
+isActive
+revision
+createdByUserId
+updatedByUserId
+createdAt
+updatedAt
+```
 
-## RBAC Bootstrap and Registration Verification
+Integrity:
 
-The API idempotently upserts the default `USER` role as an active system invariant. Registration also ensures that role inside the same transaction used to create the user and audit event.
+- unique `(asset, networkCode)`;
+- asset/network-code shape checks;
+- positive revision;
+- actor FKs preserve auditability;
+- protocol profile is typed as `TRON`, `EVM`, or `SOLANA`.
 
-Local Postman and SQL verification confirmed:
-- a new user is created with `PENDING` status;
-- the password is stored as an Argon2id hash;
-- the `USER` role is assigned through `user_roles`;
-- a `CREATE` audit event with source `SELF_REGISTRATION` is recorded;
-- duplicate registration returns HTTP 409 without a second user or audit event.
+A deterministic V1 rail is seeded:
 
-Do not use `prisma migrate dev` for this project unless a shadow database is explicitly approved. Continue using reviewed migrations and `prisma migrate deploy` for authorized environments.
+```text
+id                = 00000000-0000-4000-8000-000000000901
+asset             = USDT
+networkCode       = TRC20
+displayName       = USDT on TRON (TRC20)
+validationProfile = TRON
+```
 
-## Founder Administrator Bootstrap
+This is launch configuration, not a global schema restriction.
 
-The API idempotently ensures both `USER` and `ADMIN` roles exist. The one-time `admin:bootstrap` CLI uses a serializable transaction to activate one registered founder account and assign its ADMIN role. It refuses to run after any ADMIN assignment exists and records system-attributed ROLE_CHANGE and ACTIVATE audit events. All later role assignments require the normal audited RBAC workflow.
+### `deposit_accounts` after 0009
 
-## Configurable Auth/Registration Schema — Migration 0005
+A receiving account references a configured rail with mandatory `paymentRailId`.
 
-Migration `0005_configurable_auth_registration` was applied and verified locally on 2026-08-23.
+Existing 0008 USDT/TRC20 rows are backfilled to the deterministic seeded rail before the FK becomes NOT NULL.
 
-### Updated User Identifier Rules
+The existing `asset` and `network` columns remain immutable assignment snapshots populated from the selected rail. They are not freehand Admin input.
 
-Current `users` identifier columns:
+Uniqueness becomes:
 
-- `username` — required and unique.
-- `email` — nullable, indexed, not directly unique.
-- `phone` — nullable, indexed, not directly unique.
-- `phoneVerifiedAt` — nullable verification timestamp.
-- `mustChangePassword` — required boolean, default false.
+```text
+(paymentRailId, walletAddress)
+```
 
-Conditional single-account uniqueness is implemented through `user_identifier_claims`, rather than permanent direct unique indexes on email/mobile.
+Lookup index:
 
-### UserIdentifierClaim
+```text
+(paymentRailId, isActive)
+```
 
-Stores the normalized EMAIL or MOBILE identifier claimed by a user while that identifier type operates in single-account mode.
+The old 0008 checks forcing every account to USDT/TRC20 are removed.
 
-The `(type, normalizedValue)` uniqueness constraint prevents duplicate single-account identifiers.
+No private key, seed phrase, signing key or custody secret is stored.
 
-When a configuration moves to multiple-account mode, claims for that identifier type are removed.
+### `deposits` after 0009
 
-When configuration moves back to single-account mode:
+The deposit fact keeps exact `DECIMAL(20,8)` amount and immutable assignment snapshots.
 
-1. existing users are checked for duplicates;
-2. the transition is rejected if duplicates exist;
-3. claims are rebuilt transactionally if the data is safe.
+`0009` adds:
 
-### SystemAuthConfig
+```text
+assignedValidationProfile
+```
 
-Singleton authentication configuration containing:
+Existing TRC20 deposits are backfilled as `TRON` before this field becomes NOT NULL.
 
-- loginWithUsername
-- loginWithEmail
-- loginWithMobile
-- captchaOnLoginEnabled
-- captchaOnRegistrationEnabled
-- updatedByUserId
-- createdAt
-- updatedAt
+Transaction storage expands from `CHAR(64)` to `VARCHAR(191)` for protocol-specific identifiers.
 
-### SystemRegistrationConfig
+Transaction uniqueness becomes:
 
-Singleton registration configuration containing:
+```text
+(assignedNetwork, txid)
+```
 
-- publicRegistrationEnabled
-- superAdminRegistrationEnabled
-- adminRegistrationEnabled
-- authorizedUserRegistrationEnabled
-- emailRequired
-- mobileRequired
-- passwordMode
-- usernameMode
-- usernamePrefixEnabled
-- usernamePrefix
-- allowMultipleAccountsPerEmail
-- allowMultipleAccountsPerMobile
-- updatedByUserId
-- createdAt
-- updatedAt
+Validation uses the immutable `assignedValidationProfile` snapshot. A later Admin rail change therefore cannot reinterpret a historical deposit.
 
-### SystemSequence
+### Network and validator ownership
 
-`system_sequences` provides race-safe transactional counters.
+Network names are **data**, stored in `deposit_payment_rails.networkCode`; they are not a hardcoded application list.
 
-Current sequence:
+Protocol validator families remain code because address and transaction validation is security-sensitive:
 
-- `username`
-- initial/verified local `nextValue`: `100001`
+- `TRON`: Base58Check public address + 64-hex transaction ID;
+- `EVM`: 20-byte `0x` address + 32-byte transaction hash;
+- `SOLANA`: Base58 structural public key/signature validation.
 
-### Local Verification
+A new network using an existing protocol profile can be configured as data. A genuinely new protocol family requires reviewed validator code before activation.
 
-Verified after migration:
+### Payment routing rule
 
-- migration record finished successfully and is not rolled back;
-- all new tables exist;
-- username unique index exists;
-- email and phone non-unique indexes exist;
-- configuration singleton records exist;
-- username sequence exists;
-- existing EMAIL and MOBILE claims were backfilled.
+A package determines authoritative `amount + currency`.
 
-CAPTCHA does not require a MySQL table or migration because challenge state is intentionally short-lived Redis state.
+The USER chooses an ACTIVE payment rail whose `asset` matches that currency. The backend then randomly assigns an ACTIVE receiving account **within that exact rail**.
+
+This prevents random cross-network assignment and wrong-chain ambiguity.
+
+### One-open-deposit guard
+
+`openKey` remains nullable and unique.
+
+Open states require non-null `openKey`; service writes `openKey = userId`. Terminal review releases it to `NULL`.
+
+### Deferred accounting
+
+DEP-01 still does **not** create:
+
+- wallet balance;
+- accounting ledger credit;
+- package subscription/activation;
+- referral commission;
+- reward/cap consumption;
+- withdrawal/payout;
+- blockchain custody/signing state.
+
+Later modules must consume approved deposit facts idempotently.
+
+## Local Migration Rule
+
+1. Run repository code gate.
+2. Run read-only `npm run db:status`.
+3. Inspect exact pending migration.
+4. Apply only with explicit `npm run db:deploy` after code gate GREEN.
+5. Rerun migration status and module SQL/audit acceptance.
+6. Never rewrite an already-applied migration.
+7. Never reset the real application database merely to bypass a failed migration.
+
+Current local DB: `0008` applied; `0009` pending.
+
+Production migration status is unknown and production deployment remains HOLD.

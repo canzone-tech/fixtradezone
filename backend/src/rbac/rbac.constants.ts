@@ -6,6 +6,17 @@ export const PERMISSIONS = {
   USERS_ROLES_MANAGE: 'users.roles.manage',
   USERS_IMPERSONATE: 'users.impersonate',
   REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
+  PACKAGES_READ: 'packages.read',
+  PACKAGES_DRAFT_MANAGE: 'packages.draft.manage',
+  DEPOSIT_ACCOUNTS_READ: 'deposits.accounts.read',
+  DEPOSIT_ACCOUNTS_MANAGE: 'deposits.accounts.manage',
+  DEPOSITS_READ: 'deposits.read',
+  DEPOSITS_REVIEW: 'deposits.review',
+  WALLETS_READ: 'wallets.read',
+  LEDGER_READ: 'ledger.read',
+  LEDGER_POST: 'ledger.post',
+  SUBSCRIPTIONS_READ: 'subscriptions.read',
+  SUBSCRIPTIONS_ACTIVATE: 'subscriptions.activate',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -38,6 +49,52 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
     description: 'Assign and exceptionally reassign referral sponsors',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_READ,
+    description: 'View package plan versions and draft package terms',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_DRAFT_MANAGE,
+    description: 'Create and edit package plan drafts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_READ,
+    description: 'View configured deposit payment rails and receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE,
+    description:
+      'Create and manage deposit payment rails and receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_READ,
+    description: 'View deposit requests and payment review state',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_REVIEW,
+    description: 'Approve or reject submitted deposit payments',
+  },
+  {
+    code: PERMISSIONS.WALLETS_READ,
+    description: 'View USER wallet totals and accounting bucket balances',
+  },
+  {
+    code: PERMISSIONS.LEDGER_READ,
+    description: 'View immutable accounting transactions and entries',
+  },
+  {
+    code: PERMISSIONS.LEDGER_POST,
+    description: 'Post or reconcile eligible approved deposits into accounting',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_READ,
+    description: 'View USER package subscriptions and activation history',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_ACTIVATE,
+    description:
+      'Reconcile eligible approved and accounted deposits into package activation',
   },
   {
     code: PERMISSIONS.RBAC_READ,

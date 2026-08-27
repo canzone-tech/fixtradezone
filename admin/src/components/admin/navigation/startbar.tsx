@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { AdminUser } from "@/lib/auth";
+import { resolveAdminSession } from "@/lib/admin-session-client";
 
 type NavItem = {
   href: string;
@@ -51,11 +52,29 @@ const sections: Array<{
         href: "/packages",
         label: "Packages",
         icon: "iconoir-box",
+        permission: "packages.read",
+        enabled: true,
       },
       {
         href: "/deposits",
         label: "Deposits",
         icon: "iconoir-wallet",
+        permission: "deposits.read",
+        enabled: true,
+      },
+      {
+        href: "/wallets",
+        label: "Wallets & Ledger",
+        icon: "iconoir-bank",
+        permission: "wallets.read",
+        enabled: true,
+      },
+      {
+        href: "/subscriptions",
+        label: "Subscriptions",
+        icon: "iconoir-box-iso",
+        permission: "subscriptions.read",
+        enabled: true,
       },
       {
         href: "/payouts",
@@ -107,16 +126,10 @@ export default function Startbar() {
     let mounted = true;
 
     async function loadSession() {
-      const response = await fetch("/api/auth/session", {
-        cache: "no-store",
-      });
+      const session = await resolveAdminSession();
 
-      const payload = (await response.json().catch(() => ({}))) as {
-        user?: AdminUser;
-      };
-
-      if (mounted && response.ok && payload.user) {
-        setUser(payload.user);
+      if (mounted && session.user) {
+        setUser(session.user);
       }
     }
 
@@ -172,7 +185,8 @@ export default function Startbar() {
 
                 {visibleItems.map((item) => {
                   const active =
-                    pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
                   if (!item.enabled) {
                     return (

@@ -1,0 +1,89 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+}
+
+.trigger {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgba(88, 225, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(88, 225, 255, 0.08);
+  color: #70e6ff;
+  cursor: help;
+  outline: none;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  border-color: rgba(88, 225, 255, 0.7);
+  background: rgba(88, 225, 255, 0.14);
+  box-shadow: 0 0 0 3px rgba(88, 225, 255, 0.08);
+}
+
+.trigger i {
+  font-size: 13px;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 50;
+  inset-inline-start: 50%;
+  bottom: calc(100% + 9px);
+  width: min(300px, 70vw);
+  padding: 9px 11px;
+  border: 1px solid rgba(112, 230, 255, 0.2);
+  border-radius: 10px;
+  background: #071321;
+  color: #c8d9e9;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.34);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+}
+
+.root:hover .tooltip,
+.root:focus-within .tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.error {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 2px;
+  color: #ff9aad;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.error i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .tooltip {
+    inset-inline-start: 0;
+    width: min(280px, calc(100vw - 48px));
+    transform: translate(0, 4px);
+  }
+
+  .root:hover .tooltip,
+  .root:focus-within .tooltip {
+    transform: translate(0, 0);
+  }
+}

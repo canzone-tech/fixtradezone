@@ -30,7 +30,7 @@ Current auth endpoints:
 After registering the first founder account and applying the reviewed auth-session migration, bootstrap exactly one initial administrator:
 
 ```bash
-npm run admin:bootstrap -- founder@example.com
+npm run super-admin:bootstrap -- founder@example.com
 ```
 
 The command refuses to create a second administrator and records its activation and role assignment in the audit log.

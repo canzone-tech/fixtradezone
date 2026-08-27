@@ -1,180 +1,163 @@
 # FixTradeZone — Current State
 
-## Latest Verified Checkpoint — 2026-08-25
+## Canonical Checkpoint — 2026-08-27
 
-MLM-01 Referral Foundation is implemented and locally accepted end to end.
+Repository state plus completed local verification are the acceptance authority.
 
-### Current branches
-- Slice branch: `feature/mlm-referral-foundation`
-- Frontend child branch used for the integrated slice: `feature/mlm-referral-frontend`
-- Accepted frontend checkpoint before documentation seal: `039635cbcd29ada5436d1dbbd47dd0537dcb4aea`
-- No PR to `main` has been opened yet.
+## Active Development Branch
 
-### MLM-01 backend
-Implemented and verified:
-- referral profile / sponsor relationship foundation;
-- sponsor-change history;
-- singleton referral configuration;
-- registration referral attribution;
-- configured default sponsor behavior;
-- SUPER_ADMIN referral configuration;
-- permission-gated delegated ADMIN sponsor reassignment;
-- self-sponsor and cycle protection;
-- audited manual sponsor changes;
-- direct referral query API.
+`feature/package-subscription-activation`
 
-USER API:
-- `GET /referrals/me`
-- `GET /referrals/me/direct?page=1&limit=20`
+## Mainline Baseline
 
-ADMIN/SUPER_ADMIN API:
-- `GET /admin/referrals/config`
-- `PATCH /admin/referrals/config`
-- `PATCH /admin/referrals/:userId/sponsor`
+The reusable platform foundation, authentication/RBAC, configurable auth/registration, user/admin shell, referral foundation, package-plan foundation, deposit foundation and immutable wallet/ledger foundation are established before SUB-02.
 
-Registration accepts optional `referralCode`.
+Applied migration history must never be rewritten. MySQL remains the relational/business/accounting source of truth.
 
-### MLM-01 database
-Migration `0006_referral_foundation` is applied locally.
+## SUB-02 — Package Subscription / Activation
 
-Database migration status at the accepted milestone:
-- 6 migrations found;
-- schema up to date;
-- no additional FixTradeZone application/shadow/test database created.
+Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
-Application-enforced referral invariants include:
-- no self-sponsor;
-- no referral cycles;
-- assignment-state consistency;
-- controlled root/default sponsor behavior;
-- reasoned/audited sponsor changes.
+Canonical contract:
 
-Existing-user migration mode remains `LEAVE_UNASSIGNED_FOR_REVIEW`; historical sponsor relationships are never guessed.
+`docs/PACKAGE-SUBSCRIPTION-ACTIVATION.md`
 
-### MLM-01 frontend / BFF
-USER:
-- `/user/referrals`
-- live referral assignment status;
-- live sponsor display;
-- live direct-referral list;
-- shareable invite link `register?ref=<REFERRAL_CODE>`;
-- `/user/dashboard` shows live referral status and direct-referral total instead of the old referral API placeholder.
+SUB-02 integrates package funding, approved-deposit accounting and immutable package-subscription activation across backend, ADMIN UI and USER UI.
 
-ADMIN/SUPER_ADMIN:
-- `/referrals`
-- referral enrollment configuration;
-- default sponsor selection;
-- delegated ADMIN sponsor-change switch;
-- audited sponsor assignment/reassignment controls;
-- permission-aware navigation.
+### Supported activation behavior
 
-BFF/session behavior:
-- protected browser calls use same-origin Next.js BFF routes;
-- browser JavaScript does not own backend JWTs;
-- session refresh/validation runs before dependent referral data requests to avoid rotating-refresh-token races;
-- registration BFF forwards explicit `referralCode` or a same-origin `?ref=` invite code to the Nest registration contract.
+Deposit-funded execution currently supports:
 
-## Verification — GREEN
+- `PAYMENT_APPROVED`
+  - approval occurs first;
+  - approved-deposit accounting must exist;
+  - activation completes automatically after accounting.
+- `MANUAL_ACTIVATION`
+  - approval/accounting complete first;
+  - deposit remains Activation Pending;
+  - authorized ADMIN/SUPER_ADMIN explicitly completes activation.
 
-### Repository code gate
-Latest local `npm run verify:local` on the accepted frontend checkpoint:
-- Prisma schema validation: GREEN;
-- backend Prettier check: GREEN;
-- backend ESLint: GREEN;
-- backend Jest: 24/24 suites, 129/129 tests;
-- NestJS production build: GREEN;
-- backend diff checks: GREEN;
-- admin ESLint: GREEN;
-- admin TypeScript `tsc --noEmit`: GREEN;
-- Next.js 16.3.1 production build: GREEN;
-- root diff checks: GREEN.
+Configured but unimplemented execution engines such as `PAYMENT_SUBMITTED` and `RULE_BASED` fail closed for new package funding.
 
-### Database milestone gate
-Latest local `npm run verify:milestone` before final UI acceptance:
-- all repository code gates GREEN;
-- Prisma migration status GREEN;
-- 6 migrations applied / schema up to date.
+### Accounting policy remains independent
 
-### API checkpoint
-MLM-01 Postman referral collection: GREEN.
+Global accounting modes:
 
-The hardened referral collection covered success, authentication, authorization, validation, self-sponsor, cycle, delegated ADMIN switch/permission behavior, configuration restoration and token refresh behavior.
+- `AUTO_ON_APPROVAL`
+- `MANUAL_RECONCILIATION`
 
-### Integrated API + frontend acceptance — GREEN
-Verified locally in browser on 2026-08-25:
-1. SUPER_ADMIN opened `/referrals` and loaded live referral configuration.
-2. Referral enrollment was enabled with the configured founder/root as default sponsor.
-3. Fresh USER A registered, was activated, logged in, and showed `ASSIGNED` referral state with founder/root as sponsor.
-4. USER A dashboard showed live referral state and direct referral count.
-5. USER A copied the generated referral invite link.
-6. Fresh USER B registered through USER A's `register?ref=<CODE>` invite link.
-7. USER B was activated and showed USER A as sponsor.
-8. USER A's `/user/referrals` direct-referral list updated to include USER B as `ACTIVE / ASSIGNED`.
-9. USER A direct-referral total increased accordingly.
+Package activation never bypasses approved-deposit accounting.
 
-This proves the accepted path across frontend -> Next.js BFF -> Nest API -> MySQL -> frontend readback.
+Manual accounting recovery remains available through the authorized ledger-post path.
 
-MLM-01 final module sign-off is therefore GREEN.
+### Multiple-active packages
 
-## Locked delivery workflow
-For future modules:
-1. confirm business semantics;
-2. implement focused backend/API foundation;
-3. use local API/Postman as an intermediate checkpoint;
-4. implement matching frontend/BFF/UI;
-5. run repository verification;
-6. run database milestone verification when relevant;
-7. run final API + frontend integrated local acceptance;
-8. update persistent docs;
-9. open PR only after all gates are green.
+`MULTIPLE_ACTIVE` is operational.
 
-Work/Codex may accelerate planning and implementation, but local verification remains the acceptance authority. GitHub repository + committed `docs/` remain the source of truth.
+Local acceptance proved one USER retaining multiple simultaneous ACTIVE packages while each activation preserves its own immutable source-plan snapshot.
 
-## Core architecture / security state
-- Backend: NestJS + TypeScript.
-- ORM: Prisma 7.9.1 with MariaDB adapter.
-- Relational source of truth: MySQL.
-- MongoDB reserved for document/config/CMS use where appropriate.
-- Redis used for transient/cache/session-adjacent infrastructure.
-- Frontend/admin/user portal: Next.js.
-- JWT access + rotating refresh sessions.
-- Browser auth boundary: same-origin BFF + HttpOnly/SameSite cookies.
-- RBAC roles: `SUPER_ADMIN`, `ADMIN`, `USER`.
-- SUPER_ADMIN remains founder/master authority.
-- APIs remain deny-by-default except explicitly public endpoints.
-- Financial modules must preserve SQL DECIMAL, idempotency, auditability, immutable/reversal ledger patterns and explicit authorization.
-- Simulated activity must always be explicitly labeled simulated and never presented as real trading/profits.
+Verified historical coexistence includes:
 
-## Foundation history
-The reusable authentication/account/admin/frontend foundation remains complete and green:
-- configurable authentication and registration;
-- rotating sessions;
-- required password change;
-- custom Redis-backed CAPTCHA;
-- users administration;
-- RBAC roles/permissions;
-- security configuration / reauthentication / idle lock;
-- secure USER impersonation boundary;
-- Dark Neo ADMIN and USER portal shell;
-- role-aware login routing;
-- USER dashboard/profile;
-- canonical FixTradeZone logo and shared sign-out behavior.
+- `SINGLE_ACTIVE / PAYMENT_APPROVED`;
+- `MULTIPLE_ACTIVE / PAYMENT_APPROVED`;
+- `MULTIPLE_ACTIVE / MANUAL_ACTIVATION`.
 
-Historical detail is retained in `CHANGELOG.md`, `PROJECT-CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `DATABASE.md`, `SECURITY.md` and `API-CONTRACT.md`.
+Effective-plan changes never rewrite an existing subscription snapshot.
 
-## Immediate Next Actions
-1. Integrate `feature/mlm-referral-frontend` back into `feature/mlm-referral-foundation` by fast-forward only.
-2. On local machine, switch to the foundation branch and run `npm run verify:milestone` from the integrated branch state.
-3. Do not repeat the already-green browser journey unless the integration commit changes executable code; a branch-pointer-only fast-forward does not invalidate the accepted UI/API evidence.
-4. Update the Work/Codex handoff checkpoint.
-5. Prepare the next business-domain slice in Work/Codex using the existing locked MLM rules; no dependent implementation should proceed until any new ambiguous business semantics are explicitly locked.
-6. Open the single MLM referral PR to `main` only when the final integrated foundation branch gate is green.
+### Financial / idempotency invariants
 
-## Constraints
-- Never create extra FixTradeZone application databases without explicit approval.
-- Never use Prisma `migrate dev` without explicit shadow-database approval.
-- Never expose secrets, tokens, password material or CAPTCHA HMAC secrets.
-- Never weaken JWT/RBAC/audit/security invariants through configuration.
-- Never auto-credit deposits from TXID submission alone.
-- Never represent simulated trades/results as real.
-- Do not bypass failed gates to obtain a green result.
+Package activation:
+
+- requires an APPROVED source deposit;
+- requires its approved-deposit accounting transaction;
+- consumes exact package principal through a balanced immutable ledger transaction;
+- commits funding + subscription creation transactionally;
+- is idempotent by source deposit;
+- cannot double-consume Main / Deposit balance;
+- cannot create a duplicate subscription on manual retry;
+- records immutable source/commercial snapshots and audit evidence.
+
+Local Postman retry verification returned `created: false` and the original subscription identity for an already-activated MANUAL deposit.
+
+### SUB-02 ADMIN UI
+
+- Package plan workspace distinguishes AUTO vs MANUAL activation.
+- Accounting configuration explicitly remains independent from activation policy.
+- Deposits expose accounting recovery only when appropriate.
+- Subscriptions expose Activation Pending and authorized manual activation.
+- Pending rows retain source-plan mode/trigger context.
+- Package-plan publication is blocked while lifecycle/item edits remain unsaved.
+- Success/error/unsaved feedback remains viewport-visible on the long package-plan workspace.
+- Deposits and Subscriptions have explicit topbar route headings.
+
+### SUB-02 USER UI
+
+- Effective package mode/activation policy is displayed.
+- Unsupported activation engines cannot begin new funding.
+- Package cards explain AUTO vs MANUAL behavior.
+- Multiple simultaneous ACTIVE subscriptions are shown independently.
+- Historical subscriptions retain immutable activation-policy snapshots.
+
+## Local Acceptance — GREEN
+
+Completed on the feature branch:
+
+- backend focused/unit regression coverage;
+- Prisma validation and migration status;
+- backend formatting and ESLint;
+- NestJS production build;
+- admin lint/typecheck/Next.js production build;
+- combined browser/UI runtime verification;
+- Postman/API runtime verification;
+- AUTO `PAYMENT_APPROVED` activation;
+- `MULTIPLE_ACTIVE` simultaneous activation;
+- authorized `MANUAL_ACTIVATION`;
+- activation pending before manual completion;
+- pending-queue removal after manual completion;
+- immutable historical subscription snapshots;
+- duplicate manual activation idempotency;
+- root `npm run verify:milestone`;
+- unstaged and staged diff checks.
+
+No SUB-02 merge to `main` until the complete feature diff is reviewed and the PR is approved.
+
+## Product Scope — LOCKED
+
+FixTradeZone does not execute real trades and has no AI-agent/broker/exchange execution milestone in v1.
+
+Future trade-like presentation is limited to clearly labelled **Simulated Trade Activity** / **SIMULATED RESULTS** and must not silently mutate real wallet/ledger balances.
+
+## Current V1 Sequence
+
+1. SUB-02 package subscription / activation — locally accepted, PR handoff pending
+2. Referral commissions on legitimate package/payment events
+3. Rewards / caps / lifecycle accounting
+4. Simulated Trade Activity display only
+5. Minimal v1 landing/template controls
+6. Remaining USER/ADMIN operational slices
+7. Notifications/reports required for launch
+8. QA/security/release hardening
+9. Production deployment
+
+## Infrastructure / Data Ownership
+
+- MySQL is the relational/business/accounting source of truth.
+- MongoDB is reserved for later document/CMS/flexible configuration only if a repository feature requires it.
+- Redis is transient infrastructure and should only be used where an implemented feature requires it.
+
+## Delivery Workflow — CURRENT LOCK
+
+1. Reconcile repository + persistent docs.
+2. Lock business semantics and contract.
+3. Implement backend/database/API + matching BFF/ADMIN/USER UI as one vertical slice.
+4. Complete focused automated regression coverage.
+5. Run the combined backend + frontend code gate locally.
+6. Apply explicit reviewed migrations only when required.
+7. Run browser/UI + Postman/API verification together in one consolidated local acceptance round.
+8. Fix failures at the actual backend/frontend boundary without bypassing checks.
+9. Run SQL/audit/ledger readback where financial or persistence evidence is required.
+10. Run final milestone verification.
+11. Update persistent docs/current state and review the complete diff.
+12. Commit/push the feature branch and open PR to `main` only after every local gate is GREEN.
+
+Production deployment remains HOLD until required v1 milestones and release hardening are complete.

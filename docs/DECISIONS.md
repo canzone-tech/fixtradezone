@@ -74,3 +74,18 @@ LOCKED. Privileged security configuration is stored as a validated and audited s
 
 ## ADR-025 — Canonical FixTradeZone brand identity
 LOCKED. FixTradeZone uses one canonical brand mark across the complete project: the approved cyan/blue/purple hexagonal FixTradeZone symbol with the FIXTRADEZONE wordmark. Portal-specific labels such as ADMIN PORTAL and USER PORTAL are contextual text only and must not create alternate logo designs. New arbitrary logo variants are not permitted. Authenticated ADMIN and USER portals also use the shared teal Sign Out action pattern for consistent protected-application UX.
+
+## ADR-026 — Package plans are atomic, versioned and immutable after publication
+
+LOCKED. Stable package definitions contain no commercial terms. Price, currency,
+rate, cap, duration, lifecycle and availability settings live in an atomic
+`PackagePlanVersion` aggregate with typed `PackagePlanItem` records. Draft writes
+use whole-plan optimistic revisions and serializable audit transactions.
+Published terms are immutable; corrections clone into a new draft. Effective
+ranges cannot overlap or be backdated. Historical business events retain their
+exact plan-item reference. PKG-01 exposes configuration/catalogue only and does
+not create purchases, activations, balances, earnings or ledger state.
+
+## ADR-027 — No AI Agents milestone in FixTradeZone v1
+
+LOCKED. Older planning references to `AI Agents` are superseded by the Founder's later scope decision. FixTradeZone v1 does not implement an AI trading engine, broker/exchange integration, strategy execution or automated trading. The next product milestone after PKG-01 is the USDT TRC20 deposit flow: Deposit Accounts first, then Deposits/TXID/manual approval. Any later trade-like visualization is limited to clearly labelled Simulated Trade Activity and must never be represented as real trading or realized profit.
