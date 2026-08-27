@@ -15,6 +15,7 @@ import { PackagesModule } from './packages/packages.module';
 import { WalletModule } from './wallet/wallet.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { DepositsModule } from './deposits/deposits.module';
+import { RewardsModule } from './rewards/rewards.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DepositsModule } from './deposits/deposits.module';
     WalletModule,
     SubscriptionsModule,
     DepositsModule,
+    RewardsModule,
     DashboardModule,
     HealthModule,
   ],
