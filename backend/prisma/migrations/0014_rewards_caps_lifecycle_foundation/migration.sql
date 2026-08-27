@@ -1,7 +1,7 @@
 -- RWD-01 — package rewards / cap / lifecycle accounting foundation.
 -- Forward-only. Existing WAL/SUB/COMM migrations remain immutable.
--- Reward policy V1 is seeded DRAFT: no automatic financial effect until rollout
--- policy is explicitly locked and published.
+-- Reward policy V1 is seeded DRAFT: no financial effect until SUPER_ADMIN
+-- explicitly publishes it.
 
 ALTER TABLE `ledger_accounts`
   MODIFY `bucket` ENUM(
@@ -40,6 +40,7 @@ CREATE TABLE `reward_cap_policy_versions` (
   `effectiveFrom` DATETIME(3) NULL,
   `effectiveTo` DATETIME(3) NULL,
   `publishedAt` DATETIME(3) NULL,
+  `clonedFromPolicyVersionId` CHAR(36) NULL,
   `createdByUserId` CHAR(36) NULL,
   `updatedByUserId` CHAR(36) NULL,
   `publishedByUserId` CHAR(36) NULL,
@@ -49,10 +50,14 @@ CREATE TABLE `reward_cap_policy_versions` (
   PRIMARY KEY (`id`),
   UNIQUE INDEX `reward_cap_policy_version_key` (`versionNumber`),
   INDEX `reward_cap_policy_effective_idx` (`status`, `effectiveFrom`, `effectiveTo`),
+  INDEX `reward_cap_policy_clone_idx` (`clonedFromPolicyVersionId`),
   INDEX `reward_cap_policy_created_by_idx` (`createdByUserId`),
   INDEX `reward_cap_policy_updated_by_idx` (`updatedByUserId`),
   INDEX `reward_cap_policy_published_by_idx` (`publishedByUserId`),
 
+  CONSTRAINT `reward_cap_policy_clone_fkey`
+    FOREIGN KEY (`clonedFromPolicyVersionId`) REFERENCES `reward_cap_policy_versions`(`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `reward_cap_policy_created_by_fkey`
     FOREIGN KEY (`createdByUserId`) REFERENCES `users`(`id`)
     ON DELETE SET NULL ON UPDATE CASCADE,
@@ -65,6 +70,10 @@ CREATE TABLE `reward_cap_policy_versions` (
   CONSTRAINT `reward_cap_policy_revision_check` CHECK (`revision` > 0),
   CONSTRAINT `reward_cap_policy_effective_range_check` CHECK (
     `effectiveTo` IS NULL OR (`effectiveFrom` IS NOT NULL AND `effectiveTo` > `effectiveFrom`)
+  ),
+  CONSTRAINT `reward_cap_policy_publication_check` CHECK (
+    `status` <> 'PUBLISHED'
+    OR (`effectiveFrom` IS NOT NULL AND `publishedAt` IS NOT NULL)
   )
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -86,9 +95,10 @@ CREATE TABLE `package_reward_states` (
   `otherIncomeCountsTowardCap` BOOLEAN NOT NULL,
   `nextRewardLocalDate` DATE NOT NULL,
   `nextRewardAt` DATETIME(3) NOT NULL,
-  `rewardDayNumber` INT NOT NULL DEFAULT 0,
-  `cycleNumber` INT NOT NULL DEFAULT 1,
-  `cycleDay` INT NOT NULL DEFAULT 0,
+  `nextRewardDayNumber` INT NOT NULL,
+  `nextCycleNumber` INT NOT NULL,
+  `nextCycleDay` INT NOT NULL,
+  `settledRewardCount` INT NOT NULL DEFAULT 0,
   `status` ENUM('ACTIVE', 'COMPLETED', 'BLOCKED') NOT NULL DEFAULT 'ACTIVE',
   `completionReason` ENUM('CAP_REACHED', 'LIFETIME_REACHED') NULL,
   `blockedReason` VARCHAR(120) NULL,
@@ -114,7 +124,12 @@ CREATE TABLE `package_reward_states` (
   CONSTRAINT `package_reward_state_package_value_check` CHECK (`packageValue` > 0),
   CONSTRAINT `package_reward_state_cap_limit_check` CHECK (`capLimit` > 0),
   CONSTRAINT `package_reward_state_cap_consumed_check` CHECK (`capConsumed` >= 0 AND `capConsumed` <= `capLimit`),
-  CONSTRAINT `package_reward_state_day_check` CHECK (`rewardDayNumber` >= 0 AND `cycleNumber` > 0 AND `cycleDay` >= 0),
+  CONSTRAINT `package_reward_state_day_check` CHECK (
+    `nextRewardDayNumber` > 0
+    AND `nextCycleNumber` > 0
+    AND `nextCycleDay` > 0
+    AND `settledRewardCount` >= 0
+  ),
   CONSTRAINT `package_reward_state_revision_check` CHECK (`revision` > 0)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -134,6 +149,11 @@ CREATE TABLE `package_reward_events` (
   `rewardDayNumber` INT NOT NULL,
   `cycleNumber` INT NOT NULL,
   `cycleDay` INT NOT NULL,
+  `settlementTimezone` VARCHAR(64) NOT NULL,
+  `rewardStartMode` VARCHAR(50) NOT NULL,
+  `rewardFrequency` VARCHAR(50) NOT NULL,
+  `cycleDayMode` VARCHAR(50) NOT NULL,
+  `rewardDayMode` VARCHAR(50) NOT NULL,
   `rewardRateMode` VARCHAR(40) NOT NULL,
   `rewardRateMeaning` VARCHAR(40) NOT NULL,
   `selectedRate` DECIMAL(9,6) NOT NULL,
@@ -146,6 +166,12 @@ CREATE TABLE `package_reward_events` (
   `capConsumedBefore` DECIMAL(20,8) NOT NULL,
   `capConsumedAfter` DECIMAL(20,8) NOT NULL,
   `clippedToCap` BOOLEAN NOT NULL DEFAULT FALSE,
+  `existingSubscriptionRolloutMode` VARCHAR(60) NOT NULL,
+  `packageRewardCountsTowardCap` BOOLEAN NOT NULL,
+  `referralCommissionCountsTowardCap` BOOLEAN NOT NULL,
+  `teamCommissionCountsTowardCap` BOOLEAN NOT NULL,
+  `awardRewardCountsTowardCap` BOOLEAN NOT NULL,
+  `otherIncomeCountsTowardCap` BOOLEAN NOT NULL,
   `cycleDays` INT NOT NULL,
   `goalDays` INT NOT NULL,
   `cycleEndAction` VARCHAR(50) NOT NULL,
@@ -189,8 +215,8 @@ CREATE TABLE `package_reward_events` (
   )
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Approved R54 cap-contribution snapshot, intentionally DRAFT until Q58 rollout
--- behavior is locked and SUPER_ADMIN publication is available.
+-- R54/Q58 safe defaults. DRAFT means zero financial effect until explicit
+-- SUPER_ADMIN publication.
 INSERT INTO `reward_cap_policy_versions` (
   `id`, `versionNumber`, `status`, `revision`, `existingSubscriptionRolloutMode`,
   `packageRewardCountsTowardCap`, `referralCommissionCountsTowardCap`,
