@@ -94,21 +94,24 @@ describe('CommissionsService', () => {
     ['level compression', { compressionMode: 'COMPRESS_LEVELS' }],
     ['hold release', { releaseMode: 'HOLD_PERIOD', holdPeriodHours: 24 }],
     ['manual release', { releaseMode: 'MANUAL_APPROVAL' }],
-  ])('fails closed at publication when %s requires a deferred engine', async (_label, patch) => {
-    const { service, transaction } = publicationService(patch);
+  ])(
+    'fails closed at publication when %s requires a deferred engine',
+    async (_label, patch) => {
+      const { service, transaction } = publicationService(patch);
 
-    await expect(
-      service.publishPlan(
-        draftPlan.id,
-        {
-          expectedRevision: 1,
-          reason: 'Founder reviewed COMM-01 plan.',
-        },
-        actor,
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(transaction.$executeRaw).not.toHaveBeenCalled();
-  });
+      await expect(
+        service.publishPlan(
+          draftPlan.id,
+          {
+            expectedRevision: 1,
+            reason: 'Founder reviewed COMM-01 plan.',
+          },
+          actor,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(transaction.$executeRaw).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects package matching when active-package qualification is disabled', async () => {
     const { service, transaction } = publicationService({
@@ -124,7 +127,9 @@ describe('CommissionsService', () => {
         },
         actor,
       ),
-    ).rejects.toThrow('Package matching requires active-package qualification.');
+    ).rejects.toThrow(
+      'Package matching requires active-package qualification.',
+    );
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
@@ -143,19 +148,22 @@ describe('CommissionsService', () => {
   it.each([
     new ConflictException('retry later'),
     new ServiceUnavailableException('route needs investigation'),
-  ])('returns reconciliation state for recoverable commission failures', async (error) => {
-    const service = new CommissionsService({} as PrismaService);
-    jest.spyOn(service, 'processSubscription').mockRejectedValueOnce(error);
+  ])(
+    'returns reconciliation state for recoverable commission failures',
+    async (error) => {
+      const service = new CommissionsService({} as PrismaService);
+      jest.spyOn(service, 'processSubscription').mockRejectedValueOnce(error);
 
-    await expect(
-      service.processSubscriptionSafely(
-        '11111111-1111-4111-8111-111111111111',
-        actor,
-      ),
-    ).resolves.toMatchObject({
-      processingStatus: 'PENDING_RECONCILIATION',
-    });
-  });
+      await expect(
+        service.processSubscriptionSafely(
+          '11111111-1111-4111-8111-111111111111',
+          actor,
+        ),
+      ).resolves.toMatchObject({
+        processingStatus: 'PENDING_RECONCILIATION',
+      });
+    },
+  );
 
   it('does not hide non-recoverable validation failures', async () => {
     const service = new CommissionsService({} as PrismaService);

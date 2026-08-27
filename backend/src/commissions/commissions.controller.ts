@@ -14,7 +14,10 @@ export class CommissionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: CommissionPageQueryDto,
   ) {
-    const result = await this.commissionsService.getMyCommissions(user.id, query);
+    const result = await this.commissionsService.getMyCommissions(
+      user.id,
+      query,
+    );
 
     return {
       ...result,
