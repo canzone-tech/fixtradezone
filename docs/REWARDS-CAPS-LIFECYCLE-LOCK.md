@@ -1,10 +1,10 @@
 # RWD-01 — Founder Lock Addendum
 
-Status: **R48–R57 LOCKED / APPROVED 2026-08-27**.
+Status: **R48–R58 LOCKED / APPROVED 2026-08-27**.
 
-This addendum records Founder approval of the proposed R48–R57 execution boundary in `docs/REWARDS-CAPS-LIFECYCLE.md`.
+This addendum records Founder approval of the RWD-01 execution boundary in `docs/REWARDS-CAPS-LIFECYCLE.md`.
 
-The following are now locked for RWD-01 implementation:
+The following are locked for RWD-01 implementation:
 
 - **R48:** immutable ACTIVE package-subscription snapshot is the reward source authority.
 - **R49:** `FIXED` and `RANDOM_RANGE` are initially executable; `MANUAL` and `RULE_BASED` fail closed.
@@ -16,13 +16,28 @@ The following are now locked for RWD-01 implementation:
 - **R55:** current seeded cycle action auto-starts the next cycle while eligible; cap/lifetime completion stops future rewards; final reward is clipped to exact cap headroom.
 - **R56:** package rewards use balanced immutable ledger posting: debit `SYSTEM/PACKAGE_REWARD_EXPENSE`, credit USER `PACKAGE_EARNINGS`; reward event, cap state and ledger commit atomically.
 - **R57:** scheduler/worker and authorized reconciliation must call the same authoritative idempotent reward-processing service.
+- **R58:** existing-subscription rollout is versioned/configurable. Initial live policy is `FORWARD_ONLY_FROM_POLICY_EFFECTIVE`; no reward backfill is created for settlement days before the effective published reward policy. `RETROACTIVE_FROM_SUBSCRIPTION_SCHEDULE` remains a future selectable versioned mode and must fail closed until its controlled catch-up engine is explicitly implemented and accepted.
 
 No arbitrary reward amount or balance mutation path is approved.
 
-## Newly discovered rollout ambiguity — Q58 pending
+## Q58 rollout semantics
 
-R48–R57 do not define whether subscriptions already ACTIVE before RWD-01 becomes executable should receive rewards for settlement days that passed before the reward engine/policy was enabled.
+For the initial forward-only policy:
 
-This materially changes financial liability and therefore must not be inferred silently.
+```text
+scheduleAnchor = MAX(subscription.activatedAt, rewardPolicy.effectiveFrom)
+first payable reward boundary = next local calendar-day boundary after scheduleAnchor
+```
 
-Until Q58 is locked, implementation may create schema, APIs, deterministic calculation, cap/lifecycle state, UI and reconciliation plumbing, but automatic money posting for pre-existing ACTIVE subscriptions must fail closed.
+The natural package lifetime is **not reset** by RWD-01 rollout. `goalDays` and cycle numbering continue from the immutable subscription activation schedule. Therefore an older package may have fewer payable future days than a newly activated package, and a package whose lifetime has already elapsed receives no retroactive reward.
+
+Example:
+
+```text
+subscription activated: 2026-08-20
+reward policy effective: 2026-08-28
+first payable boundary:  2026-08-29 local settlement time
+2026-08-21 through 2026-08-28: no backfill
+```
+
+The published policy row is immutable historical authority for the state/events created under it.
