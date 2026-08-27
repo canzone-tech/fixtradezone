@@ -72,7 +72,7 @@ CREATE TABLE `user_package_subscriptions` (
   CONSTRAINT `user_package_subscriptions_sourceDepositId_fkey`
     FOREIGN KEY (`sourceDepositId`) REFERENCES `deposits`(`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `user_package_subscriptions_sourceDepositAccountingTransactionId_fkey`
+  CONSTRAINT `ups_source_accounting_tx_fkey`
     FOREIGN KEY (`sourceDepositAccountingTransactionId`) REFERENCES `ledger_transactions`(`id`)
     ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `user_package_subscriptions_fundingLedgerTransactionId_fkey`
