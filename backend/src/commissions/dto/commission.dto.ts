@@ -31,7 +31,8 @@ import {
   type InactiveUplineAction,
 } from '../commissions.constants';
 
-const RATE_PATTERN = /^(?:100(?:\.0{1,6})?|(?:[1-9]\d?|0)(?:\.\d{1,6})?)$/;
+const RATE_PATTERN =
+  /^(?!0(?:\.0{1,6})?$)(?:100(?:\.0{1,6})?|(?:[1-9]\d?|0)(?:\.\d{1,6})?)$/;
 
 export class CommissionPageQueryDto {
   @IsOptional()
