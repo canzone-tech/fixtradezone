@@ -109,9 +109,7 @@ interface ActivePackageRow {
   price: DecimalValue;
   activePackageMode: 'SINGLE_ACTIVE' | 'MULTIPLE_ACTIVE';
   multipleActivePackageBasis:
-    | 'HIGHEST_ACTIVE_PACKAGE'
-    | 'TOTAL_ACTIVE_PACKAGE_VALUE'
-    | 'PRIMARY_PACKAGE';
+    'HIGHEST_ACTIVE_PACKAGE' | 'TOTAL_ACTIVE_PACKAGE_VALUE' | 'PRIMARY_PACKAGE';
   activatedAt: Date;
 }
 
@@ -166,9 +164,7 @@ interface LedgerAccountRow {
   accountKey: string;
   ownerType: 'SYSTEM' | 'USER';
   ownerUserId: string | null;
-  bucket:
-    | 'REFERRAL_COMMISSION'
-    | 'REFERRAL_COMMISSION_EXPENSE';
+  bucket: 'REFERRAL_COMMISSION' | 'REFERRAL_COMMISSION_EXPENSE';
   currency: string;
   normalSide: 'DEBIT' | 'CREDIT';
 }
@@ -228,7 +224,9 @@ export class CommissionsService {
     context: RequestContext = {},
   ) {
     return this.runSerializable(async (transaction) => {
-      const draftRows = await transaction.$queryRaw<{ id: string }[]>(Prisma.sql`
+      const draftRows = await transaction.$queryRaw<
+        { id: string }[]
+      >(Prisma.sql`
         SELECT id
         FROM referral_commission_plan_versions
         WHERE status = 'DRAFT'
@@ -303,7 +301,8 @@ export class CommissionsService {
           action: 'CREATE',
           entityType: 'ReferralCommissionPlanVersion',
           entityId: id,
-          description: 'Published referral commission plan cloned into a new draft.',
+          description:
+            'Published referral commission plan cloned into a new draft.',
           metadata: {
             operation: COMMISSION_AUDIT_OPERATIONS.CLONE_DRAFT,
             sourcePlanVersionId: source.id,
@@ -340,12 +339,14 @@ export class CommissionsService {
       }
 
       const currentLevels = await this.getLevels(transaction, current.id);
-      const levels = dto.levels ?? currentLevels.map((level) => ({
-        level: level.level,
-        enabled: Boolean(level.enabled),
-        ratePercent: this.rateString(level.ratePercent),
-        packageMatchingEnabled: Boolean(level.packageMatchingEnabled),
-      }));
+      const levels =
+        dto.levels ??
+        currentLevels.map((level) => ({
+          level: level.level,
+          enabled: Boolean(level.enabled),
+          ratePercent: this.rateString(level.ratePercent),
+          packageMatchingEnabled: Boolean(level.packageMatchingEnabled),
+        }));
 
       const next = {
         firstPurchaseEnabled:
@@ -438,7 +439,9 @@ export class CommissionsService {
     return this.runSerializable(async (transaction) => {
       const current = await this.requirePlan(transaction, planVersionId, true);
       if (current.status !== 'DRAFT') {
-        throw new ConflictException('Referral commission plan is already published.');
+        throw new ConflictException(
+          'Referral commission plan is already published.',
+        );
       }
       if (current.revision !== dto.expectedRevision) {
         throw new ConflictException(
@@ -484,10 +487,14 @@ export class CommissionsService {
         );
       }
       if (effectiveTo && effectiveTo <= effectiveFrom) {
-        throw new BadRequestException('effectiveTo must be after effectiveFrom.');
+        throw new BadRequestException(
+          'effectiveTo must be after effectiveFrom.',
+        );
       }
 
-      const overlaps = await transaction.$queryRaw<CommissionPlanRow[]>(Prisma.sql`
+      const overlaps = await transaction.$queryRaw<
+        CommissionPlanRow[]
+      >(Prisma.sql`
         SELECT *
         FROM referral_commission_plan_versions
         WHERE status = 'PUBLISHED'
@@ -703,8 +710,7 @@ export class CommissionsService {
     subscriptionId: string,
     actor: AuthenticatedUser,
     context: RequestContext = {},
-    operation: CommissionAuditOperation =
-      COMMISSION_AUDIT_OPERATIONS.PROCESS_SUBSCRIPTION,
+    operation: CommissionAuditOperation = COMMISSION_AUDIT_OPERATIONS.PROCESS_SUBSCRIPTION,
   ) {
     try {
       const result = await this.processSubscription(
@@ -751,8 +757,7 @@ export class CommissionsService {
     subscriptionId: string,
     actor: AuthenticatedUser,
     context: RequestContext = {},
-    operation: CommissionAuditOperation =
-      COMMISSION_AUDIT_OPERATIONS.PROCESS_SUBSCRIPTION,
+    operation: CommissionAuditOperation = COMMISSION_AUDIT_OPERATIONS.PROCESS_SUBSCRIPTION,
   ) {
     return this.runSerializable(async (transaction) => {
       const sourceRows = await transaction.$queryRaw<SourceSubscriptionRow[]>(
@@ -776,7 +781,9 @@ export class CommissionsService {
         return this.runSnapshotWithEvents(transaction, existing, false);
       }
 
-      const planRows = await transaction.$queryRaw<CommissionPlanRow[]>(Prisma.sql`
+      const planRows = await transaction.$queryRaw<
+        CommissionPlanRow[]
+      >(Prisma.sql`
         SELECT *
         FROM referral_commission_plan_versions
         WHERE status = 'PUBLISHED'
@@ -794,7 +801,8 @@ export class CommissionsService {
           null,
           'NO_EFFECTIVE_PLAN',
           {
-            reason: 'No effective published commission plan at source activation time.',
+            reason:
+              'No effective published commission plan at source activation time.',
           },
         );
         await this.auditRun(transaction, actor, context, operation, run, [], {
@@ -831,8 +839,8 @@ export class CommissionsService {
         return this.runSnapshotWithEvents(transaction, run, true);
       }
 
-      const levels = (await this.getLevels(transaction, plan.id)).filter((level) =>
-        Boolean(level.enabled),
+      const levels = (await this.getLevels(transaction, plan.id)).filter(
+        (level) => Boolean(level.enabled),
       );
       if (levels.length === 0) {
         throw new ServiceUnavailableException(
@@ -993,7 +1001,9 @@ export class CommissionsService {
     forPublication: boolean,
   ) {
     if (levels.length === 0) {
-      throw new BadRequestException('At least one commission level is required.');
+      throw new BadRequestException(
+        'At least one commission level is required.',
+      );
     }
     const seen = new Set<number>();
     let enabledCount = 0;
@@ -1016,7 +1026,9 @@ export class CommissionsService {
       }
     }
     if (enabledCount === 0) {
-      throw new BadRequestException('At least one commission level must be enabled.');
+      throw new BadRequestException(
+        'At least one commission level must be enabled.',
+      );
     }
     if (plan.holdPeriodHours < 0) {
       throw new BadRequestException('holdPeriodHours cannot be negative.');
@@ -1167,7 +1179,9 @@ export class CommissionsService {
     `);
     if (history.length > 0) return history[0].newSponsorUserId;
 
-    const profiles = await transaction.$queryRaw<ReferralProfileRow[]>(Prisma.sql`
+    const profiles = await transaction.$queryRaw<
+      ReferralProfileRow[]
+    >(Prisma.sql`
       SELECT sponsorUserId, assignmentStatus, assignedAt
       FROM referral_profiles
       WHERE userId = ${memberUserId}
@@ -1352,7 +1366,11 @@ export class CommissionsService {
     );
     const receiver = await this.ensureLedgerAccount(
       transaction,
-      userWalletAccountKey(routeNode.receiverUserId, 'REFERRAL_COMMISSION', currency),
+      userWalletAccountKey(
+        routeNode.receiverUserId,
+        'REFERRAL_COMMISSION',
+        currency,
+      ),
       'USER',
       routeNode.receiverUserId,
       'REFERRAL_COMMISSION',
@@ -1436,7 +1454,9 @@ export class CommissionsService {
     `);
     const account = rows[0];
     if (!account) {
-      throw new ServiceUnavailableException('Commission ledger account is missing.');
+      throw new ServiceUnavailableException(
+        'Commission ledger account is missing.',
+      );
     }
     if (
       account.ownerType !== ownerType ||
@@ -1575,7 +1595,8 @@ export class CommissionsService {
         action: 'CREATE',
         entityType: 'ReferralCommissionRun',
         entityId: run.id,
-        description: 'Referral commission processing completed for package subscription.',
+        description:
+          'Referral commission processing completed for package subscription.',
         metadata: {
           operation,
           sourceSubscriptionId: run.sourceSubscriptionId,
