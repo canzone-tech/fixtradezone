@@ -6,138 +6,190 @@ Repository state plus completed local verification are the acceptance authority.
 
 ## Active Development Branch
 
-`feature/package-subscription-activation`
+`feature/referral-commission-foundation`
 
 ## Mainline Baseline
 
-The reusable platform foundation, authentication/RBAC, configurable auth/registration, user/admin shell, referral foundation, package-plan foundation, deposit foundation and immutable wallet/ledger foundation are established before SUB-02.
+`main` contains the merged cumulative post-MLM business foundation through PR #16:
 
-Applied migration history must never be rewritten. MySQL remains the relational/business/accounting source of truth.
+- PKG-01 package-plan foundation;
+- DEP-01 deposits foundation;
+- WAL-01 immutable wallet/ledger foundation;
+- SUB-02 package subscription / activation.
 
-## SUB-02 — Package Subscription / Activation
+Applied migration history must never be rewritten. MySQL remains the relational,
+business and accounting source of truth.
+
+## COMM-01 — Referral Commission Foundation
 
 Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
 
 Canonical contract:
 
-`docs/PACKAGE-SUBSCRIPTION-ACTIVATION.md`
+`docs/REFERRAL-COMMISSION-FOUNDATION.md`
 
-SUB-02 integrates package funding, approved-deposit accounting and immutable package-subscription activation across backend, ADMIN UI and USER UI.
+COMM-01 converts immutable ACTIVE package-subscription events into versioned,
+immutable and ledger-backed referral commission outcomes.
 
-### Supported activation behavior
+### Effective executable policy
 
-Deposit-funded execution currently supports:
+The first publishable execution engine is intentionally limited to:
 
-- `PAYMENT_APPROVED`
-  - approval occurs first;
-  - approved-deposit accounting must exist;
-  - activation completes automatically after accounting.
-- `MANUAL_ACTIVATION`
-  - approval/accounting complete first;
-  - deposit remains Activation Pending;
-  - authorized ADMIN/SUPER_ADMIN explicitly completes activation.
+```text
+inactive upline = LOST
+compression     = SKIP
+release mode    = IMMEDIATE
+```
 
-Configured but unimplemented execution engines such as `PAYMENT_SUBMITTED` and `RULE_BASED` fail closed for new package funding.
+Deferred routing/release modes remain configurable in the contract but fail
+closed at publication until their dedicated engines exist.
 
-### Accounting policy remains independent
+### Versioned commission plan
 
-Global accounting modes:
+Migration `0013_referral_commission_foundation` establishes:
 
-- `AUTO_ON_APPROVAL`
-- `MANUAL_RECONCILIATION`
+- versioned DRAFT/PUBLISHED commission plans;
+- configurable level rules;
+- immutable processing runs;
+- immutable commission events;
+- exact DECIMAL calculation snapshots;
+- deterministic source identities;
+- Referral Commission ledger posting support;
+- COMM-01 RBAC permissions.
 
-Package activation never bypasses approved-deposit accounting.
+The supplied reference levels were seeded as a DRAFT only and then explicitly
+published during local acceptance:
 
-Manual accounting recovery remains available through the authorized ledger-post path.
+```text
+L1 20%
+L2  8%
+L3  5%
+L4  3%
+L5  2%
+```
 
-### Multiple-active packages
+Package matching is enabled per level.
 
-`MULTIPLE_ACTIVE` is operational.
+### Financial source authority
 
-Local acceptance proved one USER retaining multiple simultaneous ACTIVE packages while each activation preserves its own immutable source-plan snapshot.
+Commission processing starts only from an immutable ACTIVE package subscription.
 
-Verified historical coexistence includes:
+A submitted deposit, approved deposit by itself, or accounting transaction by
+itself is not a commission event.
 
-- `SINGLE_ACTIVE / PAYMENT_APPROVED`;
-- `MULTIPLE_ACTIVE / PAYMENT_APPROVED`;
-- `MULTIPLE_ACTIVE / MANUAL_ACTIVATION`.
+The canonical package-matching calculation is:
 
-Effective-plan changes never rewrite an existing subscription snapshot.
+```text
+eligibleBase = MIN(receiver active-package basis, source package value)
+commission   = eligibleBase × level rate / 100
+```
 
-### Financial / idempotency invariants
+AVAILABLE immediate commission posts through the immutable balanced ledger:
 
-Package activation:
+```text
+DEBIT  SYSTEM / REFERRAL_COMMISSION_EXPENSE
+CREDIT USER   / REFERRAL_COMMISSION
+```
 
-- requires an APPROVED source deposit;
-- requires its approved-deposit accounting transaction;
-- consumes exact package principal through a balanced immutable ledger transaction;
-- commits funding + subscription creation transactionally;
-- is idempotent by source deposit;
-- cannot double-consume Main / Deposit balance;
-- cannot create a duplicate subscription on manual retry;
-- records immutable source/commercial snapshots and audit evidence.
+No arbitrary balance mutation endpoint exists.
 
-Local Postman retry verification returned `created: false` and the original subscription identity for an already-activated MANUAL deposit.
+### Historical behavior
 
-### SUB-02 ADMIN UI
+Sponsor routing is reconstructed at the source subscription activation time.
+Published commission-plan versions and event calculation values are preserved
+historically.
 
-- Package plan workspace distinguishes AUTO vs MANUAL activation.
-- Accounting configuration explicitly remains independent from activation policy.
-- Deposits expose accounting recovery only when appropriate.
-- Subscriptions expose Activation Pending and authorized manual activation.
-- Pending rows retain source-plan mode/trigger context.
-- Package-plan publication is blocked while lifecycle/item edits remain unsaved.
-- Success/error/unsaved feedback remains viewport-visible on the long package-plan workspace.
-- Deposits and Subscriptions have explicit topbar route headings.
+If no commission plan was effective at a historical activation timestamp,
+processing records `NO_EFFECTIVE_PLAN`; later publication does not create a
+retroactive payout.
 
-### SUB-02 USER UI
+Local browser reconciliation of older pre-COMM-01 subscriptions confirmed this
+behavior.
 
-- Effective package mode/activation policy is displayed.
-- Unsupported activation engines cannot begin new funding.
-- Package cards explain AUTO vs MANUAL behavior.
-- Multiple simultaneous ACTIVE subscriptions are shown independently.
-- Historical subscriptions retain immutable activation-policy snapshots.
+## COMM-01 Local Acceptance — GREEN
 
-## Local Acceptance — GREEN
+Completed locally on 2026-08-27:
 
-Completed on the feature branch:
+- verified pre-migration MySQL backup;
+- migration `0013_referral_commission_foundation` deployed successfully;
+- DB readback verified all four COMM-01 tables;
+- DB readback verified V1 DRAFT seed and L1–L5 reference rates;
+- DB readback verified COMM-01 permissions and ledger enums;
+- root `npm run verify:milestone` completed successfully;
+- backend `/health` returned HTTP 200;
+- frontend `/login` returned HTTP 200;
+- ADMIN `/commissions` rendered versioned plan/rules, reconciliation and immutable history;
+- USER `/user/referrals` rendered referral identity/network and ledger-backed commission history;
+- fresh USER B was correctly assigned beneath fresh sponsor USER A;
+- fresh USER A was activated on a 5 USDT package before USER B activation;
+- fresh USER B was activated on a 5 USDT package under the effective commission plan;
+- B → A L1 package matching resolved eligible base 5 USDT;
+- B → A L1 20% produced exactly 1.00000000 USDT AVAILABLE commission;
+- USER A Referral Commission wallet displayed 1.00 USDT;
+- ADMIN immutable history displayed the B → A L1 AVAILABLE event;
+- non-qualified SUPER_ADMIN uplines produced zero-value LOST events as required by the published policy;
+- admin event/ledger/reconciliation API readbacks passed;
+- USER commission history did not expose receiver/purchaser email fields;
+- deterministic/idempotent processing is covered by automated tests.
 
-- backend focused/unit regression coverage;
-- Prisma validation and migration status;
-- backend formatting and ESLint;
-- NestJS production build;
-- admin lint/typecheck/Next.js production build;
-- combined browser/UI runtime verification;
-- Postman/API runtime verification;
-- AUTO `PAYMENT_APPROVED` activation;
-- `MULTIPLE_ACTIVE` simultaneous activation;
-- authorized `MANUAL_ACTIVATION`;
-- activation pending before manual completion;
-- pending-queue removal after manual completion;
-- immutable historical subscription snapshots;
-- duplicate manual activation idempotency;
-- root `npm run verify:milestone`;
-- unstaged and staged diff checks.
+The standalone Postman same-subscription retry request was not used as runtime
+acceptance evidence because its Postman subscription-id variable was unresolved.
+No false runtime idempotency claim is recorded from that request.
 
-No SUB-02 merge to `main` until the complete feature diff is reviewed and the PR is approved.
+## Current ADMIN UI
+
+Operational routes now include:
+
+- Dashboard
+- Users
+- Roles & Permissions
+- Packages
+- Deposits
+- Wallets & Ledger
+- Subscriptions
+- Referral Commissions
+- Referrals
+- Settings
+
+The Referral Commissions workspace exposes:
+
+- effective/published commission plan state;
+- editable DRAFT level/policy configuration;
+- publication safety and unsaved-change protection;
+- reconciliation queue;
+- immutable commission events.
+
+## Current USER UI
+
+Operational USER financial/referral surfaces include:
+
+- Packages
+- Deposits
+- Wallet
+- Referrals
+
+`/user/referrals` now shows only settled ledger-backed Referral Commission as
+earned money. No projected or fabricated commission is presented as a balance.
 
 ## Product Scope — LOCKED
 
-FixTradeZone does not execute real trades and has no AI-agent/broker/exchange execution milestone in v1.
+FixTradeZone does not execute real trades and has no AI-agent/broker/exchange
+execution milestone in v1.
 
-Future trade-like presentation is limited to clearly labelled **Simulated Trade Activity** / **SIMULATED RESULTS** and must not silently mutate real wallet/ledger balances.
+Future trade-like presentation is limited to clearly labelled **Simulated Trade
+Activity** / **SIMULATED RESULTS** and must not silently mutate real wallet/ledger
+balances.
 
 ## Current V1 Sequence
 
-1. SUB-02 package subscription / activation — locally accepted, PR handoff pending
-2. Referral commissions on legitimate package/payment events
-3. Rewards / caps / lifecycle accounting
-4. Simulated Trade Activity display only
-5. Minimal v1 landing/template controls
-6. Remaining USER/ADMIN operational slices
-7. Notifications/reports required for launch
-8. QA/security/release hardening
-9. Production deployment
+1. COMM-01 referral commission foundation — locally accepted, PR handoff pending
+2. rewards / caps / lifecycle accounting
+3. Simulated Trade Activity display only
+4. minimal v1 landing/template controls
+5. remaining USER/ADMIN operational slices
+6. notifications/reports required for launch
+7. QA/security/release hardening
+8. production deployment
 
 ## Infrastructure / Data Ownership
 
@@ -160,4 +212,5 @@ Future trade-like presentation is limited to clearly labelled **Simulated Trade 
 11. Update persistent docs/current state and review the complete diff.
 12. Commit/push the feature branch and open PR to `main` only after every local gate is GREEN.
 
-Production deployment remains HOLD until required v1 milestones and release hardening are complete.
+Production deployment remains HOLD until required v1 milestones and release
+hardening are complete.
