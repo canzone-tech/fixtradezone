@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
 import {
@@ -68,7 +68,6 @@ const routeHeadings: Array<{
 export default function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const searchRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -86,17 +85,8 @@ export default function Topbar() {
 
     void loadSession();
 
-    const onShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onShortcut);
     return () => {
       mounted = false;
-      window.removeEventListener("keydown", onShortcut);
     };
   }, [router]);
 
@@ -158,34 +148,9 @@ export default function Topbar() {
       </div>
 
       <div className="ftz-topbar-actions">
-        <label className="ftz-search">
-          <i className="iconoir-search" />
-          <input
-            ref={searchRef}
-            type="search"
-            placeholder="Search users, transactions, packages..."
-            aria-label="Search admin portal"
-          />
-          <kbd>Ctrl + K</kbd>
-        </label>
-
-        <button
-          type="button"
-          className="ftz-icon-button"
-          aria-label="Favorites"
-          title="Favorites"
-        >
-          <i className="iconoir-star" />
-        </button>
-        <button
-          type="button"
-          className="ftz-icon-button ftz-notification"
-          aria-label="Notifications"
-          title="Notifications"
-        >
-          <i className="iconoir-bell" />
-          <span>8</span>
-        </button>
+        <span className="ftz-secure-pill">
+          <i className="iconoir-shield-check" /> Live operational data
+        </span>
 
         <div className="ftz-topbar-profile">
           <div className="ftz-avatar">{initials}</div>
