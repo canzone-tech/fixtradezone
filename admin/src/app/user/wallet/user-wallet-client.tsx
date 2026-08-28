@@ -156,9 +156,9 @@ export default function UserWalletClient() {
           <h1>My Wallet</h1>
           <p>
             Total Wallet is derived from immutable accounting buckets. Simulated
-            activity is never counted as wallet money, and package earnings,
-            referral commission, and rewards remain zero until their own approved
-            milestones post real ledger events.
+            activity is never counted as wallet money; package earnings and
+            referral commission appear only after their approved ledger-backed
+            settlement engines post immutable entries.
           </p>
         </section>
 
