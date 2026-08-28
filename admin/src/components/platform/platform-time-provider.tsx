@@ -11,11 +11,15 @@ import {
 import { usePathname } from "next/navigation";
 import {
   DEFAULT_PLATFORM_TIMEZONE,
+  formatPlatformDate,
+  formatPlatformDateTime,
   isValidTimeZone,
 } from "@/lib/platform-time";
 
 const PLATFORM_TIMEZONE_CHANGED_EVENT =
   "fixtradezone:platform-timezone-changed";
+
+type PlatformDateValue = string | Date | null | undefined;
 
 interface PlatformTimeContextValue {
   timeZone: string;
@@ -104,4 +108,22 @@ export default function PlatformTimeProvider({
 
 export function usePlatformTime() {
   return useContext(PlatformTimeContext);
+}
+
+export function usePlatformDateTimeFormatter() {
+  const { timeZone } = usePlatformTime();
+
+  return useCallback(
+    (value: PlatformDateValue) => formatPlatformDateTime(value, timeZone),
+    [timeZone],
+  );
+}
+
+export function usePlatformDateFormatter() {
+  const { timeZone } = usePlatformTime();
+
+  return useCallback(
+    (value: PlatformDateValue) => formatPlatformDate(value, timeZone),
+    [timeZone],
+  );
 }
