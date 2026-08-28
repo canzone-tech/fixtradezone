@@ -1,0 +1,67 @@
+name: One-shot package time label cleanup
+
+on:
+  push:
+    branches:
+      - feature/rewards-caps-lifecycle-foundation
+    paths:
+      - '.github/workflows/one-shot-package-time-label-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/rewards-caps-lifecycle-foundation
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Remove misleading UTC suffix from platform-time display
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('admin/src/app/packages/packages-client.tsx')
+          text = path.read_text()
+          old = '<strong>{formatDate(plan.effectiveFrom)} UTC</strong>'
+          new = '<strong>{formatDate(plan.effectiveFrom)}</strong>'
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one display suffix, found {count}')
+          path.write_text(text.replace(old, new))
+          PY
+
+      - name: Install Admin dependencies
+        working-directory: admin
+        run: npm ci
+
+      - name: Verify Admin portal
+        working-directory: admin
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+          npm audit --audit-level=critical
+
+      - name: Verify diff hygiene
+        run: git diff --check
+
+      - name: Commit verified cleanup and remove workflow
+        run: |
+          rm .github/workflows/one-shot-package-time-label-cleanup.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/src/app/packages/packages-client.tsx .github/workflows/one-shot-package-time-label-cleanup.yml
+          git commit -m "fix(ui): remove misleading UTC suffix from package timestamp"
+          git push
