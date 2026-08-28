@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./profile.module.css";
 
@@ -20,11 +21,7 @@ async function readPayload<T>(response: Response): Promise<T | null> {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "No login recorded";
-  }
-
-  return new Date(value).toLocaleString();
+  return value ? formatPlatformDateTime(value) : "No login recorded";
 }
 
 export default function UserProfileClient() {
@@ -64,14 +61,8 @@ export default function UserProfileClient() {
           return;
         }
 
-        if (
-          !response.ok ||
-          !payload?.user ||
-          !payload.sessionPolicy
-        ) {
-          throw new Error(
-            payload?.message || "Unable to load your profile.",
-          );
+        if (!response.ok || !payload?.user || !payload.sessionPolicy) {
+          throw new Error(payload?.message || "Unable to load your profile.");
         }
 
         if (mounted) {
@@ -142,9 +133,7 @@ export default function UserProfileClient() {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
-            <span className={styles.eyebrow}>
-              ACCOUNT & SECURITY
-            </span>
+            <span className={styles.eyebrow}>ACCOUNT & SECURITY</span>
 
             <h2>{displayName}</h2>
 
@@ -214,9 +203,7 @@ export default function UserProfileClient() {
 
             <div>
               <small>IDLE SECURITY</small>
-              <strong>
-                {session.sessionPolicy.idleLockMinutes} MIN
-              </strong>
+              <strong>{session.sessionPolicy.idleLockMinutes} MIN</strong>
             </div>
           </article>
         </section>
@@ -255,7 +242,7 @@ export default function UserProfileClient() {
 
               <div>
                 <dt>Created</dt>
-                <dd>{new Date(user.createdAt).toLocaleString()}</dd>
+                <dd>{formatPlatformDateTime(user.createdAt)}</dd>
               </div>
 
               <div>
@@ -282,9 +269,8 @@ export default function UserProfileClient() {
                 <strong>Authenticated USER session active</strong>
 
                 <p>
-                  Access and refresh credentials remain in secure
-                  HttpOnly cookies. Backend authorization remains the
-                  source of truth.
+                  Access and refresh credentials remain in secure HttpOnly
+                  cookies. Backend authorization remains the source of truth.
                 </p>
               </div>
             </div>
@@ -297,9 +283,7 @@ export default function UserProfileClient() {
 
               <div>
                 <small>IDLE LOCK</small>
-                <strong>
-                  {session.sessionPolicy.idleLockMinutes} MINUTES
-                </strong>
+                <strong>{session.sessionPolicy.idleLockMinutes} MINUTES</strong>
               </div>
             </div>
           </section>
@@ -314,9 +298,9 @@ export default function UserProfileClient() {
             <strong>Protected account boundary</strong>
 
             <p>
-              This page uses the dedicated standard USER session API.
-              ADMIN and SUPER_ADMIN sessions are rejected from this
-              USER boundary and routed to the administrator portal.
+              This page uses the dedicated standard USER session API. ADMIN and
+              SUPER_ADMIN sessions are rejected from this USER boundary and
+              routed to the administrator portal.
             </p>
           </div>
         </section>
