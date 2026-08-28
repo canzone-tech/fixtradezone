@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
-import { CommissionsService } from '../commissions/commissions.service';
 import { OperationsConfigService } from '../platform-config/operations-config.service';
-import { RewardsService } from '../rewards/rewards.service';
+import { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import type { ReviewDepositDto } from './dto/deposit.dto';
@@ -18,8 +17,7 @@ export class DepositApprovalOrchestratorService {
     private readonly operationsConfigService: OperationsConfigService,
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
-    private readonly commissionsService: CommissionsService,
-    private readonly rewardsService: RewardsService,
+    private readonly postActivationService: SubscriptionPostActivationService,
   ) {}
 
   async approveDeposit(
@@ -140,66 +138,16 @@ export class DepositApprovalOrchestratorService {
       };
     }
 
-    // From this point the package is ACTIVE. Downstream failures must never be
-    // reported as an activation failure; they remain independently recoverable.
     const subscription = activation.subscription;
-    let referralCommission: Awaited<
-      ReturnType<CommissionsService['processSubscriptionSafely']>
-    > | null = null;
-    let referralCommissionPendingReason: string | null = null;
-
-    try {
-      referralCommission =
-        await this.commissionsService.processSubscriptionSafely(
-          subscription.id,
-          actor,
-          context,
-        );
-      if (referralCommission.processingStatus === 'PENDING_RECONCILIATION') {
-        referralCommissionPendingReason = referralCommission.message;
-      }
-    } catch (error) {
-      referralCommissionPendingReason = this.errorMessage(
-        error,
-        'Referral commission requires reconciliation.',
-      );
-      this.logger.warn(
-        `Package ${subscription.id} activated but commission processing is pending: ${referralCommissionPendingReason}`,
-      );
-    }
-
-    let rewardLifecycle: Awaited<
-      ReturnType<RewardsService['reconcileSubscription']>
-    > | null = null;
-    let rewardLifecyclePendingReason: string | null = null;
-
-    try {
-      rewardLifecycle = await this.rewardsService.reconcileSubscription(
-        subscription.id,
-        actor,
-        context,
-      );
-      if (rewardLifecycle.noEffectivePolicy) {
-        rewardLifecyclePendingReason =
-          'No published reward/cap policy applies to this subscription yet.';
-      }
-    } catch (error) {
-      rewardLifecyclePendingReason = this.errorMessage(
-        error,
-        'Reward lifecycle requires reconciliation.',
-      );
-      this.logger.warn(
-        `Package ${subscription.id} activated but reward lifecycle initialization is pending: ${rewardLifecyclePendingReason}`,
-      );
-    }
-
-    const downstreamPending =
-      referralCommissionPendingReason !== null ||
-      rewardLifecyclePendingReason !== null;
+    const downstream = await this.postActivationService.process(
+      subscription.id,
+      actor,
+      context,
+    );
 
     return {
       ...approval,
-      message: downstreamPending
+      message: downstream.downstreamPending
         ? 'Deposit approved, accounted, and package activated. One or more downstream earnings stages remain safely recoverable.'
         : 'Deposit approved, accounted, package activated, commission processed, and reward lifecycle initialized automatically.',
       operationsMode: operations.operationsMode,
@@ -212,10 +160,7 @@ export class DepositApprovalOrchestratorService {
       packageActivationTrigger: activation.activationTrigger,
       packageActivationRequired: activation.activationRequired,
       subscription,
-      referralCommission,
-      referralCommissionPendingReason,
-      rewardLifecycle,
-      rewardLifecyclePendingReason,
+      ...downstream,
       automaticDownstreamProcessing: true,
     };
   }
