@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   notifyPlatformTimezoneChanged,
@@ -13,6 +13,25 @@ import PlatformSettingsNav from "../platform-settings-nav";
 import styles from "../platform-configuration.module.css";
 
 type OperationsMode = "AUTOMATIC" | "CONTROLLED_MANUAL";
+
+type IntlWithSupportedValues = typeof Intl & {
+  supportedValuesOf?: (key: "timeZone") => string[];
+};
+
+const FALLBACK_TIMEZONES = [
+  "UTC",
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Europe/London",
+  "Europe/Paris",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Australia/Sydney",
+];
 
 interface OperationsConfiguration {
   platformTimezone: string;
@@ -31,6 +50,26 @@ function apiErrorMessage(payload: ApiError, fallback: string): string {
   return fallback;
 }
 
+function supportedTimeZones(current: string): string[] {
+  const runtimeIntl = Intl as IntlWithSupportedValues;
+  const runtimeZones = runtimeIntl.supportedValuesOf?.("timeZone") ?? [];
+  const values = runtimeZones.length > 0 ? runtimeZones : FALLBACK_TIMEZONES;
+
+  return Array.from(new Set(["Asia/Kolkata", "UTC", current, ...values]))
+    .filter((timeZone) => isValidTimeZone(timeZone))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function timeZoneLabel(timeZone: string): string {
+  if (timeZone === "Asia/Kolkata") {
+    return "Asia/Kolkata — India Standard Time (IST)";
+  }
+  if (timeZone === "UTC") {
+    return "UTC — Coordinated Universal Time";
+  }
+  return timeZone;
+}
+
 export default function OperationsConfigurationClient() {
   const router = useRouter();
   const { timeZone } = usePlatformTime();
@@ -42,6 +81,10 @@ export default function OperationsConfigurationClient() {
     useState<OperationsMode>("AUTOMATIC");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const timeZones = useMemo(
+    () => supportedTimeZones(platformTimezone),
+    [platformTimezone],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -118,9 +161,7 @@ export default function OperationsConfigurationClient() {
 
     const timezone = platformTimezone.trim();
     if (!isValidTimeZone(timezone)) {
-      setError(
-        "Platform timezone must be a valid IANA timezone, for example Asia/Kolkata.",
-      );
+      setError("Select a valid platform timezone from the list.");
       return;
     }
 
@@ -248,21 +289,25 @@ export default function OperationsConfigurationClient() {
           </div>
 
           <label className={styles.field}>
-            <span>IANA timezone</span>
-            <input
-              className={styles.textInput}
+            <span>Platform timezone</span>
+            <select
+              className={styles.select}
               value={platformTimezone}
               onChange={(event) => {
                 setPlatformTimezone(event.target.value);
                 setError(null);
                 setSuccess(null);
               }}
-              placeholder="Asia/Kolkata"
-              autoComplete="off"
-            />
+            >
+              {timeZones.map((zone) => (
+                <option key={zone} value={zone}>
+                  {timeZoneLabel(zone)}
+                </option>
+              ))}
+            </select>
             <small className={styles.fieldHelp}>
-              Recommended for the current platform: Asia/Kolkata. Current
-              display setting: {timeZone}.
+              Choose from supported IANA timezones. Recommended: Asia/Kolkata —
+              India Standard Time (IST). Current display setting: {timeZone}.
             </small>
           </label>
         </article>
