@@ -15,6 +15,7 @@ import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { CommissionsService } from '../commissions/commissions.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { RewardsService } from '../rewards/rewards.service';
 import {
   AdminSubscriptionQueryDto,
   SubscriptionPageQueryDto,
@@ -54,6 +55,7 @@ export class AdminDepositSubscriptionController {
   constructor(
     private readonly subscriptionsService: SubscriptionsService,
     private readonly commissionsService: CommissionsService,
+    private readonly rewardsService: RewardsService,
   ) {}
 
   @Post(':depositId/activate-package')
@@ -77,9 +79,33 @@ export class AdminDepositSubscriptionController {
         context,
       );
 
+    let rewardLifecycle: Awaited<
+      ReturnType<RewardsService['reconcileSubscription']>
+    > | null = null;
+    let rewardLifecyclePendingReason: string | null = null;
+
+    try {
+      rewardLifecycle = await this.rewardsService.reconcileSubscription(
+        activation.subscription.id,
+        actor,
+        context,
+      );
+      if (rewardLifecycle.noEffectivePolicy) {
+        rewardLifecyclePendingReason =
+          'No published reward/cap policy applies to this subscription yet.';
+      }
+    } catch (error) {
+      rewardLifecyclePendingReason =
+        error instanceof Error
+          ? error.message
+          : 'Reward lifecycle requires reconciliation.';
+    }
+
     return {
       ...activation,
       referralCommission,
+      rewardLifecycle,
+      rewardLifecyclePendingReason,
     };
   }
 }
