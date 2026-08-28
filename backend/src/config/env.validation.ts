@@ -30,7 +30,7 @@ export const envValidationSchema = Joi.object({
   REWARD_WORKER_ENABLED: Joi.boolean()
     .truthy('true')
     .falsy('false')
-    .default(true),
+    .default(false),
 
   REWARD_WORKER_INTERVAL_MS: Joi.number()
     .integer()
