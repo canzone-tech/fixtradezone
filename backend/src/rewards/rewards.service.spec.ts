@@ -1,5 +1,8 @@
 import 'reflect-metadata';
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
@@ -113,9 +116,89 @@ const forwardOnlyState = {
   updatedAt: new Date('2026-08-28T12:00:00.000Z'),
 };
 
+const expenseAccount = {
+  id: '77777777-7777-4777-8777-777777777777',
+  accountKey: 'SYSTEM:PACKAGE_REWARD_EXPENSE:USDT',
+  ownerType: 'SYSTEM',
+  ownerUserId: null,
+  bucket: 'PACKAGE_REWARD_EXPENSE',
+  currency: 'USDT',
+  normalSide: 'DEBIT',
+};
+
+const earningsAccount = {
+  id: '88888888-8888-4888-8888-888888888888',
+  accountKey: `USER:${subscription.userId}:PACKAGE_EARNINGS:USDT`,
+  ownerType: 'USER',
+  ownerUserId: subscription.userId,
+  bucket: 'PACKAGE_EARNINGS',
+  currency: 'USDT',
+  normalSide: 'CREDIT',
+};
+
+function rewardEventFixture(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: '99999999-9999-4999-8999-999999999999',
+    sourceKey: `SUBSCRIPTION:${subscription.id}:PACKAGE_REWARD:2026-08-29`,
+    subscriptionId: subscription.id,
+    userId: subscription.userId,
+    rewardCapPolicyVersionId: publishedPolicy.id,
+    packagePlanVersionId: subscription.packagePlanVersionId,
+    packagePlanItemId: subscription.packagePlanItemId,
+    packageCode: subscription.packageCode,
+    packageDisplayName: subscription.packageDisplayName,
+    packageValue: subscription.price,
+    currency: subscription.currency,
+    rewardLocalDate: '2026-08-29',
+    rewardDayNumber: 9,
+    cycleNumber: 1,
+    cycleDay: 9,
+    settlementTimezone: subscription.settlementTimezone,
+    rewardStartMode: subscription.rewardStartMode,
+    rewardFrequency: subscription.rewardFrequency,
+    cycleDayMode: subscription.cycleDayMode,
+    rewardDayMode: subscription.rewardDayMode,
+    rewardRateMode: subscription.rewardRateMode,
+    rewardRateMeaning: subscription.rewardRateMeaning,
+    selectedRate: '1.000000',
+    calculatedReward: '1.00000000',
+    postedReward: '1.00000000',
+    capBasis: subscription.capBasis,
+    capMultiplier: subscription.capMultiplier,
+    principalTreatment: subscription.principalTreatment,
+    capLimit: '300.00000000',
+    capConsumedBefore: '100.00000000',
+    capConsumedAfter: '101.00000000',
+    clippedToCap: false,
+    existingSubscriptionRolloutMode:
+      publishedPolicy.existingSubscriptionRolloutMode,
+    packageRewardCountsTowardCap: true,
+    referralCommissionCountsTowardCap: false,
+    teamCommissionCountsTowardCap: false,
+    awardRewardCountsTowardCap: false,
+    otherIncomeCountsTowardCap: false,
+    cycleDays: subscription.cycleDays,
+    goalDays: subscription.goalDays,
+    cycleEndAction: subscription.cycleEndAction,
+    capReachedAction: subscription.capReachedAction,
+    ledgerTransactionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    completionReason: null,
+    postedAt: new Date('2026-08-29T12:00:00.000Z'),
+    createdAt: new Date('2026-08-29T12:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 type TransactionWork = (
   transaction: Prisma.TransactionClient,
 ) => Promise<unknown>;
+
+type SqlLike = {
+  strings: readonly string[];
+  values: readonly unknown[];
+};
 
 function serviceWithTransaction(
   queryResults: unknown[][],
@@ -143,6 +226,15 @@ function serviceWithTransaction(
     service: new RewardsService(prisma as unknown as PrismaService),
     transaction,
   };
+}
+
+function executedSqlContaining(
+  transaction: ReturnType<typeof serviceWithTransaction>['transaction'],
+  fragment: string,
+): SqlLike[] {
+  return transaction.$executeRaw.mock.calls
+    .map((call) => call[0] as SqlLike)
+    .filter((query) => query.strings.join('').includes(fragment));
 }
 
 describe('RewardsService RWD-01 boundaries', () => {
@@ -301,6 +393,281 @@ describe('RewardsService RWD-01 boundaries', () => {
     });
     expect(result.message).toContain('No published reward/cap policy');
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('posts a fixed package reward through equal debit/credit ledger entries and advances cap state', async () => {
+    const asOf = new Date('2026-08-29T12:00:00.000Z');
+    const nextState = {
+      ...forwardOnlyState,
+      capConsumed: '101.00000000',
+      nextRewardLocalDate: '2026-08-30',
+      nextRewardAt: new Date('2026-08-30T00:00:00.000Z'),
+      nextRewardDayNumber: 10,
+      nextCycleNumber: 1,
+      nextCycleDay: 10,
+      settledRewardCount: 1,
+      revision: 2,
+    };
+    const event = rewardEventFixture();
+    const { service, transaction } = serviceWithTransaction([
+      [subscription],
+      [forwardOnlyState],
+      [subscription],
+      [forwardOnlyState],
+      [publishedPolicy],
+      [],
+      [expenseAccount],
+      [earningsAccount],
+      [
+        { side: 'DEBIT', amount: '1.00000000' },
+        { side: 'CREDIT', amount: '1.00000000' },
+      ],
+      [event],
+      [nextState],
+    ]);
+
+    const result = await service.processSubscriptionDue(
+      subscription.id,
+      asOf,
+      actor,
+    );
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({
+      selectedRate: '1.000000',
+      calculatedReward: '1.00000000',
+      postedReward: '1.00000000',
+      capConsumedBefore: '100.00000000',
+      capConsumedAfter: '101.00000000',
+      clippedToCap: false,
+      completionReason: null,
+    });
+    expect(result.state).toMatchObject({
+      status: 'ACTIVE',
+      capConsumed: '101.00000000',
+      settledRewardCount: 1,
+      nextRewardLocalDate: '2026-08-30',
+      nextRewardDayNumber: 10,
+    });
+
+    const ledgerEntries = executedSqlContaining(
+      transaction,
+      'INSERT INTO ledger_entries',
+    );
+    expect(ledgerEntries).toHaveLength(2);
+    expect(ledgerEntries[0]?.values).toEqual(
+      expect.arrayContaining(['DEBIT', '1.00000000']),
+    );
+    expect(ledgerEntries[1]?.values).toEqual(
+      expect.arrayContaining(['CREDIT', '1.00000000']),
+    );
+    expect(transaction.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            selectedRate: '1.000000',
+            calculatedReward: '1.00000000',
+            postedReward: '1.00000000',
+            capConsumedAfter: '101.00000000',
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('clips the final reward exactly to remaining cap headroom and completes the package', async () => {
+    const asOf = new Date('2026-08-29T12:00:00.000Z');
+    const capEdgeState = {
+      ...forwardOnlyState,
+      capConsumed: '299.50000000',
+    };
+    const completedState = {
+      ...capEdgeState,
+      capConsumed: '300.00000000',
+      settledRewardCount: 1,
+      status: 'COMPLETED',
+      completionReason: 'CAP_REACHED',
+      revision: 2,
+      completedAt: asOf,
+    };
+    const event = rewardEventFixture({
+      postedReward: '0.50000000',
+      capConsumedBefore: '299.50000000',
+      capConsumedAfter: '300.00000000',
+      clippedToCap: true,
+      completionReason: 'CAP_REACHED',
+    });
+    const { service, transaction } = serviceWithTransaction([
+      [subscription],
+      [capEdgeState],
+      [subscription],
+      [capEdgeState],
+      [publishedPolicy],
+      [],
+      [expenseAccount],
+      [earningsAccount],
+      [
+        { side: 'DEBIT', amount: '0.50000000' },
+        { side: 'CREDIT', amount: '0.50000000' },
+      ],
+      [event],
+      [completedState],
+    ]);
+
+    const result = await service.processSubscriptionDue(
+      subscription.id,
+      asOf,
+      actor,
+    );
+
+    expect(result.events[0]).toMatchObject({
+      calculatedReward: '1.00000000',
+      postedReward: '0.50000000',
+      capConsumedBefore: '299.50000000',
+      capConsumedAfter: '300.00000000',
+      clippedToCap: true,
+      completionReason: 'CAP_REACHED',
+    });
+    expect(result.state).toMatchObject({
+      status: 'COMPLETED',
+      completionReason: 'CAP_REACHED',
+      capConsumed: '300.00000000',
+      settledRewardCount: 1,
+    });
+
+    const ledgerEntries = executedSqlContaining(
+      transaction,
+      'INSERT INTO ledger_entries',
+    );
+    expect(ledgerEntries).toHaveLength(2);
+    expect(ledgerEntries[0]?.values).toEqual(
+      expect.arrayContaining(['DEBIT', '0.50000000']),
+    );
+    expect(ledgerEntries[1]?.values).toEqual(
+      expect.arrayContaining(['CREDIT', '0.50000000']),
+    );
+  });
+
+  it('posts the goal-day reward once and then completes the lifecycle at lifetime boundary', async () => {
+    const asOf = new Date('2026-12-18T12:00:00.000Z');
+    const lifetimeState = {
+      ...forwardOnlyState,
+      nextRewardLocalDate: '2026-12-18',
+      nextRewardAt: new Date('2026-12-18T00:00:00.000Z'),
+      nextRewardDayNumber: 120,
+      nextCycleNumber: 4,
+      nextCycleDay: 30,
+      capConsumed: '150.00000000',
+      settledRewardCount: 111,
+      revision: 12,
+    };
+    const completedState = {
+      ...lifetimeState,
+      capConsumed: '151.00000000',
+      settledRewardCount: 112,
+      status: 'COMPLETED',
+      completionReason: 'LIFETIME_REACHED',
+      revision: 13,
+      completedAt: asOf,
+    };
+    const event = rewardEventFixture({
+      sourceKey: `SUBSCRIPTION:${subscription.id}:PACKAGE_REWARD:2026-12-18`,
+      rewardLocalDate: '2026-12-18',
+      rewardDayNumber: 120,
+      cycleNumber: 4,
+      cycleDay: 30,
+      capConsumedBefore: '150.00000000',
+      capConsumedAfter: '151.00000000',
+      completionReason: 'LIFETIME_REACHED',
+      postedAt: asOf,
+      createdAt: asOf,
+    });
+    const { service } = serviceWithTransaction([
+      [subscription],
+      [lifetimeState],
+      [subscription],
+      [lifetimeState],
+      [publishedPolicy],
+      [],
+      [expenseAccount],
+      [earningsAccount],
+      [
+        { side: 'DEBIT', amount: '1.00000000' },
+        { side: 'CREDIT', amount: '1.00000000' },
+      ],
+      [event],
+      [completedState],
+    ]);
+
+    const result = await service.processSubscriptionDue(
+      subscription.id,
+      asOf,
+      actor,
+    );
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({
+      rewardDayNumber: 120,
+      cycleNumber: 4,
+      cycleDay: 30,
+      postedReward: '1.00000000',
+      completionReason: 'LIFETIME_REACHED',
+    });
+    expect(result.state).toMatchObject({
+      status: 'COMPLETED',
+      completionReason: 'LIFETIME_REACHED',
+      capConsumed: '151.00000000',
+      settledRewardCount: 112,
+    });
+  });
+
+  it('fails closed when an immutable reward event already exists for the state reward day', async () => {
+    const asOf = new Date('2026-08-29T12:00:00.000Z');
+    const existingEvent = rewardEventFixture();
+    const { service, transaction } = serviceWithTransaction([
+      [subscription],
+      [forwardOnlyState],
+      [subscription],
+      [forwardOnlyState],
+      [publishedPolicy],
+      [existingEvent],
+    ]);
+
+    await expect(
+      service.processSubscriptionDue(subscription.id, asOf, actor),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(
+      service.processSubscriptionDue(subscription.id, asOf, actor),
+    ).rejects.toThrow();
+
+    expect(
+      executedSqlContaining(transaction, 'INSERT INTO ledger_transactions'),
+    ).toHaveLength(0);
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('stops before immutable reward event creation when ledger balance verification fails', async () => {
+    const asOf = new Date('2026-08-29T12:00:00.000Z');
+    const { service, transaction } = serviceWithTransaction([
+      [subscription],
+      [forwardOnlyState],
+      [subscription],
+      [forwardOnlyState],
+      [publishedPolicy],
+      [],
+      [expenseAccount],
+      [earningsAccount],
+      [{ side: 'DEBIT', amount: '1.00000000' }],
+    ]);
+
+    await expect(
+      service.processSubscriptionDue(subscription.id, asOf, actor),
+    ).rejects.toThrow('Package reward ledger transaction is not balanced.');
+
+    expect(
+      executedSqlContaining(transaction, 'INSERT INTO package_reward_events'),
+    ).toHaveLength(0);
     expect(transaction.auditLog.create).not.toHaveBeenCalled();
   });
 });
