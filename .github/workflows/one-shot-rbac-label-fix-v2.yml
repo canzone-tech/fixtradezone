@@ -1,0 +1,73 @@
+name: One-shot RBAC label fix v2
+
+on:
+  push:
+    branches:
+      - feature/rewards-caps-lifecycle-foundation
+    paths:
+      - .github/workflows/one-shot-rbac-label-fix-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/rewards-caps-lifecycle-foundation
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Fix SUPER_ADMIN permission label
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          path = Path('admin/src/app/rbac/rbac-client.tsx')
+          text = path.read_text()
+          pattern = re.compile(r'<em>\s*\{\s*role\.permissions\s*\.length\s*\}\{" "\}\s*permissions\s*</em>')
+          replacement = '''<em>
+                        {role.name === "SUPER_ADMIN"
+                          ? "All permissions (bypass)"
+                          : `${role.permissions.length} permissions`}
+                      </em>'''
+          updated, count = pattern.subn(replacement, text)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one RBAC role permission label, found {count}')
+          path.write_text(updated)
+          PY
+
+      - name: Install Admin dependencies
+        working-directory: admin
+        run: npm ci
+
+      - name: Verify Admin portal
+        working-directory: admin
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+          npm audit --audit-level=critical
+
+      - name: Verify diff hygiene
+        run: git diff --check
+
+      - name: Commit verified fix and cleanup temporary workflows
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/one-shot-rbac-label-fix.yml
+          rm -f .github/workflows/one-shot-rbac-label-fix-v2.yml
+          git add admin/src/app/rbac/rbac-client.tsx .github/workflows/one-shot-rbac-label-fix.yml .github/workflows/one-shot-rbac-label-fix-v2.yml
+          git diff --cached --check
+          git commit -m "fix(ui): label SUPER_ADMIN all-access RBAC scope"
+          git push origin HEAD:feature/rewards-caps-lifecycle-foundation
