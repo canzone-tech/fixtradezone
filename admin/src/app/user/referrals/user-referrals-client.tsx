@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
 import type { MyCommissionsResponse } from "@/lib/commissions";
+import { formatPlatformDate, formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./user-referrals.module.css";
 
@@ -71,11 +72,7 @@ function amountLabel(value: string, currency: string) {
 }
 
 function dateLabel(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 export default function UserReferralsClient() {
@@ -414,7 +411,7 @@ export default function UserReferralsClient() {
                       <td>@{member.username}</td>
                       <td><span className={styles.badge}>{member.status}</span></td>
                       <td>{member.assignmentStatus}</td>
-                      <td>{new Date(member.referralJoinedAt).toLocaleDateString()}</td>
+                      <td>{formatPlatformDate(member.referralJoinedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
