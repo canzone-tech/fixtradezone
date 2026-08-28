@@ -41,6 +41,10 @@ interface IdRow {
   id: string;
 }
 
+interface OperationsConfigRow {
+  platformTimezone: string;
+}
+
 interface FundingEntryRow {
   side: 'DEBIT' | 'CREDIT';
   amount: DecimalValue;
@@ -390,6 +394,22 @@ export class SubscriptionsService {
         }
       }
 
+      const operationsRows = await transaction.$queryRaw<OperationsConfigRow[]>(
+        Prisma.sql`
+          SELECT platformTimezone
+          FROM system_operations_config
+          WHERE id = 1
+          LIMIT 1
+          FOR SHARE
+        `,
+      );
+      const platformTimezone = operationsRows[0]?.platformTimezone?.trim();
+      if (!platformTimezone) {
+        throw new ServiceUnavailableException(
+          'Platform operations configuration is unavailable.',
+        );
+      }
+
       const currency = deposit.currency.toUpperCase();
       const amount = deposit.amount.toFixed(8);
       const fundingSourceKey = packageActivationSourceKey(deposit.id);
@@ -426,6 +446,8 @@ export class SubscriptionsService {
             packagePlanItemId: deposit.packagePlanItemId,
             amount,
             currency,
+            settlementTimezone: platformTimezone,
+            timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
             referralCommissionApplied: false,
             rewardsApplied: false,
           })},
@@ -565,7 +587,7 @@ export class SubscriptionsService {
           ${planItem.planVersion.activationTrigger},
           ${planItem.planVersion.renewalMode},
           ${planItem.planVersion.upgradesEnabled},
-          ${planItem.planVersion.settlementTimezone},
+          ${platformTimezone},
           ${planItem.rewardRateMode},
           ${planItem.fixedRewardRate?.toFixed(6) ?? null},
           ${planItem.minimumRewardRate?.toFixed(6) ?? null},
@@ -607,6 +629,8 @@ export class SubscriptionsService {
             packageDisplayName: deposit.packageDisplayName,
             amount,
             currency,
+            settlementTimezone: platformTimezone,
+            timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
             sourceDepositAccountingTransactionId: accountingTransaction.id,
             fundingLedgerTransactionId: fundingTransaction.id,
             debitAccount: mainAccount.accountKey,
