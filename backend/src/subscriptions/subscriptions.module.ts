@@ -5,6 +5,8 @@ import {
   AdminDepositSubscriptionController,
   AdminSubscriptionsController,
 } from './admin-subscriptions.controller';
+import { SubscriptionActivationOrchestratorService } from './subscription-activation-orchestrator.service';
+import { SubscriptionPostActivationService } from './subscription-post-activation.service';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
 
@@ -15,7 +17,11 @@ import { SubscriptionsService } from './subscriptions.service';
     AdminSubscriptionsController,
     AdminDepositSubscriptionController,
   ],
-  providers: [SubscriptionsService],
-  exports: [SubscriptionsService],
+  providers: [
+    SubscriptionsService,
+    SubscriptionPostActivationService,
+    SubscriptionActivationOrchestratorService,
+  ],
+  exports: [SubscriptionsService, SubscriptionPostActivationService],
 })
 export class SubscriptionsModule {}
