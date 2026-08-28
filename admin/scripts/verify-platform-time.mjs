@@ -5,9 +5,6 @@ import ts from "typescript";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(scriptDir, "../src");
-const formatterBoundary = path.normalize(
-  path.join(srcDir, "components/platform/platform-time-provider.tsx"),
-);
 const platformTimeLibrary = path.normalize(
   path.join(srcDir, "lib/platform-time.ts"),
 );
@@ -48,6 +45,14 @@ function isIntlDateTimeFormat(node) {
   );
 }
 
+function isDirectDateConstruction(node) {
+  return (
+    (ts.isNewExpression(node) || ts.isCallExpression(node)) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "Date"
+  );
+}
+
 for (const filePath of walk(srcDir)) {
   const normalizedPath = path.normalize(filePath);
   const text = fs.readFileSync(filePath, "utf8");
@@ -61,31 +66,6 @@ for (const filePath of walk(srcDir)) {
 
   function inspect(node) {
     if (
-      ts.isImportDeclaration(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
-      node.moduleSpecifier.text === "@/lib/platform-time" &&
-      normalizedPath !== formatterBoundary
-    ) {
-      const namedBindings = node.importClause?.namedBindings;
-      if (namedBindings && ts.isNamedImports(namedBindings)) {
-        const importedFormatters = namedBindings.elements
-          .map((element) => element.propertyName?.text ?? element.name.text)
-          .filter(
-            (name) =>
-              name === "formatPlatformDateTime" || name === "formatPlatformDate",
-          );
-
-        if (importedFormatters.length > 0) {
-          record(
-            filePath,
-            node,
-            `must consume ${importedFormatters.join(", ")} through the platform-time provider hooks instead of bypassing configured timezone context.`,
-          );
-        }
-      }
-    }
-
-    if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       (node.expression.name.text === "toLocaleDateString" ||
@@ -94,7 +74,20 @@ for (const filePath of walk(srcDir)) {
       record(
         filePath,
         node,
-        `${node.expression.name.text} is browser-locale dependent; use the platform-time provider formatter.`,
+        `${node.expression.name.text} is browser-locale dependent; use lib/platform-time.ts.`,
+      );
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "toLocaleString" &&
+      isDirectDateConstruction(node.expression.expression)
+    ) {
+      record(
+        filePath,
+        node,
+        "Date.toLocaleString is browser-locale dependent; use lib/platform-time.ts.",
       );
     }
 
@@ -106,7 +99,7 @@ for (const filePath of walk(srcDir)) {
       record(
         filePath,
         node,
-        "Intl.DateTimeFormat is centralized in lib/platform-time.ts; UI code must use platform-time provider formatters.",
+        "Intl.DateTimeFormat is centralized in lib/platform-time.ts; UI code must use the platform formatter.",
       );
     }
 
