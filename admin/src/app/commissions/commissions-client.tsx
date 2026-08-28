@@ -9,6 +9,7 @@ import type {
   CommissionPlan,
   CommissionReconciliationItem,
 } from "@/lib/commissions";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./commissions.module.css";
 
 interface ApiError {
@@ -40,11 +41,7 @@ function apiMessage(payload: ApiError, fallback: string) {
 }
 
 function dateLabel(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 function amountLabel(value: string, currency: string) {
