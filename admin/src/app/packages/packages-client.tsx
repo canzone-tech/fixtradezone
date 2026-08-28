@@ -864,7 +864,7 @@ export default function PackagesClient() {
                 </article>
                 <article>
                   <small>EFFECTIVE FROM</small>
-                  <strong>{formatDate(plan.effectiveFrom)} UTC</strong>
+                  <strong>{formatDate(plan.effectiveFrom)}</strong>
                 </article>
                 <article>
                   <small>ITEMS</small>

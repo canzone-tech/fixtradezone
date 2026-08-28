@@ -6,6 +6,7 @@ import type { AdminUser } from "@/lib/auth";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 
 interface UsersResponse {
+  total?: number;
   pagination?: { total?: number };
 }
 
