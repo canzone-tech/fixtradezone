@@ -183,6 +183,28 @@ status
 
 Money/rate values retain exact SQL DECIMAL semantics and monetary JSON values are strings.
 
+### OPS-01 timezone precedence addendum — 2026-08-28
+
+OPS-01 supersedes the original assumption that a package-plan timezone is copied into every future activation.
+
+For **new activations**, the authoritative settlement-timezone source is the singleton SUPER_ADMIN Platform Operations configuration:
+
+```text
+system_operations_config.platformTimezone
+        ↓
+activation transaction
+        ↓
+user_package_subscriptions.settlementTimezone
+```
+
+The timezone is read inside the same SERIALIZABLE activation transaction before package financial writes. If the Platform Operations timezone is unavailable, activation fails closed before package funding/subscription writes.
+
+The captured timezone is written into the immutable subscription snapshot and activation audit/ledger metadata. Reward/calendar engines consume that subscription snapshot thereafter.
+
+Already-created subscriptions retain their historical `settlementTimezone` exactly as recorded; changing Platform Operations never rewrites them.
+
+`package_plan_versions.settlementTimezone` remains in the schema only for backward compatibility/history. It is non-authoritative for new activations and is no longer an Admin-editable runtime setting. Direct package-plan timezone mutation is rejected; the single supported control is SUPER_ADMIN **Settings → Operations → Platform timezone**.
+
 ## RBAC
 
 SUB-02 uses:
@@ -227,6 +249,13 @@ GET   /admin/settings/accounting
 PATCH /admin/settings/accounting
 ```
 
+Platform Operations timezone/automation configuration (OPS-01):
+
+```text
+GET   /admin/settings/operations
+PATCH /admin/settings/operations
+```
+
 ## Frontend acceptance surface
 
 ### USER
@@ -246,6 +275,7 @@ PATCH /admin/settings/accounting
 
 - activation policy is visible and editable only on DRAFT plans;
 - AUTO vs MANUAL behavior is explicitly explained;
+- settlement timezone is informational and sourced from Platform Operations rather than exposed as a second editable package-plan knob;
 - unsaved lifecycle/item changes are visibly flagged;
 - publication is disabled until local draft changes are explicitly saved;
 - success/error/unsaved feedback remains viewport-visible on the long workspace.
@@ -283,6 +313,8 @@ GREEN through combined backend + frontend testing:
 - root milestone verification;
 - unstaged and staged diff checks.
 
+OPS-01 timezone-source behavior added on 2026-08-28 requires fresh local activation acceptance before the current combined RWD/OPS feature is eligible for merge; the historical SUB-02 evidence above is not used as proof of that new behavior.
+
 ## Explicitly deferred
 
 SUB-02 does not implement:
@@ -304,6 +336,6 @@ Later milestones must consume immutable SUB-02 records and WAL-01 ledger events 
 
 ## Delivery state
 
-Implementation and local acceptance are complete on `feature/package-subscription-activation`.
+Historical SUB-02 implementation/local acceptance was completed on `feature/package-subscription-activation`.
 
-The branch must not merge to `main` until the complete feature diff is reviewed, the repository checkpoint is committed/pushed, and the PR is approved.
+The current RWD/OPS feature branch adds the OPS-01 timezone precedence described above and must pass fresh local API/browser acceptance before merge to `main`.
