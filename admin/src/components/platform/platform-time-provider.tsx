@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   createContext,
   useCallback,
   useContext,
@@ -14,6 +15,7 @@ import {
   formatPlatformDate,
   formatPlatformDateTime,
   isValidTimeZone,
+  setRuntimePlatformTimezone,
 } from "@/lib/platform-time";
 
 const PLATFORM_TIMEZONE_CHANGED_EVENT =
@@ -69,6 +71,7 @@ export default function PlatformTimeProvider({
   const refresh = useCallback(async () => {
     const resolved = await fetchPlatformTimezone();
     if (!resolved) return;
+    setRuntimePlatformTimezone(resolved);
     setTimeZone(resolved);
     setLoaded(true);
   }, []);
@@ -78,6 +81,7 @@ export default function PlatformTimeProvider({
 
     void fetchPlatformTimezone().then((resolved) => {
       if (!active || !resolved) return;
+      setRuntimePlatformTimezone(resolved);
       setTimeZone(resolved);
       setLoaded(true);
     });
@@ -101,7 +105,7 @@ export default function PlatformTimeProvider({
 
   return (
     <PlatformTimeContext.Provider value={value}>
-      {children}
+      <Fragment key={timeZone}>{children}</Fragment>
     </PlatformTimeContext.Provider>
   );
 }
