@@ -29,6 +29,26 @@ const PlatformTimeContext = createContext<PlatformTimeContextValue>({
   refresh: async () => undefined,
 });
 
+async function fetchPlatformTimezone(): Promise<string | null> {
+  try {
+    const response = await fetch("/api/platform/time", {
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      platformTimezone?: unknown;
+    };
+
+    return typeof payload.platformTimezone === "string" &&
+      isValidTimeZone(payload.platformTimezone)
+      ? payload.platformTimezone
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function notifyPlatformTimezoneChanged() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(PLATFORM_TIMEZONE_CHANGED_EVENT));
@@ -43,31 +63,25 @@ export default function PlatformTimeProvider({
   const [loaded, setLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
-    try {
-      const response = await fetch("/api/platform/time", {
-        cache: "no-store",
-      });
-      if (!response.ok) return;
-
-      const payload = (await response.json().catch(() => ({}))) as {
-        platformTimezone?: unknown;
-      };
-      if (
-        typeof payload.platformTimezone === "string" &&
-        isValidTimeZone(payload.platformTimezone)
-      ) {
-        setTimeZone(payload.platformTimezone);
-        setLoaded(true);
-      }
-    } catch {
-      // Keep the locked safe default. A temporary display-config failure must
-      // never break authentication, deposits, or financial workflow screens.
-    }
+    const resolved = await fetchPlatformTimezone();
+    if (!resolved) return;
+    setTimeZone(resolved);
+    setLoaded(true);
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [pathname, refresh]);
+    let active = true;
+
+    void fetchPlatformTimezone().then((resolved) => {
+      if (!active || !resolved) return;
+      setTimeZone(resolved);
+      setLoaded(true);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const listener = () => void refresh();
