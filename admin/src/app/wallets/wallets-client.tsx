@@ -230,9 +230,8 @@ export default function WalletsClient() {
         <h1>Wallets & Ledger</h1>
         <p>
           Review USER wallet buckets, reconcile approved deposits into immutable
-          double-entry accounting, and inspect balanced ledger entries. Package
-          activation, commissions, rewards, and withdrawals are intentionally outside
-          this milestone.
+          double-entry accounting, and inspect balanced deposit, package funding,
+          referral commission, and package reward ledger entries.
         </p>
       </section>
 
