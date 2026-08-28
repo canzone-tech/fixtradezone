@@ -12,6 +12,8 @@ import type { OperationsMode } from './update-operations-config.dto';
 import { UpdateOperationsConfigDto } from './update-operations-config.dto';
 
 const CONFIG_ID = 1;
+// These values are bootstrap/fail-safe fallbacks only. Migration 0015 seeds the
+// singleton row and normal runtime behavior reads the persisted configuration.
 export const DEFAULT_PLATFORM_TIMEZONE = 'Asia/Kolkata';
 export const DEFAULT_OPERATIONS_MODE: OperationsMode = 'AUTOMATIC';
 
