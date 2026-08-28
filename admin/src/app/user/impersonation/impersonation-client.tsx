@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserImpersonationSession } from "@/lib/user-session";
 import styles from "./impersonation.module.css";
 
@@ -31,11 +32,8 @@ export default function ImpersonationClient() {
   const router = useRouter();
 
   const [session, setSession] = useState<UserImpersonationSession | null>(null);
-
   const [loading, setLoading] = useState(true);
-
   const [returning, setReturning] = useState(false);
-
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -48,9 +46,7 @@ export default function ImpersonationClient() {
         });
 
         const payload = await readPayload<
-          UserImpersonationSession & {
-            message?: string;
-          }
+          UserImpersonationSession & { message?: string }
         >(response);
 
         if (response.status === 401) {
@@ -104,9 +100,7 @@ export default function ImpersonationClient() {
         method: "DELETE",
       });
 
-      const payload = await readPayload<{
-        message?: string;
-      }>(response);
+      const payload = await readPayload<{ message?: string }>(response);
 
       if (!response.ok) {
         throw new Error(
@@ -158,7 +152,6 @@ export default function ImpersonationClient() {
   }
 
   const user = session.user;
-
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 
@@ -192,28 +185,24 @@ export default function ImpersonationClient() {
         <section id="account-details" className={styles.card}>
           <div>
             <span className={styles.label}>Username</span>
-
             <strong>{user.username ? `@${user.username}` : "Not set"}</strong>
           </div>
 
           <div>
             <span className={styles.label}>Phone</span>
-
             <strong>{user.phone || "Not set"}</strong>
           </div>
 
           <div>
             <span className={styles.label}>Account created</span>
-
-            <strong>{new Date(user.createdAt).toLocaleString()}</strong>
+            <strong>{formatPlatformDateTime(user.createdAt)}</strong>
           </div>
 
           <div>
             <span className={styles.label}>Last login</span>
-
             <strong>
               {user.lastLoginAt
-                ? new Date(user.lastLoginAt).toLocaleString()
+                ? formatPlatformDateTime(user.lastLoginAt)
                 : "No login recorded"}
             </strong>
           </div>
@@ -227,7 +216,6 @@ export default function ImpersonationClient() {
 
             <div>
               <strong>Real USER session active</strong>
-
               <small>
                 {session.impersonation.accessMode} impersonation boundary
               </small>
@@ -248,8 +236,7 @@ export default function ImpersonationClient() {
 
             <span>
               <i className="iconoir-clock" />
-              Expires:{" "}
-              {new Date(session.impersonation.expiresAt).toLocaleString()}
+              Expires: {formatPlatformDateTime(session.impersonation.expiresAt)}
             </span>
           </div>
         </section>
