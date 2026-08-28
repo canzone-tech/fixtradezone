@@ -24,6 +24,7 @@ import {
   statusLabel,
   statusTone,
 } from "@/lib/deposits";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 
 const MAX_QR_BYTES = 256 * 1024;
 const QR_TYPES = new Set([
@@ -43,11 +44,7 @@ interface AdminDepositWorkspace {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
