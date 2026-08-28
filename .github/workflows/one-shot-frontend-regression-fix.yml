@@ -1,0 +1,75 @@
+name: One-shot frontend regression fix
+
+on:
+  push:
+    branches:
+      - feature/rewards-caps-lifecycle-foundation
+    paths:
+      - '.github/workflows/one-shot-frontend-regression-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/rewards-caps-lifecycle-foundation
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Apply exact frontend regression fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          dashboard = Path('admin/src/app/dashboard/dashboard-client.tsx')
+          text = dashboard.read_text()
+          old = 'interface UsersResponse {\n  pagination?: { total?: number };\n}'
+          new = 'interface UsersResponse {\n  total?: number;\n  pagination?: { total?: number };\n}'
+          if text.count(old) != 1:
+              raise SystemExit('Dashboard UsersResponse shape did not match expected source')
+          dashboard.write_text(text.replace(old, new))
+
+          packages = Path('admin/src/app/packages/packages-client.tsx')
+          text = packages.read_text()
+          old = '<strong>{formatDate(plan.effectiveFrom)} UTC</strong>'
+          new = '<strong>{formatDate(plan.effectiveFrom)}</strong>'
+          if text.count(old) != 1:
+              raise SystemExit('Expected exactly one misleading package display UTC suffix')
+          packages.write_text(text.replace(old, new))
+          PY
+
+      - name: Install Admin dependencies
+        working-directory: admin
+        run: npm ci
+
+      - name: Verify Admin portal
+        working-directory: admin
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+          npm audit --audit-level=critical
+
+      - name: Verify diff hygiene
+        run: git diff --check
+
+      - name: Commit verified frontend regression fixes
+        run: |
+          rm -f .github/workflows/one-shot-package-time-label-cleanup.yml
+          rm -f .github/workflows/one-shot-frontend-regression-fix.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/src/app/dashboard/dashboard-client.tsx admin/src/app/packages/packages-client.tsx .github/workflows/
+          git commit -m "fix(ui): close frontend regression blockers"
+          git push
