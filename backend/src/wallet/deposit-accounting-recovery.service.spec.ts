@@ -39,12 +39,14 @@ describe('DepositAccountingRecoveryService', () => {
     walletLedgerService.reconcileApprovedDeposit.mockResolvedValue({
       transaction: { id: 'deposit-ledger-id' },
     });
-    subscriptionsService.activateAutomaticallyAfterAccounting.mockResolvedValue({
-      activationMode: 'AUTO',
-      activationTrigger: 'PAYMENT_APPROVED',
-      activationRequired: false,
-      subscription: { id: SUBSCRIPTION_ID, status: 'ACTIVE' },
-    });
+    subscriptionsService.activateAutomaticallyAfterAccounting.mockResolvedValue(
+      {
+        activationMode: 'AUTO',
+        activationTrigger: 'PAYMENT_APPROVED',
+        activationRequired: false,
+        subscription: { id: SUBSCRIPTION_ID, status: 'ACTIVE' },
+      },
+    );
     postActivationService.process.mockResolvedValue({
       referralCommission: { processingStatus: 'PROCESSED' },
       referralCommissionPendingReason: null,
@@ -116,12 +118,14 @@ describe('DepositAccountingRecoveryService', () => {
   });
 
   it('does not bypass a package configured for manual activation', async () => {
-    subscriptionsService.activateAutomaticallyAfterAccounting.mockResolvedValue({
-      activationMode: 'MANUAL',
-      activationTrigger: 'MANUAL_ACTIVATION',
-      activationRequired: true,
-      subscription: null,
-    });
+    subscriptionsService.activateAutomaticallyAfterAccounting.mockResolvedValue(
+      {
+        activationMode: 'MANUAL',
+        activationTrigger: 'MANUAL_ACTIVATION',
+        activationRequired: true,
+        subscription: null,
+      },
+    );
 
     const result = await service.reconcileApprovedDeposit(DEPOSIT_ID, actor);
 

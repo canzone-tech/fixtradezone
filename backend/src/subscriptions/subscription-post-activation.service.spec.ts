@@ -104,7 +104,8 @@ describe('SubscriptionPostActivationService', () => {
       noEffectivePolicy: true,
       events: [],
       state: null,
-      message: 'No published reward/cap policy applies to this subscription yet.',
+      message:
+        'No published reward/cap policy applies to this subscription yet.',
     });
 
     const result = await service.process(SUBSCRIPTION_ID, actor);

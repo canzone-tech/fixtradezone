@@ -71,10 +71,7 @@ export class RewardWorkerService
     this.running = true;
     const token = randomUUID();
     const intervalMs = this.intervalMs();
-    const lockTtlMs = Math.max(
-      intervalMs * 2,
-      REWARD_WORKER_MIN_LOCK_TTL_MS,
-    );
+    const lockTtlMs = Math.max(intervalMs * 2, REWARD_WORKER_MIN_LOCK_TTL_MS);
 
     try {
       if (!(await this.operationsConfigService.isAutomatic())) return;
