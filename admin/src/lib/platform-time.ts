@@ -24,6 +24,8 @@ export function setRuntimePlatformTimezone(timeZone: string): boolean {
   return true;
 }
 
+// Explicit overrides are reserved for controlled previews/tests; ordinary UI
+// rendering follows the runtime platform timezone set by PlatformTimeProvider.
 function resolveTimeZone(timeZone?: string): string {
   return timeZone && isValidTimeZone(timeZone)
     ? timeZone
