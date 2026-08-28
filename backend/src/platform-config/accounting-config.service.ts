@@ -4,6 +4,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { DEFAULT_PLATFORM_TIMEZONE } from './operations-config.service';
 import type { DepositPostingMode } from './update-accounting-config.dto';
 import { UpdateAccountingConfigDto } from './update-accounting-config.dto';
 
@@ -45,6 +46,10 @@ export class AccountingConfigService {
     return this.prisma.$transaction(
       async (transaction) => {
         const previous = await this.getAccountingWithClient(transaction);
+        const operationsMode =
+          settings.depositPostingMode === 'AUTO_ON_APPROVAL'
+            ? 'AUTOMATIC'
+            : 'CONTROLLED_MANUAL';
 
         await transaction.$executeRaw(Prisma.sql`
           INSERT INTO system_accounting_config (
@@ -62,6 +67,30 @@ export class AccountingConfigService {
           )
           ON DUPLICATE KEY UPDATE
             depositPostingMode = VALUES(depositPostingMode),
+            updatedByUserId = VALUES(updatedByUserId),
+            updatedAt = CURRENT_TIMESTAMP(3)
+        `);
+
+        // OPS-01 keeps this legacy endpoint compatible, but it may never create
+        // a policy contradiction with the single SUPER_ADMIN operations mode.
+        await transaction.$executeRaw(Prisma.sql`
+          INSERT INTO system_operations_config (
+            id,
+            platformTimezone,
+            operationsMode,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          ) VALUES (
+            ${CONFIG_ID},
+            ${DEFAULT_PLATFORM_TIMEZONE},
+            ${operationsMode},
+            ${actor.id},
+            CURRENT_TIMESTAMP(3),
+            CURRENT_TIMESTAMP(3)
+          )
+          ON DUPLICATE KEY UPDATE
+            operationsMode = VALUES(operationsMode),
             updatedByUserId = VALUES(updatedByUserId),
             updatedAt = CURRENT_TIMESTAMP(3)
         `);
@@ -84,6 +113,7 @@ export class AccountingConfigService {
               current: {
                 depositPostingMode: current.depositPostingMode,
               },
+              synchronizedOperationsMode: operationsMode,
             },
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
@@ -91,7 +121,8 @@ export class AccountingConfigService {
         });
 
         return {
-          message: 'Accounting configuration updated.',
+          message:
+            'Accounting configuration updated and synchronized with Operations mode.',
           ...current,
         };
       },
