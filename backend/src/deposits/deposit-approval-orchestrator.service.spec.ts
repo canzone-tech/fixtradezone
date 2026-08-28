@@ -1,7 +1,6 @@
 import type { AuthenticatedUser } from '../auth/auth-user';
-import type { CommissionsService } from '../commissions/commissions.service';
 import type { OperationsConfigService } from '../platform-config/operations-config.service';
-import type { RewardsService } from '../rewards/rewards.service';
+import type { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
@@ -36,11 +35,8 @@ describe('DepositApprovalOrchestratorService', () => {
   const subscriptionsService = {
     activateAutomaticallyAfterAccounting: jest.fn(),
   };
-  const commissionsService = {
-    processSubscriptionSafely: jest.fn(),
-  };
-  const rewardsService = {
-    reconcileSubscription: jest.fn(),
+  const postActivationService = {
+    process: jest.fn(),
   };
 
   let service: DepositApprovalOrchestratorService;
@@ -72,19 +68,24 @@ describe('DepositApprovalOrchestratorService', () => {
         subscription: { id: 'subscription-id', status: 'ACTIVE' },
       },
     );
-    commissionsService.processSubscriptionSafely.mockResolvedValue({
-      processingStatus: 'PROCESSED',
-      created: true,
-      run: { id: 'commission-run-id', outcome: 'PROCESSED' },
-      events: [],
-    });
-    rewardsService.reconcileSubscription.mockResolvedValue({
-      initialized: true,
-      noEffectivePolicy: false,
-      events: [],
-      state: { subscriptionId: 'subscription-id', status: 'ACTIVE' },
-      catchupLimitReached: false,
-      message: 'No package reward is due yet.',
+    postActivationService.process.mockResolvedValue({
+      referralCommission: {
+        processingStatus: 'PROCESSED',
+        created: true,
+        run: { id: 'commission-run-id', outcome: 'PROCESSED' },
+        events: [],
+      },
+      referralCommissionPendingReason: null,
+      rewardLifecycle: {
+        initialized: true,
+        noEffectivePolicy: false,
+        events: [],
+        state: { subscriptionId: 'subscription-id', status: 'ACTIVE' },
+        catchupLimitReached: false,
+        message: 'No package reward is due yet.',
+      },
+      rewardLifecyclePendingReason: null,
+      downstreamPending: false,
     });
 
     service = new DepositApprovalOrchestratorService(
@@ -92,8 +93,7 @@ describe('DepositApprovalOrchestratorService', () => {
       operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
-      commissionsService as unknown as CommissionsService,
-      rewardsService as unknown as RewardsService,
+      postActivationService as unknown as SubscriptionPostActivationService,
     );
   });
 
@@ -113,12 +113,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).toHaveBeenCalledWith(DEPOSIT_ID, actor, {});
-    expect(commissionsService.processSubscriptionSafely).toHaveBeenCalledWith(
-      'subscription-id',
-      actor,
-      {},
-    );
-    expect(rewardsService.reconcileSubscription).toHaveBeenCalledWith(
+    expect(postActivationService.process).toHaveBeenCalledWith(
       'subscription-id',
       actor,
       {},
@@ -164,8 +159,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
-    expect(rewardsService.reconcileSubscription).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       operationsMode: 'CONTROLLED_MANUAL',
       accountingPostingMode: 'MANUAL_RECONCILIATION',
@@ -193,8 +187,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
-    expect(rewardsService.reconcileSubscription).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: false,
@@ -215,8 +208,7 @@ describe('DepositApprovalOrchestratorService', () => {
       actor,
     );
 
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
-    expect(rewardsService.reconcileSubscription).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPosted: true,
       packageActivated: false,
@@ -226,13 +218,17 @@ describe('DepositApprovalOrchestratorService', () => {
   });
 
   it('never misreports a successful activation when a downstream stage needs reconciliation', async () => {
-    commissionsService.processSubscriptionSafely.mockResolvedValue({
-      processingStatus: 'PENDING_RECONCILIATION',
-      message: 'Commission plan requires reconciliation.',
+    postActivationService.process.mockResolvedValue({
+      referralCommission: {
+        processingStatus: 'PENDING_RECONCILIATION',
+        message: 'Commission plan requires reconciliation.',
+      },
+      referralCommissionPendingReason:
+        'Commission plan requires reconciliation.',
+      rewardLifecycle: null,
+      rewardLifecyclePendingReason: 'Reward state temporarily unavailable',
+      downstreamPending: true,
     });
-    rewardsService.reconcileSubscription.mockRejectedValue(
-      new Error('Reward state temporarily unavailable'),
-    );
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
