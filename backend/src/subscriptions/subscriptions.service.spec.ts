@@ -21,6 +21,8 @@ interface AuditCreateCall {
       depositId: string;
       amount: string;
       currency: string;
+      settlementTimezone: string;
+      timezoneSource: string;
       referralCommissionApplied: boolean;
       rewardsApplied: boolean;
     };
@@ -82,6 +84,11 @@ const existingSubscription = {
   completedAt: null,
   createdAt: new Date('2026-08-26T01:00:00.000Z'),
   updatedAt: new Date('2026-08-26T01:00:00.000Z'),
+};
+
+const createdSubscription = {
+  ...existingSubscription,
+  settlementTimezone: 'Asia/Kolkata',
 };
 
 const approvedDeposit = {
@@ -167,6 +174,7 @@ describe('SubscriptionsService', () => {
         id: existingSubscription.id,
         sourceDepositId: DEPOSIT_ID,
         price: '5.00000000',
+        settlementTimezone: 'UTC',
       },
     });
     expect(transaction.deposit.findUnique).not.toHaveBeenCalled();
@@ -208,7 +216,29 @@ describe('SubscriptionsService', () => {
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
-  it('creates one balanced funding transaction and subscription for an eligible deposit', async () => {
+  it('fails closed before financial writes when platform timezone is unavailable', async () => {
+    transaction.$queryRaw
+      .mockResolvedValueOnce([{ id: USER_ID }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: ACCOUNTING_TRANSACTION_ID,
+          sourceKey: `DEPOSIT:${DEPOSIT_ID}:CREDIT`,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
+    transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
+
+    await expect(
+      service.activateFromApprovedDeposit(DEPOSIT_ID, actor),
+    ).rejects.toThrow('Platform operations configuration is unavailable.');
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('creates one balanced funding transaction and snapshots the platform timezone', async () => {
     const mainAccount = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       accountKey: `USER:${USER_ID}:MAIN:USDT`,
@@ -239,6 +269,7 @@ describe('SubscriptionsService', () => {
         },
       ])
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ platformTimezone: 'Asia/Kolkata' }])
       .mockResolvedValueOnce([
         {
           id: FUNDING_TRANSACTION_ID,
@@ -252,7 +283,7 @@ describe('SubscriptionsService', () => {
         { side: 'DEBIT', amount: new Prisma.Decimal('5') },
         { side: 'CREDIT', amount: new Prisma.Decimal('5') },
       ])
-      .mockResolvedValueOnce([existingSubscription]);
+      .mockResolvedValueOnce([createdSubscription]);
     transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
     transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
     transaction.auditLog.create.mockImplementation((input: AuditCreateCall) => {
@@ -276,6 +307,7 @@ describe('SubscriptionsService', () => {
         packageCode: 'NEURAL_SCOUT',
         price: '5.00000000',
         currency: 'USDT',
+        settlementTimezone: 'Asia/Kolkata',
         status: 'ACTIVE',
       },
     });
@@ -292,6 +324,10 @@ describe('SubscriptionsService', () => {
     expect(auditCall.data.metadata.depositId).toBe(DEPOSIT_ID);
     expect(auditCall.data.metadata.amount).toBe('5.00000000');
     expect(auditCall.data.metadata.currency).toBe('USDT');
+    expect(auditCall.data.metadata.settlementTimezone).toBe('Asia/Kolkata');
+    expect(auditCall.data.metadata.timezoneSource).toBe(
+      'SYSTEM_OPERATIONS_CONFIG',
+    );
     expect(auditCall.data.metadata.referralCommissionApplied).toBe(false);
     expect(auditCall.data.metadata.rewardsApplied).toBe(false);
   });
