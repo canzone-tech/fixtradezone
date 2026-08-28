@@ -65,7 +65,7 @@ describe('AccountingConfigService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('audits SUPER_ADMIN policy changes with previous and current values', async () => {
+  it('audits SUPER_ADMIN policy changes and synchronizes Operations mode', async () => {
     const previousUpdatedAt = new Date('2026-08-26T01:00:00.000Z');
     const currentUpdatedAt = new Date('2026-08-26T01:05:00.000Z');
 
@@ -91,11 +91,13 @@ describe('AccountingConfigService', () => {
         { ipAddress: '127.0.0.1', userAgent: 'jest' },
       ),
     ).resolves.toEqual({
-      message: 'Accounting configuration updated.',
+      message:
+        'Accounting configuration updated and synchronized with Operations mode.',
       depositPostingMode: 'MANUAL_RECONCILIATION',
       updatedAt: currentUpdatedAt,
     });
 
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
       data: {
@@ -113,6 +115,7 @@ describe('AccountingConfigService', () => {
           current: {
             depositPostingMode: 'MANUAL_RECONCILIATION',
           },
+          synchronizedOperationsMode: 'CONTROLLED_MANUAL',
         },
         ipAddress: '127.0.0.1',
         userAgent: 'jest',
