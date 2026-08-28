@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import { resolveAdminSession } from "@/lib/admin-session-client";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type {
   ExistingSubscriptionRolloutMode,
   PackageRewardEvent,
@@ -57,11 +58,7 @@ function apiMessage(payload: ApiError, fallback: string) {
 }
 
 function dateLabel(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 function amountLabel(value: string, currency: string) {
