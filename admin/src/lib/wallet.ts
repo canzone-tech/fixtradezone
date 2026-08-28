@@ -1,3 +1,5 @@
+import { formatPlatformDateTime } from "@/lib/platform-time";
+
 export interface WalletBuckets {
   main: string;
   packageEarnings: string;
@@ -48,9 +50,15 @@ export interface AdminWalletsResponse {
   wallets: AdminWalletSummary[];
 }
 
+export type LedgerTransactionKind =
+  | "DEPOSIT_CREDIT"
+  | "PACKAGE_ACTIVATION_FUNDING"
+  | "REFERRAL_COMMISSION_CREDIT"
+  | "PACKAGE_REWARD_CREDIT";
+
 export interface LedgerTransaction {
   id: string;
-  kind: "DEPOSIT_CREDIT";
+  kind: LedgerTransactionKind;
   sourceKey: string;
   sourceType: string;
   sourceId: string;
@@ -141,9 +149,5 @@ export function compactDecimal(value: string): string {
 }
 
 export function formatWalletDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
