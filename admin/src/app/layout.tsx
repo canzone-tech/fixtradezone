@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import PlatformTimeProvider from "@/components/platform/platform-time-provider";
 import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
 import "iconoir/css/iconoir.css";
@@ -38,7 +39,7 @@ export default function RootLayout({
     >
       <body id="body">
         <AppPwa />
-        {children}
+        <PlatformTimeProvider>{children}</PlatformTimeProvider>
       </body>
     </html>
   );
