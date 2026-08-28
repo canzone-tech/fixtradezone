@@ -137,6 +137,11 @@ export interface RewardWorkerHealth {
   lastCompletedAt: string | null;
   lastErrorAt: string | null;
   lastError: string | null;
+  infrastructureEnabled: boolean;
+  operationsMode: "AUTOMATIC" | "CONTROLLED_MANUAL";
+  platformTimezone: string;
+  automaticProcessingEnabled: boolean;
+  intervalMs: number;
   lastSummary: {
     asOf: string;
     initialized: number;
