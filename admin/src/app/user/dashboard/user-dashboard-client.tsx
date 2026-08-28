@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./user-dashboard.module.css";
 
@@ -76,11 +77,7 @@ async function readPayload<T>(response: Response): Promise<T | null> {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "No login recorded";
-  }
-
-  return new Date(value).toLocaleString();
+  return value ? formatPlatformDateTime(value) : "No login recorded";
 }
 
 export default function UserDashboardClient() {

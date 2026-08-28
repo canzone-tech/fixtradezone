@@ -9,6 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { usePlatformTime } from "@/components/platform/platform-time-provider";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { AdminUser } from "@/lib/auth";
 import { resolveAdminSession } from "@/lib/admin-session-client";
 import {
@@ -173,15 +174,7 @@ function itemFromPlan(item: PackagePlanItem): ItemForm {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(new Date(value));
+  return value ? formatPlatformDateTime(value) : "Not set";
 }
 
 function toUtcInput(value: string | null): string {
