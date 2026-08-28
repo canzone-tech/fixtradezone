@@ -19,6 +19,11 @@ const routeHeadings: Array<{
     subtitle: "Payment rails, receiving accounts and deposit review",
   },
   {
+    path: "/wallets",
+    title: "Wallets & Ledger",
+    subtitle: "Wallet buckets, immutable ledger and accounting reconciliation",
+  },
+  {
     path: "/subscriptions",
     title: "Subscriptions",
     subtitle: "Package activation queue and immutable lifecycle history",
@@ -124,7 +129,7 @@ export default function Topbar() {
       pathname === candidate.path || pathname.startsWith(`${candidate.path}/`),
   ) ?? {
     title: "Dashboard",
-    subtitle: "Real-time overview of your platform",
+    subtitle: "Live operational overview of your platform",
   };
 
   async function logout() {
