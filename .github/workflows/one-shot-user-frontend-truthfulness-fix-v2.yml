@@ -1,0 +1,140 @@
+name: One-shot USER frontend truthfulness fix v2
+
+on:
+  push:
+    branches:
+      - feature/rewards-caps-lifecycle-foundation
+    paths:
+      - .github/workflows/one-shot-user-frontend-truthfulness-fix-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/rewards-caps-lifecycle-foundation
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Apply USER frontend truthfulness fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          topbar = Path('admin/src/components/user/user-topbar.tsx')
+          text = topbar.read_text()
+          pattern = re.compile(r'  const heading = pathname\.startsWith\("/user/packages"\).*?;\n\n  async function logout', re.S)
+          replacement = '''  const heading = pathname.startsWith("/user/packages")
+            ? {
+                title: "Packages",
+                subtitle: "Published USDT plans and exact commercial terms",
+              }
+            : pathname.startsWith("/user/deposits")
+              ? {
+                  title: "Deposits",
+                  subtitle: "Package funding requests and payment history",
+                }
+              : pathname.startsWith("/user/wallet")
+                ? {
+                    title: "My Wallet",
+                    subtitle: "Ledger-backed balances and immutable activity",
+                  }
+                : pathname.startsWith("/user/referrals")
+                  ? {
+                      title: "My Referrals",
+                      subtitle: "Referral identity and direct network",
+                    }
+                  : pathname === "/user/profile"
+                    ? {
+                        title: "My Profile",
+                        subtitle: "Account identity, security and session",
+                      }
+                    : {
+                        title: "User Dashboard",
+                        subtitle: "Overview of your FixTradeZone account",
+                      };
+
+          async function logout'''
+          text2, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one USER topbar heading block, found {count}')
+          topbar.write_text(text2)
+
+          wallet = Path('admin/src/app/user/wallet/user-wallet-client.tsx')
+          text = wallet.read_text()
+          pattern = re.compile(r'<span className=\{styles\.badge\} data-tone="success">\s*\+\{compactDecimal\(activity\.amount\)\} \{activity\.currency\}\s*</span>')
+          replacement = '''<span
+                      className={styles.badge}
+                      data-tone={activity.direction === "DEBIT" ? "warning" : "success"}
+                    >
+                      {activity.direction === "DEBIT" ? "-" : "+"}
+                      {compactDecimal(activity.amount)} {activity.currency}
+                    </span>'''
+          text2, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one wallet activity amount block, found {count}')
+          wallet.write_text(text2)
+
+          packages = Path('admin/src/app/user/packages/user-packages-client.tsx')
+          text = packages.read_text()
+          import_anchor = 'import UserShell from "@/components/user/user-shell";\n'
+          import_line = 'import { usePlatformTime } from "@/components/platform/platform-time-provider";\n'
+          if import_line not in text:
+              if text.count(import_anchor) != 1:
+                  raise SystemExit('USER packages UserShell import anchor mismatch')
+              text = text.replace(import_anchor, import_anchor + import_line)
+
+          router_anchor = '  const router = useRouter();\n'
+          timezone_line = '  const { timeZone } = usePlatformTime();\n'
+          if timezone_line not in text:
+              if text.count(router_anchor) != 1:
+                  raise SystemExit('USER packages router anchor mismatch')
+              text = text.replace(router_anchor, router_anchor + timezone_line)
+
+          pattern = re.compile(r'<div>\s*<small>SETTLEMENT</small>\s*<strong>\{catalogue\.plan\.settlementTimezone\}</strong>\s*</div>')
+          replacement = '''<div>
+                <small>NEW ACTIVATION TIMEZONE</small>
+                <strong>{timeZone}</strong>
+              </div>'''
+          text2, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
+              raise SystemExit(f'Expected one legacy settlement display block, found {count}')
+          packages.write_text(text2)
+          PY
+
+      - name: Install Admin dependencies
+        working-directory: admin
+        run: npm ci
+
+      - name: Verify Admin portal
+        working-directory: admin
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run build
+          npm audit --audit-level=critical
+
+      - name: Verify diff hygiene
+        run: git diff --check
+
+      - name: Commit verified fixes and cleanup temporary workflows
+        run: |
+          rm -f .github/workflows/one-shot-user-frontend-truthfulness-fix.yml
+          rm -f .github/workflows/one-shot-user-frontend-truthfulness-fix-v2.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin/src/components/user/user-topbar.tsx admin/src/app/user/wallet/user-wallet-client.tsx admin/src/app/user/packages/user-packages-client.tsx .github/workflows/
+          git commit -m "fix(ui): correct USER financial and timezone displays"
+          git push origin HEAD:feature/rewards-caps-lifecycle-foundation
