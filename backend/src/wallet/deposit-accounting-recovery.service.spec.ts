@@ -86,12 +86,32 @@ describe('DepositAccountingRecoveryService', () => {
         activationMode: 'AUTO',
         subscription: { id: SUBSCRIPTION_ID, status: 'ACTIVE' },
       },
+      packageActivationPendingReason: null,
       referralCommission: { processingStatus: 'PROCESSED' },
       rewardLifecycle: {
         initialized: true,
         state: { subscriptionId: SUBSCRIPTION_ID, status: 'ACTIVE' },
       },
       downstreamPending: false,
+    });
+  });
+
+  it('preserves successful accounting when package activation still needs recovery', async () => {
+    subscriptionsService.activateAutomaticallyAfterAccounting.mockRejectedValue(
+      new Error('This plan allows only one active package for the USER.'),
+    );
+
+    const result = await service.reconcileApprovedDeposit(DEPOSIT_ID, actor);
+
+    expect(postActivationService.process).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      transaction: { id: 'deposit-ledger-id' },
+      packageActivation: null,
+      packageActivationPendingReason:
+        'This plan allows only one active package for the USER.',
+      referralCommission: null,
+      rewardLifecycle: null,
+      downstreamPending: true,
     });
   });
 
@@ -111,6 +131,7 @@ describe('DepositAccountingRecoveryService', () => {
         activationMode: 'MANUAL',
         activationRequired: true,
       },
+      packageActivationPendingReason: null,
       referralCommission: null,
       rewardLifecycle: null,
       downstreamPending: false,
