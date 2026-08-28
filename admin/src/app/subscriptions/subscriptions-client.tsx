@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import { enumLabel } from "@/lib/packages";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./subscriptions.module.css";
 
 type SubscriptionStatus = "ACTIVE" | "COMPLETED" | "SUPERSEDED" | "CANCELLED";
@@ -69,11 +70,7 @@ function apiMessage(payload: ApiError, fallback: string) {
 }
 
 function dateLabel(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 function activationActionEnabled(trigger: string) {
