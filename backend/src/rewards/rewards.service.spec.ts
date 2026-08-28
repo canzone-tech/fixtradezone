@@ -590,7 +590,9 @@ describe('RewardsService RWD-01 boundaries', () => {
       asOf,
       actor,
     );
-    await expect(processing).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(processing).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
     await expect(processing).rejects.toThrow(
       'Reward event exists while lifecycle state still targets the same reward day; reconciliation requires investigation.',
     );
