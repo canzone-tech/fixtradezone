@@ -48,26 +48,36 @@ export default function UserTopbar({
   const idleMinutes = session?.sessionPolicy.idleLockMinutes;
 
   const heading = pathname.startsWith("/user/packages")
+  ? {
+      title: "Packages",
+      subtitle: "Published USDT plans and exact commercial terms",
+    }
+  : pathname.startsWith("/user/deposits")
     ? {
-        title: "Packages",
-        subtitle: "Published USDT plans and exact commercial terms",
+        title: "Deposits",
+        subtitle: "Package funding requests and payment history",
       }
-    : pathname.startsWith("/user/referrals")
+    : pathname.startsWith("/user/wallet")
       ? {
-          title: "My Referrals",
-          subtitle: "Referral identity and direct network",
+          title: "My Wallet",
+          subtitle: "Ledger-backed balances and immutable activity",
         }
-      : pathname === "/user/profile"
+      : pathname.startsWith("/user/referrals")
         ? {
-            title: "My Profile",
-            subtitle: "Account identity, security and session",
+            title: "My Referrals",
+            subtitle: "Referral identity and direct network",
           }
-        : {
-            title: "User Dashboard",
-            subtitle: "Overview of your FixTradeZone account",
-          };
+        : pathname === "/user/profile"
+          ? {
+              title: "My Profile",
+              subtitle: "Account identity, security and session",
+            }
+          : {
+              title: "User Dashboard",
+              subtitle: "Overview of your FixTradeZone account",
+            };
 
-  async function logout() {
+async function logout() {
     if (loggingOut) {
       return;
     }

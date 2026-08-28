@@ -251,9 +251,13 @@ export default function UserWalletClient() {
                         {formatWalletDate(activity.postedAt)} · {activity.bucket}
                       </span>
                     </div>
-                    <span className={styles.badge} data-tone="success">
-                      +{compactDecimal(activity.amount)} {activity.currency}
-                    </span>
+                    <span
+            className={styles.badge}
+            data-tone={activity.direction === "DEBIT" ? "warning" : "success"}
+          >
+            {activity.direction === "DEBIT" ? "-" : "+"}
+            {compactDecimal(activity.amount)} {activity.currency}
+          </span>
                   </div>
                   <span className={`${styles.meta} ${styles.mono}`}>
                     {activity.transactionId}
