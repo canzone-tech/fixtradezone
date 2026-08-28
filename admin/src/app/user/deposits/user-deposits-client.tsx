@@ -20,6 +20,7 @@ import {
   transactionIdHint,
 } from "@/lib/deposits";
 import type { PackageCatalogue, PackagePlanItem } from "@/lib/packages";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
 interface UserDepositWorkspace {
@@ -42,11 +43,7 @@ class UserWorkspaceAccessError extends Error {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 function activationPolicyText(trigger: string): string {
