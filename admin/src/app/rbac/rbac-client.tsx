@@ -702,12 +702,10 @@ export default function RbacClient() {
                       </small>
 
                       <em>
-                        {
-                          role.permissions
-                            .length
-                        }{" "}
-                        permissions
-                      </em>
+              {role.name === "SUPER_ADMIN"
+                ? "All permissions (bypass)"
+                : `${role.permissions.length} permissions`}
+            </em>
                     </span>
 
                     {locked ? (
