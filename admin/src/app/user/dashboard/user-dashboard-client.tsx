@@ -41,15 +41,15 @@ const workspaceStrip = [
   {
     code: "P",
     label: "Package",
-    value: "AWAITING API",
-    detail: "Module pending",
+    value: "LIVE",
+    detail: "Packages workspace",
     tone: "purple",
   },
   {
     code: "W",
     label: "Wallet",
-    value: "AWAITING API",
-    detail: "Module pending",
+    value: "LIVE",
+    detail: "Ledger-backed wallet",
     tone: "orange",
   },
   {
@@ -316,8 +316,8 @@ export default function UserDashboardClient() {
 
                 <div className="ftz-metric-copy">
                   <small>My Package</small>
-                  <strong>—</strong>
-                  <span>Awaiting live Packages API</span>
+                  <strong>LIVE</strong>
+                  <span>Open My Packages for exact lifecycle state</span>
                 </div>
               </article>
 
@@ -327,9 +327,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Wallet Balance</small>
-                  <strong>—</strong>
-                  <span>Awaiting live Wallet API</span>
+                  <small>Wallet</small>
+                  <strong>LIVE</strong>
+                  <span>Exact per-currency balances are ledger-backed</span>
                 </div>
               </article>
 
@@ -339,9 +339,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Total Deposits</small>
-                  <strong>—</strong>
-                  <span>Awaiting live Deposit API</span>
+                  <small>Deposits</small>
+                  <strong>LIVE</strong>
+                  <span>Open Deposits for payment and review status</span>
                 </div>
               </article>
 
@@ -394,7 +394,7 @@ export default function UserDashboardClient() {
                     </div>
                   </div>
 
-                  <span className={styles.pendingBadge}>LIVE API PENDING</span>
+                  <span className={styles.pendingBadge}>DEDICATED LIVE WORKSPACES</span>
                 </div>
 
                 <div className={styles.chartEmpty}>
@@ -405,16 +405,17 @@ export default function UserDashboardClient() {
                   <strong>Activity chart is ready for live data</strong>
 
                   <p>
-                    Financial totals and chart points will appear only after
-                    their production APIs are connected.
+                    Exact financial totals remain in the dedicated live Wallet,
+                    Deposits, Packages and Referrals workspaces to avoid unsafe
+                    cross-currency aggregation on this overview.
                   </p>
                 </div>
 
                 <div className="ftz-chart-stats">
                   <div>
-                    <small>Total Deposits</small>
-                    <strong>—</strong>
-                    <span>Awaiting API</span>
+                    <small>Deposits</small>
+                    <strong>LIVE</strong>
+                    <span>Dedicated deposit workspace</span>
                   </div>
 
                   <div>
@@ -425,8 +426,8 @@ export default function UserDashboardClient() {
 
                   <div>
                     <small>Referral Earnings</small>
-                    <strong>—</strong>
-                    <span>Commission module pending</span>
+                    <strong>LIVE</strong>
+                    <span>Ledger-backed wallet bucket</span>
                   </div>
 
                   <div>
@@ -447,10 +448,10 @@ export default function UserDashboardClient() {
                     </span>
 
                     <div>
-                      <strong>Wallet module pending</strong>
+                      <strong>Deposits and Wallet are live</strong>
                       <p>
-                        Deposit account, transaction and balance data will
-                        connect here through the Wallet module.
+                        Use the dedicated workspaces for exact payment status,
+                        immutable ledger activity and per-currency balances.
                       </p>
                     </div>
                   </div>
@@ -462,8 +463,8 @@ export default function UserDashboardClient() {
                   <div className="ftz-users-package-grid">
                     <div>
                       <small>Current Package</small>
-                      <strong>—</strong>
-                      <span>Awaiting Packages API</span>
+                      <strong>LIVE</strong>
+                      <span>Open My Packages for exact active packages</span>
                     </div>
 
                     <div>
@@ -478,8 +479,8 @@ export default function UserDashboardClient() {
 
                     <div>
                       <small>Package Workspace</small>
-                      <strong>Production module pending</strong>
-                      <span>No package value is being fabricated</span>
+                      <strong>Lifecycle API live</strong>
+                      <span>No package value is fabricated on the overview</span>
                     </div>
                   </div>
                 </article>
@@ -490,7 +491,7 @@ export default function UserDashboardClient() {
               <div className="ftz-panel-heading">
                 <h3>Recent Transactions</h3>
 
-                <span className={styles.pendingBadge}>LIVE DATA PENDING</span>
+                <span className={styles.pendingBadge}>WALLET HISTORY LIVE</span>
               </div>
 
               <div className="ftz-table-wrap">
@@ -513,8 +514,8 @@ export default function UserDashboardClient() {
                           <i className="iconoir-database" />
 
                           <div>
-                            <strong>No transaction API connected yet</strong>
-                            <span>Real user transactions will appear here.</span>
+                            <strong>Open My Wallet for immutable history</strong>
+                            <span>Exact ledger activity stays in the ledger-backed wallet workspace.</span>
                           </div>
                         </div>
                       </td>
@@ -558,8 +559,8 @@ export default function UserDashboardClient() {
 
                 <div>
                   <small>Referral Earnings</small>
-                  <strong>—</strong>
-                  <span>Commission module pending</span>
+                  <strong>LIVE</strong>
+                  <span>Ledger-backed wallet bucket</span>
                 </div>
               </div>
             </article>
@@ -605,9 +606,9 @@ export default function UserDashboardClient() {
                 <strong>Data integrity first</strong>
 
                 <p>
-                  Financial values remain unavailable until live APIs exist.
-                  Simulated activity will always be explicitly labelled as
-                  simulated.
+                  Exact financial values remain in dedicated ledger-backed
+                  workspaces and are never aggregated across currencies here.
+                  Simulated activity will always be explicitly labelled as simulated.
                 </p>
               </div>
             </article>
