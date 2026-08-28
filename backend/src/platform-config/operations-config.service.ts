@@ -81,14 +81,14 @@ export class OperationsConfigService {
             ${settings.platformTimezone},
             ${settings.operationsMode},
             ${actor.id},
-            CURRENT_TIMESTAMP(3),
-            CURRENT_TIMESTAMP(3)
+            UTC_TIMESTAMP(3),
+            UTC_TIMESTAMP(3)
           )
           ON DUPLICATE KEY UPDATE
             platformTimezone = VALUES(platformTimezone),
             operationsMode = VALUES(operationsMode),
             updatedByUserId = VALUES(updatedByUserId),
-            updatedAt = CURRENT_TIMESTAMP(3)
+            updatedAt = UTC_TIMESTAMP(3)
         `);
 
         // Keep the legacy accounting endpoint/state compatible with the single
@@ -104,13 +104,13 @@ export class OperationsConfigService {
             ${CONFIG_ID},
             ${depositPostingMode},
             ${actor.id},
-            CURRENT_TIMESTAMP(3),
-            CURRENT_TIMESTAMP(3)
+            UTC_TIMESTAMP(3),
+            UTC_TIMESTAMP(3)
           )
           ON DUPLICATE KEY UPDATE
             depositPostingMode = VALUES(depositPostingMode),
             updatedByUserId = VALUES(updatedByUserId),
-            updatedAt = CURRENT_TIMESTAMP(3)
+            updatedAt = UTC_TIMESTAMP(3)
         `);
 
         const current = await this.getOperationsWithClient(transaction);
