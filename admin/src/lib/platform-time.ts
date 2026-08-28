@@ -11,18 +11,15 @@ export function isValidTimeZone(timeZone: string): boolean {
 
 export function formatPlatformDateTime(
   value: string | Date | null | undefined,
-  timeZone = DEFAULT_PLATFORM_TIMEZONE,
+  timeZone: string,
 ): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-
-  const resolvedTimeZone = isValidTimeZone(timeZone)
-    ? timeZone
-    : DEFAULT_PLATFORM_TIMEZONE;
+  if (!isValidTimeZone(timeZone)) return "—";
 
   return new Intl.DateTimeFormat("en-IN", {
-    timeZone: resolvedTimeZone,
+    timeZone,
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -35,18 +32,15 @@ export function formatPlatformDateTime(
 
 export function formatPlatformDate(
   value: string | Date | null | undefined,
-  timeZone = DEFAULT_PLATFORM_TIMEZONE,
+  timeZone: string,
 ): string {
   if (!value) return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-
-  const resolvedTimeZone = isValidTimeZone(timeZone)
-    ? timeZone
-    : DEFAULT_PLATFORM_TIMEZONE;
+  if (!isValidTimeZone(timeZone)) return "—";
 
   return new Intl.DateTimeFormat("en-IN", {
-    timeZone: resolvedTimeZone,
+    timeZone,
     day: "2-digit",
     month: "short",
     year: "numeric",
