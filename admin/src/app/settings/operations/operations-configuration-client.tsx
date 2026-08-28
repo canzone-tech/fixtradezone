@@ -250,7 +250,7 @@ export default function OperationsConfigurationClient() {
           <label className={styles.field}>
             <span>IANA timezone</span>
             <input
-              className={styles.input}
+              className={styles.textInput}
               value={platformTimezone}
               onChange={(event) => {
                 setPlatformTimezone(event.target.value);
@@ -261,8 +261,8 @@ export default function OperationsConfigurationClient() {
               autoComplete="off"
             />
             <small className={styles.fieldHelp}>
-              Recommended for the current platform: Asia/Kolkata. Example
-              current setting: {timeZone}.
+              Recommended for the current platform: Asia/Kolkata. Current
+              display setting: {timeZone}.
             </small>
           </label>
         </article>
@@ -319,11 +319,15 @@ export default function OperationsConfigurationClient() {
               </p>
             </div>
           </div>
-          <div className={styles.summaryList}>
-            <span>Manual package plans remain manual even in Automatic mode.</span>
-            <span>Daily reward is not paid immediately on deposit approval.</span>
-            <span>Failed downstream stages stay recoverable without undoing a successful prior stage.</span>
-            <span>Existing financial history is never rewritten by a settings change.</span>
+          <div className={styles.warningNote}>
+            <i className="iconoir-shield-check" />
+            <div>
+              Manual package plans remain manual even in Automatic mode. Daily
+              reward is not paid immediately on deposit approval. Failed
+              downstream stages stay recoverable without undoing a successful
+              prior stage. Existing financial history is never rewritten by a
+              settings change.
+            </div>
           </div>
         </article>
       </div>
@@ -337,7 +341,7 @@ export default function OperationsConfigurationClient() {
         </div>
         <button
           type="button"
-          className={styles.primaryButton}
+          className={styles.primary}
           onClick={() => void save()}
           disabled={saving}
         >
