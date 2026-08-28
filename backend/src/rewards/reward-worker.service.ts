@@ -131,9 +131,9 @@ export class RewardWorkerService
     );
     if (typeof configured === 'boolean') return configured;
     if (typeof configured === 'string') {
-      return !['false', '0', 'no', 'off'].includes(configured.toLowerCase());
+      return ['true', '1', 'yes', 'on'].includes(configured.toLowerCase());
     }
-    return true;
+    return false;
   }
 
   private intervalMs() {
