@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { MyRewardsResponse } from "@/lib/rewards";
 import styles from "./user-reward-progress-panel.module.css";
 
@@ -20,14 +21,6 @@ function amountLabel(value: string, currency: string) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 8,
   })} ${currency}`;
-}
-
-function dateLabel(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 async function fetchRewards(): Promise<MyRewardsResponse> {
@@ -151,7 +144,7 @@ export default function UserRewardProgressPanel() {
                 <span style={{ width: `${percent}%` }} />
               </div>
               <dl>
-                <div><dt>Next reward</dt><dd>{state.status === "ACTIVE" ? dateLabel(state.nextRewardAt) : "—"}</dd></div>
+                <div><dt>Next reward</dt><dd>{state.status === "ACTIVE" ? formatPlatformDateTime(state.nextRewardAt) : "—"}</dd></div>
                 <div><dt>Natural package day</dt><dd>{state.nextRewardDayNumber}</dd></div>
                 <div><dt>Cycle</dt><dd>{state.nextCycleNumber} / day {state.nextCycleDay}</dd></div>
                 <div><dt>Cap basis</dt><dd>{state.capBasis.replaceAll("_", " ")}</dd></div>
