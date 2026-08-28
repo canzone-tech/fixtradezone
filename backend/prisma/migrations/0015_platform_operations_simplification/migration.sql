@@ -21,8 +21,8 @@ CREATE TABLE `system_operations_config` (
     CHECK (CHAR_LENGTH(TRIM(`platformTimezone`)) BETWEEN 1 AND 64)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Preserve an explicitly selected legacy accounting mode when upgrading, while
--- making AUTOMATIC the safe default when no accounting config row is present.
+-- AUTOMATIC is the safe default. If the installation already selected the
+-- legacy manual accounting mode, preserve that intent during upgrade.
 INSERT INTO `system_operations_config` (
   `id`,
   `platformTimezone`,
@@ -30,28 +30,23 @@ INSERT INTO `system_operations_config` (
   `updatedByUserId`,
   `createdAt`,
   `updatedAt`
-)
-SELECT
-  1,
-  'Asia/Kolkata',
-  CASE
-    WHEN sac.`depositPostingMode` = 'MANUAL_RECONCILIATION' THEN 'CONTROLLED_MANUAL'
-    ELSE 'AUTOMATIC'
-  END,
-  sac.`updatedByUserId`,
-  CURRENT_TIMESTAMP(3),
-  CURRENT_TIMESTAMP(3)
-FROM `system_accounting_config` sac
-WHERE sac.`id` = 1
-UNION ALL
-SELECT
+) VALUES (
   1,
   'Asia/Kolkata',
   'AUTOMATIC',
   NULL,
   CURRENT_TIMESTAMP(3),
   CURRENT_TIMESTAMP(3)
-WHERE NOT EXISTS (
-  SELECT 1 FROM `system_accounting_config` WHERE `id` = 1
 )
 ON DUPLICATE KEY UPDATE `id` = VALUES(`id`);
+
+UPDATE `system_operations_config` soc
+INNER JOIN `system_accounting_config` sac ON sac.`id` = soc.`id`
+SET
+  soc.`operationsMode` = CASE
+    WHEN sac.`depositPostingMode` = 'MANUAL_RECONCILIATION' THEN 'CONTROLLED_MANUAL'
+    ELSE 'AUTOMATIC'
+  END,
+  soc.`updatedByUserId` = sac.`updatedByUserId`,
+  soc.`updatedAt` = CURRENT_TIMESTAMP(3)
+WHERE soc.`id` = 1;
