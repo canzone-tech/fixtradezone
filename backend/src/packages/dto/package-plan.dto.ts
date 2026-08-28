@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  Equals,
   IsBoolean,
   IsIn,
   IsInt,
@@ -106,10 +107,10 @@ export class UpdatePackagePlanDto extends AuditedRevisionDto {
   @IsBoolean()
   upgradesEnabled?: boolean;
 
-  @Transform(trimString)
-  @IsOptional()
-  @IsString()
-  @Length(1, 64)
+  @Equals(undefined, {
+    message:
+      'settlementTimezone is controlled by SUPER_ADMIN Platform Operations.',
+  })
   settlementTimezone?: string;
 
   @Transform(trimString)
