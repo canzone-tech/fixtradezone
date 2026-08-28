@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PlatformConfigModule } from '../platform-config/platform-config.module';
 import {
   AdminRewardPoliciesController,
   AdminRewardsController,
@@ -9,6 +10,7 @@ import { RewardsController } from './rewards.controller';
 import { RewardsService } from './rewards.service';
 
 @Module({
+  imports: [PlatformConfigModule],
   controllers: [
     RewardsController,
     AdminRewardPoliciesController,
