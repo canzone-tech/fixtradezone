@@ -6,6 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OperationsConfigService } from '../platform-config/operations-config.service';
 import { RedisService } from '../redis/redis.service';
 import {
   REWARD_WORKER_DEFAULT_INTERVAL_MS,
@@ -25,11 +26,12 @@ export class RewardWorkerService
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly rewardsService: RewardsService,
+    private readonly operationsConfigService: OperationsConfigService,
   ) {}
 
   onModuleInit() {
-    if (!this.isEnabled()) {
-      this.logger.log('Package reward worker is disabled.');
+    if (!this.infrastructureEnabled()) {
+      this.logger.log('Package reward worker infrastructure is disabled.');
       return;
     }
 
@@ -39,13 +41,27 @@ export class RewardWorkerService
     }, intervalMs);
     this.timer.unref();
     this.logger.log(
-      `Package reward worker enabled at ${intervalMs}ms interval.`,
+      `Package reward worker scheduler armed at ${intervalMs}ms interval; Operations mode remains authoritative.`,
     );
   }
 
   onApplicationShutdown() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+  }
+
+  async getRuntimeStatus() {
+    const operations = await this.operationsConfigService.getOperations();
+    const infrastructureEnabled = this.infrastructureEnabled();
+
+    return {
+      infrastructureEnabled,
+      operationsMode: operations.operationsMode,
+      platformTimezone: operations.platformTimezone,
+      automaticProcessingEnabled:
+        infrastructureEnabled && operations.operationsMode === 'AUTOMATIC',
+      intervalMs: this.intervalMs(),
+    };
   }
 
   private async runOnce() {
@@ -56,6 +72,8 @@ export class RewardWorkerService
     const lockTtlMs = Math.max(intervalMs - 1_000, 10_000);
 
     try {
+      if (!(await this.operationsConfigService.isAutomatic())) return;
+
       const redis = this.redisService.getClient();
       const acquired = await redis.set(
         REWARD_WORKER_LOCK_KEY,
@@ -98,15 +116,15 @@ export class RewardWorkerService
       this.rewardsService.noteWorkerFailure(error);
       this.logger.error(
         error instanceof Error
-          ? `Reward worker lock failed: ${error.message}`
-          : 'Reward worker lock failed with an unknown error.',
+          ? `Reward worker orchestration failed: ${error.message}`
+          : 'Reward worker orchestration failed with an unknown error.',
       );
     } finally {
       this.running = false;
     }
   }
 
-  private isEnabled() {
+  private infrastructureEnabled() {
     if (this.configService.get<string>('NODE_ENV') === 'test') return false;
     const configured = this.configService.get<string | boolean>(
       'REWARD_WORKER_ENABLED',
