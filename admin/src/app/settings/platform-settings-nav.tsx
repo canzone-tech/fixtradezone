@@ -5,6 +5,7 @@ type PlatformSettingsSection =
   | "authentication"
   | "registration"
   | "security"
+  | "operations"
   | "accounting";
 
 interface PlatformSettingsNavProps {
@@ -36,10 +37,10 @@ const sections: Array<{
     icon: "iconoir-shield-check",
   },
   {
-    key: "accounting",
-    href: "/settings/accounting",
-    label: "Accounting",
-    icon: "iconoir-coins",
+    key: "operations",
+    href: "/settings/operations",
+    label: "Operations",
+    icon: "iconoir-settings",
   },
 ];
 
