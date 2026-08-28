@@ -23,9 +23,9 @@ The initial safe default is `AUTOMATIC`, except an upgrade must preserve an expl
 
 The legacy accounting configuration remains synchronized for compatibility and must never contradict the authoritative operations mode.
 
-### OPS-01-02 — One configurable platform timezone
+### OPS-01-02 — One authoritative configurable platform timezone
 
-SUPER_ADMIN controls one IANA platform timezone used by admin and USER operational timestamp displays.
+SUPER_ADMIN controls one IANA platform timezone from **Platform Operations**. It is the only normal runtime timezone control exposed to administrators.
 
 Initial/default value:
 
@@ -33,9 +33,32 @@ Initial/default value:
 Asia/Kolkata
 ```
 
-Database timestamps remain absolute timestamps. Existing immutable ledger transactions, reward events, commission events, deposits, subscriptions, and their immutable settlement-timezone snapshots are never rewritten when the platform display timezone changes.
+The UI exposes supported timezones through a dropdown rather than a free-text timezone field.
 
-Package/reward settlement calculations continue to use the immutable subscription settlement timezone required by the applicable package/reward contract. Platform display timezone does not silently alter a historical financial contract.
+The platform-time contract has two distinct responsibilities:
+
+1. admin and USER operational timestamps render using the configured platform timezone;
+2. every **new package activation** snapshots the platform timezone into the immutable subscription `settlementTimezone`.
+
+The resulting precedence is locked:
+
+```text
+SUPER_ADMIN Platform Operations timezone
+        ↓
+new package activation
+        ↓
+immutable subscription settlementTimezone snapshot
+        ↓
+reward/calendar settlement boundaries for that subscription
+```
+
+Existing subscription timezone snapshots remain immutable. A later platform-timezone change affects only display and future activations; it never changes the settlement calendar of an already-activated package.
+
+The historical `package_plan_versions.settlementTimezone` column is retained for schema/history compatibility, but it is **non-authoritative for new activations** and is not an Admin-editable runtime control. Direct package-plan API attempts to change `settlementTimezone` must fail validation. This prevents two competing timezone settings.
+
+Database/runtime financial timestamps are stored and written with UTC semantics. Application database sessions are pinned to UTC; platform timezone conversion occurs at the display/calendar-policy boundary rather than by rewriting stored financial history.
+
+Existing immutable ledger transactions, reward events, commission events, deposits, subscriptions, and their immutable settlement-timezone snapshots are never rewritten when platform timezone changes.
 
 ### OPS-01-03 — Automatic one-approval happy path
 
@@ -59,7 +82,7 @@ Deposit approval/package activation initializes the reward lifecycle when an eff
 
 It does **not** create an immediate daily reward merely because the deposit was approved.
 
-The first and subsequent package reward events remain governed by the locked RWD schedule and are posted only when their scheduled local reward boundary is due.
+The first and subsequent package reward events remain governed by the locked RWD schedule and are posted only when their scheduled local reward boundary is due, using the immutable subscription `settlementTimezone` captured at activation.
 
 ### OPS-01-05 — Stage isolation and recoverability
 
@@ -113,6 +136,8 @@ Every SUPER_ADMIN operations configuration mutation is audited with previous/cur
 
 Changing automation mode or platform timezone never mutates historical immutable financial records.
 
+Every newly-created package subscription must preserve its captured platform timezone in its immutable subscription snapshot and activation audit/ledger metadata so the future reward calendar is explainable.
+
 ### OPS-01-10 — Acceptance gate
 
 OPS-01 is not accepted for merge merely because code compiles or CI passes.
@@ -126,7 +151,9 @@ Before PR to `main`, the feature branch must pass:
 5. idempotency and double-post protection checks;
 6. AUTO and CONTROLLED_MANUAL behavior checks;
 7. platform timezone display checks across affected admin and USER screens;
-8. ledger balance and reward/commission lifecycle checks.
+8. fresh activation proof that the new subscription snapshots the configured platform timezone;
+9. proof that an existing subscription snapshot is not rewritten after timezone configuration changes;
+10. ledger balance and reward/commission lifecycle checks.
 
 Only after all acceptance evidence is green may documentation be marked locally accepted and a PR be raised to `main`.
 
@@ -143,6 +170,8 @@ Accounting posts automatically
         ↓
 Eligible package activates automatically
         ↓
+Platform timezone snapshots into the subscription
+        ↓
 Referral commission processes automatically
         ↓
 Reward lifecycle initializes automatically
@@ -150,4 +179,4 @@ Reward lifecycle initializes automatically
 Scheduled reward worker posts rewards only when due
 ```
 
-This contract is intentionally simple at the UI level while preserving immutable accounting, idempotency, package-plan rules, commission eligibility, reward/cap rules, RBAC, and auditability underneath.
+This contract is intentionally simple at the UI level while preserving immutable accounting, idempotency, package-plan rules, commission eligibility, reward/cap rules, RBAC, auditability, and one authoritative timezone underneath.
