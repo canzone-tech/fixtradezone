@@ -27,6 +27,7 @@ import {
   RewardPageQueryDto,
   UpdateRewardPolicyDto,
 } from './dto/reward.dto';
+import { RewardWorkerService } from './reward-worker.service';
 import { RewardsService } from './rewards.service';
 
 interface RewardBatchSummaryResponse {
@@ -45,6 +46,11 @@ interface RewardWorkerHealthResponse {
   lastErrorAt: Date | null;
   lastError: string | null;
   lastSummary: RewardBatchSummaryResponse | null;
+  infrastructureEnabled: boolean;
+  operationsMode: 'AUTOMATIC' | 'CONTROLLED_MANUAL';
+  platformTimezone: string;
+  automaticProcessingEnabled: boolean;
+  intervalMs: number;
 }
 
 @Controller('admin/reward-policies')
@@ -121,7 +127,10 @@ export class AdminRewardPoliciesController {
 
 @Controller('admin/rewards')
 export class AdminRewardsController {
-  constructor(private readonly rewardsService: RewardsService) {}
+  constructor(
+    private readonly rewardsService: RewardsService,
+    private readonly rewardWorkerService: RewardWorkerService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -147,8 +156,12 @@ export class AdminRewardsController {
   @Get('worker-health')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.REWARDS_READ)
-  getWorkerHealth(): RewardWorkerHealthResponse {
-    return this.rewardsService.getWorkerHealth();
+  async getWorkerHealth(): Promise<RewardWorkerHealthResponse> {
+    const runtime = await this.rewardWorkerService.getRuntimeStatus();
+    return {
+      ...this.rewardsService.getWorkerHealth(),
+      ...runtime,
+    };
   }
 
   @Post('process-due')
