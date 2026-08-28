@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CommissionsModule } from '../commissions/commissions.module';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
+import { RewardsModule } from '../rewards/rewards.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AdminDepositAccountsController } from './admin-deposit-accounts.controller';
@@ -16,6 +17,7 @@ import { DepositsService } from './deposits.service';
     PlatformConfigModule,
     SubscriptionsModule,
     CommissionsModule,
+    RewardsModule,
   ],
   controllers: [
     DepositsController,
