@@ -1,5 +1,8 @@
 export const DEFAULT_PLATFORM_TIMEZONE = "Asia/Kolkata";
 
+// Operational UI timestamps resolve through this runtime value so a SUPER_ADMIN
+// timezone change propagates consistently without changing immutable settlement
+// timezone snapshots or absolute database timestamps.
 let runtimePlatformTimezone = DEFAULT_PLATFORM_TIMEZONE;
 
 export function isValidTimeZone(timeZone: string): boolean {
