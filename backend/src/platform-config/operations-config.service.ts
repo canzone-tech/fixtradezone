@@ -91,8 +91,8 @@ export class OperationsConfigService {
             updatedAt = CURRENT_TIMESTAMP(3)
         `);
 
-        -- Keep the legacy accounting endpoint/state compatible with the single
-        -- operations mode so old clients cannot observe contradictory policy.
+        // Keep the legacy accounting endpoint/state compatible with the single
+        // operations mode so old clients cannot observe contradictory policy.
         await transaction.$executeRaw(Prisma.sql`
           INSERT INTO system_accounting_config (
             id,
