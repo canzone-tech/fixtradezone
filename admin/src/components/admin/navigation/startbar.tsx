@@ -106,6 +106,8 @@ const sections: Array<{
         href: "/simulated-trades",
         label: "Simulated Trade Activity",
         icon: "iconoir-graph-up",
+        permission: "simulated_activity.read",
+        enabled: true,
       },
     ],
   },
@@ -190,7 +192,8 @@ export default function Startbar() {
                 <div className="ftz-nav-label">{section.label}</div>
                 {visibleItems.map((item) => {
                   const active =
-                    pathname === item.href || pathname.startsWith(`${item.href}/`);
+                    pathname === item.href ||
+                    pathname.startsWith(`${item.href}/`);
 
                   if (!item.enabled) {
                     return (

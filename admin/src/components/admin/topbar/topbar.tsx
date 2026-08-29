@@ -39,6 +39,11 @@ const routeHeadings: Array<{
     subtitle: "Daily package settlement, cap progress and lifecycle controls",
   },
   {
+    path: "/simulated-trades",
+    title: "Simulated Trade Activity",
+    subtitle: "Display-only simulated results — never real trading",
+  },
+  {
     path: "/packages",
     title: "Package Plans",
     subtitle: "Versioned catalogue and publication controls",

@@ -175,13 +175,16 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 <span>Referrals</span>
               </Link>
 
-              <span
-                className={`ftz-nav-link ${styles.disabledNav}`}
-                aria-disabled="true"
+              <Link
+                href="/user/simulated-activity"
+                className={`ftz-nav-link ${
+                  isActive("/user/simulated-activity") ? "is-active" : ""
+                }`}
+                onClick={close}
               >
                 <i className="iconoir-graph-up" />
                 <span>Simulated Trade Activity</span>
-              </span>
+              </Link>
             </div>
           ) : null}
         </nav>

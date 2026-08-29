@@ -38,6 +38,17 @@ export const envValidationSchema = Joi.object({
     .max(3_600_000)
     .default(60_000),
 
+  SIMULATED_ACTIVITY_WORKER_ENABLED: Joi.boolean()
+    .truthy('true')
+    .falsy('false')
+    .default(false),
+
+  SIMULATED_ACTIVITY_WORKER_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .max(3_600_000)
+    .default(60_000),
+
   CAPTCHA_HMAC_SECRET: Joi.string().min(32).required(),
 
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),

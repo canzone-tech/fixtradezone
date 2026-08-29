@@ -44,44 +44,45 @@ export default function UserTopbar({
     .toUpperCase();
 
   const impersonated = session !== null && isImpersonationSession(session);
-
   const idleMinutes = session?.sessionPolicy.idleLockMinutes;
 
   const heading = pathname.startsWith("/user/packages")
-  ? {
-      title: "Packages",
-      subtitle: "Published USDT plans and exact commercial terms",
-    }
-  : pathname.startsWith("/user/deposits")
     ? {
-        title: "Deposits",
-        subtitle: "Package funding requests and payment history",
+        title: "Packages",
+        subtitle: "Published USDT plans and exact commercial terms",
       }
-    : pathname.startsWith("/user/wallet")
+    : pathname.startsWith("/user/deposits")
       ? {
-          title: "My Wallet",
-          subtitle: "Ledger-backed balances and immutable activity",
+          title: "Deposits",
+          subtitle: "Package funding requests and payment history",
         }
-      : pathname.startsWith("/user/referrals")
+      : pathname.startsWith("/user/wallet")
         ? {
-            title: "My Referrals",
-            subtitle: "Referral identity and direct network",
+            title: "My Wallet",
+            subtitle: "Ledger-backed balances and immutable activity",
           }
-        : pathname === "/user/profile"
+        : pathname.startsWith("/user/referrals")
           ? {
-              title: "My Profile",
-              subtitle: "Account identity, security and session",
+              title: "My Referrals",
+              subtitle: "Referral identity and direct network",
             }
-          : {
-              title: "User Dashboard",
-              subtitle: "Overview of your FixTradeZone account",
-            };
+          : pathname.startsWith("/user/simulated-activity")
+            ? {
+                title: "Simulated Trade Activity",
+                subtitle: "SIMULATED RESULTS — NOT REAL TRADING",
+              }
+            : pathname === "/user/profile"
+              ? {
+                  title: "My Profile",
+                  subtitle: "Account identity, security and session",
+                }
+              : {
+                  title: "User Dashboard",
+                  subtitle: "Overview of your FixTradeZone account",
+                };
 
-async function logout() {
-    if (loggingOut) {
-      return;
-    }
-
+  async function logout() {
+    if (loggingOut) return;
     setLoggingOut(true);
 
     try {
@@ -163,7 +164,6 @@ async function logout() {
                 title="Return to Admin"
               >
                 <i className="iconoir-log-out" />
-
                 <span>{returning ? "Returning..." : "Return to Admin"}</span>
               </button>
             ) : (
@@ -175,7 +175,6 @@ async function logout() {
                 title="Sign out"
               >
                 <i className="iconoir-log-out" />
-
                 <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
               </button>
             )}

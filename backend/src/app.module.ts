@@ -16,6 +16,7 @@ import { WalletModule } from './wallet/wallet.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { RewardsModule } from './rewards/rewards.module';
+import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RewardsModule } from './rewards/rewards.module';
     SubscriptionsModule,
     DepositsModule,
     RewardsModule,
+    SimulatedActivityModule,
     DashboardModule,
     HealthModule,
   ],

@@ -22,6 +22,8 @@ export const PERMISSIONS = {
   COMMISSIONS_RECONCILE: 'commissions.reconcile',
   REWARDS_READ: 'rewards.read',
   REWARDS_RECONCILE: 'rewards.reconcile',
+  SIMULATED_ACTIVITY_READ: 'simulated_activity.read',
+  SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -29,7 +31,7 @@ export const PERMISSIONS = {
 export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.DASHBOARD_READ,
-    description: 'View administration dashboard and market data',
+    description: 'View administration dashboard and operational data',
   },
   {
     code: PERMISSIONS.USERS_READ,
@@ -124,6 +126,16 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.REWARDS_RECONCILE,
     description:
       'Reconcile due package rewards through the authoritative reward engine',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_READ,
+    description:
+      'View simulated trade activity policies, events and generator health',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE,
+    description:
+      'Run idempotent simulated activity reconciliation for eligible subscriptions',
   },
   {
     code: PERMISSIONS.RBAC_READ,

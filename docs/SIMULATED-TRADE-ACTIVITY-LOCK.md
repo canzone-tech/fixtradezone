@@ -33,32 +33,47 @@ SUPER_ADMIN may configure a versioned simulated-activity policy containing:
 - WIN/LOSS outcome weights;
 - simulated percentage/result ranges per outcome;
 - allowed local timing window(s);
-- effective-from timestamp and audited reason.
+- system-assigned safe effective-from timestamp; and
+- audited reason.
 
-The Platform Operations timezone is authoritative for new simulated schedule generation. A policy stores the timezone snapshot used for each published version so historical generated events remain explainable after later platform-time changes.
+The Platform Operations timezone is authoritative for each newly published simulated schedule version. A published policy snapshots that timezone so historical generated events remain explainable after later platform-time changes.
 
 Unsupported, incomplete or invalid policy states fail closed and generate no simulated activity.
+
+## Safe publication and timezone transitions
+- A policy may be edited/published at any clock time, but execution never begins mid local calendar day.
+- The first policy becomes effective at the next Platform Operations local calendar-day boundary.
+- For the same timezone, a successor closes its predecessor and starts at the next shared local calendar-day boundary.
+- If Platform Operations timezone changed between policy versions, the predecessor closes at its own next local midnight. The successor begins at the first new-timezone local midnight at or after that closure.
+- A timezone transition may therefore intentionally contain a no-generation gap; overlap or partial-day policy mixing is not accepted merely to avoid a gap.
+- A newly published policy that has not reached its first effective boundary must become effective before another successor can be published.
+- Callers cannot backdate publication or force an arbitrary partial-day effective boundary through the normal API/UI.
 
 ## Determinism and auditability
 - Generated simulated events are immutable once committed.
 - Each event stores the exact policy/version reference used to generate it.
 - A committed event is never rerandomized or edited.
-- Re-running the daily generator is idempotent and cannot create duplicates for the same deterministic subscription/date/slot identity.
+- Re-running the generator is idempotent and cannot create duplicates for the same deterministic subscription/policy/date/slot identity.
 - Random selection is for display simulation only and is never a financial calculation input.
 - Deterministic source identity is:
 
 ```text
-SUBSCRIPTION:<subscriptionId>:SIMULATED_ACTIVITY:<localActivityDate>:<slotNumber>
+SUBSCRIPTION:<subscriptionId>:SIMULATED_ACTIVITY:POLICY:<policyVersionId>:<localActivityDate>:<slotNumber>
 ```
+
+Including `policyVersionId` prevents a legitimate future policy/timezone version from colliding with immutable history for the same subscription/date/slot number.
 
 ## Daily generation
 Initial execution model:
 - DAILY_CALENDAR schedule.
-- Calendar-day boundaries follow the policy timezone snapshot taken from Platform Operations when that policy version is published.
+- Calendar-day boundaries follow the effective policy timezone snapshot.
 - Default target is 5 simulated events/day/subscription, configurable by SUPER_ADMIN.
-- Event times are distributed inside configured timing windows.
+- Event times are deterministically distributed inside configured timing windows.
 - Event asset/outcome/result are generated only from the effective published policy.
+- Only slots whose scheduled instant is already due may be committed.
+- Reconciliation/worker process the current effective local date only; prior local dates are not synthetically backfilled.
 - One authoritative idempotent service is shared by worker and authorized reconciliation paths.
+- Bounded worker batches prioritize subscriptions with fewer committed current-day slots so later subscriptions cannot be permanently starved by the same first batch.
 
 ## Worker and operations mode
 - Infrastructure kill switch: `SIMULATED_ACTIVITY_WORKER_ENABLED`.
@@ -73,7 +88,7 @@ Initial execution model:
 ## USER display
 USER workspace may show:
 - source package/subscription;
-- local simulated event time;
+- local simulated event time in the immutable event/policy timezone snapshot;
 - asset;
 - explicit WIN/LOSS simulated outcome;
 - simulated percentage/result;
@@ -84,19 +99,21 @@ No USER action starts, stops, places or closes a real trade.
 
 ## ADMIN display
 ADMIN/SUPER_ADMIN workspace may show:
-- effective simulated-activity policy;
+- versioned/effective simulated-activity policy;
 - generated-event history;
 - due/missing simulated slots;
 - worker/generator health;
 - authorized idempotent reconciliation action.
 
-Only SUPER_ADMIN may publish/change the versioned simulation policy. ADMIN may receive read/reconciliation permission without authority to rewrite commercial/configuration history.
+Only SUPER_ADMIN may publish/change the versioned simulation policy. ADMIN may receive read/reconciliation permission without authority to rewrite configuration or historical events. A read-only ADMIN workspace must not fail merely because reconciliation permission was not granted.
 
 ## Initial safe defaults
 ```text
 scope                  = PER_ACTIVE_SUBSCRIPTION
 activitiesPerDay       = 5
 schedule               = DAILY_CALENDAR
+publication boundary   = SAFE_LOCAL_CALENDAR_DAY_START
+historical backfill    = NONE
 worker default         = OFF
 operations authority   = Platform Operations
 financial effect       = NONE
@@ -109,7 +126,7 @@ Initial seeded asset/range/timing values are configuration defaults only and may
 Before SIM-01 can be accepted:
 1. backend and admin automated gates GREEN;
 2. migration explicitly reviewed/applied locally if required;
-3. Postman verifies RBAC, policy versioning, idempotent generation and fail-closed states;
+3. Postman verifies RBAC, policy versioning, safe publication boundary, idempotent generation and fail-closed states;
 4. browser verifies ADMIN and USER labels/data/timezone;
 5. SQL readback proves immutable/idempotent event generation;
 6. wallet/ledger/rewards/commissions remain logically unaffected by simulated event generation;
