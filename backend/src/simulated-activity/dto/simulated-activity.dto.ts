@@ -27,6 +27,14 @@ const PERCENT_PATTERN = /^\d{1,3}(?:\.\d{1,6})?$/;
 const ASSET_PATTERN = /^[A-Z0-9._-]{2,32}$/;
 const CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
+function normalizeAssetSymbols(value: unknown): unknown {
+  if (!Array.isArray(value)) return value;
+  const items = value as unknown[];
+  return items.map((item): unknown =>
+    typeof item === 'string' ? item.trim().toUpperCase() : item,
+  );
+}
+
 export class SimulatedActivityPageQueryDto {
   @IsOptional()
   @Type(() => Number)
@@ -115,13 +123,7 @@ export class UpdateSimulatedActivityPolicyDto extends AuditedSimulationPolicyRev
   @ArrayMinSize(1)
   @ArrayMaxSize(50)
   @ArrayUnique()
-  @Transform(({ value }: { value: unknown }) =>
-    Array.isArray(value)
-      ? value.map((item) =>
-          typeof item === 'string' ? item.trim().toUpperCase() : item,
-        )
-      : value,
-  )
+  @Transform(({ value }: { value: unknown }) => normalizeAssetSymbols(value))
   @IsString({ each: true })
   @Matches(ASSET_PATTERN, { each: true })
   assetSymbols?: string[];

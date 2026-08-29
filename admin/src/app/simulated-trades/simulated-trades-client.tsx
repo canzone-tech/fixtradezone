@@ -362,7 +362,11 @@ export default function SimulatedTradesClient() {
   }, [router]);
 
   useEffect(() => {
-    void loadWorkspace();
+    const timer = window.setTimeout(() => {
+      void loadWorkspace();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [loadWorkspace]);
 
   function updateForm<K extends keyof FormState>(
