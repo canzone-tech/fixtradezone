@@ -1,0 +1,66 @@
+name: SIM-01 Backend Build Repair
+
+on:
+  push:
+    branches:
+      - feature/simulated-trade-activity
+    paths:
+      - '.github/workflows/sim-01-backend-build-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Apply exact Prisma JSON typing repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/src/simulated-activity/simulated-activity.service.ts')
+          text = path.read_text()
+
+          replacements = [
+            (
+              """          metadata: {\n            source: 'SIMULATED_ACTIVITY_POLICY',\n            operation: 'UPDATE_DRAFT',\n            reason: dto.reason,\n            before: currentConfig,\n            after: next,\n          },\n""",
+              """          metadata: this.auditMetadata({\n            source: 'SIMULATED_ACTIVITY_POLICY',\n            operation: 'UPDATE_DRAFT',\n            reason: dto.reason,\n            before: currentConfig,\n            after: next,\n          }),\n""",
+            ),
+            (
+              """          metadata: {\n            source: 'SIMULATED_ACTIVITY_POLICY',\n            operation: 'PUBLISH',\n            reason: dto.reason,\n            versionNumber: current.versionNumber,\n            timezoneSnapshot,\n            executionBoundary: 'SAFE_LOCAL_CALENDAR_DAY_START',\n            effectiveFrom: effectiveFrom.toISOString(),\n            predecessorPolicyVersionId: predecessor?.id ?? null,\n            predecessorEffectiveTo: predecessorEnd?.toISOString() ?? null,\n            timezoneTransitionGapPossible:\n              predecessor?.timezoneSnapshot !== undefined &&\n              predecessor?.timezoneSnapshot !== null &&\n              predecessor.timezoneSnapshot !== timezoneSnapshot,\n            configuration: config,\n          },\n""",
+              """          metadata: this.auditMetadata({\n            source: 'SIMULATED_ACTIVITY_POLICY',\n            operation: 'PUBLISH',\n            reason: dto.reason,\n            versionNumber: current.versionNumber,\n            timezoneSnapshot,\n            executionBoundary: 'SAFE_LOCAL_CALENDAR_DAY_START',\n            effectiveFrom: effectiveFrom.toISOString(),\n            predecessorPolicyVersionId: predecessor?.id ?? null,\n            predecessorEffectiveTo: predecessorEnd?.toISOString() ?? null,\n            timezoneTransitionGapPossible:\n              predecessor?.timezoneSnapshot !== undefined &&\n              predecessor?.timezoneSnapshot !== null &&\n              predecessor.timezoneSnapshot !== timezoneSnapshot,\n            configuration: config,\n          }),\n""",
+            ),
+            (
+              """          metadata: {\n            source: 'SIMULATED_ACTIVITY_RECONCILIATION',\n            summary,\n          },\n""",
+              """          metadata: this.auditMetadata({\n            source: 'SIMULATED_ACTIVITY_RECONCILIATION',\n            summary,\n          }),\n""",
+            ),
+          ]
+
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit('Expected audit metadata block missing')
+              text = text.replace(old, new, 1)
+
+          marker = """  private percentString(value: DecimalValue): string {\n    return new Prisma.Decimal(value).toFixed(6);\n  }\n"""
+          helper = """  private auditMetadata(value: Record<string, unknown>): Prisma.InputJsonValue {\n    const serialized = JSON.stringify(value);\n    const parsed = JSON.parse(serialized) as unknown;\n    return parsed as Prisma.InputJsonValue;\n  }\n\n""" + marker
+          if marker not in text:
+              raise SystemExit('auditMetadata insertion marker missing')
+          path.write_text(text.replace(marker, helper, 1))
+          PY
+
+      - name: Remove repair workflow
+        run: rm .github/workflows/sim-01-backend-build-repair.yml
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/src/simulated-activity/simulated-activity.service.ts .github/workflows/sim-01-backend-build-repair.yml
+          git commit -m "fix: type SIM-01 audit metadata as Prisma JSON"
+          git push
