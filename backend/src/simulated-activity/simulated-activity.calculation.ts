@@ -8,8 +8,7 @@ import {
 } from './simulated-activity.constants';
 
 type DecimalValue = Prisma.Decimal | number | string;
-const PERCENT_SCALE =
-  10n ** BigInt(SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES);
+const PERCENT_SCALE = 10n ** BigInt(SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES);
 
 export interface SimulatedSlotDefinition {
   scheduledAt: Date;
@@ -50,10 +49,7 @@ export function isLocalDateStartInstant(date: Date, timeZone: string): boolean {
   return localDateStartUtc(localDate, timeZone).getTime() === date.getTime();
 }
 
-export function localDateStartAtOrAfterUtc(
-  date: Date,
-  timeZone: string,
-): Date {
+export function localDateStartAtOrAfterUtc(date: Date, timeZone: string): Date {
   return isLocalDateStartInstant(date, timeZone)
     ? new Date(date.getTime())
     : nextLocalDateStartUtc(date, timeZone);
@@ -85,7 +81,9 @@ export function deterministicSimulatedSlot(input: {
     throw new BadRequestException('At least one simulated asset is required.');
   }
   if (input.winWeight < 0 || input.lossWeight < 0) {
-    throw new BadRequestException('Simulated outcome weights cannot be negative.');
+    throw new BadRequestException(
+      'Simulated outcome weights cannot be negative.',
+    );
   }
   const totalWeight = input.winWeight + input.lossWeight;
   if (!Number.isInteger(totalWeight) || totalWeight <= 0) {
@@ -104,12 +102,8 @@ export function deterministicSimulatedSlot(input: {
     outcomePick < input.winWeight ? 'WIN' : 'LOSS';
   const magnitude = deterministicPercent(
     `${input.sourceKey}:result`,
-    outcome === 'WIN'
-      ? input.winMinimumPercent
-      : input.lossMinimumPercent,
-    outcome === 'WIN'
-      ? input.winMaximumPercent
-      : input.lossMaximumPercent,
+    outcome === 'WIN' ? input.winMinimumPercent : input.lossMinimumPercent,
+    outcome === 'WIN' ? input.winMaximumPercent : input.lossMaximumPercent,
   );
 
   return {
@@ -126,7 +120,9 @@ export function deterministicSimulatedSlot(input: {
     resultPercent:
       outcome === 'WIN'
         ? magnitude.toFixed(SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES)
-        : magnitude.negated().toFixed(SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES),
+        : magnitude
+            .negated()
+            .toFixed(SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES),
   };
 }
 

@@ -552,10 +552,7 @@ export class SimulatedActivityService {
     });
   }
 
-  async getMyActivity(
-    userId: string,
-    query: SimulatedActivityPageQueryDto,
-  ) {
+  async getMyActivity(userId: string, query: SimulatedActivityPageQueryDto) {
     const skip = (query.page - 1) * query.limit;
     const rows = await this.prisma.$queryRaw<EventRow[]>(Prisma.sql`
       SELECT *
@@ -698,7 +695,7 @@ export class SimulatedActivityService {
     if (!policy || !policy.timezoneSnapshot) {
       return this.emptyBatch(asOf, null, false, true);
     }
-    if (!Boolean(policy.enabled)) {
+    if (!policy.enabled) {
       return this.emptyBatch(asOf, policy, false, false);
     }
 
@@ -813,7 +810,7 @@ export class SimulatedActivityService {
         events: [],
       };
     }
-    if (!Boolean(policy.enabled)) {
+    if (!policy.enabled) {
       return {
         disclosure: SIMULATED_ACTIVITY_DISCLOSURE,
         noEffectivePolicy: false,
@@ -902,7 +899,7 @@ export class SimulatedActivityService {
         selectedPolicy.id,
         false,
       );
-      if (!this.isPolicyEffectiveAt(policy, asOf) || !Boolean(policy.enabled)) {
+      if (!this.isPolicyEffectiveAt(policy, asOf) || !policy.enabled) {
         throw new ServiceUnavailableException(
           'Simulated activity policy changed during generation. Retry the idempotent operation.',
         );
@@ -1113,9 +1110,10 @@ export class SimulatedActivityService {
     return {
       enabled: Boolean(row.enabled),
       activitiesPerDay: Number(row.activitiesPerDay),
-      assetSymbols: this.jsonArray<string>(row.assetSymbols, 'assetSymbols').map(
-        (value) => String(value).trim().toUpperCase(),
-      ),
+      assetSymbols: this.jsonArray<string>(
+        row.assetSymbols,
+        'assetSymbols',
+      ).map((value) => String(value).trim().toUpperCase()),
       winWeight: Number(row.winWeight),
       lossWeight: Number(row.lossWeight),
       winMinimumPercent: this.percentString(row.winMinimumPercent),
@@ -1146,9 +1144,7 @@ export class SimulatedActivityService {
       config.assetSymbols.length < 1 ||
       config.assetSymbols.length > 50 ||
       new Set(config.assetSymbols).size !== config.assetSymbols.length ||
-      config.assetSymbols.some(
-        (asset) => !/^[A-Z0-9._-]{2,32}$/.test(asset),
-      )
+      config.assetSymbols.some((asset) => !/^[A-Z0-9._-]{2,32}$/.test(asset))
     ) {
       throw new BadRequestException('Simulated asset symbols are invalid.');
     }
@@ -1247,10 +1243,9 @@ export class SimulatedActivityService {
   ): SimulatedActivityBatchSummary {
     return {
       asOf: asOf.toISOString(),
-      localActivityDate:
-        policy?.timezoneSnapshot
-          ? localDateForInstant(asOf, policy.timezoneSnapshot)
-          : null,
+      localActivityDate: policy?.timezoneSnapshot
+        ? localDateForInstant(asOf, policy.timezoneSnapshot)
+        : null,
       policyVersionId: policy?.id ?? null,
       policyVersionNumber: policy?.versionNumber ?? null,
       policyEnabled,
@@ -1320,11 +1315,7 @@ export class SimulatedActivityService {
     work: (transaction: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     let lastError: unknown;
-    for (
-      let attempt = 1;
-      attempt <= MAX_SERIALIZABLE_ATTEMPTS;
-      attempt += 1
-    ) {
+    for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
       try {
         return await this.prisma.$transaction(work, {
           isolationLevel: Prisma.TransactionIsolationLevel.Serializable,

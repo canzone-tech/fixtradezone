@@ -106,7 +106,9 @@ describe('simulated activity deterministic calculation', () => {
 
     expect(nextBoundary.toISOString()).toBe('2026-08-28T18:30:00.000Z');
     expect(isLocalDateStartInstant(nextBoundary, 'Asia/Kolkata')).toBe(true);
-    expect(localDateForInstant(nextBoundary, 'Asia/Kolkata')).toBe('2026-08-29');
+    expect(localDateForInstant(nextBoundary, 'Asia/Kolkata')).toBe(
+      '2026-08-29',
+    );
   });
 
   it('rejects overlapping or insufficient timing windows', () => {

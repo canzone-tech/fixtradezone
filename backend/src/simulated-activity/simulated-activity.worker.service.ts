@@ -141,9 +141,7 @@ export class SimulatedActivityWorkerService
     const configured = this.configService.get<number | string>(
       'SIMULATED_ACTIVITY_WORKER_INTERVAL_MS',
     );
-    const parsed = Number(
-      configured ?? SIMULATED_ACTIVITY_DEFAULT_INTERVAL_MS,
-    );
+    const parsed = Number(configured ?? SIMULATED_ACTIVITY_DEFAULT_INTERVAL_MS);
     return Number.isFinite(parsed) && parsed >= 10_000
       ? Math.floor(parsed)
       : SIMULATED_ACTIVITY_DEFAULT_INTERVAL_MS;

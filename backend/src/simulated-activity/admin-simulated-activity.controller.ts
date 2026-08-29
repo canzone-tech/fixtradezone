@@ -135,10 +135,7 @@ export class AdminSimulatedActivityController {
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE)
-  processDue(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
+  processDue(@CurrentUser() actor: AuthenticatedUser, @Req() request: Request) {
     return this.service.processDueBatch(
       actor,
       getRequestContext(request),
