@@ -356,13 +356,13 @@ export class SimulatedActivityService {
           entityType: 'SimulatedActivityPolicyVersion',
           entityId: policyVersionId,
           description: 'SUPER_ADMIN updated simulated activity policy draft.',
-          metadata: {
+          metadata: this.auditMetadata({
             source: 'SIMULATED_ACTIVITY_POLICY',
             operation: 'UPDATE_DRAFT',
             reason: dto.reason,
             before: currentConfig,
             after: next,
-          },
+          }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
@@ -525,7 +525,7 @@ export class SimulatedActivityService {
           entityType: 'SimulatedActivityPolicyVersion',
           entityId: policyVersionId,
           description: 'SUPER_ADMIN published simulated activity policy.',
-          metadata: {
+          metadata: this.auditMetadata({
             source: 'SIMULATED_ACTIVITY_POLICY',
             operation: 'PUBLISH',
             reason: dto.reason,
@@ -540,7 +540,7 @@ export class SimulatedActivityService {
               predecessor?.timezoneSnapshot !== null &&
               predecessor.timezoneSnapshot !== timezoneSnapshot,
             configuration: config,
-          },
+          }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
@@ -785,10 +785,10 @@ export class SimulatedActivityService {
           entityId: null,
           description:
             'Administrator ran idempotent simulated activity reconciliation.',
-          metadata: {
+          metadata: this.auditMetadata({
             source: 'SIMULATED_ACTIVITY_RECONCILIATION',
             summary,
-          },
+          }),
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
         },
@@ -1262,6 +1262,12 @@ export class SimulatedActivityService {
       skippedNotDue: 0,
       noEffectivePolicy,
     };
+  }
+
+  private auditMetadata(value: Record<string, unknown>): Prisma.InputJsonValue {
+    const serialized = JSON.stringify(value);
+    const parsed = JSON.parse(serialized) as unknown;
+    return parsed as Prisma.InputJsonValue;
   }
 
   private percentString(value: DecimalValue): string {
