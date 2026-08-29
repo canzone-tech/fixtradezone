@@ -7,3 +7,4 @@ This module implements display-only simulated trade activity under the locked co
 - Policy publication is SUPER_ADMIN-only and activates on a safe local calendar-day boundary.
 - Worker execution requires both the explicit infrastructure opt-in and Platform Operations `AUTOMATIC` mode.
 - Reconciliation calls the same authoritative generator as the worker and cannot inject arbitrary outcomes or percentages.
+- Policy changes, publication boundaries and reconciliation summaries are serialized into Prisma-compatible JSON audit metadata before persistence.
