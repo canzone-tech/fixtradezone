@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
 
@@ -42,9 +37,7 @@ interface UpdatePayload {
   role?: Role;
 }
 
-async function readPayload<T>(
-  response: Response,
-): Promise<T | null> {
+async function readPayload<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
   } catch {
@@ -52,25 +45,15 @@ async function readPayload<T>(
   }
 }
 
-function getMessage(
-  payload: unknown,
-  fallback: string,
-): string {
-  if (
-    typeof payload === "object" &&
-    payload !== null &&
-    "message" in payload
-  ) {
+function getMessage(payload: unknown, fallback: string): string {
+  if (typeof payload === "object" && payload !== null && "message" in payload) {
     const message = payload.message;
 
     if (typeof message === "string") {
       return message;
     }
 
-    if (
-      Array.isArray(message) &&
-      typeof message[0] === "string"
-    ) {
+    if (Array.isArray(message) && typeof message[0] === "string") {
       return message[0];
     }
   }
@@ -96,82 +79,55 @@ function permissionGroup(code: string): string {
     cms: "CMS / Templates",
   };
 
-  return names[prefix] ?? (
-    prefix.charAt(0).toUpperCase() +
-    prefix.slice(1)
-  );
+  return names[prefix] ?? prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
 export default function RbacClient() {
   const router = useRouter();
 
-  const [currentUser, setCurrentUser] =
-    useState<AdminUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
 
-  const [roles, setRoles] =
-    useState<Role[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
 
-  const [permissions, setPermissions] =
-    useState<Permission[]>([]);
+  const [permissions, setPermissions] = useState<Permission[]>([]);
 
-  const [selectedRoleName, setSelectedRoleName] =
-    useState("ADMIN");
+  const [selectedRoleName, setSelectedRoleName] = useState("ADMIN");
 
-  const [draftPermissions, setDraftPermissions] =
-    useState<Set<string>>(new Set());
+  const [draftPermissions, setDraftPermissions] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [saving, setSaving] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [notice, setNotice] =
-    useState("");
+  const [notice, setNotice] = useState("");
 
-  const isSuperAdmin =
-    currentUser?.roles.includes("SUPER_ADMIN") ??
-    false;
+  const isSuperAdmin = currentUser?.roles.includes("SUPER_ADMIN") ?? false;
 
   const can = useCallback(
     (permission: string) =>
-      isSuperAdmin ||
-      currentUser?.permissions.includes(
-        permission,
-      ) === true,
+      isSuperAdmin || currentUser?.permissions.includes(permission) === true,
     [currentUser, isSuperAdmin],
   );
 
   const selectedRole = useMemo(
-    () =>
-      roles.find(
-        (role) =>
-          role.name === selectedRoleName,
-      ) ?? null,
+    () => roles.find((role) => role.name === selectedRoleName) ?? null,
     [roles, selectedRoleName],
   );
 
   const editable =
-    selectedRole?.name === "ADMIN" &&
-    isSuperAdmin &&
-    can("rbac.manage");
+    selectedRole?.name === "ADMIN" && isSuperAdmin && can("rbac.manage");
 
   const groupedPermissions = useMemo(() => {
-    const groups = new Map<
-      string,
-      Permission[]
-    >();
+    const groups = new Map<string, Permission[]>();
 
     for (const permission of permissions) {
-      const group = permissionGroup(
-        permission.code,
-      );
+      const group = permissionGroup(permission.code);
 
-      const existing =
-        groups.get(group) ?? [];
+      const existing = groups.get(group) ?? [];
 
       existing.push(permission);
       groups.set(group, existing);
@@ -180,205 +136,138 @@ export default function RbacClient() {
     return [...groups.entries()]
       .map(([name, items]) => ({
         name,
-        items: items.sort((a, b) =>
-          a.code.localeCompare(b.code),
-        ),
+        items: items.sort((a, b) => a.code.localeCompare(b.code)),
       }))
-      .sort((a, b) =>
-        a.name.localeCompare(b.name),
-      );
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [permissions]);
 
-  const originalPermissionCodes =
-    useMemo(
-      () =>
-        new Set(
-          selectedRole?.permissions.map(
-            (permission) => permission.code,
-          ) ?? [],
-        ),
-      [selectedRole],
-    );
+  const originalPermissionCodes = useMemo(
+    () =>
+      new Set(
+        selectedRole?.permissions.map((permission) => permission.code) ?? [],
+      ),
+    [selectedRole],
+  );
 
   const dirty = useMemo(() => {
-    if (
-      originalPermissionCodes.size !==
-      draftPermissions.size
-    ) {
+    if (originalPermissionCodes.size !== draftPermissions.size) {
       return true;
     }
 
-    for (
-      const code of originalPermissionCodes
-    ) {
+    for (const code of originalPermissionCodes) {
       if (!draftPermissions.has(code)) {
         return true;
       }
     }
 
     return false;
-  }, [
-    draftPermissions,
-    originalPermissionCodes,
-  ]);
+  }, [draftPermissions, originalPermissionCodes]);
 
-  const syncDraft = useCallback(
-    (role: Role | null) => {
-      setDraftPermissions(
-        new Set(
-          role?.permissions.map(
-            (permission) => permission.code,
-          ) ?? [],
-        ),
-      );
-    },
-    [],
-  );
+  const syncDraft = useCallback((role: Role | null) => {
+    setDraftPermissions(
+      new Set(role?.permissions.map((permission) => permission.code) ?? []),
+    );
+  }, []);
 
-  const loadWorkspace = useCallback(
-    async () => {
-      try {
-        const sessionResponse =
-          await fetch("/api/auth/session", {
-            cache: "no-store",
-          });
+  const loadWorkspace = useCallback(async () => {
+    try {
+      const sessionResponse = await fetch("/api/auth/session", {
+        cache: "no-store",
+      });
 
-        if (
-          sessionResponse.status === 401 ||
-          sessionResponse.status === 403
-        ) {
-          router.replace("/login");
-          router.refresh();
-          return;
-        }
-
-        const sessionPayload =
-          await readPayload<{
-            user?: AdminUser;
-            message?: string;
-          }>(sessionResponse);
-
-        if (
-          !sessionResponse.ok ||
-          !sessionPayload?.user
-        ) {
-          throw new Error(
-            getMessage(
-              sessionPayload,
-              "Unable to load administrator session.",
-            ),
-          );
-        }
-
-        setCurrentUser(
-          sessionPayload.user,
-        );
-
-        const [
-          rolesResponse,
-          permissionsResponse,
-        ] = await Promise.all([
-          fetch("/api/admin/rbac/roles", {
-            cache: "no-store",
-          }),
-          fetch(
-            "/api/admin/rbac/permissions",
-            {
-              cache: "no-store",
-            },
-          ),
-        ]);
-
-        if (
-          rolesResponse.status === 401 ||
-          permissionsResponse.status === 401
-        ) {
-          router.replace("/login");
-          router.refresh();
-          return;
-        }
-
-        const rolesPayload =
-          await readPayload<RolesPayload>(
-            rolesResponse,
-          );
-
-        const permissionsPayload =
-          await readPayload<PermissionsPayload>(
-            permissionsResponse,
-          );
-
-        if (
-          !rolesResponse.ok ||
-          !rolesPayload ||
-          !Array.isArray(
-            rolesPayload.roles,
-          )
-        ) {
-          throw new Error(
-            getMessage(
-              rolesPayload,
-              rolesResponse.status === 403
-                ? "You do not have rbac.read permission."
-                : "Unable to load roles.",
-            ),
-          );
-        }
-
-        if (
-          !permissionsResponse.ok ||
-          !permissionsPayload ||
-          !Array.isArray(
-            permissionsPayload.permissions,
-          )
-        ) {
-          throw new Error(
-            getMessage(
-              permissionsPayload,
-              permissionsResponse.status ===
-                403
-                ? "You do not have rbac.read permission."
-                : "Unable to load permissions.",
-            ),
-          );
-        }
-
-        const nextRoles =
-          rolesPayload.roles;
-
-        setRoles(nextRoles);
-
-        setPermissions(
-          permissionsPayload.permissions,
-        );
-
-        const preferredRole =
-          nextRoles.find(
-            (role) =>
-              role.name === "ADMIN",
-          ) ??
-          nextRoles[0] ??
-          null;
-
-        if (preferredRole) {
-          setSelectedRoleName(
-            preferredRole.name,
-          );
-
-          syncDraft(preferredRole);
-        }
-      } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Unable to load roles and permissions.",
-        );
-      } finally {
-        setLoading(false);
+      if (sessionResponse.status === 401 || sessionResponse.status === 403) {
+        router.replace("/login");
+        router.refresh();
+        return;
       }
-    },
-    [router, syncDraft],
-  );
+
+      const sessionPayload = await readPayload<{
+        user?: AdminUser;
+        message?: string;
+      }>(sessionResponse);
+
+      if (!sessionResponse.ok || !sessionPayload?.user) {
+        throw new Error(
+          getMessage(sessionPayload, "Unable to load administrator session."),
+        );
+      }
+
+      setCurrentUser(sessionPayload.user);
+
+      const [rolesResponse, permissionsResponse] = await Promise.all([
+        fetch("/api/admin/rbac/roles", {
+          cache: "no-store",
+        }),
+        fetch("/api/admin/rbac/permissions", {
+          cache: "no-store",
+        }),
+      ]);
+
+      if (rolesResponse.status === 401 || permissionsResponse.status === 401) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      const rolesPayload = await readPayload<RolesPayload>(rolesResponse);
+
+      const permissionsPayload =
+        await readPayload<PermissionsPayload>(permissionsResponse);
+
+      if (
+        !rolesResponse.ok ||
+        !rolesPayload ||
+        !Array.isArray(rolesPayload.roles)
+      ) {
+        throw new Error(
+          getMessage(
+            rolesPayload,
+            rolesResponse.status === 403
+              ? "You do not have rbac.read permission."
+              : "Unable to load roles.",
+          ),
+        );
+      }
+
+      if (
+        !permissionsResponse.ok ||
+        !permissionsPayload ||
+        !Array.isArray(permissionsPayload.permissions)
+      ) {
+        throw new Error(
+          getMessage(
+            permissionsPayload,
+            permissionsResponse.status === 403
+              ? "You do not have rbac.read permission."
+              : "Unable to load permissions.",
+          ),
+        );
+      }
+
+      const nextRoles = rolesPayload.roles;
+
+      setRoles(nextRoles);
+
+      setPermissions(permissionsPayload.permissions);
+
+      const preferredRole =
+        nextRoles.find((role) => role.name === "ADMIN") ?? nextRoles[0] ?? null;
+
+      if (preferredRole) {
+        setSelectedRoleName(preferredRole.name);
+
+        syncDraft(preferredRole);
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load roles and permissions.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [router, syncDraft]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -395,12 +284,7 @@ export default function RbacClient() {
       return;
     }
 
-    if (
-      dirty &&
-      !window.confirm(
-        "Discard unsaved permission changes?",
-      )
-    ) {
+    if (dirty && !window.confirm("Discard unsaved permission changes?")) {
       return;
     }
 
@@ -410,9 +294,7 @@ export default function RbacClient() {
     syncDraft(role);
   }
 
-  function togglePermission(
-    code: string,
-  ) {
+  function togglePermission(code: string) {
     if (!editable || saving) {
       return;
     }
@@ -444,12 +326,7 @@ export default function RbacClient() {
     }
 
     setDraftPermissions(
-      new Set(
-        permissions.map(
-          (permission) =>
-            permission.code,
-        ),
-      ),
+      new Set(permissions.map((permission) => permission.code)),
     );
   }
 
@@ -462,12 +339,7 @@ export default function RbacClient() {
   }
 
   async function savePermissions() {
-    if (
-      !selectedRole ||
-      !editable ||
-      !dirty ||
-      saving
-    ) {
+    if (!selectedRole || !editable || !dirty || saving) {
       return;
     }
 
@@ -489,13 +361,10 @@ export default function RbacClient() {
         {
           method: "PUT",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            permissionCodes: [
-              ...draftPermissions,
-            ].sort(),
+            permissionCodes: [...draftPermissions].sort(),
           }),
         },
       );
@@ -506,15 +375,9 @@ export default function RbacClient() {
         return;
       }
 
-      const payload =
-        await readPayload<UpdatePayload>(
-          response,
-        );
+      const payload = await readPayload<UpdatePayload>(response);
 
-      if (
-        !response.ok ||
-        !payload?.role
-      ) {
+      if (!response.ok || !payload?.role) {
         throw new Error(
           getMessage(
             payload,
@@ -527,18 +390,13 @@ export default function RbacClient() {
 
       setRoles((current) =>
         current.map((role) =>
-          role.id === payload.role?.id
-            ? payload.role
-            : role,
+          role.id === payload.role?.id ? payload.role : role,
         ),
       );
 
       syncDraft(payload.role);
 
-      setNotice(
-        payload.message ??
-          "Role permissions updated successfully.",
-      );
+      setNotice(payload.message ?? "Role permissions updated successfully.");
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -553,12 +411,8 @@ export default function RbacClient() {
   if (loading) {
     return (
       <div className="ftz-rbac-loading">
-        <div className="ftz-rbac-loading-mark">
-          FT
-        </div>
-        <p>
-          Loading roles & permissions…
-        </p>
+        <div className="ftz-rbac-loading-mark">FT</div>
+        <p>Loading roles & permissions…</p>
       </div>
     );
   }
@@ -567,23 +421,15 @@ export default function RbacClient() {
     <div className="ftz-page ftz-rbac-page">
       <header className="ftz-rbac-header">
         <div>
-          <span className="ftz-rbac-eyebrow">
-            ACCESS CONTROL
-          </span>
+          <span className="ftz-rbac-eyebrow">ACCESS CONTROL</span>
 
           <h1>Roles & Permissions</h1>
 
-          <p>
-            Review platform access and
-            control the ADMIN permission
-            scope.
-          </p>
+          <p>Review platform access and control the ADMIN permission scope.</p>
         </div>
 
         <div className="ftz-rbac-header-meta">
-          <span className="ftz-rbac-identity">
-            {currentUser?.email}
-          </span>
+          <span className="ftz-rbac-identity">{currentUser?.email}</span>
 
           <span className="ftz-rbac-secure">
             <i className="iconoir-shield-check" />
@@ -626,9 +472,7 @@ export default function RbacClient() {
 
             <div>
               <span>Permissions</span>
-              <strong>
-                {permissions.length}
-              </strong>
+              <strong>{permissions.length}</strong>
             </div>
           </article>
 
@@ -639,9 +483,7 @@ export default function RbacClient() {
 
             <div>
               <span>Selected Scope</span>
-              <strong>
-                {draftPermissions.size}
-              </strong>
+              <strong>{draftPermissions.size}</strong>
             </div>
           </article>
         </section>
@@ -650,41 +492,31 @@ export default function RbacClient() {
           <aside className="ftz-rbac-roles ftz-card">
             <div className="ftz-rbac-section-heading">
               <div>
-                <span className="ftz-rbac-eyebrow">
-                  ROLES
-                </span>
+                <span className="ftz-rbac-eyebrow">ROLES</span>
                 <h2>Access levels</h2>
               </div>
             </div>
 
             <div className="ftz-rbac-role-list">
               {roles.map((role) => {
-                const selected =
-                  selectedRoleName ===
-                  role.name;
+                const selected = selectedRoleName === role.name;
 
                 const locked =
-                  role.name ===
-                    "SUPER_ADMIN" ||
-                  role.name === "USER";
+                  role.name === "SUPER_ADMIN" || role.name === "USER";
 
                 return (
                   <button
                     key={role.id}
                     type="button"
                     className={`ftz-rbac-role ${selected ? "is-selected" : ""}`}
-                    onClick={() =>
-                      selectRole(role)
-                    }
+                    onClick={() => selectRole(role)}
                   >
                     <span className="ftz-rbac-role-icon">
                       <i
                         className={
-                          role.name ===
-                          "SUPER_ADMIN"
+                          role.name === "SUPER_ADMIN"
                             ? "iconoir-crown"
-                            : role.name ===
-                                "ADMIN"
+                            : role.name === "ADMIN"
                               ? "iconoir-shield"
                               : "iconoir-user"
                         }
@@ -692,20 +524,15 @@ export default function RbacClient() {
                     </span>
 
                     <span className="ftz-rbac-role-copy">
-                      <strong>
-                        {role.name}
-                      </strong>
+                      <strong>{role.name}</strong>
 
-                      <small>
-                        {role.description ||
-                          "Platform role"}
-                      </small>
+                      <small>{role.description || "Platform role"}</small>
 
                       <em>
-              {role.name === "SUPER_ADMIN"
-                ? "All permissions (bypass)"
-                : `${role.permissions.length} permissions`}
-            </em>
+                        {role.name === "SUPER_ADMIN"
+                          ? "All permissions (bypass)"
+                          : `${role.permissions.length} permissions`}
+                      </em>
                     </span>
 
                     {locked ? (
@@ -722,14 +549,9 @@ export default function RbacClient() {
           <section className="ftz-rbac-permissions ftz-card">
             <div className="ftz-rbac-section-heading">
               <div>
-                <span className="ftz-rbac-eyebrow">
-                  PERMISSION SCOPE
-                </span>
+                <span className="ftz-rbac-eyebrow">PERMISSION SCOPE</span>
 
-                <h2>
-                  {selectedRole?.name ??
-                    "Role"}
-                </h2>
+                <h2>{selectedRole?.name ?? "Role"}</h2>
 
                 <p>
                   {selectedRole?.description ??
@@ -740,14 +562,10 @@ export default function RbacClient() {
               <div className="ftz-rbac-scope-badges">
                 <span
                   className={`ftz-rbac-status ${
-                    selectedRole?.status ===
-                    "ACTIVE"
-                      ? "is-active"
-                      : ""
+                    selectedRole?.status === "ACTIVE" ? "is-active" : ""
                   }`}
                 >
-                  {selectedRole?.status ??
-                    "UNKNOWN"}
+                  {selectedRole?.status ?? "UNKNOWN"}
                 </span>
 
                 {editable ? (
@@ -764,55 +582,37 @@ export default function RbacClient() {
               </div>
             </div>
 
-            {selectedRole?.name ===
-            "SUPER_ADMIN" ? (
+            {selectedRole?.name === "SUPER_ADMIN" ? (
               <div className="ftz-rbac-protection-note">
                 <i className="iconoir-crown" />
                 <div>
-                  <strong>
-                    Founder authority is
-                    protected
-                  </strong>
+                  <strong>Founder authority is protected</strong>
                   <span>
-                    SUPER_ADMIN permissions
-                    are implicit and cannot be
-                    modified.
+                    SUPER_ADMIN permissions are implicit and cannot be modified.
                   </span>
                 </div>
               </div>
             ) : null}
 
-            {selectedRole?.name ===
-            "USER" ? (
+            {selectedRole?.name === "USER" ? (
               <div className="ftz-rbac-protection-note">
                 <i className="iconoir-lock" />
                 <div>
-                  <strong>
-                    Base USER role is
-                    protected
-                  </strong>
+                  <strong>Base USER role is protected</strong>
                   <span>
-                    Base user permissions are
-                    read-only in this
-                    operation.
+                    Base user permissions are read-only in this operation.
                   </span>
                 </div>
               </div>
             ) : null}
 
-            {selectedRole?.name ===
-              "ADMIN" &&
-            !isSuperAdmin ? (
+            {selectedRole?.name === "ADMIN" && !isSuperAdmin ? (
               <div className="ftz-rbac-protection-note">
                 <i className="iconoir-shield" />
                 <div>
-                  <strong>
-                    Founder approval required
-                  </strong>
+                  <strong>Founder approval required</strong>
                   <span>
-                    Only SUPER_ADMIN can
-                    modify the ADMIN
-                    permission scope.
+                    Only SUPER_ADMIN can modify the ADMIN permission scope.
                   </span>
                 </div>
               </div>
@@ -820,13 +620,8 @@ export default function RbacClient() {
 
             <div className="ftz-rbac-toolbar">
               <div>
-                <strong>
-                  {draftPermissions.size}
-                </strong>
-                <span>
-                  {" "}
-                  of {permissions.length} selected
-                </span>
+                <strong>{draftPermissions.size}</strong>
+                <span> of {permissions.length} selected</span>
               </div>
 
               {editable ? (
@@ -853,85 +648,54 @@ export default function RbacClient() {
             </div>
 
             <div className="ftz-rbac-permission-groups">
-              {groupedPermissions.map(
-                (group) => (
-                  <section
-                    className="ftz-rbac-permission-group"
-                    key={group.name}
-                  >
-                    <div className="ftz-rbac-group-heading">
-                      <h3>
-                        {group.name}
-                      </h3>
+              {groupedPermissions.map((group) => (
+                <section className="ftz-rbac-permission-group" key={group.name}>
+                  <div className="ftz-rbac-group-heading">
+                    <h3>{group.name}</h3>
 
-                      <span>
-                        {
-                          group.items.filter(
-                            (permission) =>
-                              draftPermissions.has(
-                                permission.code,
-                              ),
-                          ).length
-                        }
-                        /{group.items.length}
-                      </span>
-                    </div>
+                    <span>
+                      {
+                        group.items.filter((permission) =>
+                          draftPermissions.has(permission.code),
+                        ).length
+                      }
+                      /{group.items.length}
+                    </span>
+                  </div>
 
-                    <div className="ftz-rbac-permission-list">
-                      {group.items.map(
-                        (permission) => {
-                          const checked =
-                            draftPermissions.has(
-                              permission.code,
-                            );
+                  <div className="ftz-rbac-permission-list">
+                    {group.items.map((permission) => {
+                      const checked = draftPermissions.has(permission.code);
 
-                          return (
-                            <label
-                              className={`ftz-rbac-permission ${checked ? "is-checked" : ""} ${!editable ? "is-readonly" : ""}`}
-                              key={
-                                permission.id
-                              }
-                            >
-                              <input
-                                type="checkbox"
-                                checked={
-                                  checked
-                                }
-                                disabled={
-                                  !editable ||
-                                  saving
-                                }
-                                onChange={() =>
-                                  togglePermission(
-                                    permission.code,
-                                  )
-                                }
-                              />
+                      return (
+                        <label
+                          className={`ftz-rbac-permission ${checked ? "is-checked" : ""} ${!editable ? "is-readonly" : ""}`}
+                          key={permission.id}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!editable || saving}
+                            onChange={() => togglePermission(permission.code)}
+                          />
 
-                              <span className="ftz-rbac-checkbox">
-                                <i className="iconoir-check" />
-                              </span>
+                          <span className="ftz-rbac-checkbox">
+                            <i className="iconoir-check" />
+                          </span>
 
-                              <span className="ftz-rbac-permission-copy">
-                                <strong>
-                                  {
-                                    permission.code
-                                  }
-                                </strong>
+                          <span className="ftz-rbac-permission-copy">
+                            <strong>{permission.code}</strong>
 
-                                <small>
-                                  {permission.description ||
-                                    "Platform permission"}
-                                </small>
-                              </span>
-                            </label>
-                          );
-                        },
-                      )}
-                    </div>
-                  </section>
-                ),
-              )}
+                            <small>
+                              {permission.description || "Platform permission"}
+                            </small>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
 
             {editable ? (
@@ -939,23 +703,15 @@ export default function RbacClient() {
                 <div>
                   {dirty ? (
                     <>
-                      <strong>
-                        Unsaved changes
-                      </strong>
+                      <strong>Unsaved changes</strong>
                       <span>
-                        Review the ADMIN
-                        permission scope before
-                        saving.
+                        Review the ADMIN permission scope before saving.
                       </span>
                     </>
                   ) : (
                     <>
-                      <strong>
-                        Permission scope saved
-                      </strong>
-                      <span>
-                        No pending changes.
-                      </span>
+                      <strong>Permission scope saved</strong>
+                      <span>No pending changes.</span>
                     </>
                   )}
                 </div>
@@ -964,9 +720,7 @@ export default function RbacClient() {
                   <button
                     type="button"
                     className="ftz-rbac-button is-secondary"
-                    disabled={
-                      !dirty || saving
-                    }
+                    disabled={!dirty || saving}
                     onClick={resetChanges}
                   >
                     Reset
@@ -975,16 +729,10 @@ export default function RbacClient() {
                   <button
                     type="button"
                     className="ftz-rbac-button is-primary"
-                    disabled={
-                      !dirty || saving
-                    }
-                    onClick={() =>
-                      void savePermissions()
-                    }
+                    disabled={!dirty || saving}
+                    onClick={() => void savePermissions()}
                   >
-                    {saving
-                      ? "Saving…"
-                      : "Save permissions"}
+                    {saving ? "Saving…" : "Save permissions"}
                   </button>
                 </div>
               </footer>

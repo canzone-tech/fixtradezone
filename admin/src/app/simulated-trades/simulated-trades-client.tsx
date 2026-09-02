@@ -232,9 +232,8 @@ export default function SimulatedTradesClient() {
   const effectivePolicy = useMemo(() => {
     if (!reconciliation?.policyVersionId) return null;
     return (
-      policies.find(
-        (policy) => policy.id === reconciliation.policyVersionId,
-      ) ?? null
+      policies.find((policy) => policy.id === reconciliation.policyVersionId) ??
+      null
     );
   }, [policies, reconciliation]);
 
@@ -262,10 +261,7 @@ export default function SimulatedTradesClient() {
       setCurrentUser(user);
 
       const canRead = hasPermission(user, "simulated_activity.read");
-      const canReconcile = hasPermission(
-        user,
-        "simulated_activity.reconcile",
-      );
+      const canReconcile = hasPermission(user, "simulated_activity.reconcile");
       if (!canRead) {
         throw new Error("You do not have simulated activity read permission.");
       }
@@ -293,9 +289,8 @@ export default function SimulatedTradesClient() {
         return;
       }
 
-      const policiesPayload = await readPayload<PoliciesPayload>(
-        policiesResponse,
-      );
+      const policiesPayload =
+        await readPayload<PoliciesPayload>(policiesResponse);
       const eventsPayload = await readPayload<EventsPayload>(eventsResponse);
       const workerPayload = await readPayload<WorkerHealth>(workerResponse);
 
@@ -314,7 +309,10 @@ export default function SimulatedTradesClient() {
       }
       if (!workerResponse.ok || !workerPayload) {
         throw new Error(
-          messageFrom(workerPayload, "Unable to load simulation worker health."),
+          messageFrom(
+            workerPayload,
+            "Unable to load simulation worker health.",
+          ),
         );
       }
 
@@ -329,8 +327,9 @@ export default function SimulatedTradesClient() {
           router.refresh();
           return;
         }
-        reconciliationPayload =
-          await readPayload<ReconciliationPayload>(reconciliationResponse);
+        reconciliationPayload = await readPayload<ReconciliationPayload>(
+          reconciliationResponse,
+        );
         if (!reconciliationResponse.ok || !reconciliationPayload) {
           throw new Error(
             messageFrom(
@@ -369,10 +368,7 @@ export default function SimulatedTradesClient() {
     return () => window.clearTimeout(timer);
   }, [loadWorkspace]);
 
-  function updateForm<K extends keyof FormState>(
-    key: K,
-    value: FormState[K],
-  ) {
+  function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -423,7 +419,9 @@ export default function SimulatedTradesClient() {
       await loadWorkspace();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to save policy draft.",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to save policy draft.",
       );
     } finally {
       setSaving(false);
@@ -516,7 +514,9 @@ export default function SimulatedTradesClient() {
       );
       await loadWorkspace();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to create draft.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to create draft.",
+      );
     } finally {
       setSaving(false);
     }
@@ -576,9 +576,7 @@ export default function SimulatedTradesClient() {
             wallet, ledger, package earnings, commission, reward or cap money.
           </p>
         </div>
-        <span className={styles.disclosurePill}>
-          SIMULATED RESULTS — NOT REAL TRADING
-        </span>
+        <span className={styles.disclosurePill}>SIMULATED RESULTS</span>
       </section>
 
       {error ? (
@@ -923,9 +921,9 @@ export default function SimulatedTradesClient() {
             </div>
           ) : null}
           <p className={styles.muted}>
-            Recovery uses the same deterministic generator. Administrators cannot
-            enter an arbitrary WIN/LOSS or result percentage. Prior local dates are
-            not synthetically backfilled.
+            Recovery uses the same deterministic generator. Administrators
+            cannot enter an arbitrary WIN/LOSS or result percentage. Prior local
+            dates are not synthetically backfilled.
           </p>
         </article>
       </section>
@@ -1005,12 +1003,12 @@ export default function SimulatedTradesClient() {
       <section className={styles.disclosure}>
         <i className="iconoir-warning-triangle" />
         <div>
-          <strong>SIMULATED RESULTS — NOT REAL TRADING</strong>
+          <strong>SIMULATED RESULTS</strong>
           <p>
             These rows are generated display simulations only. They are not
-            broker/exchange executions, do not represent realized or withdrawable
-            trading profit, and never mutate wallet, ledger, reward, cap or
-            commission accounting.
+            broker/exchange executions, do not represent realized or
+            withdrawable trading profit, and never mutate wallet, ledger,
+            reward, cap or commission accounting.
           </p>
         </div>
       </section>

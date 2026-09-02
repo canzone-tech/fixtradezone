@@ -45,12 +45,48 @@ interface DashboardSnapshot {
 }
 
 const moduleStrip = [
-  { code: "U", label: "Users", detail: "Account directory", status: "LIVE", tone: "cyan" },
-  { code: "P", label: "Packages", detail: "Versioned catalogue", status: "LIVE", tone: "blue" },
-  { code: "D", label: "Deposits", detail: "Payment review", status: "LIVE", tone: "orange" },
-  { code: "W", label: "Wallets", detail: "Double-entry ledger", status: "LIVE", tone: "green" },
-  { code: "C", label: "Commissions", detail: "Referral accounting", status: "LIVE", tone: "purple" },
-  { code: "R", label: "Rewards", detail: "Caps & lifecycle", status: "LIVE", tone: "gold" },
+  {
+    code: "U",
+    label: "Users",
+    detail: "Account directory",
+    status: "LIVE",
+    tone: "cyan",
+  },
+  {
+    code: "P",
+    label: "Packages",
+    detail: "Versioned catalogue",
+    status: "LIVE",
+    tone: "blue",
+  },
+  {
+    code: "D",
+    label: "Deposits",
+    detail: "Payment review",
+    status: "LIVE",
+    tone: "orange",
+  },
+  {
+    code: "W",
+    label: "Wallets",
+    detail: "Double-entry ledger",
+    status: "LIVE",
+    tone: "green",
+  },
+  {
+    code: "C",
+    label: "Commissions",
+    detail: "Referral accounting",
+    status: "LIVE",
+    tone: "purple",
+  },
+  {
+    code: "R",
+    label: "Rewards",
+    detail: "Caps & lifecycle",
+    status: "LIVE",
+    tone: "gold",
+  },
 ] as const;
 
 async function readJson<T>(response: Response): Promise<T | null> {
@@ -248,7 +284,8 @@ export default function DashboardClient() {
                   {formatPlatformDateTime(user?.lastLoginAt)}
                 </span>
                 <span>
-                  <i className="iconoir-shield-check" /> Backend-authoritative RBAC
+                  <i className="iconoir-shield-check" /> Backend-authoritative
+                  RBAC
                 </span>
               </div>
             </div>
@@ -279,9 +316,15 @@ export default function DashboardClient() {
                 <div>
                   <h3>Operational Overview</h3>
                   <div className="ftz-legend">
-                    <span><i className="dot green" /> Live backend data</span>
-                    <span><i className="dot blue" /> Versioned policy</span>
-                    <span><i className="dot purple" /> Immutable accounting</span>
+                    <span>
+                      <i className="dot green" /> Live backend data
+                    </span>
+                    <span>
+                      <i className="dot blue" /> Versioned policy
+                    </span>
+                    <span>
+                      <i className="dot purple" /> Immutable accounting
+                    </span>
                   </div>
                 </div>
               </div>
@@ -421,7 +464,9 @@ export default function DashboardClient() {
                 </span>
                 <div>
                   <strong>Financial data stays exact</strong>
-                  <small>No demo balances or fabricated transaction totals</small>
+                  <small>
+                    No demo balances or fabricated transaction totals
+                  </small>
                 </div>
               </div>
             </div>

@@ -3,11 +3,9 @@ import { proxyAdminRequest } from "@/lib/admin-backend";
 
 export function GET(request: NextRequest) {
   const search = request.nextUrl.search;
-  return proxyAdminRequest(
-    request,
-    `/admin/deposit-payment-rails${search}`,
-    { method: "GET" },
-  );
+  return proxyAdminRequest(request, `/admin/deposit-payment-rails${search}`, {
+    method: "GET",
+  });
 }
 
 export async function POST(request: NextRequest) {

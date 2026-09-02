@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  clearImpersonationCookies,
+  IMPERSONATION_TOKEN_COOKIE,
+} from "@/lib/admin-impersonation";
+import {
   ACCESS_COOKIE,
   type AuthResponse,
   clearAuthCookies,
@@ -77,6 +81,9 @@ export async function proxyUserRequest(
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+  const impersonationToken = request.cookies.get(
+    IMPERSONATION_TOKEN_COOKIE,
+  )?.value;
 
   const invoke = (token: string) => {
     const headers = new Headers(init.headers);
@@ -90,6 +97,17 @@ export async function proxyUserRequest(
   };
 
   try {
+    if (impersonationToken) {
+      const backendResponse = await invoke(impersonationToken);
+      const response = await mirrorBackendResponse(backendResponse);
+
+      if (backendResponse.status === 401) {
+        clearImpersonationCookies(response);
+      }
+
+      return response;
+    }
+
     if (accessToken) {
       const backendResponse = await invoke(accessToken);
 

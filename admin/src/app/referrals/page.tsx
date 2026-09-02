@@ -6,7 +6,8 @@ import ReferralsClient from "./referrals-client";
 
 export default async function ReferralsPage() {
   const cookieStore = await cookies();
-  const hasSession = cookieStore.has(ACCESS_COOKIE) || cookieStore.has(REFRESH_COOKIE);
+  const hasSession =
+    cookieStore.has(ACCESS_COOKIE) || cookieStore.has(REFRESH_COOKIE);
 
   if (!hasSession) {
     redirect("/login");

@@ -7,9 +7,7 @@ export default function FixTradeZoneBrand({
   portalLabel,
   className,
 }: FixTradeZoneBrandProps) {
-  const label = portalLabel
-    ? `FixTradeZone ${portalLabel}`
-    : "FixTradeZone";
+  const label = portalLabel ? `FixTradeZone ${portalLabel}` : "FixTradeZone";
 
   return (
     <svg
@@ -20,13 +18,7 @@ export default function FixTradeZoneBrand({
       aria-label={label}
     >
       <defs>
-        <linearGradient
-          id="ftzCanonicalBrand"
-          x1="0"
-          y1="0"
-          x2="1"
-          y2="1"
-        >
+        <linearGradient id="ftzCanonicalBrand" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#22f2df" />
           <stop offset=".55" stopColor="#35b8ff" />
           <stop offset="1" stopColor="#8b55ff" />

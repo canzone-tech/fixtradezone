@@ -24,6 +24,8 @@ export const PERMISSIONS = {
   REWARDS_RECONCILE: 'rewards.reconcile',
   SIMULATED_ACTIVITY_READ: 'simulated_activity.read',
   SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
+  INTERNAL_TRADING_READ: 'internal_trading.read',
+  INTERNAL_TRADING_RECONCILE: 'internal_trading.reconcile',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -136,6 +138,15 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE,
     description:
       'Run idempotent simulated activity reconciliation for eligible subscriptions',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_READ,
+    description: 'View internal trading policies, events and lifecycle state',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_RECONCILE,
+    description:
+      'Reconcile internal trading lifecycle for eligible package subscriptions',
   },
   {
     code: PERMISSIONS.RBAC_READ,

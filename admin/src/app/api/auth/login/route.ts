@@ -130,7 +130,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json(
         {
-          message: "This account does not have access to a FixTradeZone portal.",
+          message:
+            "This account does not have access to a FixTradeZone portal.",
         },
         { status: 403 },
       );

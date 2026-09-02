@@ -53,9 +53,7 @@ export default function UserProfileClient() {
 
         if (response.status === 403) {
           router.replace(
-            payload?.redirectTo === "/dashboard"
-              ? "/dashboard"
-              : "/login",
+            payload?.redirectTo === "/dashboard" ? "/dashboard" : "/login",
           );
           router.refresh();
           return;

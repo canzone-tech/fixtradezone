@@ -214,8 +214,7 @@ export default function LoginPage() {
       }
 
       const redirectTo =
-        "redirectTo" in payload &&
-        payload.redirectTo === "/user/dashboard"
+        "redirectTo" in payload && payload.redirectTo === "/user/dashboard"
           ? "/user/dashboard"
           : "/dashboard";
 

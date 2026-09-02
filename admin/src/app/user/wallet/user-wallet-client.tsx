@@ -61,7 +61,9 @@ async function fetchWalletWorkspace(): Promise<{
   session: UserDirectSession;
   wallet: UserWalletResponse;
 }> {
-  const sessionResponse = await fetch("/api/user/session", { cache: "no-store" });
+  const sessionResponse = await fetch("/api/user/session", {
+    cache: "no-store",
+  });
   const session = await checkedUserJson<
     UserDirectSession & UserApiMessagePayload
   >(sessionResponse, "USER session is unavailable.");
@@ -72,10 +74,9 @@ async function fetchWalletWorkspace(): Promise<{
   const walletResponse = await fetch("/api/user/wallet?limit=50", {
     cache: "no-store",
   });
-  const wallet = await checkedUserJson<UserWalletResponse & UserApiMessagePayload>(
-    walletResponse,
-    "Could not load wallet accounting.",
-  );
+  const wallet = await checkedUserJson<
+    UserWalletResponse & UserApiMessagePayload
+  >(walletResponse, "Could not load wallet accounting.");
 
   return { session, wallet };
 }
@@ -101,7 +102,9 @@ export default function UserWalletClient() {
         return;
       }
       setError(
-        caught instanceof Error ? caught.message : "Could not load wallet accounting.",
+        caught instanceof Error
+          ? caught.message
+          : "Could not load wallet accounting.",
       );
     } finally {
       setLoading(false);
@@ -195,13 +198,15 @@ export default function UserWalletClient() {
                 <div className={styles.metric}>
                   <small>Package Earnings</small>
                   <strong>
-                    {compactDecimal(summary.buckets.packageEarnings)} {summary.currency}
+                    {compactDecimal(summary.buckets.packageEarnings)}{" "}
+                    {summary.currency}
                   </strong>
                 </div>
                 <div className={styles.metric}>
                   <small>Referral Commission</small>
                   <strong>
-                    {compactDecimal(summary.buckets.referralCommission)} {summary.currency}
+                    {compactDecimal(summary.buckets.referralCommission)}{" "}
+                    {summary.currency}
                   </strong>
                 </div>
                 <div className={styles.metric}>
@@ -216,8 +221,8 @@ export default function UserWalletClient() {
         ) : (
           <section className={styles.card}>
             <div className={styles.empty}>
-              No wallet accounting has been posted yet. Approved deposits appear here
-              only after controlled ledger posting.
+              No wallet accounting has been posted yet. Approved deposits appear
+              here only after controlled ledger posting.
             </div>
           </section>
         )}
@@ -243,21 +248,27 @@ export default function UserWalletClient() {
           ) : (
             <div className={styles.list}>
               {wallet.activity.map((activity) => (
-                <div className={styles.row} key={`${activity.transactionId}-${activity.bucket}`}>
+                <div
+                  className={styles.row}
+                  key={`${activity.transactionId}-${activity.bucket}`}
+                >
                   <div className={styles.rowTop}>
                     <div>
                       <strong>{activity.description}</strong>
                       <span className={styles.meta}>
-                        {formatWalletDate(activity.postedAt)} · {activity.bucket}
+                        {formatWalletDate(activity.postedAt)} ·{" "}
+                        {activity.bucket}
                       </span>
                     </div>
                     <span
-            className={styles.badge}
-            data-tone={activity.direction === "DEBIT" ? "warning" : "success"}
-          >
-            {activity.direction === "DEBIT" ? "-" : "+"}
-            {compactDecimal(activity.amount)} {activity.currency}
-          </span>
+                      className={styles.badge}
+                      data-tone={
+                        activity.direction === "DEBIT" ? "warning" : "success"
+                      }
+                    >
+                      {activity.direction === "DEBIT" ? "-" : "+"}
+                      {compactDecimal(activity.amount)} {activity.currency}
+                    </span>
                   </div>
                   <span className={`${styles.meta} ${styles.mono}`}>
                     {activity.transactionId}

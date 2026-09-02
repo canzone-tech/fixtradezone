@@ -1,15 +1,9 @@
 export type CommissionPlanStatus = "DRAFT" | "PUBLISHED";
 export type CommissionInactiveUplineAction = "LOST" | "PENDING" | "PASS_UP";
 export type CommissionCompressionMode =
-  | "SKIP"
-  | "PASS_SAME_LEVEL"
-  | "COMPRESS_LEVELS"
-  | "PENDING";
+  "SKIP" | "PASS_SAME_LEVEL" | "COMPRESS_LEVELS" | "PENDING";
 export type CommissionReleaseMode =
-  | "IMMEDIATE"
-  | "HOLD_PERIOD"
-  | "MANUAL_APPROVAL"
-  | "CONDITION_BASED";
+  "IMMEDIATE" | "HOLD_PERIOD" | "MANUAL_APPROVAL" | "CONDITION_BASED";
 
 export interface CommissionLevelRule {
   id?: string;

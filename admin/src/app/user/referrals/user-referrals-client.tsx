@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
 import type { MyCommissionsResponse } from "@/lib/commissions";
-import { formatPlatformDate, formatPlatformDateTime } from "@/lib/platform-time";
+import {
+  formatPlatformDate,
+  formatPlatformDateTime,
+} from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./user-referrals.module.css";
 
@@ -61,7 +64,9 @@ function displayName(user: {
   firstName: string | null;
   lastName: string | null;
 }) {
-  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username;
+  return (
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || user.username
+  );
 }
 
 function amountLabel(value: string, currency: string) {
@@ -80,7 +85,9 @@ export default function UserReferralsClient() {
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [profile, setProfile] = useState<ReferralProfile | null>(null);
   const [direct, setDirect] = useState<DirectResponse | null>(null);
-  const [commissions, setCommissions] = useState<MyCommissionsResponse | null>(null);
+  const [commissions, setCommissions] = useState<MyCommissionsResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -96,9 +103,9 @@ export default function UserReferralsClient() {
         const sessionResponse = await fetch("/api/user/session", {
           cache: "no-store",
         });
-        const sessionPayload = await readPayload<UserDirectSession & ErrorPayload>(
-          sessionResponse,
-        );
+        const sessionPayload = await readPayload<
+          UserDirectSession & ErrorPayload
+        >(sessionResponse);
 
         if (sessionResponse.status === 401) {
           router.replace("/login");
@@ -121,18 +128,21 @@ export default function UserReferralsClient() {
           !sessionPayload?.user ||
           !sessionPayload.sessionPolicy
         ) {
-          throw new Error(sessionPayload?.message || "Unable to load USER session.");
+          throw new Error(
+            sessionPayload?.message || "Unable to load USER session.",
+          );
         }
 
-        const [profileResponse, directResponse, commissionResponse] = await Promise.all([
-          fetch("/api/user/referrals", { cache: "no-store" }),
-          fetch("/api/user/referrals/direct?page=1&limit=20", {
-            cache: "no-store",
-          }),
-          fetch("/api/user/commissions?page=1&limit=50", {
-            cache: "no-store",
-          }),
-        ]);
+        const [profileResponse, directResponse, commissionResponse] =
+          await Promise.all([
+            fetch("/api/user/referrals", { cache: "no-store" }),
+            fetch("/api/user/referrals/direct?page=1&limit=20", {
+              cache: "no-store",
+            }),
+            fetch("/api/user/commissions?page=1&limit=50", {
+              cache: "no-store",
+            }),
+          ]);
 
         if (
           profileResponse.status === 401 ||
@@ -144,9 +154,9 @@ export default function UserReferralsClient() {
           return;
         }
 
-        const profilePayload = await readPayload<ReferralProfile & ErrorPayload>(
-          profileResponse,
-        );
+        const profilePayload = await readPayload<
+          ReferralProfile & ErrorPayload
+        >(profileResponse);
         const directPayload = await readPayload<DirectResponse & ErrorPayload>(
           directResponse,
         );
@@ -168,7 +178,8 @@ export default function UserReferralsClient() {
 
         if (!commissionResponse.ok || !commissionPayload) {
           throw new Error(
-            commissionPayload?.message || "Unable to load referral commissions.",
+            commissionPayload?.message ||
+              "Unable to load referral commissions.",
           );
         }
 
@@ -242,7 +253,8 @@ export default function UserReferralsClient() {
             <span>NETWORK + COMMISSIONS</span>
             <h2>My Referrals</h2>
             <p>
-              Referral identity, direct network and ledger-backed commission history.
+              Referral identity, direct network and ledger-backed commission
+              history.
             </p>
           </div>
           <div className={styles.status}>{profile.assignmentStatus}</div>
@@ -358,13 +370,19 @@ export default function UserReferralsClient() {
                 <tbody>
                   {commissions.events.map((event) => (
                     <tr key={event.id}>
-                      <td>@{event.purchaserUsername ?? event.purchaserUserId}</td>
+                      <td>
+                        @{event.purchaserUsername ?? event.purchaserUserId}
+                      </td>
                       <td>{event.sourcePackageDisplayName ?? "Package"}</td>
                       <td>L{event.level}</td>
                       <td>{amountLabel(event.eligibleBase, event.currency)}</td>
                       <td>{event.ratePercent}%</td>
-                      <td>{amountLabel(event.commissionAmount, event.currency)}</td>
-                      <td><span className={styles.badge}>{event.status}</span></td>
+                      <td>
+                        {amountLabel(event.commissionAmount, event.currency)}
+                      </td>
+                      <td>
+                        <span className={styles.badge}>{event.status}</span>
+                      </td>
                       <td>{dateLabel(event.createdAt)}</td>
                     </tr>
                   ))}
@@ -409,7 +427,9 @@ export default function UserReferralsClient() {
                     <tr key={member.id}>
                       <td>{displayName(member)}</td>
                       <td>@{member.username}</td>
-                      <td><span className={styles.badge}>{member.status}</span></td>
+                      <td>
+                        <span className={styles.badge}>{member.status}</span>
+                      </td>
                       <td>{member.assignmentStatus}</td>
                       <td>{formatPlatformDate(member.referralJoinedAt)}</td>
                     </tr>

@@ -117,9 +117,7 @@ export default function UserDashboardClient() {
 
         if (response.status === 403) {
           router.replace(
-            payload?.redirectTo === "/dashboard"
-              ? "/dashboard"
-              : "/login",
+            payload?.redirectTo === "/dashboard" ? "/dashboard" : "/login",
           );
           router.refresh();
           return;
@@ -131,9 +129,7 @@ export default function UserDashboardClient() {
           !payload.sessionPolicy ||
           typeof payload.sessionPolicy.idleLockMinutes !== "number"
         ) {
-          throw new Error(
-            payload?.message || "Unable to load your dashboard.",
-          );
+          throw new Error(payload?.message || "Unable to load your dashboard.");
         }
 
         if (mounted) {
@@ -219,9 +215,7 @@ export default function UserDashboardClient() {
           ? {
               ...item,
               value: referralProfile?.assignmentStatus ?? item.value,
-              detail: referralProfile
-                ? "Live referral API"
-                : item.detail,
+              detail: referralProfile ? "Live referral API" : item.detail,
             }
           : item,
       ),
@@ -394,7 +388,9 @@ export default function UserDashboardClient() {
                     </div>
                   </div>
 
-                  <span className={styles.pendingBadge}>DEDICATED LIVE WORKSPACES</span>
+                  <span className={styles.pendingBadge}>
+                    DEDICATED LIVE WORKSPACES
+                  </span>
                 </div>
 
                 <div className={styles.chartEmpty}>
@@ -480,7 +476,9 @@ export default function UserDashboardClient() {
                     <div>
                       <small>Package Workspace</small>
                       <strong>Lifecycle API live</strong>
-                      <span>No package value is fabricated on the overview</span>
+                      <span>
+                        No package value is fabricated on the overview
+                      </span>
                     </div>
                   </div>
                 </article>
@@ -514,8 +512,13 @@ export default function UserDashboardClient() {
                           <i className="iconoir-database" />
 
                           <div>
-                            <strong>Open My Wallet for immutable history</strong>
-                            <span>Exact ledger activity stays in the ledger-backed wallet workspace.</span>
+                            <strong>
+                              Open My Wallet for immutable history
+                            </strong>
+                            <span>
+                              Exact ledger activity stays in the ledger-backed
+                              wallet workspace.
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -608,7 +611,8 @@ export default function UserDashboardClient() {
                 <p>
                   Exact financial values remain in dedicated ledger-backed
                   workspaces and are never aggregated across currencies here.
-                  Simulated activity will always be explicitly labelled as simulated.
+                  Simulated activity will always be explicitly labelled as
+                  simulated.
                 </p>
               </div>
             </article>

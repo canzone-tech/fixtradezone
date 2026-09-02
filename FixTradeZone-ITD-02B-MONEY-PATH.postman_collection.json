@@ -1,0 +1,529 @@
+{
+  "info": {
+    "name": "FixTradeZone ITD-02B LOCAL MONEY-PATH ACCEPTANCE",
+    "_postman_id": "0a326412-1f46-49e8-87c2-itd02b",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Local-only ITD-02B acceptance. Fresh activation -> state -> due trades -> immutable events -> 3-leg ledger -> idempotency -> USER privacy/readback."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:3000"
+    },
+    {
+      "key": "adminAccessToken",
+      "value": ""
+    },
+    {
+      "key": "userAccessToken",
+      "value": ""
+    },
+    {
+      "key": "depositId",
+      "value": ""
+    },
+    {
+      "key": "depositUserId",
+      "value": ""
+    },
+    {
+      "key": "subscriptionId",
+      "value": ""
+    },
+    {
+      "key": "principalAmount",
+      "value": ""
+    },
+    {
+      "key": "eventCountAfterFirst",
+      "value": "0"
+    },
+    {
+      "key": "ledgerTransactionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Admin - Effective ITD policy",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/policies",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const p = (b.policies || []).find(x => x.status === 'PUBLISHED' && x.enabled === true);",
+              "pm.test('Enabled published policy exists', () => pm.expect(p).to.exist);",
+              "if (p) {",
+              "  pm.expect(Number(p.activitiesPerDay)).to.be.at.least(5);",
+              "  pm.expect(Number(p.userSharePercent) + Number(p.adminSharePercent)).to.eql(100);",
+              "  pm.collectionVariables.set('publishedPolicyId', p.id);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Admin - Find fresh activation pending deposit",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/subscriptions/activation-pending?page=1&limit=100",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const rows = b.deposits || [];",
+              "let id = pm.collectionVariables.get('depositId');",
+              "let row = id ? rows.find(x => x.depositId === id) : rows[0];",
+              "if (!id && row) {",
+              "  id = row.depositId;",
+              "  pm.collectionVariables.set('depositId', id);",
+              "}",
+              "if (row) pm.collectionVariables.set('depositUserId', row.userId);",
+              "pm.test('Fresh activation-pending deposit selected', () => {",
+              "  pm.expect(id, 'Set depositId manually if no pending deposit exists').to.be.ok;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Admin - Activate fresh package",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/admin/deposits/{{depositId}}/activate-package",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Activation success', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+              "const b = pm.response.json();",
+              "pm.test('Fresh activation created', () => pm.expect(b.created).to.eql(true));",
+              "pm.test('Subscription returned', () => pm.expect(b.subscription && b.subscription.id).to.be.ok);",
+              "if (b.subscription) {",
+              "  pm.collectionVariables.set('subscriptionId', b.subscription.id);",
+              "  const expectedUser = pm.collectionVariables.get('depositUserId');",
+              "  if (expectedUser) pm.expect(b.subscription.userId).to.eql(expectedUser);",
+              "  if ('earningAuthority' in b.subscription) {",
+              "    pm.test('ITD owns new subscription earnings', () => pm.expect(b.subscription.earningAuthority).to.eql('INTERNAL_TRADING'));",
+              "  }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Admin - New package appears in ITD workspace",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/workspace?page=1&limit=100",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const id = pm.collectionVariables.get('subscriptionId');",
+              "const s = (b.states || []).find(x => x.subscriptionId === id);",
+              "pm.test('ITD state exists', () => pm.expect(s).to.exist);",
+              "if (s) {",
+              "  pm.collectionVariables.set('principalAmount', s.principalAmount);",
+              "  pm.test('Package active', () => pm.expect(s.status).to.eql('ACTIVE'));",
+              "  pm.test('Split totals 100%', () => pm.expect(Number(s.userSharePercent) + Number(s.adminSharePercent)).to.eql(100));",
+              "  pm.test('Initial high-water valid', () => pm.expect(Number(s.grossHighWaterMark)).to.be.at.least(0));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Admin - Reconcile lifecycle state",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/reconcile-state",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Admin - Reconcile due financial trades",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/reconcile-trades",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('createdEvents is valid', () => pm.expect(Number(b.createdEvents)).to.be.at.least(0));",
+              "pm.test('createdSettlements is valid', () => pm.expect(Number(b.createdSettlements)).to.be.at.least(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Admin - Immutable trade history + principal formula",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/events?page=1&limit=100",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const rows = b.events || [];",
+              "pm.collectionVariables.set('eventCountAfterFirst', String(b.total || rows.length));",
+              "pm.test('At least one due trade exists', () => pm.expect(rows.length).to.be.above(0));",
+              "const keys = rows.map(x => `${x.localTradeDate}:${x.slotNumber}`);",
+              "pm.test('No duplicate date/slot events', () => pm.expect(new Set(keys).size).to.eql(keys.length));",
+              "const principal = Number(pm.collectionVariables.get('principalAmount'));",
+              "for (const e of rows) {",
+              "  if (e.eventType === 'NORMAL') {",
+              "    const expected = Number((principal * Number(e.resultPercent) / 100).toFixed(8));",
+              "    pm.expect(Number(e.grossResultAmount)).to.be.closeTo(expected, 0.00000002);",
+              "  }",
+              "  pm.expect(Number(e.userShareAmount) + Number(e.adminShareAmount)).to.be.closeTo(Number(e.grossSettlementAmount), 0.00000002);",
+              "}",
+              "const posted = rows.find(x => x.ledgerTransactionId);",
+              "pm.test('At least one high-water financial settlement exists', () => pm.expect(posted, 'No WIN has crossed the high-water yet').to.exist);",
+              "if (posted) pm.collectionVariables.set('ledgerTransactionId', posted.ledgerTransactionId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Admin - Settlement ledger is balanced 3-leg accounting",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/ledger/{{ledgerTransactionId}}",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Ledger transaction exists', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Ledger reports balanced', () => pm.expect(b.balanced).to.eql(true));",
+              "pm.test('Correct ledger kind', () => pm.expect(b.transaction.kind).to.eql('INTERNAL_TRADING_SETTLEMENT'));",
+              "const entries = b.entries || [];",
+              "const debits = entries.filter(x => x.side === 'DEBIT').reduce((a,x) => a + Number(x.amount), 0);",
+              "const credits = entries.filter(x => x.side === 'CREDIT').reduce((a,x) => a + Number(x.amount), 0);",
+              "pm.test('Debit equals credit', () => pm.expect(debits).to.be.closeTo(credits, 0.00000002));",
+              "const buckets = entries.map(x => x.bucket);",
+              "pm.test('Return expense debit exists', () => pm.expect(buckets).to.include('INTERNAL_TRADING_RETURN_EXPENSE'));",
+              "pm.test('USER package earning credit exists', () => pm.expect(buckets).to.include('PACKAGE_EARNINGS'));",
+              "pm.test('Admin profit credit exists', () => pm.expect(buckets).to.include('INTERNAL_TRADING_ADMIN_PROFIT'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Admin - Reconcile same due trades again (idempotency)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/reconcile-trades",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('No duplicate events', () => pm.expect(Number(b.createdEvents)).to.eql(0));",
+              "pm.test('No duplicate settlements', () => pm.expect(Number(b.createdSettlements)).to.eql(0));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Admin - Event count unchanged after idempotent replay",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/events?page=1&limit=100",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{adminAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const before = Number(pm.collectionVariables.get('eventCountAfterFirst'));",
+              "pm.test('Immutable event count unchanged', () => pm.expect(Number(b.total)).to.eql(before));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 USER - Own trading packages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/internal-trading/me/packages",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{userAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "const id = pm.collectionVariables.get('subscriptionId');",
+              "const s = (b.packages || []).find(x => x.subscriptionId === id);",
+              "pm.test('USER owns activated package', () => pm.expect(s, 'Use USER token for the deposit owner').to.exist);",
+              "if (s) {",
+              "  pm.test('USER credited earnings visible', () => pm.expect(s.userCreditedAmount).to.exist);",
+              "  pm.test('Admin recognized amount hidden', () => pm.expect(s).to.not.have.property('adminRecognizedAmount'));",
+              "  pm.test('Admin split hidden', () => pm.expect(s).to.not.have.property('adminSharePercent'));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 USER - Own trade history + privacy",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{subscriptionId}}/events?page=1&limit=100",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{userAccessToken}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('USER event history exists', () => pm.expect((b.events || []).length).to.be.above(0));",
+              "for (const e of (b.events || [])) {",
+              "  pm.expect(e).to.not.have.property('adminShareAmount');",
+              "  pm.expect(e).to.not.have.property('ledgerTransactionId');",
+              "  pm.expect(e).to.not.have.property('generatedByUserId');",
+              "  pm.expect(e).to.not.have.property('sourceKey');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Negative - USER API without authentication",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/internal-trading/me/packages"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Negative - Admin reconcile without authentication",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{baseUrl}}/admin/internal-trading/subscriptions/{{subscriptionId}}/reconcile-trades"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

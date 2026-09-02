@@ -121,7 +121,9 @@ export default function RewardsClient() {
     if (!selectedPolicy || !draft || selectedPolicy.status !== "DRAFT") {
       return false;
     }
-    return JSON.stringify(draft) !== JSON.stringify(policyDraft(selectedPolicy));
+    return (
+      JSON.stringify(draft) !== JSON.stringify(policyDraft(selectedPolicy))
+    );
   }, [draft, selectedPolicy]);
 
   const load = useCallback(async () => {
@@ -137,20 +139,15 @@ export default function RewardsClient() {
       ]);
 
     const policyBody = (await policyRes.json().catch(() => ({}))) as
-      | PolicyListResponse
-      | ApiError;
+      PolicyListResponse | ApiError;
     const statesBody = (await statesRes.json().catch(() => ({}))) as
-      | StateListResponse
-      | ApiError;
+      StateListResponse | ApiError;
     const eventsBody = (await eventsRes.json().catch(() => ({}))) as
-      | RewardListResponse
-      | ApiError;
+      RewardListResponse | ApiError;
     const queueBody = (await queueRes.json().catch(() => ({}))) as
-      | ReconciliationResponse
-      | ApiError;
+      ReconciliationResponse | ApiError;
     const healthBody = (await healthRes.json().catch(() => ({}))) as
-      | RewardWorkerHealth
-      | ApiError;
+      RewardWorkerHealth | ApiError;
 
     if (!policyRes.ok) {
       throw new Error(
@@ -169,7 +166,10 @@ export default function RewardsClient() {
     }
     if (!queueRes.ok && queueRes.status !== 403) {
       throw new Error(
-        apiMessage(queueBody as ApiError, "Unable to load reconciliation queue."),
+        apiMessage(
+          queueBody as ApiError,
+          "Unable to load reconciliation queue.",
+        ),
       );
     }
     if (!healthRes.ok) {
@@ -191,7 +191,7 @@ export default function RewardsClient() {
     setEvents((eventsBody as RewardListResponse).rewards ?? []);
     setReconciliation(
       queueRes.ok
-        ? (queueBody as ReconciliationResponse).subscriptions ?? []
+        ? ((queueBody as ReconciliationResponse).subscriptions ?? [])
         : [],
     );
     setWorkerHealth(healthBody as RewardWorkerHealth);
@@ -263,16 +263,19 @@ export default function RewardsClient() {
         },
       );
       const body = (await response.json().catch(() => ({}))) as
-        | RewardPolicy
-        | ApiError;
+        RewardPolicy | ApiError;
       if (!response.ok) {
         throw new Error(apiMessage(body as ApiError, "Unable to save policy."));
       }
       selectedPolicyIdRef.current = (body as RewardPolicy).id;
-      setSuccess(`Reward policy V${(body as RewardPolicy).versionNumber} saved.`);
+      setSuccess(
+        `Reward policy V${(body as RewardPolicy).versionNumber} saved.`,
+      );
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save policy.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to save policy.",
+      );
     } finally {
       setBusy(null);
     }
@@ -300,15 +303,16 @@ export default function RewardsClient() {
         },
       );
       const body = (await response.json().catch(() => ({}))) as
-        | RewardPolicy
-        | ApiError;
+        RewardPolicy | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(body as ApiError, "Unable to publish reward policy."),
         );
       }
       selectedPolicyIdRef.current = (body as RewardPolicy).id;
-      setSuccess(`Reward policy V${(body as RewardPolicy).versionNumber} published.`);
+      setSuccess(
+        `Reward policy V${(body as RewardPolicy).versionNumber} published.`,
+      );
       await load();
     } catch (caught) {
       setError(
@@ -335,15 +339,16 @@ export default function RewardsClient() {
         }),
       });
       const body = (await response.json().catch(() => ({}))) as
-        | RewardPolicy
-        | ApiError;
+        RewardPolicy | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(body as ApiError, "Unable to create reward policy draft."),
         );
       }
       selectedPolicyIdRef.current = (body as RewardPolicy).id;
-      setSuccess(`Reward policy V${(body as RewardPolicy).versionNumber} draft created.`);
+      setSuccess(
+        `Reward policy V${(body as RewardPolicy).versionNumber} draft created.`,
+      );
       await load();
     } catch (caught) {
       setError(
@@ -365,8 +370,7 @@ export default function RewardsClient() {
         method: "POST",
       });
       const body = (await response.json().catch(() => ({}))) as
-        | ProcessDueResponse
-        | ApiError;
+        ProcessDueResponse | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(body as ApiError, "Unable to process due rewards."),
@@ -398,8 +402,7 @@ export default function RewardsClient() {
         { method: "POST" },
       );
       const body = (await response.json().catch(() => ({}))) as
-        | ProcessSubscriptionResponse
-        | ApiError;
+        ProcessSubscriptionResponse | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(body as ApiError, "Unable to reconcile package rewards."),
@@ -454,13 +457,23 @@ export default function RewardsClient() {
           <h2>Rewards, Caps & Lifecycle</h2>
           <p>
             Daily package rewards are sourced only from ACTIVE subscription
-            snapshots and settle through balanced Package Earnings ledger entries.
+            snapshots and settle through balanced Package Earnings ledger
+            entries.
           </p>
         </div>
         <div className={styles.heroStats}>
-          <article><small>STATES</small><strong>{states.length}</strong></article>
-          <article><small>EVENTS</small><strong>{events.length}</strong></article>
-          <article><small>QUEUE</small><strong>{reconciliation.length}</strong></article>
+          <article>
+            <small>STATES</small>
+            <strong>{states.length}</strong>
+          </article>
+          <article>
+            <small>EVENTS</small>
+            <strong>{events.length}</strong>
+          </article>
+          <article>
+            <small>QUEUE</small>
+            <strong>{reconciliation.length}</strong>
+          </article>
         </div>
       </section>
 
@@ -474,7 +487,9 @@ export default function RewardsClient() {
             <button
               type="button"
               key={policy.id}
-              className={policy.id === selectedPolicy?.id ? styles.versionActive : ""}
+              className={
+                policy.id === selectedPolicy?.id ? styles.versionActive : ""
+              }
               onClick={() => selectPolicy(policy.id)}
             >
               <strong>V{policy.versionNumber}</strong>
@@ -503,7 +518,10 @@ export default function RewardsClient() {
                   {selectedPolicy.status === "PUBLISHED" && isSuperAdmin ? (
                     <button
                       type="button"
-                      disabled={Boolean(busy) || policies.some((item) => item.status === "DRAFT")}
+                      disabled={
+                        Boolean(busy) ||
+                        policies.some((item) => item.status === "DRAFT")
+                      }
                       onClick={() => void cloneDraft(selectedPolicy)}
                     >
                       Clone draft
@@ -516,7 +534,11 @@ export default function RewardsClient() {
                         disabled={Boolean(busy) || !dirty}
                         onClick={() => void saveDraft()}
                       >
-                        {busy === "save" ? "Saving…" : dirty ? "Save policy · UNSAVED" : "Policy saved"}
+                        {busy === "save"
+                          ? "Saving…"
+                          : dirty
+                            ? "Save policy · UNSAVED"
+                            : "Policy saved"}
                       </button>
                       <button
                         type="button"
@@ -524,7 +546,11 @@ export default function RewardsClient() {
                         disabled={Boolean(busy) || dirty}
                         onClick={() => void publishPolicy()}
                       >
-                        {dirty ? "Save changes before publishing" : busy === "publish" ? "Publishing…" : "Publish policy"}
+                        {dirty
+                          ? "Save changes before publishing"
+                          : busy === "publish"
+                            ? "Publishing…"
+                            : "Publish policy"}
                       </button>
                     </>
                   ) : null}
@@ -536,11 +562,23 @@ export default function RewardsClient() {
                   <span>Existing subscriptions</span>
                   <select
                     value={draft.existingSubscriptionRolloutMode}
-                    disabled={selectedPolicy.status !== "DRAFT" || !isSuperAdmin}
-                    onChange={(event) => setDraft({ ...draft, existingSubscriptionRolloutMode: event.target.value as ExistingSubscriptionRolloutMode })}
+                    disabled={
+                      selectedPolicy.status !== "DRAFT" || !isSuperAdmin
+                    }
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        existingSubscriptionRolloutMode: event.target
+                          .value as ExistingSubscriptionRolloutMode,
+                      })
+                    }
                   >
-                    <option value="FORWARD_ONLY_FROM_POLICY_EFFECTIVE">Forward only from policy effective</option>
-                    <option value="RETROACTIVE_FROM_SUBSCRIPTION_SCHEDULE">Retroactive · engine deferred</option>
+                    <option value="FORWARD_ONLY_FROM_POLICY_EFFECTIVE">
+                      Forward only from policy effective
+                    </option>
+                    <option value="RETROACTIVE_FROM_SUBSCRIPTION_SCHEDULE">
+                      Retroactive · engine deferred
+                    </option>
                   </select>
                 </label>
                 {[
@@ -555,8 +593,12 @@ export default function RewardsClient() {
                     <input
                       type="checkbox"
                       checked={Boolean(draft[key as keyof DraftState])}
-                      disabled={selectedPolicy.status !== "DRAFT" || !isSuperAdmin}
-                      onChange={(event) => setDraft({ ...draft, [key]: event.target.checked })}
+                      disabled={
+                        selectedPolicy.status !== "DRAFT" || !isSuperAdmin
+                      }
+                      onChange={(event) =>
+                        setDraft({ ...draft, [key]: event.target.checked })
+                      }
                     />
                   </label>
                 ))}
@@ -564,9 +606,10 @@ export default function RewardsClient() {
 
               <div className={styles.safeRule}>
                 <i className="iconoir-shield-check" />
-                Initial executable policy is Forward Only + Package Reward counts
-                toward cap. Retroactive catch-up and other cap-contribution mixes
-                fail closed until their dedicated engines are accepted.
+                Initial executable policy is Forward Only + Package Reward
+                counts toward cap. Retroactive catch-up and other
+                cap-contribution mixes fail closed until their dedicated engines
+                are accepted.
               </div>
             </>
           )}
@@ -576,21 +619,41 @@ export default function RewardsClient() {
       <section className={styles.healthGrid}>
         <article className={styles.card}>
           <div className={styles.cardHead}>
-            <div><span>AUTOMATIC WORKER</span><h3>Scheduler health</h3></div>
+            <div>
+              <span>AUTOMATIC WORKER</span>
+              <h3>Scheduler health</h3>
+            </div>
             <b>{workerHealth?.lastError ? "ATTENTION" : "READY"}</b>
           </div>
           <dl className={styles.healthList}>
-            <div><dt>Last started</dt><dd>{dateLabel(workerHealth?.lastStartedAt ?? null)}</dd></div>
-            <div><dt>Last completed</dt><dd>{dateLabel(workerHealth?.lastCompletedAt ?? null)}</dd></div>
-            <div><dt>Last events</dt><dd>{workerHealth?.lastSummary?.createdEvents ?? 0}</dd></div>
-            <div><dt>Remaining due</dt><dd>{workerHealth?.lastSummary?.remainingDue ?? 0}</dd></div>
+            <div>
+              <dt>Last started</dt>
+              <dd>{dateLabel(workerHealth?.lastStartedAt ?? null)}</dd>
+            </div>
+            <div>
+              <dt>Last completed</dt>
+              <dd>{dateLabel(workerHealth?.lastCompletedAt ?? null)}</dd>
+            </div>
+            <div>
+              <dt>Last events</dt>
+              <dd>{workerHealth?.lastSummary?.createdEvents ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Remaining due</dt>
+              <dd>{workerHealth?.lastSummary?.remainingDue ?? 0}</dd>
+            </div>
           </dl>
-          {workerHealth?.lastError ? <p className={styles.workerError}>{workerHealth.lastError}</p> : null}
+          {workerHealth?.lastError ? (
+            <p className={styles.workerError}>{workerHealth.lastError}</p>
+          ) : null}
         </article>
 
         <article className={styles.card}>
           <div className={styles.cardHead}>
-            <div><span>AUTHORIZED RECOVERY</span><h3>Process due rewards</h3></div>
+            <div>
+              <span>AUTHORIZED RECOVERY</span>
+              <h3>Process due rewards</h3>
+            </div>
           </div>
           <p className={styles.cardCopy}>
             Uses the exact same idempotent calculation service as the automatic
@@ -609,23 +672,67 @@ export default function RewardsClient() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <div><span>RECONCILIATION</span><h3>Due / blocked subscriptions</h3></div>
+          <div>
+            <span>RECONCILIATION</span>
+            <h3>Due / blocked subscriptions</h3>
+          </div>
           <b>{reconciliation.length} loaded</b>
         </div>
         {reconciliation.length === 0 ? (
-          <div className={styles.empty}>No due or blocked reward subscriptions.</div>
+          <div className={styles.empty}>
+            No due or blocked reward subscriptions.
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table>
-              <thead><tr><th>USER</th><th>Package</th><th>State</th><th>Next due</th><th>Action</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>USER</th>
+                  <th>Package</th>
+                  <th>State</th>
+                  <th>Next due</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
               <tbody>
                 {reconciliation.map((item) => (
                   <tr key={item.subscriptionId}>
-                    <td><strong>@{item.username}</strong><small>{item.email ?? "—"}</small></td>
-                    <td>{item.packageDisplayName}<small>{amountLabel(item.packageValue, item.currency)}</small></td>
-                    <td><span className={item.stateStatus === "BLOCKED" ? styles.badBadge : styles.neutralBadge}>{enumLabel(item.stateStatus)}</span>{item.blockedReason ? <small>{item.blockedReason}</small> : null}</td>
+                    <td>
+                      <strong>@{item.username}</strong>
+                      <small>{item.email ?? "—"}</small>
+                    </td>
+                    <td>
+                      {item.packageDisplayName}
+                      <small>
+                        {amountLabel(item.packageValue, item.currency)}
+                      </small>
+                    </td>
+                    <td>
+                      <span
+                        className={
+                          item.stateStatus === "BLOCKED"
+                            ? styles.badBadge
+                            : styles.neutralBadge
+                        }
+                      >
+                        {enumLabel(item.stateStatus)}
+                      </span>
+                      {item.blockedReason ? (
+                        <small>{item.blockedReason}</small>
+                      ) : null}
+                    </td>
                     <td>{dateLabel(item.nextRewardAt)}</td>
-                    <td><button type="button" disabled={!canReconcile || Boolean(busy)} onClick={() => void reconcile(item.subscriptionId)}>{busy === `reconcile:${item.subscriptionId}` ? "Processing…" : "Reconcile"}</button></td>
+                    <td>
+                      <button
+                        type="button"
+                        disabled={!canReconcile || Boolean(busy)}
+                        onClick={() => void reconcile(item.subscriptionId)}
+                      >
+                        {busy === `reconcile:${item.subscriptionId}`
+                          ? "Processing…"
+                          : "Reconcile"}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -636,7 +743,10 @@ export default function RewardsClient() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <div><span>CAP + LIFECYCLE</span><h3>Package reward states</h3></div>
+          <div>
+            <span>CAP + LIFECYCLE</span>
+            <h3>Package reward states</h3>
+          </div>
           <b>{states.length} loaded</b>
         </div>
         {states.length === 0 ? (
@@ -644,16 +754,52 @@ export default function RewardsClient() {
         ) : (
           <div className={styles.tableWrap}>
             <table>
-              <thead><tr><th>USER</th><th>Package</th><th>Cap</th><th>Progress</th><th>Next reward</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>USER</th>
+                  <th>Package</th>
+                  <th>Cap</th>
+                  <th>Progress</th>
+                  <th>Next reward</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
                 {states.map((state) => (
                   <tr key={state.subscriptionId}>
-                    <td><strong>@{state.username ?? state.userId}</strong><small>{state.email ?? "—"}</small></td>
-                    <td>{state.packageDisplayName ?? "Package"}<small>{amountLabel(state.packageValue, state.currency)}</small></td>
-                    <td>{amountLabel(state.capConsumed, state.currency)} / {amountLabel(state.capLimit, state.currency)}</td>
-                    <td>Day {state.nextRewardDayNumber} · Cycle {state.nextCycleNumber}/{state.nextCycleDay}<small>{state.settledRewardCount} settled</small></td>
+                    <td>
+                      <strong>@{state.username ?? state.userId}</strong>
+                      <small>{state.email ?? "—"}</small>
+                    </td>
+                    <td>
+                      {state.packageDisplayName ?? "Package"}
+                      <small>
+                        {amountLabel(state.packageValue, state.currency)}
+                      </small>
+                    </td>
+                    <td>
+                      {amountLabel(state.capConsumed, state.currency)} /{" "}
+                      {amountLabel(state.capLimit, state.currency)}
+                    </td>
+                    <td>
+                      Day {state.nextRewardDayNumber} · Cycle{" "}
+                      {state.nextCycleNumber}/{state.nextCycleDay}
+                      <small>{state.settledRewardCount} settled</small>
+                    </td>
                     <td>{dateLabel(state.nextRewardAt)}</td>
-                    <td><span className={state.status === "ACTIVE" ? styles.goodBadge : state.status === "BLOCKED" ? styles.badBadge : styles.neutralBadge}>{state.status}</span></td>
+                    <td>
+                      <span
+                        className={
+                          state.status === "ACTIVE"
+                            ? styles.goodBadge
+                            : state.status === "BLOCKED"
+                              ? styles.badBadge
+                              : styles.neutralBadge
+                        }
+                      >
+                        {state.status}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -664,25 +810,65 @@ export default function RewardsClient() {
 
       <section className={styles.card}>
         <div className={styles.cardHead}>
-          <div><span>IMMUTABLE LEDGER HISTORY</span><h3>Package reward events</h3></div>
+          <div>
+            <span>IMMUTABLE LEDGER HISTORY</span>
+            <h3>Package reward events</h3>
+          </div>
           <b>{events.length} loaded</b>
         </div>
         {events.length === 0 ? (
-          <div className={styles.empty}>No package reward events have settled yet.</div>
+          <div className={styles.empty}>
+            No package reward events have settled yet.
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table>
-              <thead><tr><th>USER</th><th>Package / date</th><th>Rate</th><th>Calculated</th><th>Posted</th><th>Cap after</th><th>Lifecycle</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>USER</th>
+                  <th>Package / date</th>
+                  <th>Rate</th>
+                  <th>Calculated</th>
+                  <th>Posted</th>
+                  <th>Cap after</th>
+                  <th>Lifecycle</th>
+                </tr>
+              </thead>
               <tbody>
                 {events.map((event) => (
                   <tr key={event.id}>
-                    <td><strong>@{event.username ?? event.userId}</strong><small>{event.email ?? "—"}</small></td>
-                    <td>{event.packageDisplayName}<small>{event.rewardLocalDate} · day {event.rewardDayNumber}</small></td>
-                    <td>{event.selectedRate}%<small>{enumLabel(event.rewardRateMode)}</small></td>
-                    <td>{amountLabel(event.calculatedReward, event.currency)}</td>
-                    <td>{amountLabel(event.postedReward, event.currency)}{event.clippedToCap ? <small>Clipped to cap</small> : null}</td>
-                    <td>{amountLabel(event.capConsumedAfter, event.currency)} / {amountLabel(event.capLimit, event.currency)}</td>
-                    <td>{event.completionReason ? enumLabel(event.completionReason) : `Cycle ${event.cycleNumber} / day ${event.cycleDay}`}</td>
+                    <td>
+                      <strong>@{event.username ?? event.userId}</strong>
+                      <small>{event.email ?? "—"}</small>
+                    </td>
+                    <td>
+                      {event.packageDisplayName}
+                      <small>
+                        {event.rewardLocalDate} · day {event.rewardDayNumber}
+                      </small>
+                    </td>
+                    <td>
+                      {event.selectedRate}%
+                      <small>{enumLabel(event.rewardRateMode)}</small>
+                    </td>
+                    <td>
+                      {amountLabel(event.calculatedReward, event.currency)}
+                    </td>
+                    <td>
+                      {amountLabel(event.postedReward, event.currency)}
+                      {event.clippedToCap ? (
+                        <small>Clipped to cap</small>
+                      ) : null}
+                    </td>
+                    <td>
+                      {amountLabel(event.capConsumedAfter, event.currency)} /{" "}
+                      {amountLabel(event.capLimit, event.currency)}
+                    </td>
+                    <td>
+                      {event.completionReason
+                        ? enumLabel(event.completionReason)
+                        : `Cycle ${event.cycleNumber} / day ${event.cycleDay}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

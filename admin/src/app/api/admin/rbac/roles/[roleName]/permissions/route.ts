@@ -11,8 +11,7 @@ export async function PUT(
     }>;
   },
 ) {
-  const { roleName } =
-    await params;
+  const { roleName } = await params;
 
   return proxyAdminRequest(
     request,
@@ -20,8 +19,7 @@ export async function PUT(
     {
       method: "PUT",
       headers: {
-        "Content-Type":
-          "application/json",
+        "Content-Type": "application/json",
       },
       body: await request.text(),
     },

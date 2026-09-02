@@ -111,8 +111,7 @@ export default function OperationsConfigurationClient() {
           cache: "no-store",
         });
         const payload = (await response.json().catch(() => ({}))) as
-          | OperationsConfiguration
-          | ApiError;
+          OperationsConfiguration | ApiError;
 
         if (response.status === 401) {
           router.replace("/login");
@@ -176,8 +175,7 @@ export default function OperationsConfigurationClient() {
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as
-        | OperationsConfiguration
-        | ApiError;
+        OperationsConfiguration | ApiError;
 
       if (response.status === 401) {
         router.replace("/login");

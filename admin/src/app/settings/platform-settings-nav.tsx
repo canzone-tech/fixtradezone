@@ -2,11 +2,7 @@ import Link from "next/link";
 import styles from "./platform-configuration.module.css";
 
 type PlatformSettingsSection =
-  | "authentication"
-  | "registration"
-  | "security"
-  | "operations"
-  | "accounting";
+  "authentication" | "registration" | "security" | "operations" | "accounting";
 
 interface PlatformSettingsNavProps {
   active: PlatformSettingsSection;

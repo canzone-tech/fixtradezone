@@ -66,20 +66,26 @@ export default function UserTopbar({
               title: "My Referrals",
               subtitle: "Referral identity and direct network",
             }
-          : pathname.startsWith("/user/simulated-activity")
+          : pathname.startsWith("/user/trading")
             ? {
-                title: "Simulated Trade Activity",
-                subtitle: "SIMULATED RESULTS — NOT REAL TRADING",
+                title: "Trading",
+                subtitle:
+                  "Package trading progress, earnings and trade history",
               }
-            : pathname === "/user/profile"
+            : pathname.startsWith("/user/simulated-activity")
               ? {
-                  title: "My Profile",
-                  subtitle: "Account identity, security and session",
+                  title: "Simulated Trade Activity",
+                  subtitle: "SIMULATED RESULTS",
                 }
-              : {
-                  title: "User Dashboard",
-                  subtitle: "Overview of your FixTradeZone account",
-                };
+              : pathname === "/user/profile"
+                ? {
+                    title: "My Profile",
+                    subtitle: "Account identity, security and session",
+                  }
+                : {
+                    title: "User Dashboard",
+                    subtitle: "Overview of your FixTradeZone account",
+                  };
 
   async function logout() {
     if (loggingOut) return;

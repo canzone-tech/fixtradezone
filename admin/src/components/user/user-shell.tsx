@@ -38,8 +38,7 @@ export default function UserShell({
     };
   }, []);
 
-  const impersonated =
-    session !== null && isImpersonationSession(session);
+  const impersonated = session !== null && isImpersonationSession(session);
 
   const lockScope = session
     ? impersonated

@@ -39,6 +39,12 @@ const routeHeadings: Array<{
     subtitle: "Daily package settlement, cap progress and lifecycle controls",
   },
   {
+    path: "/internal-trading",
+    title: "Internal Trading",
+    subtitle:
+      "Automatic package trading, financial settlement and recovery controls",
+  },
+  {
     path: "/simulated-trades",
     title: "Simulated Trade Activity",
     subtitle: "Display-only simulated results — never real trading",

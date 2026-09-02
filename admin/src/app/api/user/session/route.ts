@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  clearImpersonationCookies,
+  IMPERSONATION_TOKEN_COOKIE,
+} from "@/lib/admin-impersonation";
+import {
   ACCESS_COOKIE,
   type AdminUser,
   type AuthResponse,
@@ -136,8 +140,45 @@ export async function GET(request: NextRequest) {
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+  const impersonationToken = request.cookies.get(
+    IMPERSONATION_TOKEN_COOKIE,
+  )?.value;
 
   try {
+    if (impersonationToken) {
+      const impersonationResponse = await backendFetch(
+        "/user/impersonation/session",
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${impersonationToken}`,
+          },
+        },
+      );
+
+      const impersonationPayload = await readJson(impersonationResponse);
+
+      const response = NextResponse.json(
+        impersonationPayload ?? {
+          message: impersonationResponse.ok
+            ? "Impersonation session validated."
+            : "Unable to validate impersonation session.",
+        },
+        {
+          status: impersonationResponse.status,
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+
+      if (impersonationResponse.status === 401) {
+        clearImpersonationCookies(response);
+      }
+
+      return response;
+    }
+
     if (accessToken) {
       const profileResponse = await backendFetch("/auth/me", {
         method: "GET",

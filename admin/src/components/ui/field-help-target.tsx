@@ -26,7 +26,9 @@ export default function FieldHelpTarget({
       if (!control) return false;
 
       const form = control.closest("form") ?? document;
-      const labels = Array.from(form.querySelectorAll<HTMLLabelElement>("label[for]"));
+      const labels = Array.from(
+        form.querySelectorAll<HTMLLabelElement>("label[for]"),
+      );
       const targetLabel = labels.find(
         (candidate) => candidate.htmlFor === targetId,
       );
@@ -63,8 +65,5 @@ export default function FieldHelpTarget({
 
   if (!mount) return null;
 
-  return createPortal(
-    <FieldHelp content={content} label={label} />,
-    mount,
-  );
+  return createPortal(<FieldHelp content={content} label={label} />, mount);
 }

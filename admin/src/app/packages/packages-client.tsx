@@ -958,9 +958,10 @@ export default function PackagesClient() {
                         <p>
                           New package activations snapshot the single Platform
                           Operations timezone. Existing subscription snapshots
-                          remain immutable. Legacy plan value {plan.settlementTimezone}
-                          is retained only for backward-compatible history and is
-                          not an Admin control.
+                          remain immutable. Legacy plan value{" "}
+                          {plan.settlementTimezone}
+                          is retained only for backward-compatible history and
+                          is not an Admin control.
                         </p>
                       </div>
                     </div>

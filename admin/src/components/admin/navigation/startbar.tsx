@@ -103,6 +103,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/internal-trading",
+        label: "Internal Trading",
+        icon: "iconoir-graph-up",
+        permission: "internal_trading.read",
+        enabled: true,
+      },
+      {
         href: "/simulated-trades",
         label: "Simulated Trade Activity",
         icon: "iconoir-graph-up",

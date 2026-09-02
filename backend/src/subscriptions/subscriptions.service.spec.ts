@@ -10,6 +10,7 @@ const PLAN_ITEM_ID = '88888888-8888-4888-8888-888888888888';
 const DEFINITION_ID = '99999999-9999-4999-8999-999999999999';
 const ACCOUNTING_TRANSACTION_ID = '55555555-5555-4555-8555-555555555555';
 const FUNDING_TRANSACTION_ID = '66666666-6666-4666-8666-666666666666';
+const INTERNAL_TRADE_POLICY_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 
 // Keep the audit assertion explicitly typed so strict lint guards the money path.
 interface AuditCreateCall {
@@ -62,6 +63,10 @@ const existingSubscription = {
   renewalMode: 'MANUAL_AFTER_TERMINAL',
   upgradesEnabled: false,
   settlementTimezone: 'UTC',
+  earningAuthority: 'LEGACY_REWARD' as const,
+  internalTradeSplitPolicyVersionId: null,
+  internalTradeUserSharePercent: null,
+  internalTradeAdminSharePercent: null,
   rewardRateMode: 'RANDOM_RANGE',
   fixedRewardRate: null,
   minimumRewardRate: new Prisma.Decimal('0.004'),
@@ -89,6 +94,10 @@ const existingSubscription = {
 const createdSubscription = {
   ...existingSubscription,
   settlementTimezone: 'Asia/Kolkata',
+  earningAuthority: 'INTERNAL_TRADING' as const,
+  internalTradeSplitPolicyVersionId: INTERNAL_TRADE_POLICY_ID,
+  internalTradeUserSharePercent: new Prisma.Decimal('70'),
+  internalTradeAdminSharePercent: new Prisma.Decimal('30'),
 };
 
 const approvedDeposit = {
@@ -175,6 +184,10 @@ describe('SubscriptionsService', () => {
         sourceDepositId: DEPOSIT_ID,
         price: '5.00000000',
         settlementTimezone: 'UTC',
+        earningAuthority: 'LEGACY_REWARD',
+        internalTradeSplitPolicyVersionId: null,
+        internalTradeUserSharePercent: null,
+        internalTradeAdminSharePercent: null,
       },
     });
     expect(transaction.deposit.findUnique).not.toHaveBeenCalled();
@@ -283,6 +296,13 @@ describe('SubscriptionsService', () => {
         { side: 'DEBIT', amount: new Prisma.Decimal('5') },
         { side: 'CREDIT', amount: new Prisma.Decimal('5') },
       ])
+      .mockResolvedValueOnce([
+        {
+          id: INTERNAL_TRADE_POLICY_ID,
+          userSharePercent: new Prisma.Decimal('70'),
+          adminSharePercent: new Prisma.Decimal('30'),
+        },
+      ])
       .mockResolvedValueOnce([createdSubscription]);
     transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
     transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
@@ -308,6 +328,10 @@ describe('SubscriptionsService', () => {
         price: '5.00000000',
         currency: 'USDT',
         settlementTimezone: 'Asia/Kolkata',
+        earningAuthority: 'INTERNAL_TRADING',
+        internalTradeSplitPolicyVersionId: INTERNAL_TRADE_POLICY_ID,
+        internalTradeUserSharePercent: '70.000000',
+        internalTradeAdminSharePercent: '30.000000',
         status: 'ACTIVE',
       },
     });

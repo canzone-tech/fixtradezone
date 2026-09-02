@@ -27,12 +27,18 @@ export class SubscriptionActivationOrchestratorService {
       context,
     );
 
+    const earningLifecycle =
+      downstream.internalTradingLifecycle?.earningAuthority ===
+      'INTERNAL_TRADING'
+        ? 'internal trading lifecycle initialization'
+        : 'reward lifecycle initialization';
+
     return {
       ...activation,
       ...downstream,
       message: downstream.downstreamPending
         ? 'Package activation completed. One or more downstream earnings stages remain safely recoverable.'
-        : 'Package activation, commission processing, and reward lifecycle initialization completed.',
+        : `Package activation, commission processing, and ${earningLifecycle} completed.`,
     };
   }
 }

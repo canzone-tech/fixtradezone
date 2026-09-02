@@ -128,9 +128,10 @@ async function fetchWorkspace(): Promise<{
   const sessionResponse = await fetch("/api/user/session", {
     cache: "no-store",
   });
-  const session = await checkedUserJson<
-    UserDirectSession & ApiMessagePayload
-  >(sessionResponse, "USER session is unavailable.");
+  const session = await checkedUserJson<UserDirectSession & ApiMessagePayload>(
+    sessionResponse,
+    "USER session is unavailable.",
+  );
   if (!session.user || !session.sessionPolicy) {
     throw new Error("USER session is incomplete.");
   }
@@ -213,11 +214,13 @@ export default function UserSimulatedActivityClient() {
   }, [router]);
 
   const loadedWins = useMemo(
-    () => activity?.events.filter((event) => event.outcome === "WIN").length ?? 0,
+    () =>
+      activity?.events.filter((event) => event.outcome === "WIN").length ?? 0,
     [activity],
   );
   const loadedLosses = useMemo(
-    () => activity?.events.filter((event) => event.outcome === "LOSS").length ?? 0,
+    () =>
+      activity?.events.filter((event) => event.outcome === "LOSS").length ?? 0,
     [activity],
   );
   const policy = activity?.effectivePolicy ?? null;
@@ -246,9 +249,7 @@ export default function UserSimulatedActivityClient() {
               never represent broker/exchange execution or withdrawable profit.
             </p>
           </div>
-          <span className={styles.disclosurePill}>
-            SIMULATED RESULTS — NOT REAL TRADING
-          </span>
+          <span className={styles.disclosurePill}>SIMULATED RESULTS</span>
         </section>
 
         {error ? (
@@ -383,7 +384,9 @@ export default function UserSimulatedActivityClient() {
                       <td>
                         <strong>{event.packageDisplayName}</strong>
                         <br />
-                        <span className={styles.muted}>{event.packageCode}</span>
+                        <span className={styles.muted}>
+                          {event.packageCode}
+                        </span>
                       </td>
                       <td>
                         {formatPlatformDateTime(
@@ -425,7 +428,7 @@ export default function UserSimulatedActivityClient() {
         <section className={styles.disclosure}>
           <i className="iconoir-warning-triangle" />
           <div>
-            <strong>SIMULATED RESULTS — NOT REAL TRADING</strong>
+            <strong>SIMULATED RESULTS</strong>
             <p>
               Simulated activity never changes Main Wallet, Package Earnings,
               Referral Commission, Rewards, package caps or any accounting

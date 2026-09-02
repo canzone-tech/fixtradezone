@@ -3,9 +3,7 @@ export type ExistingSubscriptionRolloutMode =
   | "RETROACTIVE_FROM_SUBSCRIPTION_SCHEDULE"
   | "FORWARD_ONLY_FROM_POLICY_EFFECTIVE";
 export type PackageRewardStateStatus = "ACTIVE" | "COMPLETED" | "BLOCKED";
-export type PackageRewardCompletionReason =
-  | "CAP_REACHED"
-  | "LIFETIME_REACHED";
+export type PackageRewardCompletionReason = "CAP_REACHED" | "LIFETIME_REACHED";
 
 export interface RewardPolicy {
   id: string;

@@ -30,9 +30,7 @@ export interface UserImpersonationSession {
   };
 }
 
-export type UserPortalSession =
-  | UserDirectSession
-  | UserImpersonationSession;
+export type UserPortalSession = UserDirectSession | UserImpersonationSession;
 
 export function isImpersonationSession(
   session: UserPortalSession,

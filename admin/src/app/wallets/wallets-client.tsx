@@ -103,9 +103,8 @@ export default function WalletsClient() {
     total: 0,
     deposits: [],
   });
-  const [selectedLedger, setSelectedLedger] = useState<LedgerDetailResponse | null>(
-    null,
-  );
+  const [selectedLedger, setSelectedLedger] =
+    useState<LedgerDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -114,7 +113,9 @@ export default function WalletsClient() {
   const canReadWallets = user !== null && hasPermission(user, "wallets.read");
   const canReadLedger = user !== null && hasPermission(user, "ledger.read");
   const canPostLedger = user !== null && hasPermission(user, "ledger.post");
-  const currencyCount = new Set(wallets.wallets.map((wallet) => wallet.currency)).size;
+  const currencyCount = new Set(
+    wallets.wallets.map((wallet) => wallet.currency),
+  ).size;
 
   function applyWorkspace(workspace: AdminWalletWorkspace) {
     setUser(workspace.user);
@@ -174,10 +175,9 @@ export default function WalletsClient() {
         `/api/admin/deposits/${deposit.id}/post-accounting`,
         { method: "POST" },
       );
-      const payload = await checkedJson<LedgerMutationResponse & ApiMessagePayload>(
-        response,
-        "Could not post approved deposit into accounting.",
-      );
+      const payload = await checkedJson<
+        LedgerMutationResponse & ApiMessagePayload
+      >(response, "Could not post approved deposit into accounting.");
       setNotice(payload.message);
       await reload();
     } catch (caught) {
@@ -195,8 +195,12 @@ export default function WalletsClient() {
     setBusy(`ledger-${transaction.id}`);
     setError(null);
     try {
-      const payload = await checkedJson<LedgerDetailResponse & ApiMessagePayload>(
-        await fetch(`/api/admin/ledger/${transaction.id}`, { cache: "no-store" }),
+      const payload = await checkedJson<
+        LedgerDetailResponse & ApiMessagePayload
+      >(
+        await fetch(`/api/admin/ledger/${transaction.id}`, {
+          cache: "no-store",
+        }),
         "Could not load ledger transaction details.",
       );
       setSelectedLedger(payload);
@@ -222,7 +226,11 @@ export default function WalletsClient() {
         />
       ) : null}
       {error ? (
-        <FlashMessage message={error} type="error" onClose={() => setError(null)} />
+        <FlashMessage
+          message={error}
+          type="error"
+          onClose={() => setError(null)}
+        />
       ) : null}
 
       <section className={styles.hero}>
@@ -230,8 +238,8 @@ export default function WalletsClient() {
         <h1>Wallets & Ledger</h1>
         <p>
           Review USER wallet buckets, reconcile approved deposits into immutable
-          double-entry accounting, and inspect balanced deposit, package funding,
-          referral commission, and package reward ledger entries.
+          double-entry accounting, and inspect balanced deposit, package
+          funding, referral commission, and package reward ledger entries.
         </p>
       </section>
 
@@ -253,9 +261,13 @@ export default function WalletsClient() {
           </div>
 
           {!canPostLedger ? (
-            <div className={styles.notice}>Ledger posting permission is required.</div>
+            <div className={styles.notice}>
+              Ledger posting permission is required.
+            </div>
           ) : reconciliation.deposits.length === 0 ? (
-            <div className={styles.empty}>No approved deposits are waiting for accounting.</div>
+            <div className={styles.empty}>
+              No approved deposits are waiting for accounting.
+            </div>
           ) : (
             <div className={styles.list}>
               {reconciliation.deposits.map((deposit) => (
@@ -266,7 +278,8 @@ export default function WalletsClient() {
                         {deposit.username} · {deposit.packageDisplayName}
                       </strong>
                       <span className={styles.meta}>
-                        {compactDecimal(deposit.amount)} {deposit.currency} · {deposit.assignedNetwork}
+                        {compactDecimal(deposit.amount)} {deposit.currency} ·{" "}
+                        {deposit.assignedNetwork}
                       </span>
                     </div>
                     <span className={styles.badge} data-tone="warning">
@@ -283,7 +296,9 @@ export default function WalletsClient() {
                       onClick={() => void postAccounting(deposit)}
                       disabled={busy !== null}
                     >
-                      {busy === `post-${deposit.id}` ? "Posting…" : "Post accounting"}
+                      {busy === `post-${deposit.id}`
+                        ? "Posting…"
+                        : "Post accounting"}
                     </button>
                   </div>
                 </div>
@@ -318,8 +333,8 @@ export default function WalletsClient() {
             </div>
           </div>
           <div className={styles.notice}>
-            Financial values are never aggregated across currencies. Exact per-currency
-            totals remain in the wallet table and immutable ledger.
+            Financial values are never aggregated across currencies. Exact
+            per-currency totals remain in the wallet table and immutable ledger.
           </div>
         </div>
       </section>
@@ -333,7 +348,9 @@ export default function WalletsClient() {
             </div>
           </div>
           {wallets.wallets.length === 0 ? (
-            <div className={styles.empty}>No USER wallet accounts have been posted yet.</div>
+            <div className={styles.empty}>
+              No USER wallet accounts have been posted yet.
+            </div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -353,12 +370,16 @@ export default function WalletsClient() {
                     <tr key={`${wallet.userId}-${wallet.currency}`}>
                       <td>
                         <strong>{wallet.username}</strong>
-                        <span className={styles.meta}>{wallet.email ?? "—"}</span>
+                        <span className={styles.meta}>
+                          {wallet.email ?? "—"}
+                        </span>
                       </td>
                       <td>{wallet.currency}</td>
                       <td>{compactDecimal(wallet.buckets.main)}</td>
                       <td>{compactDecimal(wallet.buckets.packageEarnings)}</td>
-                      <td>{compactDecimal(wallet.buckets.referralCommission)}</td>
+                      <td>
+                        {compactDecimal(wallet.buckets.referralCommission)}
+                      </td>
                       <td>{compactDecimal(wallet.buckets.rewards)}</td>
                       <td>
                         <strong>{compactDecimal(wallet.totalWallet)}</strong>
@@ -382,7 +403,9 @@ export default function WalletsClient() {
               </div>
             </div>
             {ledger.transactions.length === 0 ? (
-              <div className={styles.empty}>No accounting transactions posted yet.</div>
+              <div className={styles.empty}>
+                No accounting transactions posted yet.
+              </div>
             ) : (
               <div className={styles.list}>
                 {ledger.transactions.map((transaction) => (
@@ -393,7 +416,8 @@ export default function WalletsClient() {
                     onClick={() => void inspectLedger(transaction)}
                     disabled={busy !== null}
                   >
-                    {transaction.kind} · {transaction.currency} · {formatWalletDate(transaction.postedAt)}
+                    {transaction.kind} · {transaction.currency} ·{" "}
+                    {formatWalletDate(transaction.postedAt)}
                   </button>
                 ))}
               </div>
@@ -404,7 +428,9 @@ export default function WalletsClient() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.eyebrow}>Ledger Detail</p>
-                <h2>{selectedLedger ? "Balanced entries" : "Select a transaction"}</h2>
+                <h2>
+                  {selectedLedger ? "Balanced entries" : "Select a transaction"}
+                </h2>
               </div>
               {selectedLedger ? (
                 <span
@@ -418,7 +444,8 @@ export default function WalletsClient() {
 
             {!selectedLedger ? (
               <div className={styles.empty}>
-                Choose a ledger transaction to inspect its debit and credit entries.
+                Choose a ledger transaction to inspect its debit and credit
+                entries.
               </div>
             ) : (
               <div className={styles.list}>

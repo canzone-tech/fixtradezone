@@ -17,6 +17,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
+import { InternalTradingModule } from './internal-trading/internal-trading.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SimulatedActivityModule } from './simulated-activity/simulated-activity
     DepositsModule,
     RewardsModule,
     SimulatedActivityModule,
+    InternalTradingModule,
     DashboardModule,
     HealthModule,
   ],

@@ -45,6 +45,12 @@ interface OperationsConfigRow {
   platformTimezone: string;
 }
 
+interface EffectiveInternalTradePolicyRow {
+  id: string;
+  userSharePercent: DecimalValue;
+  adminSharePercent: DecimalValue;
+}
+
 interface FundingEntryRow {
   side: 'DEBIT' | 'CREDIT';
   amount: DecimalValue;
@@ -99,6 +105,10 @@ interface SubscriptionRow {
   renewalMode: string;
   upgradesEnabled: boolean | number;
   settlementTimezone: string;
+  earningAuthority: 'LEGACY_REWARD' | 'INTERNAL_TRADING';
+  internalTradeSplitPolicyVersionId: string | null;
+  internalTradeUserSharePercent: DecimalValue | null;
+  internalTradeAdminSharePercent: DecimalValue | null;
   rewardRateMode: string;
   fixedRewardRate: DecimalValue | null;
   minimumRewardRate: DecimalValue | null;
@@ -523,6 +533,34 @@ export class SubscriptionsService {
       await this.applyBalance(transaction, principalAccount, 'CREDIT', amount);
 
       const activatedAt = new Date();
+
+      const internalTradePolicyRows = await transaction.$queryRaw<
+        EffectiveInternalTradePolicyRow[]
+      >(
+        Prisma.sql`
+            SELECT
+              id,
+              userSharePercent,
+              adminSharePercent
+            FROM internal_trade_policy_versions
+            WHERE status = 'PUBLISHED'
+              AND enabled = TRUE
+              AND effectiveFrom <= ${activatedAt}
+              AND (
+                effectiveTo IS NULL
+                OR effectiveTo > ${activatedAt}
+              )
+            ORDER BY effectiveFrom DESC, versionNumber DESC
+            LIMIT 1
+            FOR SHARE
+          `,
+      );
+
+      const internalTradePolicy = internalTradePolicyRows[0] ?? null;
+      const earningAuthority = internalTradePolicy
+        ? ('INTERNAL_TRADING' as const)
+        : ('LEGACY_REWARD' as const);
+
       const scheduledEndAt = new Date(
         activatedAt.getTime() + planItem.goalDays * 24 * 60 * 60 * 1000,
       );
@@ -548,6 +586,10 @@ export class SubscriptionsService {
           renewalMode,
           upgradesEnabled,
           settlementTimezone,
+          earningAuthority,
+          internalTradeSplitPolicyVersionId,
+          internalTradeUserSharePercent,
+          internalTradeAdminSharePercent,
           rewardRateMode,
           fixedRewardRate,
           minimumRewardRate,
@@ -588,6 +630,22 @@ export class SubscriptionsService {
           ${planItem.planVersion.renewalMode},
           ${planItem.planVersion.upgradesEnabled},
           ${platformTimezone},
+          ${earningAuthority},
+          ${internalTradePolicy?.id ?? null},
+          ${
+            internalTradePolicy
+              ? new Prisma.Decimal(
+                  internalTradePolicy.userSharePercent,
+                ).toFixed(6)
+              : null
+          },
+          ${
+            internalTradePolicy
+              ? new Prisma.Decimal(
+                  internalTradePolicy.adminSharePercent,
+                ).toFixed(6)
+              : null
+          },
           ${planItem.rewardRateMode},
           ${planItem.fixedRewardRate?.toFixed(6) ?? null},
           ${planItem.minimumRewardRate?.toFixed(6) ?? null},
@@ -631,6 +689,18 @@ export class SubscriptionsService {
             currency,
             settlementTimezone: platformTimezone,
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
+            earningAuthority,
+            internalTradeSplitPolicyVersionId: internalTradePolicy?.id ?? null,
+            internalTradeUserSharePercent: internalTradePolicy
+              ? new Prisma.Decimal(
+                  internalTradePolicy.userSharePercent,
+                ).toFixed(6)
+              : null,
+            internalTradeAdminSharePercent: internalTradePolicy
+              ? new Prisma.Decimal(
+                  internalTradePolicy.adminSharePercent,
+                ).toFixed(6)
+              : null,
             sourceDepositAccountingTransactionId: accountingTransaction.id,
             fundingLedgerTransactionId: fundingTransaction.id,
             debitAccount: mainAccount.accountKey,
@@ -930,6 +1000,16 @@ export class SubscriptionsService {
       renewalMode: row.renewalMode,
       upgradesEnabled: Boolean(row.upgradesEnabled),
       settlementTimezone: row.settlementTimezone,
+      earningAuthority: row.earningAuthority,
+      internalTradeSplitPolicyVersionId: row.internalTradeSplitPolicyVersionId,
+      internalTradeUserSharePercent:
+        row.internalTradeUserSharePercent === null
+          ? null
+          : this.rateString(row.internalTradeUserSharePercent),
+      internalTradeAdminSharePercent:
+        row.internalTradeAdminSharePercent === null
+          ? null
+          : this.rateString(row.internalTradeAdminSharePercent),
       rewardRateMode: row.rewardRateMode,
       fixedRewardRate:
         row.fixedRewardRate === null

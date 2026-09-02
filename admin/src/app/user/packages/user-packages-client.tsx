@@ -219,9 +219,9 @@ export default function UserPackagesClient() {
                 <strong>V{catalogue.plan.versionNumber}</strong>
               </div>
               <div>
-      <small>NEW ACTIVATION TIMEZONE</small>
-      <strong>{timeZone}</strong>
-    </div>
+                <small>NEW ACTIVATION TIMEZONE</small>
+                <strong>{timeZone}</strong>
+              </div>
               <div>
                 <small>ACTIVE PACKAGE MODE</small>
                 <strong>{enumLabel(catalogue.plan.activePackageMode)}</strong>

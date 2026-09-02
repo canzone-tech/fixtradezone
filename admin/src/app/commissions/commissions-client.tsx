@@ -92,19 +92,23 @@ export default function CommissionsClient() {
   );
 
   const dirty = useMemo(() => {
-    if (!selectedPlan || !draft || selectedPlan.status !== "DRAFT") return false;
-    return JSON.stringify(draft) !== JSON.stringify(draftSnapshot(selectedPlan));
+    if (!selectedPlan || !draft || selectedPlan.status !== "DRAFT")
+      return false;
+    return (
+      JSON.stringify(draft) !== JSON.stringify(draftSnapshot(selectedPlan))
+    );
   }, [draft, selectedPlan]);
 
   const load = useCallback(async () => {
     setError(null);
-    const [planResponse, eventResponse, reconciliationResponse] = await Promise.all([
-      fetch("/api/admin/commission-plans", { cache: "no-store" }),
-      fetch("/api/admin/commissions?limit=100", { cache: "no-store" }),
-      fetch("/api/admin/commissions/reconciliation?limit=100", {
-        cache: "no-store",
-      }),
-    ]);
+    const [planResponse, eventResponse, reconciliationResponse] =
+      await Promise.all([
+        fetch("/api/admin/commission-plans", { cache: "no-store" }),
+        fetch("/api/admin/commissions?limit=100", { cache: "no-store" }),
+        fetch("/api/admin/commissions/reconciliation?limit=100", {
+          cache: "no-store",
+        }),
+      ]);
 
     const planPayload = (await planResponse
       .json()
@@ -117,7 +121,9 @@ export default function CommissionsClient() {
       .catch(() => ({}))) as ReconciliationResponse & ApiError;
 
     if (!planResponse.ok) {
-      throw new Error(apiMessage(planPayload, "Unable to load commission plans."));
+      throw new Error(
+        apiMessage(planPayload, "Unable to load commission plans."),
+      );
     }
     if (!eventResponse.ok) {
       throw new Error(
@@ -142,7 +148,9 @@ export default function CommissionsClient() {
     setPlans(nextPlans);
     setEvents(eventPayload.commissions ?? []);
     setPending(
-      reconciliationResponse.ok ? reconciliationPayload.subscriptions ?? [] : [],
+      reconciliationResponse.ok
+        ? (reconciliationPayload.subscriptions ?? [])
+        : [],
     );
     selectedPlanIdRef.current = nextSelected?.id ?? "";
     setSelectedPlanId(nextSelected?.id ?? "");
@@ -229,17 +237,20 @@ export default function CommissionsClient() {
         },
       );
       const payload = (await response.json().catch(() => ({}))) as
-        | CommissionPlan
-        | ApiError;
+        CommissionPlan | ApiError;
       if (!response.ok) {
-        throw new Error(apiMessage(payload as ApiError, "Unable to save draft."));
+        throw new Error(
+          apiMessage(payload as ApiError, "Unable to save draft."),
+        );
       }
       const saved = payload as CommissionPlan;
       selectedPlanIdRef.current = saved.id;
       setSuccess(`Commission plan V${saved.versionNumber} draft updated.`);
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to save draft.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to save draft.",
+      );
     } finally {
       setBusy(null);
     }
@@ -269,8 +280,7 @@ export default function CommissionsClient() {
         },
       );
       const payload = (await response.json().catch(() => ({}))) as
-        | CommissionPlan
-        | ApiError;
+        CommissionPlan | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(payload as ApiError, "Unable to publish plan."),
@@ -303,17 +313,20 @@ export default function CommissionsClient() {
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as
-        | CommissionPlan
-        | ApiError;
+        CommissionPlan | ApiError;
       if (!response.ok) {
-        throw new Error(apiMessage(payload as ApiError, "Unable to clone draft."));
+        throw new Error(
+          apiMessage(payload as ApiError, "Unable to clone draft."),
+        );
       }
       const created = payload as CommissionPlan;
       selectedPlanIdRef.current = created.id;
       setSuccess(`Commission plan V${created.versionNumber} draft created.`);
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to clone draft.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to clone draft.",
+      );
     } finally {
       setBusy(null);
     }
@@ -329,8 +342,7 @@ export default function CommissionsClient() {
         { method: "POST" },
       );
       const payload = (await response.json().catch(() => ({}))) as
-        | ProcessResponse
-        | ApiError;
+        ProcessResponse | ApiError;
       if (!response.ok) {
         throw new Error(
           apiMessage(payload as ApiError, "Unable to reconcile commission."),
@@ -356,7 +368,9 @@ export default function CommissionsClient() {
 
   if (loading) {
     return (
-      <div className={styles.loading}>Loading referral commission workspace…</div>
+      <div className={styles.loading}>
+        Loading referral commission workspace…
+      </div>
     );
   }
 
@@ -680,7 +694,9 @@ export default function CommissionsClient() {
           <b>{pending.length} pending</b>
         </div>
         {pending.length === 0 ? (
-          <div className={styles.empty}>No unprocessed package subscriptions.</div>
+          <div className={styles.empty}>
+            No unprocessed package subscriptions.
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table>
@@ -765,7 +781,9 @@ export default function CommissionsClient() {
                     <td>L{event.level}</td>
                     <td>{amountLabel(event.eligibleBase, event.currency)}</td>
                     <td>{event.ratePercent}%</td>
-                    <td>{amountLabel(event.commissionAmount, event.currency)}</td>
+                    <td>
+                      {amountLabel(event.commissionAmount, event.currency)}
+                    </td>
                     <td>
                       <span
                         className={
