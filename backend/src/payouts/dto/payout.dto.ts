@@ -23,8 +23,7 @@ import {
 } from '../payouts.constants';
 
 const MONEY_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/;
-const PERCENT_PATTERN =
-  /^(?:100(?:\.0{1,6})?|(?:\d|[1-9]\d)(?:\.\d{1,6})?)$/;
+const PERCENT_PATTERN = /^(?:100(?:\.0{1,6})?|(?:\d|[1-9]\d)(?:\.\d{1,6})?)$/;
 
 export class CreatePayoutDto {
   @IsUUID()

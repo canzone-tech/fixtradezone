@@ -25,10 +25,7 @@ import {
 type DecimalValue = Prisma.Decimal | number | string;
 type LedgerSide = 'DEBIT' | 'CREDIT';
 type LedgerBucket =
-  | PayoutBucket
-  | 'PAYOUT_RESERVE'
-  | 'PAYOUT_SETTLEMENT'
-  | 'PAYOUT_FEE_REVENUE';
+  PayoutBucket | 'PAYOUT_RESERVE' | 'PAYOUT_SETTLEMENT' | 'PAYOUT_FEE_REVENUE';
 
 interface LedgerAccountRow {
   id: string;
@@ -605,9 +602,7 @@ export class PayoutAccountingService {
     });
   }
 
-  private countNumber(
-    value: bigint | number | string | undefined,
-  ): number {
+  private countNumber(value: bigint | number | string | undefined): number {
     if (typeof value === 'bigint') return Number(value);
     if (typeof value === 'number') return value;
     if (typeof value === 'string') return Number.parseInt(value, 10) || 0;

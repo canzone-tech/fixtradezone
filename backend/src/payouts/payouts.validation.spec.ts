@@ -12,9 +12,7 @@ describe('payout validation', () => {
 
   it('normalizes valid-format TRON transaction ids', () => {
     const txid = 'A'.repeat(64);
-    expect(normalizePayoutTransactionId('TRON', txid)).toBe(
-      'a'.repeat(64),
-    );
+    expect(normalizePayoutTransactionId('TRON', txid)).toBe('a'.repeat(64));
   });
 
   it('rejects malformed TRON transaction ids', () => {
@@ -25,8 +23,6 @@ describe('payout validation', () => {
 
   it('normalizes EVM transaction ids without 0x', () => {
     const txid = `0x${'B'.repeat(64)}`;
-    expect(normalizePayoutTransactionId('EVM', txid)).toBe(
-      'b'.repeat(64),
-    );
+    expect(normalizePayoutTransactionId('EVM', txid)).toBe('b'.repeat(64));
   });
 });

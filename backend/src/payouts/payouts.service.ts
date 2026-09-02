@@ -137,7 +137,8 @@ export class PayoutsService {
         };
       }
 
-      const policy = await this.payoutPolicy.requireEffectivePolicy(transaction);
+      const policy =
+        await this.payoutPolicy.requireEffectivePolicy(transaction);
       await this.payoutPolicy.requireEnabledBucket(
         transaction,
         policy.id,
@@ -348,9 +349,7 @@ export class PayoutsService {
       const payout = await this.requirePayout(transaction, payoutId, true);
 
       if (payout.status !== 'PENDING_REVIEW') {
-        throw new ConflictException(
-          'Only a pending payout may be approved.',
-        );
+        throw new ConflictException('Only a pending payout may be approved.');
       }
       if (!payout.reserveLedgerTransactionId) {
         throw new ServiceUnavailableException(
@@ -400,10 +399,7 @@ export class PayoutsService {
     return this.runSerializable(async (transaction) => {
       const payout = await this.requirePayout(transaction, payoutId, true);
 
-      if (
-        payout.status !== 'PENDING_REVIEW' &&
-        payout.status !== 'APPROVED'
-      ) {
+      if (payout.status !== 'PENDING_REVIEW' && payout.status !== 'APPROVED') {
         throw new ConflictException(
           'Only a pending or approved payout may be rejected.',
         );
@@ -702,9 +698,7 @@ export class PayoutsService {
     return decimal.toFixed(8).replace(/(?:\.0+|(?<=\.[0-9]*?)0+)$/, '');
   }
 
-  private countNumber(
-    value: bigint | number | string | undefined,
-  ): number {
+  private countNumber(value: bigint | number | string | undefined): number {
     if (typeof value === 'bigint') return Number(value);
     if (typeof value === 'number') return value;
     if (typeof value === 'string') return Number.parseInt(value, 10) || 0;

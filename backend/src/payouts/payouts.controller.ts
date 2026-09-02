@@ -11,10 +11,7 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
-import {
-  CreatePayoutDto,
-  PayoutPageQueryDto,
-} from './dto/payout.dto';
+import { CreatePayoutDto, PayoutPageQueryDto } from './dto/payout.dto';
 import { PayoutPolicyService } from './payout-policy.service';
 import { PayoutsService } from './payouts.service';
 

@@ -22,8 +22,5 @@ export function normalizePayoutTransactionId(
   profile: PayoutValidationProfile,
   value: string,
 ): string | null {
-  return normalizeDepositTransactionId(
-    asDepositProfile(profile),
-    value.trim(),
-  );
+  return normalizeDepositTransactionId(asDepositProfile(profile), value.trim());
 }

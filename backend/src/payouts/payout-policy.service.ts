@@ -135,10 +135,7 @@ export class PayoutPolicyService {
     };
   }
 
-  async createDraft(
-    actor: AuthenticatedUser,
-    context: RequestContext = {},
-  ) {
+  async createDraft(actor: AuthenticatedUser, context: RequestContext = {}) {
     return this.runSerializable(async (transaction) => {
       const existingDrafts = await transaction.$queryRaw<{ id: string }[]>(
         Prisma.sql`
@@ -326,7 +323,11 @@ export class PayoutPolicyService {
 
       const config = this.normalizedPolicyConfig(current);
       this.validatePolicyConfig(config);
-      const rules = await this.getBucketRules(transaction, policyVersionId, true);
+      const rules = await this.getBucketRules(
+        transaction,
+        policyVersionId,
+        true,
+      );
       const enabledBuckets = this.enabledBuckets(rules);
 
       if (config.requestsEnabled && enabledBuckets.length === 0) {
@@ -423,7 +424,7 @@ export class PayoutPolicyService {
     transaction: Prisma.TransactionClient,
   ): Promise<PayoutPolicyRow> {
     const policy = await this.getEffectivePolicy(transaction);
-    if (!policy || !Boolean(policy.requestsEnabled)) {
+    if (!policy || !policy.requestsEnabled) {
       throw new ConflictException('Payout requests are currently disabled.');
     }
     return policy;
@@ -442,7 +443,7 @@ export class PayoutPolicyService {
       LIMIT 1
     `);
 
-    if (!rows[0] || !Boolean(rows[0].enabled)) {
+    if (!rows[0] || !rows[0].enabled) {
       throw new ConflictException(
         'The selected wallet bucket is not enabled for payouts.',
       );
@@ -450,9 +451,7 @@ export class PayoutPolicyService {
   }
 
   validationProfile(value: string): PayoutValidationProfile {
-    if (
-      PAYOUT_VALIDATION_PROFILES.includes(value as PayoutValidationProfile)
-    ) {
+    if (PAYOUT_VALIDATION_PROFILES.includes(value as PayoutValidationProfile)) {
       return value as PayoutValidationProfile;
     }
     throw new ServiceUnavailableException(
@@ -543,13 +542,13 @@ export class PayoutPolicyService {
     const base = this.normalizedPolicyConfig(current);
     return {
       requestsEnabled: dto.requestsEnabled ?? base.requestsEnabled,
-      asset: dto.asset === undefined ? base.asset : dto.asset.trim().toUpperCase(),
+      asset:
+        dto.asset === undefined ? base.asset : dto.asset.trim().toUpperCase(),
       networkCode:
         dto.networkCode === undefined
           ? base.networkCode
           : dto.networkCode.trim().toUpperCase(),
-      validationProfile:
-        dto.validationProfile ?? base.validationProfile,
+      validationProfile: dto.validationProfile ?? base.validationProfile,
       minimumAmount:
         dto.minimumAmount === undefined
           ? base.minimumAmount
@@ -563,9 +562,7 @@ export class PayoutPolicyService {
     };
   }
 
-  private normalizedPolicyConfig(
-    row: PayoutPolicyRow,
-  ): NormalizedPolicyConfig {
+  private normalizedPolicyConfig(row: PayoutPolicyRow): NormalizedPolicyConfig {
     return {
       requestsEnabled: Boolean(row.requestsEnabled),
       asset: row.asset.trim().toUpperCase(),
@@ -653,9 +650,7 @@ export class PayoutPolicyService {
       .map((rule) => rule.bucket);
   }
 
-  private countNumber(
-    value: bigint | number | string | undefined,
-  ): number {
+  private countNumber(value: bigint | number | string | undefined): number {
     if (typeof value === 'bigint') return Number(value);
     if (typeof value === 'number') return value;
     if (typeof value === 'string') return Number.parseInt(value, 10) || 0;

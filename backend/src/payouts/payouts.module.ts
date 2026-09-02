@@ -12,11 +12,7 @@ import { PayoutsService } from './payouts.service';
     AdminPayoutsController,
     AdminPayoutPoliciesController,
   ],
-  providers: [
-    PayoutsService,
-    PayoutPolicyService,
-    PayoutAccountingService,
-  ],
+  providers: [PayoutsService, PayoutPolicyService, PayoutAccountingService],
   exports: [PayoutsService, PayoutPolicyService],
 })
 export class PayoutsModule {}
