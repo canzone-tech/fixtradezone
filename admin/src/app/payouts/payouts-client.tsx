@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/payouts/payout.module.css";
@@ -67,6 +67,10 @@ async function fetchWorkspace(): Promise<{
   return { payouts, policies };
 }
 
+function findDraft(policies: PayoutPoliciesResponse): PayoutPolicy | null {
+  return policies.policies.find((policy) => policy.status === "DRAFT") ?? null;
+}
+
 export default function PayoutsClient() {
   const router = useRouter();
   const [payouts, setPayouts] = useState<AdminPayoutsResponse | null>(null);
@@ -75,11 +79,6 @@ export default function PayoutsClient() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const draft = useMemo(
-    () => policies?.policies.find((policy) => policy.status === "DRAFT") ?? null,
-    [policies],
-  );
 
   const [requestsEnabled, setRequestsEnabled] = useState(false);
   const [asset, setAsset] = useState("USDT");
@@ -92,19 +91,32 @@ export default function PayoutsClient() {
   const [percentageFee, setPercentageFee] = useState("0");
   const [enabledBuckets, setEnabledBuckets] = useState<PayoutBucket[]>([]);
 
-  useEffect(() => {
-    if (!draft) return;
+  const draft = policies ? findDraft(policies) : null;
 
-    setRequestsEnabled(draft.requestsEnabled);
-    setAsset(draft.asset);
-    setNetworkCode(draft.networkCode);
-    setValidationProfile(draft.validationProfile);
-    setMinimumAmount(draft.minimumAmount ?? "");
-    setMaximumAmount(draft.maximumAmount ?? "");
-    setFixedFeeAmount(draft.fixedFeeAmount);
-    setPercentageFee(draft.percentageFee);
-    setEnabledBuckets(draft.enabledBuckets ?? []);
-  }, [draft]);
+  function hydrateDraftForm(nextDraft: PayoutPolicy | null) {
+    if (!nextDraft) {
+      setRequestsEnabled(false);
+      setAsset("USDT");
+      setNetworkCode("TRC20");
+      setValidationProfile("TRON");
+      setMinimumAmount("");
+      setMaximumAmount("");
+      setFixedFeeAmount("0");
+      setPercentageFee("0");
+      setEnabledBuckets([]);
+      return;
+    }
+
+    setRequestsEnabled(nextDraft.requestsEnabled);
+    setAsset(nextDraft.asset);
+    setNetworkCode(nextDraft.networkCode);
+    setValidationProfile(nextDraft.validationProfile);
+    setMinimumAmount(nextDraft.minimumAmount ?? "");
+    setMaximumAmount(nextDraft.maximumAmount ?? "");
+    setFixedFeeAmount(nextDraft.fixedFeeAmount);
+    setPercentageFee(nextDraft.percentageFee);
+    setEnabledBuckets(nextDraft.enabledBuckets ?? []);
+  }
 
   async function reload() {
     setLoading(true);
@@ -114,6 +126,7 @@ export default function PayoutsClient() {
       const workspace = await fetchWorkspace();
       setPayouts(workspace.payouts);
       setPolicies(workspace.policies);
+      hydrateDraftForm(findDraft(workspace.policies));
     } catch (caught) {
       if (caught instanceof AdminPayoutAccessError && caught.status === 401) {
         router.replace("/login");
@@ -131,9 +144,53 @@ export default function PayoutsClient() {
   }
 
   useEffect(() => {
-    void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let mounted = true;
+
+    async function loadInitial() {
+      try {
+        const workspace = await fetchWorkspace();
+        if (!mounted) return;
+
+        const initialDraft = findDraft(workspace.policies);
+
+        setPayouts(workspace.payouts);
+        setPolicies(workspace.policies);
+
+        if (initialDraft) {
+          setRequestsEnabled(initialDraft.requestsEnabled);
+          setAsset(initialDraft.asset);
+          setNetworkCode(initialDraft.networkCode);
+          setValidationProfile(initialDraft.validationProfile);
+          setMinimumAmount(initialDraft.minimumAmount ?? "");
+          setMaximumAmount(initialDraft.maximumAmount ?? "");
+          setFixedFeeAmount(initialDraft.fixedFeeAmount);
+          setPercentageFee(initialDraft.percentageFee);
+          setEnabledBuckets(initialDraft.enabledBuckets ?? []);
+        }
+      } catch (caught) {
+        if (!mounted) return;
+
+        if (caught instanceof AdminPayoutAccessError && caught.status === 401) {
+          router.replace("/login");
+          return;
+        }
+
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "Could not load payout workspace.",
+        );
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    void loadInitial();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   function toggleBucket(bucket: PayoutBucket) {
     setEnabledBuckets((current) =>
@@ -248,7 +305,7 @@ export default function PayoutsClient() {
     );
   }
 
-  async function reject(payout: AdminPayoutRequest) {
+  async function rejectPayout(payout: AdminPayoutRequest) {
     const note = window.prompt(
       "Rejection note (reserved funds will be released):",
       "Rejected by payout operations",
@@ -642,7 +699,7 @@ export default function PayoutsClient() {
                         <button
                           type="button"
                           className={styles.buttonDanger}
-                          onClick={() => void reject(payout)}
+                          onClick={() => void rejectPayout(payout)}
                           disabled={busy}
                         >
                           Reject & release
@@ -663,7 +720,7 @@ export default function PayoutsClient() {
                         <button
                           type="button"
                           className={styles.buttonDanger}
-                          onClick={() => void reject(payout)}
+                          onClick={() => void rejectPayout(payout)}
                           disabled={busy}
                         >
                           Reject & release
