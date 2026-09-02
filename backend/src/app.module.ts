@@ -18,6 +18,7 @@ import { DepositsModule } from './deposits/deposits.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
 import { InternalTradingModule } from './internal-trading/internal-trading.module';
+import { PayoutsModule } from './payouts/payouts.module';
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { InternalTradingModule } from './internal-trading/internal-trading.modul
     RewardsModule,
     SimulatedActivityModule,
     InternalTradingModule,
+    PayoutsModule,
     DashboardModule,
     HealthModule,
   ],

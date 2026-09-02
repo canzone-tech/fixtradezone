@@ -26,6 +26,9 @@ export const PERMISSIONS = {
   SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
   INTERNAL_TRADING_READ: 'internal_trading.read',
   INTERNAL_TRADING_RECONCILE: 'internal_trading.reconcile',
+  PAYOUTS_READ: 'payouts.read',
+  PAYOUTS_REVIEW: 'payouts.review',
+  PAYOUTS_POLICY_MANAGE: 'payouts.policy.manage',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -147,6 +150,18 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.INTERNAL_TRADING_RECONCILE,
     description:
       'Reconcile internal trading lifecycle for eligible package subscriptions',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_READ,
+    description: 'View payout policies, requests and payout operational state',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_REVIEW,
+    description: 'Approve, reject, submit and complete payout requests',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_POLICY_MANAGE,
+    description: 'Create, edit and publish versioned payout policies',
   },
   {
     code: PERMISSIONS.RBAC_READ,
