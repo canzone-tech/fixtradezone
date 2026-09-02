@@ -54,7 +54,11 @@ export type LedgerTransactionKind =
   | "DEPOSIT_CREDIT"
   | "PACKAGE_ACTIVATION_FUNDING"
   | "REFERRAL_COMMISSION_CREDIT"
-  | "PACKAGE_REWARD_CREDIT";
+  | "PACKAGE_REWARD_CREDIT"
+  | "INTERNAL_TRADING_SETTLEMENT"
+  | "PAYOUT_RESERVE"
+  | "PAYOUT_RELEASE"
+  | "PAYOUT_SETTLEMENT";
 
 export interface LedgerTransaction {
   id: string;

@@ -94,6 +94,8 @@ const sections: Array<{
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
+        permission: "payouts.read",
+        enabled: true,
       },
       {
         href: "/referrals",

@@ -155,13 +155,18 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Wallet</span>
             </Link>
 
-            <span
-              className={`ftz-nav-link ${styles.disabledNav}`}
-              aria-disabled="true"
-            >
-              <i className="iconoir-coins-swap" />
-              <span>Payouts</span>
-            </span>
+            {!impersonated ? (
+              <Link
+                href="/user/payouts"
+                className={`ftz-nav-link ${
+                  isActive("/user/payouts") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-coins-swap" />
+                <span>Payouts</span>
+              </Link>
+            ) : null}
 
             <Link
               href="/user/referrals"
