@@ -4,6 +4,7 @@ import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
 import "iconoir/css/iconoir.css";
 import "../styles/fixtradezone-theme.scss";
+import "../styles/fixtradezone-readability.scss";
 
 export const metadata: Metadata = {
   applicationName: "FixTradeZone",

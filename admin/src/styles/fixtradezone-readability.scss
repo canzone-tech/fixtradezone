@@ -1,0 +1,110 @@
+/*
+ * FixTradeZone project-wide readability layer.
+ * Imported after the master theme so Admin, User and Auth screens share
+ * the same minimum readable sizes for secondary/technical text.
+ * This file intentionally changes typography only.
+ */
+
+:root {
+  --ftz-readable-small: 12px;
+  --ftz-readable-label: 13px;
+  --ftz-readable-table: 13px;
+  --ftz-readable-control: 14px;
+}
+
+/* Semantic secondary text should never collapse into 8–11px UI copy. */
+:where(small, .small) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.45;
+}
+
+/* Covers both global classes and CSS-module generated class names. */
+:where(
+  [class*="meta" i],
+  [class*="eyebrow" i],
+  [class*="kicker" i],
+  [class*="helper" i],
+  [class*="hint" i],
+  [class*="caption" i]
+) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.45;
+}
+
+:where(label, [class*="label" i]) {
+  font-size: var(--ftz-readable-label) !important;
+  line-height: 1.4;
+}
+
+/* Status chips and badges are operational information, not decorative text. */
+:where(
+  .badge,
+  [class*="badge" i],
+  [class*="chip" i],
+  [class*="pill" i]
+) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.3;
+}
+
+/* Technical identifiers / account keys / transaction references. */
+:where(code, kbd, samp, [class*="mono" i]) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.45;
+}
+
+/* Tables are used across Admin and User financial/operations screens. */
+:where(table th) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.45;
+}
+
+:where(table td) {
+  font-size: var(--ftz-readable-table) !important;
+  line-height: 1.5;
+}
+
+/* Form copy was as small as 10–11px in parts of the master theme. */
+:where(
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea
+) {
+  font-size: var(--ftz-readable-control) !important;
+}
+
+/* Known dashboard/auth elements that historically used 8–11px text. */
+:where(
+  .ftz-nav-label,
+  .ftz-notification span,
+  .ftz-search kbd,
+  .ftz-dashboard-loading p,
+  .ftz-market-item strong,
+  .ftz-market-item small,
+  .ftz-market-item > b,
+  .ftz-metric-copy span,
+  .ftz-legend,
+  .ftz-deposit-legend,
+  .ftz-chart-months,
+  .ftz-chart-tooltip,
+  .ftz-chart-tooltip strong,
+  .ftz-chart-stats small,
+  .ftz-referral-top small,
+  .ftz-activity-row strong,
+  .ftz-activity-row small,
+  .ftz-activity-row time,
+  .ftz-grow-card p,
+  .ftz-auth-market-row strong,
+  .ftz-auth-market-row b,
+  .ftz-login-head p,
+  .ftz-login-form label,
+  .ftz-rbac-eyebrow
+) {
+  font-size: var(--ftz-readable-small) !important;
+  line-height: 1.45;
+}
+
+/* Slightly stronger identity text beside avatars/profile controls. */
+:where(.ftz-sidebar-profile strong, .ftz-topbar-profile-copy strong) {
+  font-size: var(--ftz-readable-label) !important;
+}
