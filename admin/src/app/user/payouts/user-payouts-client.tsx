@@ -24,6 +24,11 @@ import {
   payoutStatusTone,
   readJson,
 } from "@/lib/payouts";
+import {
+  type UserWalletResponse,
+  type WalletCurrencySummary,
+  compactDecimal,
+} from "@/lib/wallet";
 
 interface UserApiPayload extends ApiMessagePayload {
   redirectTo?: string | null;
@@ -70,10 +75,29 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+function payoutBucketBalance(
+  wallet: WalletCurrencySummary | null,
+  bucket: PayoutBucket,
+): string {
+  if (!wallet) return "0";
+
+  switch (bucket) {
+    case "MAIN":
+      return wallet.buckets.main;
+    case "PACKAGE_EARNINGS":
+      return wallet.buckets.packageEarnings;
+    case "REFERRAL_COMMISSION":
+      return wallet.buckets.referralCommission;
+    case "REWARDS":
+      return wallet.buckets.rewards;
+  }
+}
+
 async function fetchPayoutWorkspace(): Promise<{
   session: UserDirectSession;
   policy: CurrentPayoutPolicyResponse;
   payouts: UserPayoutsResponse;
+  wallet: UserWalletResponse;
 }> {
   const sessionResponse = await fetch("/api/user/session", {
     cache: "no-store",
@@ -87,22 +111,25 @@ async function fetchPayoutWorkspace(): Promise<{
     throw new Error("USER session is incomplete.");
   }
 
-  const policyResponse = await fetch("/api/user/payouts/policy", {
-    cache: "no-store",
-  });
+  const [policyResponse, payoutsResponse, walletResponse] = await Promise.all([
+    fetch("/api/user/payouts/policy", { cache: "no-store" }),
+    fetch("/api/user/payouts?limit=50", { cache: "no-store" }),
+    fetch("/api/user/wallet?page=1&limit=50", { cache: "no-store" }),
+  ]);
+
   const policy = await checkedJson<
     CurrentPayoutPolicyResponse & UserApiPayload
   >(policyResponse, "Could not load payout policy.");
-
-  const payoutsResponse = await fetch("/api/user/payouts?limit=50", {
-    cache: "no-store",
-  });
   const payouts = await checkedJson<UserPayoutsResponse & UserApiPayload>(
     payoutsResponse,
     "Could not load payout history.",
   );
+  const wallet = await checkedJson<UserWalletResponse & UserApiPayload>(
+    walletResponse,
+    "Could not load wallet balances.",
+  );
 
-  return { session, policy, payouts };
+  return { session, policy, payouts, wallet };
 }
 
 export default function UserPayoutsClient() {
@@ -110,6 +137,7 @@ export default function UserPayoutsClient() {
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [policy, setPolicy] = useState<CurrentPayoutPolicyResponse | null>(null);
   const [payouts, setPayouts] = useState<UserPayoutsResponse | null>(null);
+  const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
   const [sourceBucket, setSourceBucket] = useState<PayoutBucket>("MAIN");
   const [amount, setAmount] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
@@ -129,6 +157,17 @@ export default function UserPayoutsClient() {
     [payouts],
   );
 
+  const activeWallet = useMemo<WalletCurrencySummary | null>(() => {
+    const currency = activePolicy?.asset ?? "USDT";
+    return (
+      wallet?.wallets.find(
+        (item) => item.currency.toUpperCase() === currency.toUpperCase(),
+      ) ?? null
+    );
+  }, [activePolicy?.asset, wallet]);
+
+  const selectedBucketBalance = payoutBucketBalance(activeWallet, sourceBucket);
+
   async function reload() {
     setLoading(true);
     setError(null);
@@ -138,6 +177,7 @@ export default function UserPayoutsClient() {
       setSession(workspace.session);
       setPolicy(workspace.policy);
       setPayouts(workspace.payouts);
+      setWallet(workspace.wallet);
 
       if (
         workspace.policy.enabledBuckets.length > 0 &&
@@ -173,6 +213,7 @@ export default function UserPayoutsClient() {
         setSession(workspace.session);
         setPolicy(workspace.policy);
         setPayouts(workspace.payouts);
+        setWallet(workspace.wallet);
 
         if (workspace.policy.enabledBuckets.length > 0) {
           setSourceBucket(workspace.policy.enabledBuckets[0]);
@@ -355,6 +396,53 @@ export default function UserPayoutsClient() {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
+              <p className={styles.eyebrow}>Available Wallet</p>
+              <h2>{activePolicy?.asset ?? "USDT"} balances</h2>
+            </div>
+            {activeWallet ? (
+              <span className={styles.badge} data-tone="success">
+                Total {compactDecimal(activeWallet.totalWallet)} {activeWallet.currency}
+              </span>
+            ) : null}
+          </div>
+
+          {activeWallet ? (
+            <div className={styles.metrics}>
+              <div className={styles.metric}>
+                <small>Main / Deposit</small>
+                <strong>
+                  {compactDecimal(activeWallet.buckets.main)} {activeWallet.currency}
+                </strong>
+              </div>
+              <div className={styles.metric}>
+                <small>Package Earnings</small>
+                <strong>
+                  {compactDecimal(activeWallet.buckets.packageEarnings)} {activeWallet.currency}
+                </strong>
+              </div>
+              <div className={styles.metric}>
+                <small>Referral Commission</small>
+                <strong>
+                  {compactDecimal(activeWallet.buckets.referralCommission)} {activeWallet.currency}
+                </strong>
+              </div>
+              <div className={styles.metric}>
+                <small>Rewards</small>
+                <strong>
+                  {compactDecimal(activeWallet.buckets.rewards)} {activeWallet.currency}
+                </strong>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.empty}>
+              No wallet balance is available for the payout asset.
+            </div>
+          )}
+        </section>
+
+        <section className={styles.card}>
+          <div className={styles.cardHeader}>
+            <div>
               <p className={styles.eyebrow}>New Request</p>
               <h2>Request payout</h2>
             </div>
@@ -382,6 +470,10 @@ export default function UserPayoutsClient() {
                   ))
                 )}
               </select>
+              <span className={styles.help}>
+                Available in selected bucket: {compactDecimal(selectedBucketBalance)}{" "}
+                {activeWallet?.currency ?? activePolicy?.asset ?? "USDT"}
+              </span>
             </div>
 
             <div className={styles.field}>
