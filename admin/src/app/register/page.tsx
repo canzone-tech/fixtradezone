@@ -104,6 +104,7 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -211,6 +212,7 @@ export default function RegisterPage() {
     if (lastName.trim()) body.lastName = lastName.trim();
     if (email.trim()) body.email = email.trim();
     if (phone.trim()) body.phone = phone.trim();
+    if (referralCode.trim()) body.referralCode = referralCode.trim().toUpperCase();
     if (currentPolicy.usernameMode !== "AUTO" && username.trim()) {
       body.username = username.trim().toLowerCase();
     }
@@ -447,10 +449,8 @@ export default function RegisterPage() {
               </div>
 
               <div className="ftz-auth-label-row">
-                <label htmlFor="register-mobile">
-                  Mobile {policy.mobileRequired ? "*" : ""}
-                </label>
-                <small>E.164 format</small>
+                <label htmlFor="register-mobile">Mobile (optional)</label>
+                <small>E.164 format if provided</small>
               </div>
               <div className="ftz-auth-input">
                 <i className="iconoir-phone" />
@@ -459,10 +459,26 @@ export default function RegisterPage() {
                   type="tel"
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
-                  required={policy.mobileRequired}
                   maxLength={16}
                   autoComplete="tel"
                   placeholder="+919876543210"
+                />
+              </div>
+
+              <div className="ftz-auth-label-row">
+                <label htmlFor="register-referral">Referral code (optional)</label>
+                <small>Sponsor code</small>
+              </div>
+              <div className="ftz-auth-input">
+                <i className="iconoir-user-plus" />
+                <input
+                  id="register-referral"
+                  type="text"
+                  value={referralCode}
+                  onChange={(event) => setReferralCode(event.target.value.toUpperCase())}
+                  maxLength={64}
+                  autoComplete="off"
+                  placeholder="Enter referral code"
                 />
               </div>
 
