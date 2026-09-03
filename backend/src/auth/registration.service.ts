@@ -5,10 +5,14 @@ import {
   Injectable,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { ReferralsService } from '../referrals/referrals.service';
+import {
+  DuplicateAccountService,
+  type RegistrationDuplicateDecision,
+} from '../duplicate-account/duplicate-account.service';
+import type { Prisma } from '../generated/prisma/client';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { ReferralsService } from '../referrals/referrals.service';
 import { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from './auth.constants';
 import {
   AUTH_USER_SELECT,
@@ -27,7 +31,10 @@ const AUTO_USERNAME_ATTEMPTS = 100;
 const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
+  | 'SELF_REGISTRATION'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;
@@ -62,10 +69,36 @@ export class RegistrationService {
     @Optional() private readonly referralsService?: ReferralsService,
     @Optional()
     private readonly emailVerificationService?: EmailVerificationService,
+    @Optional()
+    private readonly duplicateAccountService?: DuplicateAccountService,
   ) {}
 
   async registerPublic(dto: RegisterDto, context: RequestContext = {}) {
-    const result = await this.register(dto, null, context);
+    const duplicateDecision = this.duplicateAccountService
+      ? await this.duplicateAccountService.evaluateRegistration({
+          deviceInstallationId: dto.deviceInstallationId,
+          email: dto.email,
+          context,
+        })
+      : null;
+
+    if (duplicateDecision?.blockRegistration) {
+      await this.duplicateAccountService?.recordBlockedRegistration(
+        duplicateDecision,
+        dto.email,
+        context,
+      );
+      throw new ConflictException(
+        'Registration is blocked by the duplicate-account protection policy.',
+      );
+    }
+
+    const result = await this.register(
+      dto,
+      null,
+      context,
+      duplicateDecision,
+    );
 
     const delivery = this.emailVerificationService
       ? await this.emailVerificationService.sendInitial(result.user, context)
@@ -81,6 +114,7 @@ export class RegistrationService {
       verificationStatus: result.user.email
         ? 'PENDING_EMAIL_VERIFICATION'
         : 'PENDING',
+      duplicateAccountAction: duplicateDecision?.action ?? 'ALLOWED',
     };
   }
 
@@ -109,13 +143,14 @@ export class RegistrationService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
-    return this.register(dto, actor, context);
+    return this.register(dto, actor, context, null);
   }
 
   private async register(
     dto: RegisterDto,
     actor: AuthenticatedUser | null,
     context: RequestContext,
+    duplicateDecision: RegistrationDuplicateDecision | null,
   ) {
     try {
       return await this.prisma.$transaction(
@@ -180,7 +215,11 @@ export class RegistrationService {
               mustChangePassword: passwordResult.generated,
               firstName: dto.firstName,
               lastName: dto.lastName,
-              status: 'PENDING',
+              status:
+                source === 'SELF_REGISTRATION' &&
+                duplicateDecision?.restrictAccount
+                  ? 'RESTRICTED'
+                  : 'PENDING',
               roles: {
                 create: {
                   role: {
@@ -224,6 +263,20 @@ export class RegistrationService {
               )
             : null;
 
+          if (
+            source === 'SELF_REGISTRATION' &&
+            duplicateDecision &&
+            this.duplicateAccountService
+          ) {
+            await this.duplicateAccountService.recordRegistration(
+              transaction,
+              duplicateDecision,
+              user.id,
+              dto.email,
+              context,
+            );
+          }
+
           await transaction.auditLog.create({
             data: {
               actorUserId: actor?.id ?? user.id,
@@ -247,6 +300,8 @@ export class RegistrationService {
                       age18Declared: true,
                       kycDeclarationAccepted: true,
                       emailVerificationRequired: true,
+                      duplicateAccountAction:
+                        duplicateDecision?.action ?? 'ALLOWED',
                     }
                   : {}),
               },
