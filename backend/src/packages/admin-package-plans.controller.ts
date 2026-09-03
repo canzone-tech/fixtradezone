@@ -18,6 +18,8 @@ import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
+import { ClientPackageProfileService } from './client-package-profile.service';
+import { ApplyClientPackageProfileDto } from './dto/apply-client-package-profile.dto';
 import {
   CreatePackagePlanDraftDto,
   CreatePackagePlanItemDto,
@@ -29,7 +31,10 @@ import { PackagesService } from './packages.service';
 
 @Controller('admin/package-plans')
 export class AdminPackagePlansController {
-  constructor(private readonly packagesService: PackagesService) {}
+  constructor(
+    private readonly packagesService: PackagesService,
+    private readonly clientPackageProfileService: ClientPackageProfileService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -73,6 +78,24 @@ export class AdminPackagePlansController {
     @Req() request: Request,
   ) {
     return this.packagesService.updatePlanVersion(
+      planVersionId,
+      dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Post(':planVersionId/client-profile')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(SuperAdminOnlyGuard)
+  applyClientPackageProfile(
+    @Param('planVersionId', new ParseUUIDPipe()) planVersionId: string,
+    @Body() dto: ApplyClientPackageProfileDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.clientPackageProfileService.apply(
       planVersionId,
       dto,
       actor,
