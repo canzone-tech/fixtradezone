@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
 import { formatPlatformDateTime } from "@/lib/platform-time";
@@ -10,6 +10,10 @@ import styles from "./profile.module.css";
 interface ErrorPayload {
   message?: string;
   redirectTo?: string;
+}
+
+interface ProfileUpdatePayload extends ErrorPayload {
+  user?: UserDirectSession["user"];
 }
 
 async function readPayload<T>(response: Response): Promise<T | null> {
@@ -28,8 +32,14 @@ export default function UserProfileClient() {
   const router = useRouter();
 
   const [session, setSession] = useState<UserDirectSession | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -65,6 +75,9 @@ export default function UserProfileClient() {
 
         if (mounted) {
           setSession(payload);
+          setFirstName(payload.user.firstName ?? "");
+          setLastName(payload.user.lastName ?? "");
+          setPhone(payload.user.phone ?? "");
         }
       } catch (caught) {
         if (mounted) {
@@ -103,6 +116,59 @@ export default function UserProfileClient() {
     );
   }, [session]);
 
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session) return;
+
+    setSaving(true);
+    setSaveError("");
+    setSaveMessage("");
+
+    try {
+      const response = await fetch("/api/user/session", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          phone,
+        }),
+      });
+      const payload = await readPayload<ProfileUpdatePayload>(response);
+
+      if (response.status === 401) {
+        router.replace("/login");
+        router.refresh();
+        return;
+      }
+
+      if (!response.ok || !payload?.user) {
+        throw new Error(payload?.message || "Unable to update your profile.");
+      }
+
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              user: payload.user as UserDirectSession["user"],
+            }
+          : current,
+      );
+      setFirstName(payload.user.firstName ?? "");
+      setLastName(payload.user.lastName ?? "");
+      setPhone(payload.user.phone ?? "");
+      setSaveMessage(payload.message ?? "Profile updated successfully.");
+    } catch (caught) {
+      setSaveError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to update your profile.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <UserShell session={null}>
@@ -132,12 +198,10 @@ export default function UserProfileClient() {
         <section className={styles.hero}>
           <div>
             <span className={styles.eyebrow}>ACCOUNT & SECURITY</span>
-
             <h2>{displayName}</h2>
-
             <p>
-              Review your FixTradeZone identity, account status and
-              authenticated session information.
+              Your registration identity is intentionally minimal. First name,
+              last name and mobile are optional and can be maintained here.
             </p>
 
             <div className={styles.badges}>
@@ -145,7 +209,6 @@ export default function UserProfileClient() {
                 <i className="iconoir-shield-check" />
                 {user.status}
               </span>
-
               {user.roles.map((role) => (
                 <span key={role}>
                   <i className="iconoir-user" />
@@ -165,40 +228,33 @@ export default function UserProfileClient() {
             <span>
               <i className="iconoir-user" />
             </span>
-
             <div>
               <small>ACCOUNT STATUS</small>
               <strong>{user.status}</strong>
             </div>
           </article>
-
           <article>
             <span>
               <i className="iconoir-key" />
             </span>
-
             <div>
               <small>ACCESS ROLE</small>
               <strong>USER</strong>
             </div>
           </article>
-
           <article>
             <span>
               <i className="iconoir-clock" />
             </span>
-
             <div>
               <small>LAST LOGIN</small>
               <strong>{formatDate(user.lastLoginAt)}</strong>
             </div>
           </article>
-
           <article>
             <span>
               <i className="iconoir-timer" />
             </span>
-
             <div>
               <small>IDLE SECURITY</small>
               <strong>{session.sessionPolicy.idleLockMinutes} MIN</strong>
@@ -210,80 +266,111 @@ export default function UserProfileClient() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <div>
-                <span>PROFILE</span>
-                <h3>Account Details</h3>
+                <span>OPTIONAL PROFILE</span>
+                <h3>Personal Details</h3>
               </div>
-
-              <i className="iconoir-profile-circle" />
+              <i className="iconoir-edit-pencil" />
             </div>
 
-            <dl className={styles.details}>
-              <div>
-                <dt>Full Name</dt>
-                <dd>{displayName}</dd>
+            <form className={styles.profileForm} onSubmit={saveProfile}>
+              <div className={styles.formGrid}>
+                <label>
+                  <span>First name</span>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    maxLength={100}
+                    autoComplete="given-name"
+                    placeholder="Optional"
+                    disabled={saving}
+                  />
+                </label>
+
+                <label>
+                  <span>Last name</span>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    maxLength={100}
+                    autoComplete="family-name"
+                    placeholder="Optional"
+                    disabled={saving}
+                  />
+                </label>
               </div>
 
-              <div>
-                <dt>Username</dt>
-                <dd>@{user.username}</dd>
-              </div>
+              <label>
+                <span>Mobile</span>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  maxLength={16}
+                  autoComplete="tel"
+                  placeholder="Optional · E.164, e.g. +919876543210"
+                  disabled={saving}
+                />
+              </label>
 
-              <div>
-                <dt>Email</dt>
-                <dd>{user.email || "Not set"}</dd>
-              </div>
+              <p className={styles.formHint}>
+                These fields are optional. Leave a field blank and save to clear
+                it. Email and username remain account identifiers and are not
+                changed here.
+              </p>
 
-              <div>
-                <dt>Phone</dt>
-                <dd>{user.phone || "Not set"}</dd>
-              </div>
+              {saveError ? (
+                <div className={styles.formError} role="alert">
+                  {saveError}
+                </div>
+              ) : null}
+              {saveMessage ? (
+                <div className={styles.formSuccess}>{saveMessage}</div>
+              ) : null}
 
-              <div>
-                <dt>Created</dt>
-                <dd>{formatPlatformDateTime(user.createdAt)}</dd>
-              </div>
-
-              <div>
-                <dt>Last Login</dt>
-                <dd>{formatDate(user.lastLoginAt)}</dd>
-              </div>
-            </dl>
+              <button type="submit" disabled={saving}>
+                <span>{saving ? "Saving…" : "Save optional details"}</span>
+                <i className="iconoir-check" />
+              </button>
+            </form>
           </section>
 
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <div>
-                <span>SECURITY</span>
-                <h3>Session Status</h3>
+                <span>ACCOUNT</span>
+                <h3>Identity Details</h3>
               </div>
-
-              <i className="iconoir-shield-check" />
+              <i className="iconoir-profile-circle" />
             </div>
 
-            <div className={styles.securityState}>
-              <span />
-
+            <dl className={styles.details}>
               <div>
-                <strong>Authenticated USER session active</strong>
-
-                <p>
-                  Access and refresh credentials remain in secure HttpOnly
-                  cookies. Backend authorization remains the source of truth.
-                </p>
+                <dt>Display Name</dt>
+                <dd>{displayName}</dd>
               </div>
-            </div>
-
-            <div className={styles.securityFacts}>
               <div>
-                <small>SESSION TYPE</small>
-                <strong>STANDARD USER</strong>
+                <dt>Username</dt>
+                <dd>@{user.username}</dd>
               </div>
-
               <div>
-                <small>IDLE LOCK</small>
-                <strong>{session.sessionPolicy.idleLockMinutes} MINUTES</strong>
+                <dt>Email</dt>
+                <dd>{user.email || "Not set"}</dd>
               </div>
-            </div>
+              <div>
+                <dt>Mobile</dt>
+                <dd>{user.phone || "Not set"}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatPlatformDateTime(user.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Last Login</dt>
+                <dd>{formatDate(user.lastLoginAt)}</dd>
+              </div>
+            </dl>
           </section>
         </div>
 
@@ -291,14 +378,12 @@ export default function UserProfileClient() {
           <span>
             <i className="iconoir-shield-check" />
           </span>
-
           <div>
             <strong>Protected account boundary</strong>
-
             <p>
-              This page uses the dedicated standard USER session API. ADMIN and
-              SUPER_ADMIN sessions are rejected from this USER boundary and
-              routed to the administrator portal.
+              Optional profile updates are authenticated, validated server-side
+              and audited. Profile changes are disabled during administrator
+              impersonation.
             </p>
           </div>
         </section>
