@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { OperationsConfigService } from '../platform-config/operations-config.service';
 import { RedisService } from '../redis/redis.service';
+import { InternalTradingPackageCompletionService } from './internal-trading-package-completion.service';
 import {
   INTERNAL_TRADING_WORKER_CURSOR_KEY,
   INTERNAL_TRADING_WORKER_CURSOR_TTL_MS,
@@ -28,6 +29,8 @@ export interface InternalTradingWorkerSummary {
   processedSubscriptions: number;
   createdEvents: number;
   createdSettlements: number;
+  completedSubscriptions: number;
+  principalReturns: number;
   failedSubscriptions: number;
   failures: WorkerFailure[];
   cursor: string | null;
@@ -63,6 +66,7 @@ export class InternalTradingWorkerService
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly tradeService: InternalTradingTradeService,
+    private readonly packageCompletionService: InternalTradingPackageCompletionService,
     private readonly operationsConfigService: OperationsConfigService,
   ) {}
 
@@ -159,8 +163,6 @@ export class InternalTradingWorkerService
           batchSize,
         );
 
-        // Cursor reached the end. Wrap around so every ACTIVE
-        // subscription is revisited without starvation.
         if (candidates.length === 0 && cursor !== null) {
           cursor = null;
 
@@ -175,10 +177,13 @@ export class InternalTradingWorkerService
           processedSubscriptions: 0,
           createdEvents: 0,
           createdSettlements: 0,
+          completedSubscriptions: 0,
+          principalReturns: 0,
           failedSubscriptions: 0,
           failures: [],
           cursor,
         };
+        const finalizedThisRun = new Set<string>();
 
         for (const subscriptionId of candidates) {
           try {
@@ -194,24 +199,47 @@ export class InternalTradingWorkerService
             summary.createdSettlements += Number(
               result.createdSettlements ?? 0,
             );
-          } catch (error) {
-            summary.failedSubscriptions += 1;
 
-            if (summary.failures.length < 20) {
-              summary.failures.push({
-                subscriptionId,
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : 'Unknown internal trading worker error.',
-              });
+            if (result.state?.status === 'COMPLETED') {
+              const completion =
+                await this.packageCompletionService.finalizeCompletion(
+                  subscriptionId,
+                  null,
+                );
+              finalizedThisRun.add(subscriptionId);
+
+              if (completion.finalized) {
+                summary.completedSubscriptions += 1;
+              }
+              if (completion.principalReturnApplied) {
+                summary.principalReturns += 1;
+              }
             }
+          } catch (error) {
+            this.noteSubscriptionFailure(summary, subscriptionId, error);
+          }
+        }
 
-            this.logger.error(
-              error instanceof Error
-                ? `ITD worker failed subscription ${subscriptionId}: ${error.message}`
-                : `ITD worker failed subscription ${subscriptionId}.`,
-            );
+        const pendingCompletions =
+          await this.packageCompletionService.listPendingCompletions(batchSize);
+
+        for (const subscriptionId of pendingCompletions) {
+          if (finalizedThisRun.has(subscriptionId)) continue;
+
+          try {
+            const completion =
+              await this.packageCompletionService.finalizeCompletion(
+                subscriptionId,
+                null,
+              );
+            if (completion.finalized) {
+              summary.completedSubscriptions += 1;
+            }
+            if (completion.principalReturnApplied) {
+              summary.principalReturns += 1;
+            }
+          } catch (error) {
+            this.noteSubscriptionFailure(summary, subscriptionId, error);
           }
         }
 
@@ -235,10 +263,11 @@ export class InternalTradingWorkerService
         if (
           summary.createdEvents > 0 ||
           summary.createdSettlements > 0 ||
+          summary.completedSubscriptions > 0 ||
           summary.failedSubscriptions > 0
         ) {
           this.logger.log(
-            `Internal trading worker scanned ${summary.scannedSubscriptions}, created ${summary.createdEvents} event(s), created ${summary.createdSettlements} settlement(s), failures ${summary.failedSubscriptions}.`,
+            `Internal trading worker scanned ${summary.scannedSubscriptions}, created ${summary.createdEvents} event(s), created ${summary.createdSettlements} settlement(s), completed ${summary.completedSubscriptions} package(s), returned ${summary.principalReturns} principal(s), failures ${summary.failedSubscriptions}.`,
           );
         }
       } catch (error) {
@@ -268,6 +297,27 @@ export class InternalTradingWorkerService
     } finally {
       this.running = false;
     }
+  }
+
+  private noteSubscriptionFailure(
+    summary: InternalTradingWorkerSummary,
+    subscriptionId: string,
+    error: unknown,
+  ) {
+    summary.failedSubscriptions += 1;
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unknown internal trading worker error.';
+
+    if (summary.failures.length < 20) {
+      summary.failures.push({ subscriptionId, message });
+    }
+
+    this.logger.error(
+      `ITD worker failed subscription ${subscriptionId}: ${message}`,
+    );
   }
 
   private noteFailure(error: unknown) {
