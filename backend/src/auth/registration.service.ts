@@ -31,10 +31,7 @@ const AUTO_USERNAME_ATTEMPTS = 100;
 const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  | 'SELF_REGISTRATION'
-  | 'SUPER_ADMIN'
-  | 'ADMIN'
-  | 'AUTHORIZED_USER';
+  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;
@@ -93,12 +90,7 @@ export class RegistrationService {
       );
     }
 
-    const result = await this.register(
-      dto,
-      null,
-      context,
-      duplicateDecision,
-    );
+    const result = await this.register(dto, null, context, duplicateDecision);
 
     const delivery = this.emailVerificationService
       ? await this.emailVerificationService.sendInitial(result.user, context)

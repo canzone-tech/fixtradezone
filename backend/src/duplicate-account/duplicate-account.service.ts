@@ -24,11 +24,7 @@ const DEVICE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type DuplicateAccountRiskAction =
-  | 'ALLOWED'
-  | 'MONITORED'
-  | 'RESTRICTED'
-  | 'BLOCKED'
-  | 'BYPASSED';
+  'ALLOWED' | 'MONITORED' | 'RESTRICTED' | 'BLOCKED' | 'BYPASSED';
 
 export interface ConfigSnapshot {
   enforcementMode: DuplicateAccountEnforcementMode;
@@ -207,9 +203,11 @@ export class DuplicateAccountService {
 
     return this.prisma.$transaction(
       async (transaction) => {
-        const existing = await transaction.duplicateAccountAllowlist.findUnique({
-          where: { id },
-        });
+        const existing = await transaction.duplicateAccountAllowlist.findUnique(
+          {
+            where: { id },
+          },
+        );
 
         if (!existing) {
           throw new NotFoundException('Allowlist entry was not found.');
@@ -250,9 +248,11 @@ export class DuplicateAccountService {
       ? this.normalizeDeviceId(input.deviceInstallationId)
       : null;
     const ipAddress = this.normalizeIp(context.ipAddress);
-    const configRow = await this.prisma.systemDuplicateAccountConfig.findUnique({
-      where: { id: CONFIG_ID },
-    });
+    const configRow = await this.prisma.systemDuplicateAccountConfig.findUnique(
+      {
+        where: { id: CONFIG_ID },
+      },
+    );
     const config = this.toConfigSnapshot(configRow);
 
     const bypass = await this.findBypass(deviceInstallationId, ipAddress);

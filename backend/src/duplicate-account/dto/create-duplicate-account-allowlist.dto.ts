@@ -1,5 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export const DUPLICATE_ACCOUNT_ALLOWLIST_TYPES = [
   'DEVICE_INSTALLATION_ID',

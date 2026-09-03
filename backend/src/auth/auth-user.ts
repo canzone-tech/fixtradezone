@@ -1,11 +1,7 @@
 export const AUTH_SESSION_ID: unique symbol = Symbol('AUTH_SESSION_ID');
 
 export type AuthUserStatus =
-  | 'ACTIVE'
-  | 'RESTRICTED'
-  | 'SUSPENDED'
-  | 'BLOCKED'
-  | 'PENDING';
+  'ACTIVE' | 'RESTRICTED' | 'SUSPENDED' | 'BLOCKED' | 'PENDING';
 
 export const AUTH_USER_SELECT = {
   id: true,
