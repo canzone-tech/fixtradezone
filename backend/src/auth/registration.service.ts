@@ -340,11 +340,7 @@ export class RegistrationService {
       );
     }
 
-    if (
-      source !== 'SELF_REGISTRATION' &&
-      config.mobileRequired &&
-      !dto.phone
-    ) {
+    if (source !== 'SELF_REGISTRATION' && config.mobileRequired && !dto.phone) {
       throw new BadRequestException(
         'Mobile number is required by the current registration policy.',
       );
