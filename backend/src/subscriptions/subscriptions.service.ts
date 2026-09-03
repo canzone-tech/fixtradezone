@@ -405,7 +405,9 @@ export class SubscriptionsService {
         }
 
         if (
-          !planItem.minimumInvestment.equals(deposit.packageMinimumInvestment) ||
+          !planItem.minimumInvestment.equals(
+            deposit.packageMinimumInvestment,
+          ) ||
           !this.optionalDecimalEquals(
             planItem.maximumInvestment,
             deposit.packageMaximumInvestment,
@@ -437,7 +439,7 @@ export class SubscriptionsService {
         minimumInvestment = deposit.packageMinimumInvestment.toFixed(8);
         maximumInvestment =
           deposit.packageMaximumInvestment?.toFixed(8) ?? null;
-        principalTreatment = deposit.packagePrincipalTreatment as typeof principalTreatment;
+        principalTreatment = deposit.packagePrincipalTreatment;
       } else if (!planItem.price.equals(deposit.amount)) {
         throw new ConflictException(
           'Legacy fixed-price deposit amount does not match its immutable package source.',

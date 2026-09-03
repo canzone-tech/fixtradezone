@@ -145,7 +145,11 @@ export class ClientPackageProfileService {
           (entry) => !byCode.has(entry.packageCode),
         );
 
-        if (missing.length > 0 || unexpected.length > 0 || plan.items.length !== 9) {
+        if (
+          missing.length > 0 ||
+          unexpected.length > 0 ||
+          plan.items.length !== 9
+        ) {
           throw new BadRequestException(
             'The client package profile requires exactly the nine canonical FixTradeZone package definitions.',
           );
