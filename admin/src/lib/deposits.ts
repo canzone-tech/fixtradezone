@@ -1,7 +1,10 @@
 import type { PackagePlanItem } from "@/lib/packages";
 
 export type DepositStatus =
-  "AWAITING_TXID" | "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  | "AWAITING_TXID"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED";
 
 export type DepositValidationProfile = "TRON" | "EVM" | "SOLANA";
 
@@ -59,6 +62,10 @@ export interface Deposit {
   packageCode: string;
   packageDisplayName: string;
   amount: string;
+  packageMinimumInvestment: string | null;
+  packageMaximumInvestment: string | null;
+  packageDurationDays: number | null;
+  packagePrincipalTreatment: string | null;
   currency: string;
   assignedDepositAccountId: string;
   assignedAccountLabel: string;
