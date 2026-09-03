@@ -208,6 +208,94 @@
   white-space: nowrap;
 }
 
+.profileForm {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profileForm label {
+  display: grid;
+  gap: 6px;
+  color: #7f92aa;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.profileForm input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(83, 119, 176, 0.28);
+  border-radius: 9px;
+  outline: 0;
+  color: #eaf2ff;
+  background: rgba(2, 11, 27, 0.56);
+  font-size: 10px;
+}
+
+.profileForm input:focus {
+  border-color: rgba(23, 233, 220, 0.62);
+  box-shadow: 0 0 0 3px rgba(23, 233, 220, 0.06);
+}
+
+.profileForm input:disabled {
+  opacity: 0.65;
+}
+
+.formHint {
+  margin: 0;
+  color: #61758f;
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.formError,
+.formSuccess {
+  padding: 10px 11px;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.formError {
+  border: 1px solid rgba(255, 100, 120, 0.2);
+  color: #ff8999;
+  background: rgba(92, 18, 35, 0.16);
+}
+
+.formSuccess {
+  border: 1px solid rgba(20, 229, 154, 0.2);
+  color: #42e9af;
+  background: rgba(8, 97, 68, 0.12);
+}
+
+.profileForm button {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border: 1px solid rgba(31, 255, 226, 0.3);
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(90deg, #078a88, #0bbb8e 52%, #0fc997);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.profileForm button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .securityState {
   display: flex;
   gap: 12px;
@@ -337,7 +425,8 @@
 
   .metrics,
   .details,
-  .securityFacts {
+  .securityFacts,
+  .formGrid {
     grid-template-columns: 1fr;
   }
 }
