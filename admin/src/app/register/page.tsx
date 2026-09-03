@@ -135,6 +135,13 @@ export default function RegisterPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const inviteReferralCode = new URLSearchParams(window.location.search)
+      .get("ref")
+      ?.trim();
+
+    if (inviteReferralCode) {
+      setReferralCode(inviteReferralCode.slice(0, 128).toUpperCase());
+    }
 
     void Promise.all([getPolicy(), getCaptcha()])
       .then(([nextPolicy, nextCaptcha]) => {
@@ -202,7 +209,9 @@ export default function RegisterPage() {
       kycDeclarationAccepted,
     };
 
-    if (referralCode.trim()) body.referralCode = referralCode.trim();
+    if (referralCode.trim()) {
+      body.referralCode = referralCode.trim().toUpperCase();
+    }
     if (email.trim()) body.email = email.trim();
     if (currentPolicy.usernameMode !== "AUTO" && username.trim()) {
       body.username = username.trim().toLowerCase();
@@ -414,7 +423,9 @@ export default function RegisterPage() {
                   id="register-referral"
                   type="text"
                   value={referralCode}
-                  onChange={(event) => setReferralCode(event.target.value)}
+                  onChange={(event) =>
+                    setReferralCode(event.target.value.toUpperCase())
+                  }
                   maxLength={128}
                   autoComplete="off"
                   placeholder="Enter referral code"
