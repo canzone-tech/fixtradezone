@@ -172,6 +172,24 @@ export class CreatePackagePlanItemDto extends AuditedRevisionDto {
   @Matches(PRICE_PATTERN)
   price!: string;
 
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  minimumInvestment?: string | null;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  maximumInvestment?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(36500)
+  durationDays?: number | null;
+
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
   )
@@ -280,6 +298,24 @@ export class UpdatePackagePlanItemDto extends AuditedRevisionDto {
   @IsString()
   @Matches(PRICE_PATTERN)
   price?: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  minimumInvestment?: string | null;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  maximumInvestment?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(36500)
+  durationDays?: number | null;
 
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
