@@ -19,7 +19,12 @@ import {
   statusTone,
   transactionIdHint,
 } from "@/lib/deposits";
-import type { PackageCatalogue, PackagePlanItem } from "@/lib/packages";
+import {
+  investmentRangeLabel,
+  principalReturnLabel,
+  type PackageCatalogue,
+  type PackagePlanItem,
+} from "@/lib/packages";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
@@ -41,6 +46,8 @@ class UserWorkspaceAccessError extends Error {
     this.name = "UserWorkspaceAccessError";
   }
 }
+
+const INVESTMENT_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,8})?$/;
 
 function formatDate(value: string | null): string {
   return formatPlatformDateTime(value);
@@ -86,8 +93,6 @@ async function checkedUserJson<T extends ApiMessagePayload>(
 }
 
 async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
-  // Keep requests sequential so a rotating refresh token can never be raced by
-  // parallel BFF calls.
   const sessionResponse = await fetch("/api/user/session", {
     cache: "no-store",
   });
@@ -144,6 +149,7 @@ export default function UserDepositsClient() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [selectedPackageId, setSelectedPackageId] = useState("");
   const [selectedRailId, setSelectedRailId] = useState("");
+  const [investmentAmount, setInvestmentAmount] = useState("");
   const [txid, setTxid] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -186,11 +192,15 @@ export default function UserDepositsClient() {
     setPackages(workspace.packages);
     setRails(workspace.rails);
     setDeposits(workspace.deposits);
-    setSelectedPackageId((current) =>
-      workspace.packages.some((item) => item.id === current)
-        ? current
-        : (workspace.packages[0]?.id ?? ""),
-    );
+
+    const nextPackage =
+      workspace.packages.find((item) => item.id === selectedPackageId) ??
+      workspace.packages[0] ??
+      null;
+    setSelectedPackageId(nextPackage?.id ?? "");
+    if (nextPackage && !investmentAmount) {
+      setInvestmentAmount(nextPackage.minimumInvestment);
+    }
   }
 
   async function reloadWorkspace() {
@@ -221,7 +231,16 @@ export default function UserDepositsClient() {
     async function loadInitialWorkspace() {
       try {
         const workspace = await fetchUserDepositWorkspace();
-        if (mounted) applyWorkspace(workspace);
+        if (!mounted) return;
+
+        const firstPackage = workspace.packages[0] ?? null;
+        setSession(workspace.session);
+        setPackagePlan(workspace.plan);
+        setPackages(workspace.packages);
+        setRails(workspace.rails);
+        setDeposits(workspace.deposits);
+        setSelectedPackageId(firstPackage?.id ?? "");
+        setInvestmentAmount(firstPackage?.minimumInvestment ?? "");
       } catch (caught) {
         const redirectTo = redirectFor(caught);
         if (redirectTo) {
@@ -253,8 +272,25 @@ export default function UserDepositsClient() {
     queueMicrotask(() => setSelectedRailId(nextRailId));
   }, [eligibleRails, selectedRailId]);
 
+  function choosePackage(packageId: string) {
+    const nextPackage = packages.find((item) => item.id === packageId) ?? null;
+    setSelectedPackageId(packageId);
+    setInvestmentAmount(nextPackage?.minimumInvestment ?? "");
+    setError(null);
+    setNotice(null);
+  }
+
   async function createDeposit() {
-    if (!selectedPackageId || !selectedRailId || openDeposit) return;
+    if (!selectedPackageId || !selectedRailId || !selectedPackage || openDeposit) {
+      return;
+    }
+
+    const normalizedAmount = investmentAmount.trim();
+    if (!INVESTMENT_PATTERN.test(normalizedAmount) || normalizedAmount === "0") {
+      setError("Enter a valid USDT investment amount with up to 8 decimals.");
+      return;
+    }
+
     setBusy("create");
     setError(null);
     setNotice(null);
@@ -266,6 +302,7 @@ export default function UserDepositsClient() {
         body: JSON.stringify({
           packagePlanItemId: selectedPackageId,
           paymentRailId: selectedRailId,
+          investmentAmount: normalizedAmount,
         }),
       });
       const payload = await readJson<
@@ -349,10 +386,10 @@ export default function UserDepositsClient() {
             <p className={styles.eyebrow}>CONFIGURED PAYMENT NETWORKS</p>
             <h1>Deposits</h1>
             <p>
-              Select a package and one supported payment network for its
-              currency. The backend then randomly assigns an active public
-              receiving account inside that exact network. Never send funds on a
-              different network.
+              Choose a package, enter the exact investment inside its published
+              range, then select a supported payment network. The backend
+              snapshots that exact principal before assigning a receiving
+              account.
             </p>
           </div>
           {openDeposit ? (
@@ -372,7 +409,7 @@ export default function UserDepositsClient() {
           <div className={styles.notice}>
             <strong>Package policy:</strong>{" "}
             {packagePlan.activePackageMode === "MULTIPLE_ACTIVE"
-              ? "Multiple purchased packages may remain active simultaneously. "
+              ? "Each purchased package may remain active and operate independently. "
               : "Only one package may remain active at a time. "}
             {activationPolicyText(packagePlan.activationTrigger)}
           </div>
@@ -407,7 +444,7 @@ export default function UserDepositsClient() {
               <div className={styles.list}>
                 <div className={styles.kv}>
                   <div>
-                    <small>Exact amount</small>
+                    <small>Exact investment</small>
                     <strong>
                       {compactDecimal(openDeposit.amount)}{" "}
                       {openDeposit.currency}
@@ -417,6 +454,12 @@ export default function UserDepositsClient() {
                     <small>Network</small>
                     <strong>{openDeposit.assignedNetwork}</strong>
                   </div>
+                  {openDeposit.packageDurationDays ? (
+                    <div>
+                      <small>Duration</small>
+                      <strong>{openDeposit.packageDurationDays} days</strong>
+                    </div>
+                  ) : null}
                   <div className={styles.full}>
                     <small>Assigned receiving address</small>
                     <strong className={styles.mono}>
@@ -486,7 +529,7 @@ export default function UserDepositsClient() {
             <div className={styles.cardHeader}>
               <div>
                 <p className={styles.eyebrow}>New Deposit</p>
-                <h2>Select package and payment network</h2>
+                <h2>Select package, exact investment and payment network</h2>
               </div>
             </div>
 
@@ -502,18 +545,31 @@ export default function UserDepositsClient() {
                     className={styles.select}
                     id="deposit-package"
                     value={selectedPackageId}
-                    onChange={(event) =>
-                      setSelectedPackageId(event.target.value)
-                    }
+                    onChange={(event) => choosePackage(event.target.value)}
                   >
                     {packages.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.displayName} — {compactDecimal(item.price)}{" "}
+                        {item.displayName} — {investmentRangeLabel(item)}{" "}
                         {item.currency}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                <div className={styles.field}>
+                  <label htmlFor="deposit-investment">Investment amount</label>
+                  <input
+                    className={styles.input}
+                    id="deposit-investment"
+                    inputMode="decimal"
+                    value={investmentAmount}
+                    onChange={(event) => setInvestmentAmount(event.target.value)}
+                    placeholder={selectedPackage?.minimumInvestment ?? "0"}
+                    maxLength={22}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div className={styles.field}>
                   <label htmlFor="deposit-rail">Payment network</label>
                   <select
@@ -535,16 +591,24 @@ export default function UserDepositsClient() {
                   </select>
                 </div>
 
-                {selectedPackage && selectedRail ? (
+                {selectedPackage ? (
                   <div className={`${styles.notice} ${styles.full}`}>
-                    Pay exactly{" "}
+                    <strong>{selectedPackage.displayName}</strong>: published
+                    investment range {investmentRangeLabel(selectedPackage)}{" "}
+                    {selectedPackage.currency}, duration{" "}
+                    {selectedPackage.durationDays} days. {" "}
+                    {principalReturnLabel(selectedPackage)}.
+                  </div>
+                ) : null}
+
+                {selectedPackage && selectedRail && investmentAmount.trim() ? (
+                  <div className={`${styles.notice} ${styles.full}`}>
+                    After the backend validates the range, pay exactly{" "}
                     <strong>
-                      {compactDecimal(selectedPackage.price)}{" "}
-                      {selectedPackage.currency}
+                      {investmentAmount.trim()} {selectedPackage.currency}
                     </strong>{" "}
-                    on <strong>{selectedRail.networkCode}</strong>. The
-                    receiving address will be assigned by the backend from that
-                    rail&apos;s active account pool.
+                    on <strong>{selectedRail.networkCode}</strong>. The receiving
+                    address is assigned from that rail&apos;s active account pool.
                   </div>
                 ) : null}
 
@@ -553,7 +617,10 @@ export default function UserDepositsClient() {
                     className={styles.button}
                     type="button"
                     disabled={
-                      !selectedPackageId || !selectedRailId || busy !== null
+                      !selectedPackageId ||
+                      !selectedRailId ||
+                      !investmentAmount.trim() ||
+                      busy !== null
                     }
                     onClick={() => void createDeposit()}
                   >
@@ -589,7 +656,8 @@ export default function UserDepositsClient() {
                 <thead>
                   <tr>
                     <th>Package</th>
-                    <th>Amount</th>
+                    <th>Investment</th>
+                    <th>Duration</th>
                     <th>Network</th>
                     <th>Status</th>
                     <th>Transaction ID</th>
@@ -602,6 +670,11 @@ export default function UserDepositsClient() {
                       <td>{deposit.packageDisplayName}</td>
                       <td>
                         {compactDecimal(deposit.amount)} {deposit.currency}
+                      </td>
+                      <td>
+                        {deposit.packageDurationDays
+                          ? `${deposit.packageDurationDays} days`
+                          : "Legacy"}
                       </td>
                       <td>{deposit.assignedNetwork}</td>
                       <td>
