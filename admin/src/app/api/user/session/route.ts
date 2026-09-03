@@ -21,6 +21,7 @@ import { backendFetch, readJson } from "@/lib/backend";
 const DEFAULT_IDLE_LOCK_MINUTES = 5;
 
 interface ProfilePayload {
+  message?: string;
   user?: AdminUser;
 }
 
@@ -54,7 +55,6 @@ function readIdleLockMinutes(payload: unknown): number | null {
   }
 
   const root = payload as Record<string, unknown>;
-
   const direct = root.idleLockMinutes;
 
   if (
@@ -237,8 +237,6 @@ export async function GET(request: NextRequest) {
     if (!isStandardUser(auth.user)) {
       const response = roleRejected(auth.user);
 
-      // Refresh-token rotation already occurred. Preserve the newly issued
-      // valid session instead of leaving the account with a consumed token.
       setAuthCookies(response, auth);
 
       return response;
@@ -257,6 +255,82 @@ export async function GET(request: NextRequest) {
       {
         message: "USER authentication service is temporarily unavailable.",
       },
+      { status: 503 },
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  if (isCrossSiteRequest(request)) {
+    return NextResponse.json(
+      { message: "Cross-site profile updates are not allowed." },
+      { status: 403 },
+    );
+  }
+
+  if (request.cookies.get(IMPERSONATION_TOKEN_COOKIE)?.value) {
+    return NextResponse.json(
+      { message: "Profile changes are disabled during impersonation." },
+      { status: 403 },
+    );
+  }
+
+  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+
+  if (!accessToken) {
+    return sessionExpired();
+  }
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as unknown;
+    const profileResponse = await backendFetch("/auth/me/profile", {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    const payload = (await readJson(profileResponse)) as ProfilePayload | null;
+
+    if (profileResponse.status === 401) {
+      return sessionExpired();
+    }
+
+    if (!profileResponse.ok) {
+      return NextResponse.json(
+        payload ?? { message: "Unable to update your profile." },
+        {
+          status: profileResponse.status,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    }
+
+    if (!payload?.user || !isAdminUser(payload.user)) {
+      return NextResponse.json(
+        { message: "Authentication service returned an invalid profile." },
+        { status: 502 },
+      );
+    }
+
+    if (!isStandardUser(payload.user)) {
+      return roleRejected(payload.user);
+    }
+
+    return NextResponse.json(
+      {
+        message: payload.message ?? "Profile updated successfully.",
+        user: payload.user,
+      },
+      {
+        status: 200,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
+  } catch {
+    return NextResponse.json(
+      { message: "USER profile service is temporarily unavailable." },
       { status: 503 },
     );
   }
