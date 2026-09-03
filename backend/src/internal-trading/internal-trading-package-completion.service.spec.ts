@@ -138,35 +138,33 @@ describe('InternalTradingPackageCompletionService', () => {
     expect(result.principalReturnTransactionId).toEqual(expect.any(String));
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(6);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(2);
-    expect(transaction.auditLog.create).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'CREATE',
-          entityType: 'LedgerTransaction',
-          metadata: expect.objectContaining({
-            operation: 'RETURN_PACKAGE_PRINCIPAL',
-            amount: '12.50000000',
-            debitAccount: principalAccount.accountKey,
-            creditAccount: userMainAccount.accountKey,
-            balanced: true,
-          }),
-        }),
-      }),
-    );
-    expect(transaction.auditLog.create).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          action: 'UPDATE',
-          entityType: 'UserPackageSubscription',
-          metadata: expect.objectContaining({
-            operation: 'FINALIZE_PACKAGE_COMPLETION',
-            principalReturnApplied: true,
-          }),
-        }),
-      }),
-    );
+    expect(
+      transaction.auditLog.create.mock.calls[0]?.[0] as unknown,
+    ).toMatchObject({
+      data: {
+        action: 'CREATE',
+        entityType: 'LedgerTransaction',
+        metadata: {
+          operation: 'RETURN_PACKAGE_PRINCIPAL',
+          amount: '12.50000000',
+          debitAccount: principalAccount.accountKey,
+          creditAccount: userMainAccount.accountKey,
+          balanced: true,
+        },
+      },
+    });
+    expect(
+      transaction.auditLog.create.mock.calls[1]?.[0] as unknown,
+    ).toMatchObject({
+      data: {
+        action: 'UPDATE',
+        entityType: 'UserPackageSubscription',
+        metadata: {
+          operation: 'FINALIZE_PACKAGE_COMPLETION',
+          principalReturnApplied: true,
+        },
+      },
+    });
   });
 
   it('completes PrimeBot without a principal-return ledger movement', async () => {
@@ -193,16 +191,16 @@ describe('InternalTradingPackageCompletionService', () => {
     });
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
-    expect(transaction.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          metadata: expect.objectContaining({
-            principalTreatment: 'NON_REFUNDABLE_PACKAGE_VALUE',
-            principalReturnApplied: false,
-          }),
-        }),
-      }),
-    );
+    expect(
+      transaction.auditLog.create.mock.calls[0]?.[0] as unknown,
+    ).toMatchObject({
+      data: {
+        metadata: {
+          principalTreatment: 'NON_REFUNDABLE_PACKAGE_VALUE',
+          principalReturnApplied: false,
+        },
+      },
+    });
   });
 
   it('is idempotent after a verified principal-return transaction exists', async () => {
