@@ -5,4 +5,5 @@ export { ReauthenticateDto } from './reauthenticate.dto';
 export { RefreshTokenDto } from './refresh-token.dto';
 export { RegisterDto } from './register.dto';
 export { ResendEmailVerificationDto } from './resend-email-verification.dto';
+export { UpdateOwnProfileDto } from './update-own-profile.dto';
 export { VerifyEmailDto } from './verify-email.dto';
