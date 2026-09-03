@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
 import { CaptchaModule } from '../captcha/captcha.module';
 import { ReferralsModule } from '../referrals/referrals.module';
 import { SecurityConfigModule } from '../security-config/security-config.module';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { EmailVerificationService } from './email-verification.service';
 import { FounderSuperAdminBootstrapService } from './founder-super-admin-bootstrap.service';
 import { FullImpersonationGuard } from './full-impersonation.guard';
 import { ImpersonationAuthGuard } from './impersonation-auth.guard';
@@ -31,6 +32,7 @@ import { TokenService } from './token.service';
   controllers: [AuthController, ImpersonationController],
   providers: [
     AuthService,
+    EmailVerificationService,
     FounderSuperAdminBootstrapService,
     FullImpersonationGuard,
     ImpersonationAuthGuard,
@@ -44,6 +46,7 @@ import { TokenService } from './token.service';
   ],
   exports: [
     AuthService,
+    EmailVerificationService,
     FounderSuperAdminBootstrapService,
     PasswordService,
     RegistrationService,

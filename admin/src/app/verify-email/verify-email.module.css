@@ -1,0 +1,23 @@
+.cardBody {
+  display: grid;
+  gap: 16px;
+}
+
+.statusBox {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.statusBox strong {
+  font-size: 15px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

@@ -1,24 +1,25 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { envValidationSchema } from './config/env.validation';
-import { PrismaModule } from './database/prisma.module';
-import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
-import { RbacModule } from './rbac/rbac.module';
-import { UsersModule } from './users/users.module';
-import { SecurityConfigModule } from './security-config/security-config.module';
+import { CommunicationModule } from './communication/communication.module';
+import { envValidationSchema } from './config/env.validation';
 import { DashboardModule } from './dashboard/dashboard.module';
-import { PlatformConfigModule } from './platform-config/platform-config.module';
-import { RedisModule } from './redis/redis.module';
-import { PackagesModule } from './packages/packages.module';
-import { WalletModule } from './wallet/wallet.module';
-import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { PrismaModule } from './database/prisma.module';
 import { DepositsModule } from './deposits/deposits.module';
-import { RewardsModule } from './rewards/rewards.module';
-import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
+import { HealthModule } from './health/health.module';
 import { InternalTradingModule } from './internal-trading/internal-trading.module';
+import { PackagesModule } from './packages/packages.module';
 import { PayoutsModule } from './payouts/payouts.module';
+import { PlatformConfigModule } from './platform-config/platform-config.module';
+import { RbacModule } from './rbac/rbac.module';
+import { RedisModule } from './redis/redis.module';
+import { RewardsModule } from './rewards/rewards.module';
+import { SecurityConfigModule } from './security-config/security-config.module';
+import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { UsersModule } from './users/users.module';
+import { WalletModule } from './wallet/wallet.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { PayoutsModule } from './payouts/payouts.module';
     }),
     PrismaModule,
     RedisModule,
+    CommunicationModule,
     AuthModule,
     RbacModule,
     UsersModule,

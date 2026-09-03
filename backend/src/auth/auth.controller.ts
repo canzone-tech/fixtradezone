@@ -22,7 +22,10 @@ import {
   ReauthenticateDto,
   RefreshTokenDto,
   RegisterDto,
+  ResendEmailVerificationDto,
+  VerifyEmailDto,
 } from './dto';
+import { EmailVerificationService } from './email-verification.service';
 import { Public } from './public.decorator';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
@@ -34,6 +37,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly reauthenticationService: ReauthenticationService,
     private readonly registrationService: RegistrationService,
+    private readonly emailVerificationService: EmailVerificationService,
   ) {}
 
   @Public()
@@ -50,6 +54,31 @@ export class AuthController {
   @Post('register')
   register(@Body() dto: RegisterDto, @Req() request: Request) {
     return this.authService.register(dto, getRequestContext(request));
+  }
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('email-verification/verify')
+  verifyEmail(@Body() dto: VerifyEmailDto, @Req() request: Request) {
+    return this.emailVerificationService.verify(
+      dto.token,
+      getRequestContext(request),
+    );
+  }
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('email-verification/resend')
+  resendEmailVerification(
+    @Body() dto: ResendEmailVerificationDto,
+    @Req() request: Request,
+  ) {
+    return this.emailVerificationService.resend(
+      dto.email,
+      getRequestContext(request),
+    );
   }
 
   @Public()

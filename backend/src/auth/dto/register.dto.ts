@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
@@ -65,6 +66,14 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(64)
   referralCode?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  age18Declared?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  kycDeclarationAccepted?: boolean;
 
   @Transform(trimString)
   @IsOptional()

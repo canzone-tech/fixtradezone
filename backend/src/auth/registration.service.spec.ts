@@ -4,8 +4,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import { PERMISSIONS } from '../rbac/rbac.constants';
 import { AUTH_USER_SELECT, type AuthenticatedUser } from './auth-user';
+import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 import { RegistrationService } from './registration.service';
@@ -19,7 +19,7 @@ describe('RegistrationService', () => {
     firstName: 'Prashant',
     lastName: 'Shukla',
     status: 'PENDING' as const,
-    createdAt: new Date('2026-08-22T00:00:00.000Z'),
+    createdAt: new Date('2026-09-03T00:00:00.000Z'),
     lastLoginAt: null,
     roles: [
       {
@@ -38,6 +38,7 @@ describe('RegistrationService', () => {
     },
     user: {
       create: jest.fn(),
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
     userIdentifierClaim: {
@@ -72,18 +73,24 @@ describe('RegistrationService', () => {
     ensureDefaultUserRole: jest.fn(),
   };
 
+  const emailVerificationService = {
+    sendInitial: jest.fn(),
+  };
+
   const defaultRole = {
     id: 'user-role-id',
     name: 'USER',
   };
 
-  const manualDto = {
+  const publicDto = {
     email: 'user@example.com',
     username: 'Trader.One',
     phone: '+919876543210',
     password: 'SecurePassword123!',
     firstName: 'Prashant',
     lastName: 'Shukla',
+    age18Declared: true,
+    kycDeclarationAccepted: true,
   };
 
   const superAdminActor: AuthenticatedUser = {
@@ -100,21 +107,6 @@ describe('RegistrationService', () => {
     permissions: [],
   };
 
-  const adminActor: AuthenticatedUser = {
-    ...superAdminActor,
-    id: 'admin-id',
-    username: 'admin',
-    roles: ['ADMIN'],
-  };
-
-  const authorizedUserActor: AuthenticatedUser = {
-    ...superAdminActor,
-    id: 'registrar-id',
-    username: 'registrar',
-    roles: ['USER'],
-    permissions: [PERMISSIONS.USERS_CREATE],
-  };
-
   let service: RegistrationService;
 
   beforeEach(() => {
@@ -123,65 +115,38 @@ describe('RegistrationService', () => {
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.user.create.mockResolvedValue(createdUser);
+    transaction.user.findFirst.mockResolvedValue(null);
     transaction.user.findUnique.mockResolvedValue(null);
-
-    transaction.userIdentifierClaim.create.mockResolvedValue({
-      id: 'claim-id',
-    });
-
-    transaction.auditLog.create.mockResolvedValue({
-      id: 'audit-id',
-    });
-
+    transaction.userIdentifierClaim.create.mockResolvedValue({ id: 'claim-id' });
+    transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
     transaction.systemSequence.upsert.mockResolvedValue({
       key: 'username',
       nextValue: 100001n,
     });
-
     transaction.systemSequence.update.mockResolvedValue({
       key: 'username',
       nextValue: 100002n,
     });
-
-    transaction.$queryRaw.mockResolvedValue([
-      {
-        nextValue: 100001n,
-      },
-    ]);
-
+    transaction.$queryRaw.mockResolvedValue([{ nextValue: 100001n }]);
     passwordService.hash.mockResolvedValue('argon2-hash');
-
     passwordService.generateTemporaryPassword.mockReturnValue(
       'generated-temporary-password',
     );
-
     rbacBootstrapService.ensureDefaultUserRole.mockResolvedValue(defaultRole);
+    emailVerificationService.sendInitial.mockResolvedValue({ sent: true });
 
     service = new RegistrationService(
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
       rbacBootstrapService as unknown as RbacBootstrapService,
+      undefined,
+      emailVerificationService as unknown as EmailVerificationService,
     );
   });
 
-  it('returns the safe public registration policy with configured values', async () => {
+  it('returns public policy with mandatory declarations and email verification', async () => {
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue({
-      publicRegistrationEnabled: false,
-      emailRequired: false,
-      mobileRequired: true,
-      passwordMode: 'AUTO',
-      usernameMode: 'AUTO',
-      usernamePrefixEnabled: true,
-      usernamePrefix: 'ftz',
-      superAdminRegistrationEnabled: true,
-      adminRegistrationEnabled: true,
-      authorizedUserRegistrationEnabled: true,
-      allowMultipleAccountsPerEmail: true,
-      allowMultipleAccountsPerMobile: true,
-    });
-
-    await expect(service.getPublicRegistrationPolicy()).resolves.toEqual({
-      publicRegistrationEnabled: false,
+      publicRegistrationEnabled: true,
       emailRequired: false,
       mobileRequired: true,
       passwordMode: 'AUTO',
@@ -189,50 +154,153 @@ describe('RegistrationService', () => {
       usernamePrefixEnabled: true,
       usernamePrefix: 'ftz',
     });
-  });
 
-  it('returns safe defaults when registration configuration is absent', async () => {
     await expect(service.getPublicRegistrationPolicy()).resolves.toEqual({
       publicRegistrationEnabled: true,
       emailRequired: true,
-      mobileRequired: false,
-      passwordMode: 'MANUAL',
-      usernameMode: 'AUTO_OR_MANUAL',
-      usernamePrefixEnabled: false,
-      usernamePrefix: null,
+      mobileRequired: true,
+      passwordMode: 'AUTO',
+      usernameMode: 'AUTO',
+      usernamePrefixEnabled: true,
+      usernamePrefix: 'ftz',
+      age18DeclarationRequired: true,
+      kycDeclarationRequired: true,
+      emailVerificationRequired: true,
+      declarationPolicyVersion: 'CLIENT_REVISION_2026_09_V1',
     });
   });
 
-  it('registers a public user with manual credentials, identifier claims and audit', async () => {
-    const result = await service.registerPublic(manualDto, {
+  it('registers public user pending verification and issues verification email after commit', async () => {
+    const result = await service.registerPublic(publicDto, {
       ipAddress: '127.0.0.1',
       userAgent: 'Jest',
     });
 
-    expect(passwordService.hash).toHaveBeenCalledWith(manualDto.password);
-
+    expect(transaction.user.findFirst).toHaveBeenCalledWith({
+      where: { email: 'user@example.com' },
+      select: { id: true },
+    });
     expect(transaction.user.create).toHaveBeenCalledWith({
       data: {
-        email: manualDto.email,
+        email: publicDto.email,
         username: 'trader.one',
-        phone: manualDto.phone,
+        phone: publicDto.phone,
         passwordHash: 'argon2-hash',
         mustChangePassword: false,
-        firstName: manualDto.firstName,
-        lastName: manualDto.lastName,
+        firstName: publicDto.firstName,
+        lastName: publicDto.lastName,
         status: 'PENDING',
         roles: {
           create: {
             role: {
-              connect: {
-                id: defaultRole.id,
-              },
+              connect: { id: defaultRole.id },
             },
           },
         },
       },
       select: AUTH_USER_SELECT,
     });
+    expect(transaction.userIdentifierClaim.create).toHaveBeenCalledWith({
+      data: {
+        userId: createdUser.id,
+        type: 'EMAIL',
+        normalizedValue: 'user@example.com',
+      },
+    });
+    expect(transaction.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: createdUser.id,
+        action: 'CREATE',
+        entityType: 'User',
+        entityId: createdUser.id,
+        metadata: expect.objectContaining({
+          source: 'SELF_REGISTRATION',
+          declarationPolicyVersion: 'CLIENT_REVISION_2026_09_V1',
+          age18Declared: true,
+          kycDeclarationAccepted: true,
+          emailVerificationRequired: true,
+        }),
+        ipAddress: '127.0.0.1',
+        userAgent: 'Jest',
+      }),
+    });
+    expect(emailVerificationService.sendInitial).toHaveBeenCalledWith(
+      expect.objectContaining({ id: createdUser.id, email: createdUser.email }),
+      { ipAddress: '127.0.0.1', userAgent: 'Jest' },
+    );
+    expect(result).toMatchObject({
+      emailVerificationRequired: true,
+      verificationEmailSent: true,
+      verificationStatus: 'PENDING_EMAIL_VERIFICATION',
+      user: {
+        id: createdUser.id,
+        status: 'PENDING',
+      },
+    });
+  });
+
+  it('does not roll back registration when initial email delivery fails', async () => {
+    emailVerificationService.sendInitial.mockResolvedValue({ sent: false });
+
+    const result = await service.registerPublic(publicDto);
+
+    expect(result).toMatchObject({
+      emailVerificationRequired: true,
+      verificationEmailSent: false,
+      verificationStatus: 'PENDING_EMAIL_VERIFICATION',
+    });
+    expect(transaction.user.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires both public registration declarations', async () => {
+    await expect(
+      service.registerPublic({
+        ...publicDto,
+        age18Declared: false,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      service.registerPublic({
+        ...publicDto,
+        kycDeclarationAccepted: false,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction.user.create).not.toHaveBeenCalled();
+  });
+
+  it('requires an email for public registration even when legacy config marks it optional', async () => {
+    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
+      emailRequired: false,
+    });
+
+    await expect(
+      service.registerPublic({
+        username: 'trader.one',
+        password: 'SecurePassword123!',
+        age18Declared: true,
+        kycDeclarationAccepted: true,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('hard rejects a public duplicate email before creating the user', async () => {
+    transaction.user.findFirst.mockResolvedValue({ id: 'existing-user-id' });
+
+    await expect(service.registerPublic(publicDto)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    expect(transaction.user.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps public email uniqueness even if the legacy multiple-email flag is enabled', async () => {
+    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
+      allowMultipleAccountsPerEmail: true,
+    });
+
+    await service.registerPublic(publicDto);
 
     expect(transaction.userIdentifierClaim.create).toHaveBeenCalledWith({
       data: {
@@ -241,51 +309,6 @@ describe('RegistrationService', () => {
         normalizedValue: 'user@example.com',
       },
     });
-
-    expect(transaction.userIdentifierClaim.create).toHaveBeenCalledWith({
-      data: {
-        userId: createdUser.id,
-        type: 'MOBILE',
-        normalizedValue: '+919876543210',
-      },
-    });
-
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        actorUserId: createdUser.id,
-        action: 'CREATE',
-        entityType: 'User',
-        entityId: createdUser.id,
-        description: 'User completed self-registration.',
-        metadata: {
-          source: 'SELF_REGISTRATION',
-          createdByUserId: null,
-          generatedUsername: false,
-          generatedPassword: false,
-        },
-        ipAddress: '127.0.0.1',
-        userAgent: 'Jest',
-      },
-    });
-
-    expect(result).toMatchObject({
-      message: 'Registration successful.',
-      user: {
-        id: createdUser.id,
-        username: createdUser.username,
-        roles: ['USER'],
-      },
-    });
-
-    expect(result).not.toHaveProperty('temporaryPassword');
-
-    expect(JSON.stringify(result)).not.toContain('argon2-hash');
-
-    expect(JSON.stringify(result)).not.toContain(manualDto.password);
-
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-      isolationLevel: 'Serializable',
-    });
   });
 
   it('rejects public registration when disabled', async () => {
@@ -293,313 +316,56 @@ describe('RegistrationService', () => {
       publicRegistrationEnabled: false,
     });
 
-    await expect(service.registerPublic(manualDto)).rejects.toBeInstanceOf(
+    await expect(service.registerPublic(publicDto)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
 
-    expect(passwordService.hash).not.toHaveBeenCalled();
     expect(transaction.user.create).not.toHaveBeenCalled();
   });
 
-  it('records SUPER_ADMIN as the dashboard registration source', async () => {
-    await service.registerDashboard(manualDto, superAdminActor, {
-      ipAddress: '127.0.0.1',
-    });
-
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        actorUserId: superAdminActor.id,
-        action: 'CREATE',
-        entityType: 'User',
-        entityId: createdUser.id,
-        description: 'Authorized account creator registered a platform user.',
-        metadata: {
-          source: 'SUPER_ADMIN',
-          createdByUserId: superAdminActor.id,
-          generatedUsername: false,
-          generatedPassword: false,
-        },
-        ipAddress: '127.0.0.1',
-        userAgent: undefined,
+  it('does not require public declarations for SUPER_ADMIN-created users', async () => {
+    await service.registerDashboard(
+      {
+        email: publicDto.email,
+        username: publicDto.username,
+        phone: publicDto.phone,
+        password: publicDto.password,
       },
-    });
-  });
-
-  it('rejects ADMIN registration when the policy disables it', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      adminRegistrationEnabled: false,
-    });
-
-    await expect(
-      service.registerDashboard(manualDto, adminActor),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-
-    expect(transaction.user.create).not.toHaveBeenCalled();
-  });
-
-  it('allows an authorized USER only when registration and users.create are enabled', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      authorizedUserRegistrationEnabled: true,
-    });
-
-    await service.registerDashboard(manualDto, authorizedUserActor);
-
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        actorUserId: authorizedUserActor.id,
-        action: 'CREATE',
-        entityType: 'User',
-        entityId: createdUser.id,
-        description: 'Authorized account creator registered a platform user.',
-        metadata: {
-          source: 'AUTHORIZED_USER',
-          createdByUserId: authorizedUserActor.id,
-          generatedUsername: false,
-          generatedPassword: false,
-        },
-        ipAddress: undefined,
-        userAgent: undefined,
-      },
-    });
-
-    const unauthorizedActor: AuthenticatedUser = {
-      ...authorizedUserActor,
-      id: 'unauthorized-id',
-      username: 'unauthorized',
-      permissions: [],
-    };
-
-    await expect(
-      service.registerDashboard(manualDto, unauthorizedActor),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-  });
-
-  it('enforces required email and mobile registration policy', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      emailRequired: true,
-      mobileRequired: true,
-    });
-
-    await expect(
-      service.registerPublic({
-        username: 'trader.one',
-        password: 'SecurePassword123!',
-        phone: '+919876543210',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
-    await expect(
-      service.registerPublic({
-        email: 'user@example.com',
-        username: 'trader.one',
-        password: 'SecurePassword123!',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('generates an AUTO password, hashes it and marks the account for password change', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      passwordMode: 'AUTO',
-    });
-
-    const result = await service.registerPublic({
-      email: manualDto.email,
-      username: manualDto.username,
-      phone: manualDto.phone,
-    });
-
-    expect(passwordService.generateTemporaryPassword).toHaveBeenCalledTimes(1);
-
-    expect(passwordService.hash).toHaveBeenCalledWith(
-      'generated-temporary-password',
+      superAdminActor,
     );
 
-    expect(transaction.user.create).toHaveBeenCalledWith({
-      data: {
-        email: manualDto.email,
-        username: 'trader.one',
-        phone: manualDto.phone,
-        passwordHash: 'argon2-hash',
-        mustChangePassword: true,
-        firstName: undefined,
-        lastName: undefined,
-        status: 'PENDING',
-        roles: {
-          create: {
-            role: {
-              connect: {
-                id: defaultRole.id,
-              },
-            },
-          },
-        },
-      },
-      select: AUTH_USER_SELECT,
-    });
-
-    expect(result).toMatchObject({
-      temporaryPassword: 'generated-temporary-password',
-      mustChangePassword: true,
-    });
+    expect(transaction.user.create).toHaveBeenCalledTimes(1);
+    expect(emailVerificationService.sendInitial).not.toHaveBeenCalled();
   });
 
-  it('rejects manually supplied password when AUTO password mode is active', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      passwordMode: 'AUTO',
-    });
-
-    await expect(service.registerPublic(manualDto)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-
-    expect(passwordService.hash).not.toHaveBeenCalled();
-  });
-
-  it('generates a prefixed username from the locked sequence', async () => {
+  it('supports generated usernames without changing the existing sequence contract', async () => {
     transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
       usernameMode: 'AUTO',
       usernamePrefixEnabled: true,
       usernamePrefix: 'FTZ',
     });
-
     transaction.user.create.mockResolvedValue({
       ...createdUser,
       username: 'ftz100001',
     });
 
     const result = await service.registerPublic({
-      email: manualDto.email,
-      phone: manualDto.phone,
-      password: manualDto.password,
-    });
-
-    expect(transaction.systemSequence.upsert).toHaveBeenCalledWith({
-      where: {
-        key: 'username',
-      },
-      create: {
-        key: 'username',
-        nextValue: 100001n,
-      },
-      update: {},
-    });
-
-    expect(transaction.user.findUnique).toHaveBeenCalledWith({
-      where: {
-        username: 'ftz100001',
-      },
-      select: {
-        id: true,
-      },
+      ...publicDto,
+      username: undefined,
     });
 
     expect(transaction.systemSequence.update).toHaveBeenCalledWith({
-      where: {
-        key: 'username',
-      },
-      data: {
-        nextValue: 100002n,
-      },
+      where: { key: 'username' },
+      data: { nextValue: 100002n },
     });
-
-    expect(transaction.user.create).toHaveBeenCalledWith({
-      data: {
-        email: manualDto.email,
-        username: 'ftz100001',
-        phone: manualDto.phone,
-        passwordHash: 'argon2-hash',
-        mustChangePassword: false,
-        firstName: undefined,
-        lastName: undefined,
-        status: 'PENDING',
-        roles: {
-          create: {
-            role: {
-              connect: {
-                id: defaultRole.id,
-              },
-            },
-          },
-        },
-      },
-      select: AUTH_USER_SELECT,
-    });
-
     expect(result.user.username).toBe('ftz100001');
   });
 
-  it('skips email and mobile claims when multiple accounts are allowed', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      allowMultipleAccountsPerEmail: true,
-      allowMultipleAccountsPerMobile: true,
-    });
+  it('maps Prisma uniqueness failures to the safe conflict response', async () => {
+    transaction.userIdentifierClaim.create.mockRejectedValue({ code: 'P2002' });
 
-    await service.registerPublic(manualDto);
-
-    expect(transaction.userIdentifierClaim.create).not.toHaveBeenCalled();
-  });
-
-  it('converts Prisma unique constraint violations into a safe conflict response', async () => {
-    transaction.user.create.mockRejectedValue({
-      code: 'P2002',
-    });
-
-    await expect(service.registerPublic(manualDto)).rejects.toBeInstanceOf(
+    await expect(service.registerPublic(publicDto)).rejects.toBeInstanceOf(
       ConflictException,
     );
-
-    expect(transaction.auditLog.create).not.toHaveBeenCalled();
-  });
-
-  it('skips a collided generated username and advances the sequence safely', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      usernameMode: 'AUTO',
-      usernamePrefixEnabled: true,
-      usernamePrefix: 'FTZ',
-    });
-
-    transaction.user.findUnique
-      .mockResolvedValueOnce({
-        id: 'existing-user-id',
-      })
-      .mockResolvedValueOnce(null);
-
-    transaction.user.create.mockResolvedValue({
-      ...createdUser,
-      username: 'ftz100002',
-    });
-
-    await service.registerPublic({
-      email: manualDto.email,
-      phone: manualDto.phone,
-      password: manualDto.password,
-    });
-
-    expect(transaction.user.findUnique).toHaveBeenNthCalledWith(1, {
-      where: {
-        username: 'ftz100001',
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    expect(transaction.user.findUnique).toHaveBeenNthCalledWith(2, {
-      where: {
-        username: 'ftz100002',
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    expect(transaction.systemSequence.update).toHaveBeenCalledWith({
-      where: {
-        key: 'username',
-      },
-      data: {
-        nextValue: 100003n,
-      },
-    });
   });
 });

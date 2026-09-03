@@ -17,15 +17,20 @@ import {
 } from './auth-user';
 import type { RequestContext } from './auth.types';
 import type { RegisterDto } from './dto/register.dto';
+import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 
 const USERNAME_SEQUENCE_KEY = 'username';
 const USERNAME_SEQUENCE_START = 100001n;
 const AUTO_USERNAME_ATTEMPTS = 100;
+const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
+  | 'SELF_REGISTRATION'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;
@@ -58,10 +63,28 @@ export class RegistrationService {
     private readonly passwordService: PasswordService,
     private readonly rbacBootstrapService: RbacBootstrapService,
     @Optional() private readonly referralsService?: ReferralsService,
+    @Optional()
+    private readonly emailVerificationService?: EmailVerificationService,
   ) {}
 
-  registerPublic(dto: RegisterDto, context: RequestContext = {}) {
-    return this.register(dto, null, context);
+  async registerPublic(dto: RegisterDto, context: RequestContext = {}) {
+    const result = await this.register(dto, null, context);
+
+    const delivery = this.emailVerificationService
+      ? await this.emailVerificationService.sendInitial(result.user, context)
+      : { sent: false };
+
+    return {
+      ...result,
+      message: delivery.sent
+        ? 'Registration successful. Check your email to verify and activate your account.'
+        : 'Registration successful. Email verification is required; use resend if the message is not delivered.',
+      emailVerificationRequired: true,
+      verificationEmailSent: delivery.sent,
+      verificationStatus: result.user.email
+        ? 'PENDING_EMAIL_VERIFICATION'
+        : 'PENDING',
+    };
   }
 
   async getPublicRegistrationPolicy() {
@@ -71,12 +94,16 @@ export class RegistrationService {
 
     return {
       publicRegistrationEnabled: config?.publicRegistrationEnabled ?? true,
-      emailRequired: config?.emailRequired ?? true,
+      emailRequired: true,
       mobileRequired: config?.mobileRequired ?? false,
       passwordMode: config?.passwordMode ?? 'MANUAL',
       usernameMode: config?.usernameMode ?? 'AUTO_OR_MANUAL',
       usernamePrefixEnabled: config?.usernamePrefixEnabled ?? false,
       usernamePrefix: config?.usernamePrefix ?? null,
+      age18DeclarationRequired: true,
+      kycDeclarationRequired: true,
+      emailVerificationRequired: true,
+      declarationPolicyVersion: REGISTRATION_DECLARATION_POLICY_VERSION,
     };
   }
 
@@ -96,9 +123,10 @@ export class RegistrationService {
     try {
       return await this.prisma.$transaction(
         async (transaction) => {
-          const config = await transaction.systemRegistrationConfig.findUnique({
-            where: { id: 1 },
-          });
+          const config =
+            await transaction.systemRegistrationConfig.findUnique({
+              where: { id: 1 },
+            });
 
           const policy: RegistrationConfig = {
             publicRegistrationEnabled:
@@ -121,7 +149,23 @@ export class RegistrationService {
           };
 
           const source = this.assertRegistrationAllowed(actor, policy);
-          this.assertRequiredIdentifiers(dto, policy);
+          this.assertRequiredIdentifiers(dto, policy, source);
+          this.assertPublicDeclarations(dto, source);
+
+          if (source === 'SELF_REGISTRATION' && dto.email) {
+            const existingEmailUser = await transaction.user.findFirst({
+              where: {
+                email: dto.email.trim().toLowerCase(),
+              },
+              select: { id: true },
+            });
+
+            if (existingEmailUser) {
+              throw new ConflictException(
+                'An account already exists with one of the supplied unique identifiers.',
+              );
+            }
+          }
 
           const passwordResult = this.resolvePassword(dto, policy);
           const passwordHash = await this.passwordService.hash(
@@ -152,7 +196,11 @@ export class RegistrationService {
             select: AUTH_USER_SELECT,
           });
 
-          if (dto.email && !policy.allowMultipleAccountsPerEmail) {
+          if (
+            dto.email &&
+            (source === 'SELF_REGISTRATION' ||
+              !policy.allowMultipleAccountsPerEmail)
+          ) {
             await transaction.userIdentifierClaim.create({
               data: {
                 userId: user.id,
@@ -196,6 +244,15 @@ export class RegistrationService {
                 generatedUsername:
                   !dto.username || policy.usernameMode === 'AUTO',
                 generatedPassword: passwordResult.generated,
+                ...(source === 'SELF_REGISTRATION'
+                  ? {
+                      declarationPolicyVersion:
+                        REGISTRATION_DECLARATION_POLICY_VERSION,
+                      age18Declared: true,
+                      kycDeclarationAccepted: true,
+                      emailVerificationRequired: true,
+                    }
+                  : {}),
               },
               ipAddress: context.ipAddress,
               userAgent: context.userAgent,
@@ -273,15 +330,44 @@ export class RegistrationService {
   private assertRequiredIdentifiers(
     dto: RegisterDto,
     config: RegistrationConfig,
+    source: RegistrationSource,
   ): void {
-    if (config.emailRequired && !dto.email) {
+    if (source === 'SELF_REGISTRATION' && !dto.email) {
+      throw new BadRequestException(
+        'Email is required for public registration and verification.',
+      );
+    }
+
+    if (source !== 'SELF_REGISTRATION' && config.emailRequired && !dto.email) {
       throw new BadRequestException(
         'Email is required by the current registration policy.',
       );
     }
+
     if (config.mobileRequired && !dto.phone) {
       throw new BadRequestException(
         'Mobile number is required by the current registration policy.',
+      );
+    }
+  }
+
+  private assertPublicDeclarations(
+    dto: RegisterDto,
+    source: RegistrationSource,
+  ): void {
+    if (source !== 'SELF_REGISTRATION') {
+      return;
+    }
+
+    if (dto.age18Declared !== true) {
+      throw new BadRequestException(
+        'You must declare that you are 18 years of age or older.',
+      );
+    }
+
+    if (dto.kycDeclarationAccepted !== true) {
+      throw new BadRequestException(
+        'You must accept the identity and future KYC verification declaration.',
       );
     }
   }

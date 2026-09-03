@@ -27,6 +27,34 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+  PUBLIC_APP_URL: Joi.string().uri().default('https://localhost:3001'),
+
+  COMMUNICATION_EMAIL_MODE: Joi.string()
+    .valid('CONSOLE', 'HTTP')
+    .default('CONSOLE'),
+
+  COMMUNICATION_EMAIL_FROM: Joi.string()
+    .email()
+    .default('no-reply@fixtradezone.local'),
+
+  COMMUNICATION_EMAIL_HTTP_URL: Joi.string().uri().allow('').default(''),
+
+  COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: Joi.string()
+    .allow('')
+    .default(''),
+
+  EMAIL_VERIFICATION_TTL_MINUTES: Joi.number()
+    .integer()
+    .min(5)
+    .max(1440)
+    .default(30),
+
+  EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: Joi.number()
+    .integer()
+    .min(10)
+    .max(3600)
+    .default(60),
+
   REWARD_WORKER_ENABLED: Joi.boolean()
     .truthy('true')
     .falsy('false')
