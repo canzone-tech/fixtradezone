@@ -341,7 +341,7 @@ model Role {
 }
 
 model Permission {
-  id          String   @id @default(uuid()) @db.Char(36)
+  id          String   @id @default(uuid()) @db.VarChar(36)
   code        String   @unique @db.VarChar(150)
   description String?  @db.VarChar(255)
   createdAt   DateTime @default(now()) @db.DateTime(3)
@@ -455,11 +455,11 @@ model SystemRegistrationConfig {
   usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
   usernamePrefixEnabled             Boolean              @default(false)
   usernamePrefix                    String?               @db.VarChar(20)
-  allowMultipleAccountsPerEmail     Boolean              @default(false)
-  allowMultipleAccountsPerMobile    Boolean              @default(false)
+  allowMultipleAccountsPerEmail     Boolean               @default(false)
+  allowMultipleAccountsPerMobile    Boolean               @default(false)
   updatedByUserId                   String?               @db.Char(36)
-  createdAt                         DateTime             @default(now()) @db.DateTime(3)
-  updatedAt                         DateTime             @updatedAt @db.DateTime(3)
+  createdAt                         DateTime              @default(now()) @db.DateTime(3)
+  updatedAt                         DateTime              @updatedAt @db.DateTime(3)
 
   updatedByUser User? @relation("RegistrationConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
@@ -662,6 +662,9 @@ model PackagePlanItem {
   sortOrder           Int
   availability        PackageAvailability       @default(AVAILABLE)
   price               Decimal                   @db.Decimal(20, 8)
+  minimumInvestment   Decimal?                  @db.Decimal(20, 8)
+  maximumInvestment   Decimal?                  @db.Decimal(20, 8)
+  durationDays        Int?
   currency            String                    @db.VarChar(10)
   rewardRateMode      PackageRewardRateMode
   fixedRewardRate     Decimal?                  @db.Decimal(9, 6)
@@ -756,6 +759,10 @@ model Deposit {
   packageCode               String                   @db.VarChar(64)
   packageDisplayName        String                   @db.VarChar(100)
   amount                    Decimal                  @db.Decimal(20, 8)
+  packageMinimumInvestment  Decimal?                 @db.Decimal(20, 8)
+  packageMaximumInvestment  Decimal?                 @db.Decimal(20, 8)
+  packageDurationDays       Int?
+  packagePrincipalTreatment String?                  @db.VarChar(50)
   currency                  String                   @db.VarChar(10)
   assignedDepositAccountId  String                   @db.Char(36)
   assignedAccountLabel      String                   @db.VarChar(100)
