@@ -38,7 +38,7 @@ export interface AuthUserRecord {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'PENDING';
+  status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'PENDING' | 'RESTRICTED';
   createdAt: Date;
   lastLoginAt: Date | null;
   roles: Array<{
