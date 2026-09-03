@@ -6,6 +6,7 @@ import { AdminInternalTradingPoliciesController } from './admin-internal-trading
 import { AdminInternalTradingTradeController } from './admin-internal-trading-trade.controller';
 import { InternalTradingController } from './internal-trading.controller';
 import { InternalTradingLifecycleService } from './internal-trading-lifecycle.service';
+import { InternalTradingPackageCompletionService } from './internal-trading-package-completion.service';
 import { InternalTradingTradeService } from './internal-trading-trade.service';
 import { InternalTradingService } from './internal-trading.service';
 import { InternalTradingWorkerService } from './internal-trading-worker.service';
@@ -21,9 +22,14 @@ import { InternalTradingWorkerService } from './internal-trading-worker.service'
   providers: [
     InternalTradingService,
     InternalTradingLifecycleService,
+    InternalTradingPackageCompletionService,
     InternalTradingTradeService,
     InternalTradingWorkerService,
   ],
-  exports: [InternalTradingLifecycleService, InternalTradingTradeService],
+  exports: [
+    InternalTradingLifecycleService,
+    InternalTradingPackageCompletionService,
+    InternalTradingTradeService,
+  ],
 })
 export class InternalTradingModule {}
