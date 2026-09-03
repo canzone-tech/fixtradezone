@@ -213,11 +213,7 @@ export class CaptchaService {
         );
 
         if (redisResult !== null) {
-          this.reconcileLocalAfterRedisResult(
-            key,
-            suppliedDigest,
-            redisResult,
-          );
+          this.reconcileLocalAfterRedisResult(key, suppliedDigest, redisResult);
 
           if (redisResult) {
             return;
@@ -392,7 +388,8 @@ export class CaptchaService {
     }
 
     this.lastRedisWarningAt = now;
-    const reason = error instanceof Error ? error.message : 'Unknown Redis error';
+    const reason =
+      error instanceof Error ? error.message : 'Unknown Redis error';
     this.logger.warn(
       `CAPTCHA shared Redis state is unavailable; using bounded in-process fallback. ${reason}`,
     );
@@ -411,8 +408,7 @@ export class CaptchaService {
   private ensureLocalCapacity(): void {
     while (this.localChallenges.size >= CAPTCHA_LOCAL_MAX_ENTRIES) {
       const oldestKey = this.localChallenges.keys().next().value as
-        | string
-        | undefined;
+        string | undefined;
 
       if (!oldestKey) {
         return;
