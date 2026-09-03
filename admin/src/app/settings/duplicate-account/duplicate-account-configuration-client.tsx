@@ -70,7 +70,6 @@ export default function DuplicateAccountConfigurationClient() {
   const [success, setSuccess] = useState("");
 
   async function load() {
-    setError("");
     const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
     const session = (await sessionResponse.json().catch(() => ({}))) as {
       user?: AdminUser;
