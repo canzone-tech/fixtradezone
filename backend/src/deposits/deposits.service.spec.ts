@@ -73,8 +73,12 @@ function deposit(overrides: Record<string, unknown> = {}) {
     packagePlanVersionId: PLAN_ID,
     packagePlanItemId: ITEM_ID,
     packageCode: 'NEURAL_SCOUT',
-    packageDisplayName: 'Neural Scout',
+    packageDisplayName: 'FTZ AlphaBotc',
     amount: new Prisma.Decimal('5.00000000'),
+    packageMinimumInvestment: new Prisma.Decimal('5.00000000'),
+    packageMaximumInvestment: new Prisma.Decimal('24.00000000'),
+    packageDurationDays: 10,
+    packagePrincipalTreatment: 'RETURN_SEPARATELY',
     currency: 'USDT',
     assignedDepositAccountId: ACCOUNT_ID,
     assignedAccountLabel: 'Treasury A',
@@ -115,9 +119,13 @@ function packagePlan(
       items: [
         {
           id: ITEM_ID,
-          displayName: 'Neural Scout',
+          displayName: 'FTZ AlphaBotc',
           availability: 'AVAILABLE',
           price: new Prisma.Decimal('5.00000000'),
+          minimumInvestment: new Prisma.Decimal('5.00000000'),
+          maximumInvestment: new Prisma.Decimal('24.00000000'),
+          durationDays: 10,
+          principalTreatment: 'RETURN_SEPARATELY',
           currency: 'USDT',
           packageDefinition: {
             id: DEFINITION_ID,
@@ -222,6 +230,49 @@ describe('DepositsService', () => {
     expect(transaction.deposit.create).not.toHaveBeenCalled();
   });
 
+  it('requires an exact investment amount for a ranged package', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).rejects.toThrow('investmentAmount is required for this package range.');
+
+    expect(transaction.depositPaymentRail.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rejects a ranged investment below the package minimum', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '4.99999999',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Investment amount must be at least 5.00000000 USDT.');
+  });
+
+  it('rejects a ranged investment above the package maximum', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '24.00000001',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Investment amount must not exceed 24.00000000 USDT.');
+  });
+
   it('allows deposit funding for authorized manual package activation', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(
       packagePlan('MANUAL_ACTIVATION'),
@@ -233,7 +284,11 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).resolves.toMatchObject({
@@ -253,7 +308,11 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -266,13 +325,17 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('uses package amount and snapshots the selected rail/account', async () => {
+  it('snapshots the exact user-selected ranged investment and rail/account', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
     transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
     transaction.depositAccount.findMany.mockResolvedValue([account]);
@@ -286,7 +349,11 @@ describe('DepositsService', () => {
     );
 
     const result = await service.createDeposit(
-      { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+      {
+        packagePlanItemId: ITEM_ID,
+        paymentRailId: RAIL_ID,
+        investmentAmount: '12.5',
+      },
       actor,
     );
 
@@ -294,13 +361,21 @@ describe('DepositsService', () => {
       userId: USER_ID,
       openKey: USER_ID,
       packagePlanItemId: ITEM_ID,
-      amount: new Prisma.Decimal('5.00000000'),
+      amount: new Prisma.Decimal('12.50000000'),
+      packageMinimumInvestment: new Prisma.Decimal('5.00000000'),
+      packageMaximumInvestment: new Prisma.Decimal('24.00000000'),
+      packageDurationDays: 10,
+      packagePrincipalTreatment: 'RETURN_SEPARATELY',
       assignedDepositAccountId: ACCOUNT_ID,
       assignedWalletAddress: ADDRESS,
       assignedNetwork: 'TRC20',
       assignedValidationProfile: 'TRON',
     });
-    expect(result.deposit.amount).toBe('5');
+    expect(result.deposit.amount).toBe('12.5');
+    expect(result.deposit.packageMinimumInvestment).toBe('5');
+    expect(result.deposit.packageMaximumInvestment).toBe('24');
+    expect(result.deposit.packageDurationDays).toBe(10);
+    expect(result.deposit.packagePrincipalTreatment).toBe('RETURN_SEPARATELY');
   });
 
   it('normalizes transaction IDs from the immutable validation profile snapshot', async () => {
