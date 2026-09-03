@@ -7,6 +7,7 @@ import { envValidationSchema } from './config/env.validation';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './database/prisma.module';
 import { DepositsModule } from './deposits/deposits.module';
+import { DuplicateAccountModule } from './duplicate-account/duplicate-account.module';
 import { HealthModule } from './health/health.module';
 import { InternalTradingModule } from './internal-trading/internal-trading.module';
 import { PackagesModule } from './packages/packages.module';
@@ -35,6 +36,7 @@ import { WalletModule } from './wallet/wallet.module';
     PrismaModule,
     RedisModule,
     CommunicationModule,
+    DuplicateAccountModule,
     AuthModule,
     RbacModule,
     UsersModule,
