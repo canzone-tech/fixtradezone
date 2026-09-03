@@ -15,6 +15,9 @@ export function createDtoTerms(dto: CreatePackagePlanItemDto): ItemTerms {
     sortOrder: dto.sortOrder,
     availability: dto.availability,
     price: dto.price,
+    minimumInvestment: dto.minimumInvestment ?? null,
+    maximumInvestment: dto.maximumInvestment ?? null,
+    durationDays: dto.durationDays ?? null,
     currency: dto.currency,
     rewardRateMode: dto.rewardRateMode,
     fixedRewardRate: dto.fixedRewardRate ?? null,
@@ -42,6 +45,9 @@ export function itemTerms(item: PlanItemWithDefinition): ItemTerms {
     sortOrder: item.sortOrder,
     availability: item.availability,
     price: item.price.toFixed(8),
+    minimumInvestment: item.minimumInvestment?.toFixed(8) ?? null,
+    maximumInvestment: item.maximumInvestment?.toFixed(8) ?? null,
+    durationDays: item.durationDays,
     currency: item.currency,
     rewardRateMode: item.rewardRateMode,
     fixedRewardRate: item.fixedRewardRate?.toFixed(6) ?? null,
@@ -74,6 +80,16 @@ export function mergeItemTerms(
     sortOrder: dto.sortOrder ?? current.sortOrder,
     availability: dto.availability ?? current.availability,
     price: dto.price ?? current.price,
+    minimumInvestment:
+      dto.minimumInvestment === undefined
+        ? current.minimumInvestment
+        : dto.minimumInvestment,
+    maximumInvestment:
+      dto.maximumInvestment === undefined
+        ? current.maximumInvestment
+        : dto.maximumInvestment,
+    durationDays:
+      dto.durationDays === undefined ? current.durationDays : dto.durationDays,
     currency: dto.currency ?? current.currency,
     rewardRateMode: dto.rewardRateMode ?? current.rewardRateMode,
     fixedRewardRate:
@@ -148,6 +164,10 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
       ? capAmount.plus(item.price)
       : capAmount;
 
+  const minimumInvestment = item.minimumInvestment ?? item.price;
+  const durationDays = item.durationDays ?? item.goalDays;
+  const rangeConfigured = item.minimumInvestment !== null;
+
   return {
     id: item.id,
     packageDefinitionId: item.packageDefinitionId,
@@ -157,6 +177,12 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
     sortOrder: item.sortOrder,
     availability: item.availability,
     price: item.price.toFixed(8),
+    minimumInvestment: minimumInvestment.toFixed(8),
+    maximumInvestment: rangeConfigured
+      ? (item.maximumInvestment?.toFixed(8) ?? null)
+      : item.price.toFixed(8),
+    rangeConfigured,
+    durationDays,
     currency: item.currency,
     rewardRateMode: item.rewardRateMode,
     fixedRewardRate: item.fixedRewardRate?.toFixed(6) ?? null,
@@ -166,6 +192,12 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
     capBasis: item.capBasis,
     capMultiplier: item.capMultiplier.toFixed(4),
     principalTreatment: item.principalTreatment,
+    principalReturn:
+      item.principalTreatment === 'RETURN_SEPARATELY'
+        ? ('RETURN_EXACT_INVESTED_PRINCIPAL' as const)
+        : item.principalTreatment === 'NON_REFUNDABLE_PACKAGE_VALUE'
+          ? ('NO_CAPITAL_RETURN' as const)
+          : ('LEGACY_INCLUDED_IN_TOTAL_RETURN' as const),
     maximumTotalReturn: maximumTotalReturn.toFixed(8),
     maximumProfit: maximumProfit.toFixed(8),
     goalDays: item.goalDays,
