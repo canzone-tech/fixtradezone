@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type FormEvent,
 } from "react";
+import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import styles from "./register.module.css";
 
 type CreationMode = "AUTO" | "MANUAL" | "AUTO_OR_MANUAL";
@@ -251,6 +252,8 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
+      body.deviceInstallationId = await getOrCreateDeviceInstallationId();
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
