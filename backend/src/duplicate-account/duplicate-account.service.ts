@@ -30,7 +30,7 @@ type DuplicateAccountRiskAction =
   | 'BLOCKED'
   | 'BYPASSED';
 
-interface ConfigSnapshot {
+export interface ConfigSnapshot {
   enforcementMode: DuplicateAccountEnforcementMode;
   deviceSignalEnabled: boolean;
   ipSignalEnabled: boolean;
@@ -120,8 +120,8 @@ export class DuplicateAccountService {
               'SUPER_ADMIN updated duplicate-account enforcement configuration.',
             metadata: {
               source: 'DUPLICATE_ACCOUNT_CONFIG',
-              previous,
-              current,
+              previous: this.toAuditConfigSnapshot(previous),
+              current: this.toAuditConfigSnapshot(current),
             },
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
@@ -164,7 +164,8 @@ export class DuplicateAccountService {
               action: 'CREATE',
               entityType: 'DuplicateAccountAllowlist',
               entityId: entry.id,
-              description: 'SUPER_ADMIN added a duplicate-account allowlist entry.',
+              description:
+                'SUPER_ADMIN added a duplicate-account allowlist entry.',
               metadata: {
                 source: 'DUPLICATE_ACCOUNT_ALLOWLIST',
                 type: entry.type,
@@ -529,17 +530,28 @@ export class DuplicateAccountService {
     return trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed;
   }
 
-  private toConfigSnapshot(row: {
-    enforcementMode: DuplicateAccountEnforcementMode;
-    deviceSignalEnabled: boolean;
-    ipSignalEnabled: boolean;
-    updatedAt: Date;
-  } | null): ConfigSnapshot {
+  private toConfigSnapshot(
+    row: {
+      enforcementMode: DuplicateAccountEnforcementMode;
+      deviceSignalEnabled: boolean;
+      ipSignalEnabled: boolean;
+      updatedAt: Date;
+    } | null,
+  ): ConfigSnapshot {
     return {
       enforcementMode: row?.enforcementMode ?? 'OFF',
       deviceSignalEnabled: row?.deviceSignalEnabled ?? true,
       ipSignalEnabled: row?.ipSignalEnabled ?? true,
       updatedAt: row?.updatedAt ?? null,
+    };
+  }
+
+  private toAuditConfigSnapshot(snapshot: ConfigSnapshot) {
+    return {
+      enforcementMode: snapshot.enforcementMode,
+      deviceSignalEnabled: snapshot.deviceSignalEnabled,
+      ipSignalEnabled: snapshot.ipSignalEnabled,
+      updatedAt: snapshot.updatedAt?.toISOString() ?? null,
     };
   }
 
