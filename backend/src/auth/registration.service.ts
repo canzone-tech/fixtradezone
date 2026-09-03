@@ -92,7 +92,7 @@ export class RegistrationService {
     return {
       publicRegistrationEnabled: config?.publicRegistrationEnabled ?? true,
       emailRequired: true,
-      mobileRequired: config?.mobileRequired ?? false,
+      mobileRequired: false,
       passwordMode: config?.passwordMode ?? 'MANUAL',
       usernameMode: config?.usernameMode ?? 'AUTO_OR_MANUAL',
       usernamePrefixEnabled: config?.usernamePrefixEnabled ?? false,
@@ -340,7 +340,11 @@ export class RegistrationService {
       );
     }
 
-    if (config.mobileRequired && !dto.phone) {
+    if (
+      source !== 'SELF_REGISTRATION' &&
+      config.mobileRequired &&
+      !dto.phone
+    ) {
       throw new BadRequestException(
         'Mobile number is required by the current registration policy.',
       );
