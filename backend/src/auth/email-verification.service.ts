@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommunicationService } from '../communication/communication.service';
 import { PrismaService } from '../database/prisma.service';
+import type { Prisma } from '../generated/prisma/client';
 import { RedisService } from '../redis/redis.service';
 import type { RequestContext } from './auth.types';
 
@@ -388,7 +389,7 @@ export class EmailVerificationService {
     entityType: string;
     entityId: string;
     description: string;
-    metadata: Record<string, unknown>;
+    metadata: Prisma.InputJsonObject;
     context: RequestContext;
   }): Promise<void> {
     try {
