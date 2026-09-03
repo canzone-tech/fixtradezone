@@ -13,7 +13,7 @@ export interface AdminUser {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  status: "ACTIVE" | "SUSPENDED" | "BLOCKED" | "PENDING";
+  status: "ACTIVE" | "SUSPENDED" | "BLOCKED" | "PENDING" | "RESTRICTED";
   createdAt: string;
   lastLoginAt: string | null;
   roles: string[];
@@ -57,7 +57,9 @@ export function isAdminUser(payload: unknown): payload is AdminUser {
     (candidate.firstName === null || typeof candidate.firstName === "string") &&
     (candidate.lastName === null || typeof candidate.lastName === "string") &&
     typeof candidate.status === "string" &&
-    ["ACTIVE", "SUSPENDED", "BLOCKED", "PENDING"].includes(candidate.status) &&
+    ["ACTIVE", "SUSPENDED", "BLOCKED", "PENDING", "RESTRICTED"].includes(
+      candidate.status,
+    ) &&
     typeof candidate.createdAt === "string" &&
     (candidate.lastLoginAt === null ||
       typeof candidate.lastLoginAt === "string") &&
@@ -122,94 +124,73 @@ export function isPasswordChangeRequiredResponse(
 }
 
 export function isAdministrator(user: AdminUser): boolean {
-  return (
-    user.status === "ACTIVE" &&
-    (user.roles.includes("SUPER_ADMIN") || user.roles.includes("ADMIN"))
-  );
+  return user.roles.includes("ADMIN") || user.roles.includes("SUPER_ADMIN");
 }
 
 export function isStandardUser(user: AdminUser): boolean {
-  return (
-    user.status === "ACTIVE" &&
-    user.roles.includes("USER") &&
-    !user.roles.includes("SUPER_ADMIN") &&
-    !user.roles.includes("ADMIN")
-  );
-}
-
-export function getPortalRedirect(user: AdminUser): PortalRedirectPath | null {
-  if (isAdministrator(user)) {
-    return "/dashboard";
-  }
-
-  if (isStandardUser(user)) {
-    return "/user/dashboard";
-  }
-
-  return null;
+  return user.roles.includes("USER") && !isAdministrator(user);
 }
 
 export function isCrossSiteRequest(request: NextRequest): boolean {
-  return request.headers.get("sec-fetch-site") === "cross-site";
-}
+  const secFetchSite = request.headers.get("sec-fetch-site");
 
-function sharedCookieOptions() {
-  return {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict" as const,
-    path: "/",
-  };
+  if (secFetchSite === "cross-site") {
+    return true;
+  }
+
+  const origin = request.headers.get("origin");
+
+  if (!origin) {
+    return false;
+  }
+
+  try {
+    return new URL(origin).origin !== request.nextUrl.origin;
+  } catch {
+    return true;
+  }
 }
 
 export function setAuthCookies(
   response: NextResponse,
-  payload: AuthResponse,
+  auth: Pick<AuthResponse, "accessToken" | "refreshToken" | "expiresIn" | "refreshExpiresIn">,
 ): void {
-  const shared = sharedCookieOptions();
-
-  response.cookies.set(ACCESS_COOKIE, payload.accessToken, {
-    ...shared,
-    maxAge: payload.expiresIn,
+  response.cookies.set(ACCESS_COOKIE, auth.accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: auth.expiresIn,
   });
-
-  response.cookies.set(REFRESH_COOKIE, payload.refreshToken, {
-    ...shared,
-    maxAge: payload.refreshExpiresIn,
-  });
-
-  clearPasswordChangeCookie(response);
-}
-
-export function setPasswordChangeCookie(
-  response: NextResponse,
-  payload: PasswordChangeRequiredResponse,
-): void {
-  response.cookies.set(PASSWORD_CHANGE_COOKIE, payload.passwordChangeToken, {
-    ...sharedCookieOptions(),
-    maxAge: payload.expiresIn,
-  });
-}
-
-export function clearPasswordChangeCookie(response: NextResponse): void {
-  response.cookies.set(PASSWORD_CHANGE_COOKIE, "", {
-    ...sharedCookieOptions(),
-    maxAge: 0,
+  response.cookies.set(REFRESH_COOKIE, auth.refreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: auth.refreshExpiresIn,
   });
 }
 
 export function clearAuthCookies(response: NextResponse): void {
-  const shared = sharedCookieOptions();
-
   response.cookies.set(ACCESS_COOKIE, "", {
-    ...shared,
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
     maxAge: 0,
   });
-
   response.cookies.set(REFRESH_COOKIE, "", {
-    ...shared,
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
     maxAge: 0,
   });
-
-  clearPasswordChangeCookie(response);
+  response.cookies.set(PASSWORD_CHANGE_COOKIE, "", {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }
