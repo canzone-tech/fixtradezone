@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomBytes, randomInt } from 'node:crypto';
 
@@ -10,8 +10,18 @@ const CAPTCHA_TTL_SECONDS = 180;
 const CAPTCHA_MAX_ATTEMPTS = 5;
 const CAPTCHA_KEY_PREFIX = 'fixtradezone:captcha:v1';
 const CAPTCHA_ERROR = 'Invalid or expired CAPTCHA challenge.';
+const CAPTCHA_REDIS_TIMEOUT_MS = 750;
+const CAPTCHA_LOCAL_MAX_ENTRIES = 5_000;
+const CAPTCHA_REDIS_WARNING_INTERVAL_MS = 30_000;
 
 type SegmentName = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g';
+
+interface LocalCaptchaState {
+  answerDigest: string;
+  attemptsRemaining: number;
+  expiresAt: number;
+  redisBacked: boolean;
+}
 
 const DIGIT_SEGMENTS: Readonly<Record<string, readonly SegmentName[]>> = {
   '0': ['a', 'b', 'c', 'd', 'e', 'f'],
@@ -88,7 +98,10 @@ return 0
 
 @Injectable()
 export class CaptchaService {
+  private readonly logger = new Logger(CaptchaService.name);
   private readonly hmacSecret: string;
+  private readonly localChallenges = new Map<string, LocalCaptchaState>();
+  private lastRedisWarningAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -111,40 +124,47 @@ export class CaptchaService {
     }
 
     const challenge = this.generateChallenge();
-    const client = this.redis.getClient();
+    this.pruneLocalChallenges();
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const challengeId = randomBytes(24).toString('base64url');
       const key = this.buildKey(purpose, challengeId);
+
+      if (this.localChallenges.has(key)) {
+        continue;
+      }
 
       const answerDigest = this.digestAnswer(
         purpose,
         challengeId,
         challenge.answer,
       );
-
-      const storedValue = JSON.stringify({
+      const localState: LocalCaptchaState = {
         answerDigest,
         attemptsRemaining: CAPTCHA_MAX_ATTEMPTS,
-      });
+        expiresAt: Date.now() + CAPTCHA_TTL_SECONDS * 1_000,
+        redisBacked: false,
+      };
 
-      const stored = await client.set(
-        key,
-        storedValue,
-        'EX',
-        CAPTCHA_TTL_SECONDS,
-        'NX',
-      );
+      this.ensureLocalCapacity();
+      this.localChallenges.set(key, localState);
 
-      if (stored === 'OK') {
-        return {
-          enabled: true,
-          purpose,
-          challengeId,
-          imageDataUri: this.toDataUri(challenge.svg),
-          expiresIn: CAPTCHA_TTL_SECONDS,
-        };
+      const redisStored = await this.tryStoreRedisChallenge(key, localState);
+
+      if (redisStored === false) {
+        this.localChallenges.delete(key);
+        continue;
       }
+
+      localState.redisBacked = redisStored === true;
+
+      return {
+        enabled: true,
+        purpose,
+        challengeId,
+        imageDataUri: this.toDataUri(challenge.svg),
+        expiresIn: CAPTCHA_TTL_SECONDS,
+      };
     }
 
     throw new Error('Unable to allocate a unique CAPTCHA challenge.');
@@ -182,20 +202,45 @@ export class CaptchaService {
       normalizedAnswer,
     );
 
-    const rawResult: unknown = await this.redis
-      .getClient()
-      .eval(VERIFY_SCRIPT, 1, key, suppliedDigest);
+    this.pruneLocalChallenges();
+    const localState = this.localChallenges.get(key);
 
-    const verified =
-      typeof rawResult === 'number'
-        ? rawResult === 1
-        : typeof rawResult === 'string'
-          ? rawResult === '1'
-          : false;
+    if (localState) {
+      if (localState.redisBacked) {
+        const redisResult = await this.tryVerifyRedisChallenge(
+          key,
+          suppliedDigest,
+        );
 
-    if (!verified) {
+        if (redisResult !== null) {
+          this.reconcileLocalAfterRedisResult(
+            key,
+            suppliedDigest,
+            redisResult,
+          );
+
+          if (redisResult) {
+            return;
+          }
+
+          throw new BadRequestException(CAPTCHA_ERROR);
+        }
+      }
+
+      if (this.verifyLocalChallenge(key, suppliedDigest)) {
+        return;
+      }
+
       throw new BadRequestException(CAPTCHA_ERROR);
     }
+
+    const redisResult = await this.tryVerifyRedisChallenge(key, suppliedDigest);
+
+    if (redisResult === true) {
+      return;
+    }
+
+    throw new BadRequestException(CAPTCHA_ERROR);
   }
 
   private async isEnabled(purpose: CaptchaPurpose): Promise<boolean> {
@@ -214,6 +259,167 @@ export class CaptchaService {
     }
 
     return config?.captchaOnRegistrationEnabled ?? false;
+  }
+
+  private async tryStoreRedisChallenge(
+    key: string,
+    state: LocalCaptchaState,
+  ): Promise<boolean | null> {
+    const storedValue = JSON.stringify({
+      answerDigest: state.answerDigest,
+      attemptsRemaining: state.attemptsRemaining,
+    });
+
+    try {
+      const stored = await this.withRedisTimeout(
+        this.redis
+          .getClient()
+          .set(key, storedValue, 'EX', CAPTCHA_TTL_SECONDS, 'NX'),
+      );
+
+      return stored === 'OK';
+    } catch (error: unknown) {
+      this.logRedisFallback(error);
+      return null;
+    }
+  }
+
+  private async tryVerifyRedisChallenge(
+    key: string,
+    suppliedDigest: string,
+  ): Promise<boolean | null> {
+    try {
+      const rawResult: unknown = await this.withRedisTimeout(
+        this.redis.getClient().eval(VERIFY_SCRIPT, 1, key, suppliedDigest),
+      );
+
+      return this.readRedisVerificationResult(rawResult);
+    } catch (error: unknown) {
+      this.logRedisFallback(error);
+      return null;
+    }
+  }
+
+  private readRedisVerificationResult(rawResult: unknown): boolean {
+    if (typeof rawResult === 'number') {
+      return rawResult === 1;
+    }
+
+    return typeof rawResult === 'string' && rawResult === '1';
+  }
+
+  private reconcileLocalAfterRedisResult(
+    key: string,
+    suppliedDigest: string,
+    verified: boolean,
+  ): void {
+    const current = this.localChallenges.get(key);
+
+    if (!current) {
+      return;
+    }
+
+    if (verified || current.answerDigest === suppliedDigest) {
+      this.localChallenges.delete(key);
+      return;
+    }
+
+    current.attemptsRemaining -= 1;
+
+    if (current.attemptsRemaining <= 0) {
+      this.localChallenges.delete(key);
+    }
+  }
+
+  private verifyLocalChallenge(key: string, suppliedDigest: string): boolean {
+    const current = this.localChallenges.get(key);
+
+    if (!current || current.expiresAt <= Date.now()) {
+      this.localChallenges.delete(key);
+      return false;
+    }
+
+    if (current.answerDigest === suppliedDigest) {
+      this.localChallenges.delete(key);
+      void this.deleteRedisBestEffort(key);
+      return true;
+    }
+
+    current.attemptsRemaining -= 1;
+
+    if (current.attemptsRemaining <= 0) {
+      this.localChallenges.delete(key);
+      void this.deleteRedisBestEffort(key);
+    }
+
+    return false;
+  }
+
+  private async deleteRedisBestEffort(key: string): Promise<void> {
+    try {
+      await this.withRedisTimeout(this.redis.getClient().del(key));
+    } catch {
+      // Redis is only the shared-state mirror. The local challenge has already
+      // been consumed, and Redis TTL will remove any stale mirror automatically.
+    }
+  }
+
+  private async withRedisTimeout<T>(operation: Promise<T>): Promise<T> {
+    let timer: NodeJS.Timeout | undefined;
+
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('CAPTCHA Redis operation timed out.')),
+        CAPTCHA_REDIS_TIMEOUT_MS,
+      );
+      timer.unref();
+    });
+
+    try {
+      return await Promise.race([operation, timeout]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
+  }
+
+  private logRedisFallback(error: unknown): void {
+    const now = Date.now();
+
+    if (now - this.lastRedisWarningAt < CAPTCHA_REDIS_WARNING_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastRedisWarningAt = now;
+    const reason = error instanceof Error ? error.message : 'Unknown Redis error';
+    this.logger.warn(
+      `CAPTCHA shared Redis state is unavailable; using bounded in-process fallback. ${reason}`,
+    );
+  }
+
+  private pruneLocalChallenges(): void {
+    const now = Date.now();
+
+    for (const [key, state] of this.localChallenges) {
+      if (state.expiresAt <= now) {
+        this.localChallenges.delete(key);
+      }
+    }
+  }
+
+  private ensureLocalCapacity(): void {
+    while (this.localChallenges.size >= CAPTCHA_LOCAL_MAX_ENTRIES) {
+      const oldestKey = this.localChallenges.keys().next().value as
+        | string
+        | undefined;
+
+      if (!oldestKey) {
+        return;
+      }
+
+      this.localChallenges.delete(oldestKey);
+    }
   }
 
   private buildKey(purpose: CaptchaPurpose, challengeId: string): string {
