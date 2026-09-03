@@ -208,21 +208,25 @@ describe('RegistrationService', () => {
       },
     });
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: {
         actorUserId: createdUser.id,
         action: 'CREATE',
         entityType: 'User',
         entityId: createdUser.id,
-        metadata: expect.objectContaining({
+        description: 'User completed self-registration.',
+        metadata: {
           source: 'SELF_REGISTRATION',
+          createdByUserId: null,
+          generatedUsername: false,
+          generatedPassword: false,
           declarationPolicyVersion: 'CLIENT_REVISION_2026_09_V1',
           age18Declared: true,
           kycDeclarationAccepted: true,
           emailVerificationRequired: true,
-        }),
+        },
         ipAddress: '127.0.0.1',
         userAgent: 'Jest',
-      }),
+      },
     });
     expect(emailVerificationService.sendInitial).toHaveBeenCalledWith(
       expect.objectContaining({ id: createdUser.id, email: createdUser.email }),
