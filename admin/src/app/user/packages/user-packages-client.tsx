@@ -10,6 +10,8 @@ import {
   apiMessage,
   decimalLabel,
   enumLabel,
+  investmentRangeLabel,
+  principalReturnLabel,
   readApiPayload,
   rewardRateLabel,
   type ApiErrorPayload,
@@ -170,10 +172,11 @@ export default function UserPackagesClient() {
         <header className={styles.header}>
           <div>
             <span>VERSIONED USDT CATALOGUE</span>
-            <h2>Choose with clarity</h2>
+            <h2>Choose your exact investment</h2>
             <p>
-              Exact published package terms are shown here. Package activation
-              is funded through the audited deposit/payment workflow.
+              Each package publishes an investment range and duration. Your
+              exact selected amount is snapshotted as that package&apos;s principal
+              and each active package operates independently.
             </p>
           </div>
 
@@ -204,10 +207,10 @@ export default function UserPackagesClient() {
             <p>
               No package plan is currently published and effective. Nothing is
               purchasable or activatable until SUPER_ADMIN publishes the
-              founder-approved catalogue.
+              reviewed catalogue.
             </p>
             <div className={styles.emptyGuardrail}>
-              <i className="iconoir-lock" /> No fallback prices or invented
+              <i className="iconoir-lock" /> No fallback ranges or invented
               availability are shown.
             </div>
           </section>
@@ -273,7 +276,7 @@ export default function UserPackagesClient() {
                   <h3>{item.displayName}</h3>
 
                   <div className={styles.price}>
-                    <strong>{decimalLabel(item.price)}</strong>
+                    <strong>{investmentRangeLabel(item)}</strong>
                     <span>{item.currency}</span>
                   </div>
 
@@ -285,32 +288,30 @@ export default function UserPackagesClient() {
 
                   <dl className={styles.termList}>
                     <div>
-                      <dt>Maximum total return</dt>
+                      <dt>Investment</dt>
                       <dd>
-                        {decimalLabel(item.maximumTotalReturn)} {item.currency}
+                        {investmentRangeLabel(item)} {item.currency}
                       </dd>
                     </div>
                     <div>
-                      <dt>Maximum profit</dt>
-                      <dd>
-                        {decimalLabel(item.maximumProfit)} {item.currency}
-                      </dd>
+                      <dt>Package duration</dt>
+                      <dd>{item.durationDays} calendar days</dd>
                     </div>
                     <div>
-                      <dt>Cap</dt>
-                      <dd>{decimalLabel(item.capMultiplier)}× total return</dd>
+                      <dt>Capital treatment</dt>
+                      <dd>{principalReturnLabel(item)}</dd>
                     </div>
                     <div>
-                      <dt>Goal / lifetime</dt>
-                      <dd>{item.goalDays} calendar days</dd>
-                    </div>
-                    <div>
-                      <dt>Reward cycle</dt>
-                      <dd>{item.cycleDays} calendar days</dd>
+                      <dt>Cap multiplier</dt>
+                      <dd>{decimalLabel(item.capMultiplier)}×</dd>
                     </div>
                     <div>
                       <dt>Rewards begin</dt>
                       <dd>{enumLabel(item.rewardStartMode)}</dd>
+                    </div>
+                    <div>
+                      <dt>Lifecycle end</dt>
+                      <dd>{enumLabel(item.cycleEndAction)}</dd>
                     </div>
                   </dl>
 
@@ -328,7 +329,7 @@ export default function UserPackagesClient() {
                         {item.availability !== "AVAILABLE"
                           ? "This package cannot accept a new activation under the current plan."
                           : catalogue.activationAvailable
-                            ? activationPolicy?.detail
+                            ? `${activationPolicy?.detail} Your exact investment is validated against this package range.`
                             : "Funding is disabled until this plan's configured activation engine is available."}
                       </small>
                     </span>
@@ -337,7 +338,7 @@ export default function UserPackagesClient() {
                   {item.availability === "AVAILABLE" &&
                   catalogue.activationAvailable ? (
                     <Link href="/user/deposits" className={styles.depositLink}>
-                      Open Deposits <i className="iconoir-arrow-right" />
+                      Choose Investment <i className="iconoir-arrow-right" />
                     </Link>
                   ) : null}
                 </article>
@@ -349,10 +350,11 @@ export default function UserPackagesClient() {
               <div>
                 <strong>How these values are governed</strong>
                 <p>
-                  Prices, percentages and caps come directly from one effective
-                  published plan version. Financial values are exact decimal
-                  strings. Each activation snapshots its source plan and payment
-                  references so later plan changes never rewrite history.
+                  Investment ranges, percentages, duration and capital treatment
+                  come directly from one effective published plan version. Money
+                  remains exact decimal data. Each activation snapshots its
+                  actual selected principal and source package terms so later
+                  plan changes never rewrite history.
                 </p>
               </div>
             </section>
