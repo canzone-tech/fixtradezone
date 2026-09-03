@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import PlatformSettingsNav from "../platform-settings-nav";
 import styles from "./duplicate-account.module.css";
 
@@ -90,7 +91,10 @@ export default function DuplicateAccountConfigurationClient() {
     const payload = (await response.json().catch(() => null)) as Snapshot | null;
     if (!response.ok || !payload?.config) {
       throw new Error(
-        messageOf(payload as ApiError | null, "Unable to load duplicate-account protection."),
+        messageOf(
+          payload as ApiError | null,
+          "Unable to load duplicate-account protection.",
+        ),
       );
     }
 
@@ -138,12 +142,17 @@ export default function DuplicateAccountConfigurationClient() {
         | null;
       if (!response.ok || !payload?.config) {
         throw new Error(
-          messageOf(payload as ApiError | null, "Unable to save enforcement mode."),
+          messageOf(
+            payload as ApiError | null,
+            "Unable to save enforcement mode.",
+          ),
         );
       }
 
       setSnapshot((current) =>
-        current ? { ...current, config: payload.config as DuplicateConfig } : current,
+        current
+          ? { ...current, config: payload.config as DuplicateConfig }
+          : current,
       );
       setSuccess(payload.message ?? "Duplicate-account mode updated.");
     } catch (caught) {
@@ -178,13 +187,19 @@ export default function DuplicateAccountConfigurationClient() {
         | null;
       if (!response.ok || !payload?.entry) {
         throw new Error(
-          messageOf(payload as ApiError | null, "Unable to add allowlist entry."),
+          messageOf(
+            payload as ApiError | null,
+            "Unable to add allowlist entry.",
+          ),
         );
       }
 
       setSnapshot((current) =>
         current
-          ? { ...current, allowlist: [payload.entry as AllowlistEntry, ...current.allowlist] }
+          ? {
+              ...current,
+              allowlist: [payload.entry as AllowlistEntry, ...current.allowlist],
+            }
           : current,
       );
       setAllowValue("");
@@ -192,7 +207,9 @@ export default function DuplicateAccountConfigurationClient() {
       setSuccess(payload.message ?? "Allowlist entry added.");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to add allowlist entry.",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to add allowlist entry.",
       );
     } finally {
       setSaving(false);
@@ -234,7 +251,9 @@ export default function DuplicateAccountConfigurationClient() {
   }
 
   if (loading) {
-    return <div className={styles.loading}>Loading duplicate-account protection…</div>;
+    return (
+      <div className={styles.loading}>Loading duplicate-account protection…</div>
+    );
   }
 
   return (
@@ -250,7 +269,9 @@ export default function DuplicateAccountConfigurationClient() {
             supporting context only and never blocks an account by itself.
           </p>
         </div>
-        <span className={styles.modeBadge}>{snapshot?.config.enforcementMode ?? mode}</span>
+        <span className={styles.modeBadge}>
+          {snapshot?.config.enforcementMode ?? mode}
+        </span>
       </header>
 
       <section className={styles.panel}>
@@ -286,7 +307,12 @@ export default function DuplicateAccountConfigurationClient() {
           )}
         </div>
 
-        <button className={styles.primary} type="button" onClick={() => void saveMode()} disabled={saving}>
+        <button
+          className={styles.primary}
+          type="button"
+          onClick={() => void saveMode()}
+          disabled={saving}
+        >
           Save enforcement mode
         </button>
       </section>
@@ -304,7 +330,13 @@ export default function DuplicateAccountConfigurationClient() {
         </p>
 
         <form className={styles.allowForm} onSubmit={addAllowlist}>
-          <select value={allowType} onChange={(event) => setAllowType(event.target.value as AllowlistType)} disabled={saving}>
+          <select
+            value={allowType}
+            onChange={(event) =>
+              setAllowType(event.target.value as AllowlistType)
+            }
+            disabled={saving}
+          >
             <option value="DEVICE_INSTALLATION_ID">Device installation ID</option>
             <option value="IP_ADDRESS">IP address</option>
           </select>
@@ -326,7 +358,9 @@ export default function DuplicateAccountConfigurationClient() {
             maxLength={100}
             disabled={saving}
           />
-          <button type="submit" disabled={saving}>Add allowlist</button>
+          <button type="submit" disabled={saving}>
+            Add allowlist
+          </button>
         </form>
 
         <div className={styles.list}>
@@ -338,7 +372,11 @@ export default function DuplicateAccountConfigurationClient() {
                   <code>{entry.value}</code>
                   <span>{entry.label || "No label"}</span>
                 </div>
-                <button type="button" onClick={() => void removeAllowlist(entry.id)} disabled={saving}>
+                <button
+                  type="button"
+                  onClick={() => void removeAllowlist(entry.id)}
+                  disabled={saving}
+                >
                   Remove
                 </button>
               </div>
@@ -375,13 +413,17 @@ export default function DuplicateAccountConfigurationClient() {
                     <td>{event.action}</td>
                     <td>{event.enforcementMode}</td>
                     <td>{event.attemptedEmail ?? "—"}</td>
-                    <td><code>{event.installationId ?? "—"}</code></td>
+                    <td>
+                      <code>{event.installationId ?? "—"}</code>
+                    </td>
                     <td>{event.ipAddress ?? "—"}</td>
-                    <td>{new Date(event.createdAt).toLocaleString()}</td>
+                    <td>{formatPlatformDateTime(event.createdAt)}</td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan={6}>No duplicate-account risk events yet.</td></tr>
+                <tr>
+                  <td colSpan={6}>No duplicate-account risk events yet.</td>
+                </tr>
               )}
             </tbody>
           </table>
