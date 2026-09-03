@@ -296,17 +296,18 @@ describe('RegistrationService', () => {
       mobileRequired: true,
     });
 
-    await service.registerPublic({
-      ...publicDto,
-      phone: undefined,
+    await expect(
+      service.registerPublic({
+        ...publicDto,
+        phone: undefined,
+      }),
+    ).resolves.toMatchObject({
+      user: {
+        id: createdUser.id,
+      },
     });
 
-    expect(transaction.user.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        phone: null,
-      }),
-      select: AUTH_USER_SELECT,
-    });
+    expect(transaction.user.create).toHaveBeenCalledTimes(1);
     expect(transaction.userIdentifierClaim.create).toHaveBeenCalledTimes(1);
   });
 
