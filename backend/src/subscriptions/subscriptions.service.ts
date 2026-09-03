@@ -98,6 +98,9 @@ interface SubscriptionRow {
   packageCode: string;
   packageDisplayName: string;
   price: DecimalValue;
+  minimumInvestment: DecimalValue | null;
+  maximumInvestment: DecimalValue | null;
+  durationDays: number | null;
   currency: string;
   activePackageMode: string;
   multipleActivePackageBasis: string;
@@ -323,6 +326,10 @@ export class SubscriptionsService {
           userId: true,
           status: true,
           amount: true,
+          packageMinimumInvestment: true,
+          packageMaximumInvestment: true,
+          packageDurationDays: true,
+          packagePrincipalTreatment: true,
           currency: true,
           packagePlanVersionId: true,
           packagePlanItemId: true,
@@ -371,14 +378,71 @@ export class SubscriptionsService {
           'Deposit package snapshot no longer resolves to its source plan item.',
         );
       }
-      if (
-        !planItem.price.equals(deposit.amount) ||
-        planItem.currency !== deposit.currency
-      ) {
+
+      if (planItem.currency !== deposit.currency) {
         throw new ConflictException(
-          'Deposit amount/currency does not match its immutable package source.',
+          'Deposit currency does not match its immutable package source.',
         );
       }
+
+      const rangeDeposit = deposit.packageMinimumInvestment !== null;
+      let durationDays = planItem.goalDays;
+      let minimumInvestment: string | null = null;
+      let maximumInvestment: string | null = null;
+      let principalTreatment = planItem.principalTreatment;
+
+      if (rangeDeposit) {
+        if (
+          deposit.packageDurationDays === null ||
+          deposit.packagePrincipalTreatment === null ||
+          planItem.minimumInvestment === null ||
+          planItem.durationDays === null
+        ) {
+          throw new ConflictException(
+            'Range investment lifecycle snapshot is incomplete.',
+          );
+        }
+
+        if (
+          !planItem.minimumInvestment.equals(deposit.packageMinimumInvestment) ||
+          !this.optionalDecimalEquals(
+            planItem.maximumInvestment,
+            deposit.packageMaximumInvestment,
+          ) ||
+          planItem.durationDays !== deposit.packageDurationDays ||
+          planItem.principalTreatment !== deposit.packagePrincipalTreatment
+        ) {
+          throw new ConflictException(
+            'Deposit range/lifecycle snapshot does not match its immutable package source.',
+          );
+        }
+
+        if (deposit.amount.lt(deposit.packageMinimumInvestment)) {
+          throw new ConflictException(
+            'Deposit amount is below its immutable package minimum.',
+          );
+        }
+
+        if (
+          deposit.packageMaximumInvestment !== null &&
+          deposit.amount.gt(deposit.packageMaximumInvestment)
+        ) {
+          throw new ConflictException(
+            'Deposit amount exceeds its immutable package maximum.',
+          );
+        }
+
+        durationDays = deposit.packageDurationDays;
+        minimumInvestment = deposit.packageMinimumInvestment.toFixed(8);
+        maximumInvestment =
+          deposit.packageMaximumInvestment?.toFixed(8) ?? null;
+        principalTreatment = deposit.packagePrincipalTreatment as typeof principalTreatment;
+      } else if (!planItem.price.equals(deposit.amount)) {
+        throw new ConflictException(
+          'Legacy fixed-price deposit amount does not match its immutable package source.',
+        );
+      }
+
       if (
         !allowedTriggers.some(
           (trigger) => trigger === planItem.planVersion.activationTrigger,
@@ -455,6 +519,10 @@ export class SubscriptionsService {
             packagePlanVersionId: deposit.packagePlanVersionId,
             packagePlanItemId: deposit.packagePlanItemId,
             amount,
+            minimumInvestment,
+            maximumInvestment,
+            durationDays: rangeDeposit ? durationDays : null,
+            principalTreatment,
             currency,
             settlementTimezone: platformTimezone,
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
@@ -562,7 +630,7 @@ export class SubscriptionsService {
         : ('LEGACY_REWARD' as const);
 
       const scheduledEndAt = new Date(
-        activatedAt.getTime() + planItem.goalDays * 24 * 60 * 60 * 1000,
+        activatedAt.getTime() + durationDays * 24 * 60 * 60 * 1000,
       );
       const subscriptionId = randomUUID();
 
@@ -579,6 +647,9 @@ export class SubscriptionsService {
           packageCode,
           packageDisplayName,
           price,
+          minimumInvestment,
+          maximumInvestment,
+          durationDays,
           currency,
           activePackageMode,
           multipleActivePackageBasis,
@@ -623,6 +694,9 @@ export class SubscriptionsService {
           ${deposit.packageCode},
           ${deposit.packageDisplayName},
           ${amount},
+          ${minimumInvestment},
+          ${maximumInvestment},
+          ${rangeDeposit ? durationDays : null},
           ${currency},
           ${planItem.planVersion.activePackageMode},
           ${planItem.planVersion.multipleActivePackageBasis},
@@ -653,7 +727,7 @@ export class SubscriptionsService {
           ${planItem.rewardRateMeaning},
           ${planItem.capBasis},
           ${planItem.capMultiplier.toFixed(4)},
-          ${planItem.principalTreatment},
+          ${principalTreatment},
           ${planItem.goalDays},
           ${planItem.cycleDays},
           ${planItem.rewardStartMode},
@@ -686,6 +760,10 @@ export class SubscriptionsService {
             packageCode: deposit.packageCode,
             packageDisplayName: deposit.packageDisplayName,
             amount,
+            minimumInvestment,
+            maximumInvestment,
+            durationDays: rangeDeposit ? durationDays : null,
+            principalTreatment,
             currency,
             settlementTimezone: platformTimezone,
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
@@ -993,6 +1071,15 @@ export class SubscriptionsService {
       packageCode: row.packageCode,
       packageDisplayName: row.packageDisplayName,
       price: this.decimalString(row.price),
+      minimumInvestment:
+        row.minimumInvestment === null
+          ? null
+          : this.decimalString(row.minimumInvestment),
+      maximumInvestment:
+        row.maximumInvestment === null
+          ? null
+          : this.decimalString(row.maximumInvestment),
+      durationDays: row.durationDays,
       currency: row.currency,
       activePackageMode: row.activePackageMode,
       multipleActivePackageBasis: row.multipleActivePackageBasis,
@@ -1027,6 +1114,12 @@ export class SubscriptionsService {
       capBasis: row.capBasis,
       capMultiplier: new Prisma.Decimal(row.capMultiplier).toFixed(4),
       principalTreatment: row.principalTreatment,
+      principalReturn:
+        row.principalTreatment === 'RETURN_SEPARATELY'
+          ? ('RETURN_EXACT_INVESTED_PRINCIPAL' as const)
+          : row.principalTreatment === 'NON_REFUNDABLE_PACKAGE_VALUE'
+            ? ('NO_CAPITAL_RETURN' as const)
+            : ('LEGACY_INCLUDED_IN_TOTAL_RETURN' as const),
       goalDays: row.goalDays,
       cycleDays: row.cycleDays,
       rewardStartMode: row.rewardStartMode,
@@ -1042,6 +1135,16 @@ export class SubscriptionsService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
+  }
+
+  private optionalDecimalEquals(
+    left: Prisma.Decimal | null,
+    right: Prisma.Decimal | null,
+  ) {
+    if (left === null || right === null) {
+      return left === null && right === null;
+    }
+    return left.equals(right);
   }
 
   private decimalString(value: DecimalValue) {
