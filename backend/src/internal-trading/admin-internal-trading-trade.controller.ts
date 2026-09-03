@@ -19,6 +19,7 @@ import {
   InternalTradingEventQueryDto,
   InternalTradingWorkspaceQueryDto,
 } from './dto/internal-trading-trade.dto';
+import { InternalTradingPackageCompletionService } from './internal-trading-package-completion.service';
 import { InternalTradingTradeService } from './internal-trading-trade.service';
 import { InternalTradingWorkerService } from './internal-trading-worker.service';
 
@@ -26,6 +27,7 @@ import { InternalTradingWorkerService } from './internal-trading-worker.service'
 export class AdminInternalTradingTradeController {
   constructor(
     private readonly service: InternalTradingTradeService,
+    private readonly packageCompletionService: InternalTradingPackageCompletionService,
     private readonly worker: InternalTradingWorkerService,
   ) {}
 
@@ -58,16 +60,28 @@ export class AdminInternalTradingTradeController {
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.INTERNAL_TRADING_RECONCILE)
-  reconcileTrades(
+  async reconcileTrades(
     @Param('subscriptionId', new ParseUUIDPipe())
     subscriptionId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.service.reconcileSubscription(
+    const context = getRequestContext(request);
+    const trading = await this.service.reconcileSubscription(
       subscriptionId,
       actor,
-      getRequestContext(request),
+      context,
     );
+    const packageCompletion =
+      await this.packageCompletionService.finalizeCompletion(
+        subscriptionId,
+        actor,
+        context,
+      );
+
+    return {
+      ...trading,
+      packageCompletion,
+    };
   }
 }
