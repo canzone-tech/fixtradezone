@@ -3,7 +3,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 import styles from "./register.module.css";
 
 type CreationMode = "AUTO" | "MANUAL" | "AUTO_OR_MANUAL";
@@ -63,6 +68,24 @@ function readMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function readInviteReferralCode(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return (
+    new URLSearchParams(window.location.search)
+      .get("ref")
+      ?.trim()
+      .slice(0, 128)
+      .toUpperCase() ?? ""
+  );
+}
+
+function subscribeToInviteReferralCode() {
+  return () => undefined;
+}
+
 async function getPolicy(): Promise<RegistrationPolicy> {
   const response = await fetch("/api/auth/registration-policy", {
     cache: "no-store",
@@ -95,9 +118,17 @@ async function getCaptcha(): Promise<CaptchaDisabled | CaptchaChallenge> {
 }
 
 export default function RegisterPage() {
+  const inviteReferralCode = useSyncExternalStore(
+    subscribeToInviteReferralCode,
+    readInviteReferralCode,
+    () => "",
+  );
   const [policy, setPolicy] = useState<RegistrationPolicy | null>(null);
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
-  const [referralCode, setReferralCode] = useState("");
+  const [referralCodeOverride, setReferralCodeOverride] = useState<string | null>(
+    null,
+  );
+  const referralCode = referralCodeOverride ?? inviteReferralCode;
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -135,13 +166,6 @@ export default function RegisterPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const inviteReferralCode = new URLSearchParams(window.location.search)
-      .get("ref")
-      ?.trim();
-
-    if (inviteReferralCode) {
-      setReferralCode(inviteReferralCode.slice(0, 128).toUpperCase());
-    }
 
     void Promise.all([getPolicy(), getCaptcha()])
       .then(([nextPolicy, nextCaptcha]) => {
@@ -424,7 +448,7 @@ export default function RegisterPage() {
                   type="text"
                   value={referralCode}
                   onChange={(event) =>
-                    setReferralCode(event.target.value.toUpperCase())
+                    setReferralCodeOverride(event.target.value.toUpperCase())
                   }
                   maxLength={128}
                   autoComplete="off"
