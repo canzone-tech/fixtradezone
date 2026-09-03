@@ -316,7 +316,18 @@ export default function LoginPage() {
           <div className="ftz-login-head">
             <span>ADMIN PORTAL</span>
             <h2>Welcome back</h2>
-            <p>Sign in to continue to the FixTradeZone control center.</p>
+            <p>
+              Sign in to continue to the FixTradeZone control center.
+              <br />
+              New here?{" "}
+              <a
+                href="/register"
+                style={{ color: "#19e6d3", fontWeight: 700 }}
+              >
+                Create an account
+              </a>
+              .
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="ftz-login-form">
