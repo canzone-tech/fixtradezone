@@ -35,11 +35,7 @@ interface SubscriptionCompletionRow {
   packageDisplayName: string;
   price: Prisma.Decimal | string | number;
   currency: string;
-  principalTreatment:
-    | 'RETURN_SEPARATELY'
-    | 'INCLUDED_IN_TOTAL_RETURN'
-    | 'NON_REFUNDABLE_PACKAGE_VALUE'
-    | string;
+  principalTreatment: string;
   durationDays: number | null;
   status: 'ACTIVE' | 'COMPLETED' | 'SUPERSEDED' | 'CANCELLED';
   completedAt: Date | null;
