@@ -69,7 +69,7 @@ export default function DuplicateAccountConfigurationClient() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function load() {
+  async function load(): Promise<Snapshot | null> {
     const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
     const session = (await sessionResponse.json().catch(() => ({}))) as {
       user?: AdminUser;
@@ -77,11 +77,11 @@ export default function DuplicateAccountConfigurationClient() {
 
     if (!sessionResponse.ok || !session.user) {
       router.replace("/login");
-      return;
+      return null;
     }
     if (!session.user.roles.includes("SUPER_ADMIN")) {
       router.replace("/dashboard");
-      return;
+      return null;
     }
 
     const response = await fetch("/api/admin/settings/duplicate-account", {
@@ -97,14 +97,19 @@ export default function DuplicateAccountConfigurationClient() {
       );
     }
 
-    setSnapshot(payload);
-    setMode(payload.config.enforcementMode);
+    return payload;
   }
 
   useEffect(() => {
     let mounted = true;
 
     void load()
+      .then((payload) => {
+        if (mounted && payload) {
+          setSnapshot(payload);
+          setMode(payload.config.enforcementMode);
+        }
+      })
       .catch((caught: unknown) => {
         if (mounted) {
           setError(
