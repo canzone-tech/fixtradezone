@@ -225,6 +225,7 @@ describe('RegistrationService', () => {
           age18Declared: true,
           kycDeclarationAccepted: true,
           emailVerificationRequired: true,
+          duplicateAccountAction: 'ALLOWED',
         },
         ipAddress: '127.0.0.1',
         userAgent: 'Jest',
@@ -238,6 +239,7 @@ describe('RegistrationService', () => {
       emailVerificationRequired: true,
       verificationEmailSent: true,
       verificationStatus: 'PENDING_EMAIL_VERIFICATION',
+      duplicateAccountAction: 'ALLOWED',
       user: {
         id: createdUser.id,
         status: 'PENDING',
