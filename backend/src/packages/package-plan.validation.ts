@@ -49,13 +49,46 @@ export function assertPublishablePlan(plan: PlanWithItems) {
       );
     }
 
-    if (
-      item.capBasis !== 'TOTAL_RETURN' ||
-      item.principalTreatment !== 'INCLUDED_IN_TOTAL_RETURN'
-    ) {
-      throw new BadRequestException(
-        `${item.packageDefinition.code} must use TOTAL_RETURN with INCLUDED_IN_TOTAL_RETURN.`,
-      );
+    if (item.minimumInvestment === null) {
+      if (
+        item.capBasis !== 'TOTAL_RETURN' ||
+        item.principalTreatment !== 'INCLUDED_IN_TOTAL_RETURN'
+      ) {
+        throw new BadRequestException(
+          `${item.packageDefinition.code} legacy fixed-price terms must use TOTAL_RETURN with INCLUDED_IN_TOTAL_RETURN.`,
+        );
+      }
+    } else {
+      if (item.durationDays === null) {
+        throw new BadRequestException(
+          `${item.packageDefinition.code} range terms require durationDays.`,
+        );
+      }
+
+      if (!item.price.equals(item.minimumInvestment)) {
+        throw new BadRequestException(
+          `${item.packageDefinition.code} range terms must keep compatibility price equal to minimumInvestment.`,
+        );
+      }
+
+      if (
+        item.goalDays !== item.durationDays ||
+        item.cycleDays !== item.durationDays ||
+        item.cycleEndAction !== 'COMPLETE_PACKAGE'
+      ) {
+        throw new BadRequestException(
+          `${item.packageDefinition.code} range lifecycle must complete at its configured duration.`,
+        );
+      }
+
+      if (
+        item.principalTreatment !== 'RETURN_SEPARATELY' &&
+        item.principalTreatment !== 'NON_REFUNDABLE_PACKAGE_VALUE'
+      ) {
+        throw new BadRequestException(
+          `${item.packageDefinition.code} range lifecycle must explicitly define capital return or no capital return.`,
+        );
+      }
     }
 
     if (item.capReachedAction === 'AUTO_RENEW') {
@@ -68,6 +101,14 @@ export function assertPublishablePlan(plan: PlanWithItems) {
 
 export function validateAndConvertItemTerms(terms: ItemTerms) {
   const price = decimal(terms.price, 'price');
+  const minimumInvestment = nullableDecimal(
+    terms.minimumInvestment,
+    'minimumInvestment',
+  );
+  const maximumInvestment = nullableDecimal(
+    terms.maximumInvestment,
+    'maximumInvestment',
+  );
   const capMultiplier = decimal(terms.capMultiplier, 'capMultiplier');
   const fixedRewardRate = nullableDecimal(
     terms.fixedRewardRate,
@@ -84,6 +125,42 @@ export function validateAndConvertItemTerms(terms: ItemTerms) {
 
   if (!price.gt(0)) {
     throw new BadRequestException('Package price must be greater than zero.');
+  }
+
+  const rangeConfigured = minimumInvestment !== null || terms.durationDays !== null;
+
+  if (rangeConfigured) {
+    if (minimumInvestment === null || terms.durationDays === null) {
+      throw new BadRequestException(
+        'Range packages require minimumInvestment and durationDays together.',
+      );
+    }
+
+    if (!minimumInvestment.gt(0)) {
+      throw new BadRequestException(
+        'minimumInvestment must be greater than zero.',
+      );
+    }
+
+    if (maximumInvestment && maximumInvestment.lt(minimumInvestment)) {
+      throw new BadRequestException(
+        'maximumInvestment cannot be less than minimumInvestment.',
+      );
+    }
+
+    if (terms.durationDays < 1) {
+      throw new BadRequestException('durationDays must be at least 1.');
+    }
+
+    if (!price.equals(minimumInvestment)) {
+      throw new BadRequestException(
+        'Range packages must keep compatibility price equal to minimumInvestment.',
+      );
+    }
+  } else if (maximumInvestment !== null) {
+    throw new BadRequestException(
+      'maximumInvestment cannot be configured without minimumInvestment.',
+    );
   }
 
   if (!capMultiplier.gt(0)) {
@@ -147,6 +224,9 @@ export function validateAndConvertItemTerms(terms: ItemTerms) {
 
   return {
     price,
+    minimumInvestment,
+    maximumInvestment,
+    durationDays: terms.durationDays,
     capMultiplier,
     fixedRewardRate,
     minimumRewardRate,
