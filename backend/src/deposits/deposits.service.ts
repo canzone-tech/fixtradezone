@@ -510,6 +510,57 @@ export class DepositsService {
         );
       }
 
+      const rangeConfigured = item.minimumInvestment !== null;
+      let investmentAmount: Prisma.Decimal;
+
+      if (rangeConfigured) {
+        if (item.durationDays === null) {
+          throw new ServiceUnavailableException(
+            'Selected package range is missing its duration snapshot.',
+          );
+        }
+
+        if (!dto.investmentAmount) {
+          throw new BadRequestException(
+            'investmentAmount is required for this package range.',
+          );
+        }
+
+        investmentAmount = new Prisma.Decimal(dto.investmentAmount);
+
+        if (investmentAmount.lt(item.minimumInvestment!)) {
+          throw new BadRequestException(
+            `Investment amount must be at least ${item.minimumInvestment!.toFixed(8)} ${item.currency}.`,
+          );
+        }
+
+        if (
+          item.maximumInvestment !== null &&
+          investmentAmount.gt(item.maximumInvestment)
+        ) {
+          throw new BadRequestException(
+            `Investment amount must not exceed ${item.maximumInvestment.toFixed(8)} ${item.currency}.`,
+          );
+        }
+      } else {
+        investmentAmount = item.price;
+
+        if (
+          dto.investmentAmount &&
+          !new Prisma.Decimal(dto.investmentAmount).equals(item.price)
+        ) {
+          throw new BadRequestException(
+            `This legacy package requires the exact fixed amount ${item.price.toFixed(8)} ${item.currency}.`,
+          );
+        }
+      }
+
+      if (!investmentAmount.gt(0)) {
+        throw new BadRequestException(
+          'Investment amount must be greater than zero.',
+        );
+      }
+
       const rail = await transaction.depositPaymentRail.findFirst({
         where: {
           id: dto.paymentRailId,
@@ -551,7 +602,17 @@ export class DepositsService {
           packagePlanItemId: item.id,
           packageCode: item.packageDefinition.code,
           packageDisplayName: item.displayName,
-          amount: item.price,
+          amount: investmentAmount,
+          packageMinimumInvestment: rangeConfigured
+            ? item.minimumInvestment
+            : null,
+          packageMaximumInvestment: rangeConfigured
+            ? item.maximumInvestment
+            : null,
+          packageDurationDays: rangeConfigured ? item.durationDays : null,
+          packagePrincipalTreatment: rangeConfigured
+            ? item.principalTreatment
+            : null,
           currency: item.currency,
           assignedDepositAccountId: assignedAccount.id,
           assignedAccountLabel: assignedAccount.label,
@@ -576,8 +637,14 @@ export class DepositsService {
             packagePlanVersionId: plan.id,
             packagePlanItemId: item.id,
             packageCode: item.packageDefinition.code,
-            amount: item.price.toString(),
+            amount: investmentAmount.toFixed(8),
             currency: item.currency,
+            packageMinimumInvestment:
+              item.minimumInvestment?.toFixed(8) ?? null,
+            packageMaximumInvestment:
+              item.maximumInvestment?.toFixed(8) ?? null,
+            packageDurationDays: item.durationDays,
+            packagePrincipalTreatment: item.principalTreatment,
             paymentRailId: rail.id,
             assignedDepositAccountId: assignedAccount.id,
             assignedWalletAddress: assignedAccount.walletAddress,
@@ -841,6 +908,10 @@ export class DepositsService {
     packageCode: string;
     packageDisplayName: string;
     amount: Prisma.Decimal;
+    packageMinimumInvestment: Prisma.Decimal | null;
+    packageMaximumInvestment: Prisma.Decimal | null;
+    packageDurationDays: number | null;
+    packagePrincipalTreatment: string | null;
     currency: string;
     assignedDepositAccountId: string;
     assignedAccountLabel: string;
@@ -877,6 +948,14 @@ export class DepositsService {
       packageCode: deposit.packageCode,
       packageDisplayName: deposit.packageDisplayName,
       amount: this.decimalString(deposit.amount),
+      packageMinimumInvestment: deposit.packageMinimumInvestment
+        ? this.decimalString(deposit.packageMinimumInvestment)
+        : null,
+      packageMaximumInvestment: deposit.packageMaximumInvestment
+        ? this.decimalString(deposit.packageMaximumInvestment)
+        : null,
+      packageDurationDays: deposit.packageDurationDays,
+      packagePrincipalTreatment: deposit.packagePrincipalTreatment,
       currency: deposit.currency,
       assignedDepositAccountId: deposit.assignedDepositAccountId,
       assignedAccountLabel: deposit.assignedAccountLabel,
