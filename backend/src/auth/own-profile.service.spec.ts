@@ -81,7 +81,9 @@ describe('OwnProfileService', () => {
       allowMultipleAccountsPerMobile: false,
     });
     transaction.userIdentifierClaim.deleteMany.mockResolvedValue({ count: 0 });
-    transaction.userIdentifierClaim.create.mockResolvedValue({ id: 'claim-id' });
+    transaction.userIdentifierClaim.create.mockResolvedValue({
+      id: 'claim-id',
+    });
     transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
 
     service = new OwnProfileService(prisma as unknown as PrismaService);

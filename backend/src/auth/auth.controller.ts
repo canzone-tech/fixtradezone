@@ -155,10 +155,6 @@ export class AuthController {
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.ownProfileService.update(
-      user,
-      dto,
-      getRequestContext(request),
-    );
+    return this.ownProfileService.update(user, dto, getRequestContext(request));
   }
 }
