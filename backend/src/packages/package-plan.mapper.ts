@@ -47,7 +47,7 @@ export function itemTerms(item: PlanItemWithDefinition): ItemTerms {
     price: item.price.toFixed(8),
     minimumInvestment: item.minimumInvestment?.toFixed(8) ?? null,
     maximumInvestment: item.maximumInvestment?.toFixed(8) ?? null,
-    durationDays: item.durationDays,
+    durationDays: item.durationDays ?? null,
     currency: item.currency,
     rewardRateMode: item.rewardRateMode,
     fixedRewardRate: item.fixedRewardRate?.toFixed(6) ?? null,
@@ -166,7 +166,7 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
 
   const minimumInvestment = item.minimumInvestment ?? item.price;
   const durationDays = item.durationDays ?? item.goalDays;
-  const rangeConfigured = item.minimumInvestment !== null;
+  const rangeConfigured = item.minimumInvestment != null;
 
   return {
     id: item.id,
