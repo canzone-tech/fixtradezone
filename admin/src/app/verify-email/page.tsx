@@ -31,20 +31,26 @@ export default function VerifyEmailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const token = new URLSearchParams(window.location.search).get("token")?.trim();
 
-    if (!token) {
-      setError("Email verification token is missing.");
-      setLoading(false);
-      return;
-    }
+    void Promise.resolve().then(async () => {
+      const token = new URLSearchParams(window.location.search)
+        .get("token")
+        ?.trim();
 
-    void fetch("/api/auth/email-verification/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then(async (response) => {
+      if (!token) {
+        if (!cancelled) {
+          setError("Email verification token is missing.");
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/auth/email-verification/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
         const payload = (await response.json().catch(() => null)) as unknown;
 
         if (!response.ok) {
@@ -54,17 +60,20 @@ export default function VerifyEmailPage() {
         if (!cancelled) {
           setResult(payload as VerifyResult);
         }
-      })
-      .catch((caught: unknown) => {
+      } catch (caught: unknown) {
         if (!cancelled) {
           setError(
-            caught instanceof Error ? caught.message : "Unable to verify email.",
+            caught instanceof Error
+              ? caught.message
+              : "Unable to verify email.",
           );
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    });
 
     return () => {
       cancelled = true;
