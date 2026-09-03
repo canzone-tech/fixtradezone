@@ -1,11 +1,12 @@
 "use client";
 
 import { type ReactNode, useEffect } from "react";
+import IdleLock from "@/components/security/idle-lock";
+import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
   isImpersonationSession,
   type UserPortalSession,
 } from "@/lib/user-session";
-import IdleLock from "@/components/security/idle-lock";
 import UserSidebar from "./user-sidebar";
 import UserTopbar from "./user-topbar";
 import styles from "./user-shell.module.css";
@@ -39,6 +40,34 @@ export default function UserShell({
   }, []);
 
   const impersonated = session !== null && isImpersonationSession(session);
+  const deviceObservationUserId =
+    session && !impersonated ? session.user.id : null;
+
+  useEffect(() => {
+    if (!deviceObservationUserId) return;
+
+    let cancelled = false;
+
+    void getOrCreateDeviceInstallationId()
+      .then(async (deviceInstallationId) => {
+        if (cancelled) return;
+
+        await fetch("/api/user/device-installation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceInstallationId }),
+          cache: "no-store",
+        });
+      })
+      .catch(() => {
+        // Device observation is a duplicate-risk signal. It must never break the
+        // authenticated USER portal when browser storage or the observer is down.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceObservationUserId]);
 
   const lockScope = session
     ? impersonated
