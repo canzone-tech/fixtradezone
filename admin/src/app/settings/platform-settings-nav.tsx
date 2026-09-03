@@ -2,7 +2,12 @@ import Link from "next/link";
 import styles from "./platform-configuration.module.css";
 
 type PlatformSettingsSection =
-  "authentication" | "registration" | "security" | "operations" | "accounting";
+  | "authentication"
+  | "registration"
+  | "duplicate-account"
+  | "security"
+  | "operations"
+  | "accounting";
 
 interface PlatformSettingsNavProps {
   active: PlatformSettingsSection;
@@ -25,6 +30,12 @@ const sections: Array<{
     href: "/settings/registration",
     label: "Registration",
     icon: "iconoir-user-plus",
+  },
+  {
+    key: "duplicate-account",
+    href: "/settings/duplicate-account",
+    label: "Duplicate Protection",
+    icon: "iconoir-fingerprint",
   },
   {
     key: "security",
