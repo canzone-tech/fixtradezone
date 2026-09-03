@@ -393,6 +393,7 @@ export class SubscriptionsService {
 
       if (rangeDeposit) {
         if (
+          deposit.packageMinimumInvestment === null ||
           deposit.packageDurationDays === null ||
           deposit.packagePrincipalTreatment === null ||
           planItem.minimumInvestment === null ||
