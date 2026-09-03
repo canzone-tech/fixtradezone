@@ -160,7 +160,7 @@ describe('RegistrationService', () => {
     await expect(service.getPublicRegistrationPolicy()).resolves.toEqual({
       publicRegistrationEnabled: true,
       emailRequired: true,
-      mobileRequired: true,
+      mobileRequired: false,
       passwordMode: 'AUTO',
       usernameMode: 'AUTO',
       usernamePrefixEnabled: true,
@@ -289,6 +289,25 @@ describe('RegistrationService', () => {
         kycDeclarationAccepted: true,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('keeps mobile optional for public registration even when legacy config marks it required', async () => {
+    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
+      mobileRequired: true,
+    });
+
+    await service.registerPublic({
+      ...publicDto,
+      phone: undefined,
+    });
+
+    expect(transaction.user.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        phone: null,
+      }),
+      select: AUTH_USER_SELECT,
+    });
+    expect(transaction.userIdentifierClaim.create).toHaveBeenCalledTimes(1);
   });
 
   it('hard rejects a public duplicate email before creating the user', async () => {
