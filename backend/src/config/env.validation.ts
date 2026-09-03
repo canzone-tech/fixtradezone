@@ -39,9 +39,7 @@ export const envValidationSchema = Joi.object({
 
   COMMUNICATION_EMAIL_HTTP_URL: Joi.string().uri().allow('').default(''),
 
-  COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: Joi.string()
-    .allow('')
-    .default(''),
+  COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: Joi.string().allow('').default(''),
 
   EMAIL_VERIFICATION_TTL_MINUTES: Joi.number()
     .integer()

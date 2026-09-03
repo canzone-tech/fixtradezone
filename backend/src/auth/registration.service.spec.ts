@@ -117,7 +117,9 @@ describe('RegistrationService', () => {
     transaction.user.create.mockResolvedValue(createdUser);
     transaction.user.findFirst.mockResolvedValue(null);
     transaction.user.findUnique.mockResolvedValue(null);
-    transaction.userIdentifierClaim.create.mockResolvedValue({ id: 'claim-id' });
+    transaction.userIdentifierClaim.create.mockResolvedValue({
+      id: 'claim-id',
+    });
     transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
     transaction.systemSequence.upsert.mockResolvedValue({
       key: 'username',

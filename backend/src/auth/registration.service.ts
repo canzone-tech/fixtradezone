@@ -27,10 +27,7 @@ const AUTO_USERNAME_ATTEMPTS = 100;
 const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  | 'SELF_REGISTRATION'
-  | 'SUPER_ADMIN'
-  | 'ADMIN'
-  | 'AUTHORIZED_USER';
+  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;
@@ -123,10 +120,9 @@ export class RegistrationService {
     try {
       return await this.prisma.$transaction(
         async (transaction) => {
-          const config =
-            await transaction.systemRegistrationConfig.findUnique({
-              where: { id: 1 },
-            });
+          const config = await transaction.systemRegistrationConfig.findUnique({
+            where: { id: 1 },
+          });
 
           const policy: RegistrationConfig = {
             publicRegistrationEnabled:

@@ -1,4 +1,8 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { EmailDeliveryResult, EmailMessage } from './communication.types';
 
@@ -64,7 +68,9 @@ export class EmailTransportService {
       });
     } catch (error: unknown) {
       const messageText =
-        error instanceof Error ? error.message : 'Unknown email transport error';
+        error instanceof Error
+          ? error.message
+          : 'Unknown email transport error';
       this.logger.error(`Email HTTP transport failed: ${messageText}`);
       throw new ServiceUnavailableException('Email delivery is unavailable.');
     }
