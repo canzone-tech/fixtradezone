@@ -24,6 +24,12 @@ const actor: AuthenticatedUser = {
   permissions: [],
 };
 
+interface AuditCreateArgs {
+  data: Record<string, unknown>;
+}
+
+type AuditCreate = (args: AuditCreateArgs) => Promise<{ id: string }>;
+
 function subscription(
   overrides: Partial<{
     packageDisplayName: string;
@@ -81,10 +87,11 @@ const userMainAccount = {
 };
 
 describe('InternalTradingPackageCompletionService', () => {
+  const auditCreate: jest.MockedFunction<AuditCreate> = jest.fn();
   const transaction = {
     $queryRaw: jest.fn(),
     $executeRaw: jest.fn(),
-    auditLog: { create: jest.fn() },
+    auditLog: { create: auditCreate },
   };
   const prisma = {
     $queryRaw: jest.fn(),
@@ -96,7 +103,7 @@ describe('InternalTradingPackageCompletionService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.$executeRaw.mockResolvedValue(1);
-    transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
+    auditCreate.mockResolvedValue({ id: 'audit-id' });
     prisma.$transaction.mockImplementation(
       async (work: (tx: typeof transaction) => Promise<unknown>) =>
         work(transaction),
@@ -137,10 +144,8 @@ describe('InternalTradingPackageCompletionService', () => {
     });
     expect(result.principalReturnTransactionId).toEqual(expect.any(String));
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(6);
-    expect(transaction.auditLog.create).toHaveBeenCalledTimes(2);
-    expect(
-      transaction.auditLog.create.mock.calls[0]?.[0] as unknown,
-    ).toMatchObject({
+    expect(auditCreate).toHaveBeenCalledTimes(2);
+    expect(auditCreate.mock.calls[0]?.[0]).toMatchObject({
       data: {
         action: 'CREATE',
         entityType: 'LedgerTransaction',
@@ -153,9 +158,7 @@ describe('InternalTradingPackageCompletionService', () => {
         },
       },
     });
-    expect(
-      transaction.auditLog.create.mock.calls[1]?.[0] as unknown,
-    ).toMatchObject({
+    expect(auditCreate.mock.calls[1]?.[0]).toMatchObject({
       data: {
         action: 'UPDATE',
         entityType: 'UserPackageSubscription',
@@ -190,10 +193,8 @@ describe('InternalTradingPackageCompletionService', () => {
       message: 'Package completed. No capital return applies to this package.',
     });
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
-    expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
-    expect(
-      transaction.auditLog.create.mock.calls[0]?.[0] as unknown,
-    ).toMatchObject({
+    expect(auditCreate).toHaveBeenCalledTimes(1);
+    expect(auditCreate.mock.calls[0]?.[0]).toMatchObject({
       data: {
         metadata: {
           principalTreatment: 'NON_REFUNDABLE_PACKAGE_VALUE',
@@ -241,7 +242,7 @@ describe('InternalTradingPackageCompletionService', () => {
       message: 'Package completion is already finalized.',
     });
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
-    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+    expect(auditCreate).not.toHaveBeenCalled();
   });
 
   it('does nothing before internal trading reaches duration completion', async () => {
