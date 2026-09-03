@@ -49,7 +49,7 @@ export function assertPublishablePlan(plan: PlanWithItems) {
       );
     }
 
-    if (item.minimumInvestment === null) {
+    if (item.minimumInvestment == null) {
       if (
         item.capBasis !== 'TOTAL_RETURN' ||
         item.principalTreatment !== 'INCLUDED_IN_TOTAL_RETURN'
@@ -59,7 +59,7 @@ export function assertPublishablePlan(plan: PlanWithItems) {
         );
       }
     } else {
-      if (item.durationDays === null) {
+      if (item.durationDays == null) {
         throw new BadRequestException(
           `${item.packageDefinition.code} range terms require durationDays.`,
         );
@@ -127,10 +127,11 @@ export function validateAndConvertItemTerms(terms: ItemTerms) {
     throw new BadRequestException('Package price must be greater than zero.');
   }
 
-  const rangeConfigured = minimumInvestment !== null || terms.durationDays !== null;
+  const rangeConfigured =
+    minimumInvestment !== null || terms.durationDays != null;
 
   if (rangeConfigured) {
-    if (minimumInvestment === null || terms.durationDays === null) {
+    if (minimumInvestment === null || terms.durationDays == null) {
       throw new BadRequestException(
         'Range packages require minimumInvestment and durationDays together.',
       );
@@ -226,7 +227,7 @@ export function validateAndConvertItemTerms(terms: ItemTerms) {
     price,
     minimumInvestment,
     maximumInvestment,
-    durationDays: terms.durationDays,
+    durationDays: terms.durationDays ?? null,
     capMultiplier,
     fixedRewardRate,
     minimumRewardRate,
