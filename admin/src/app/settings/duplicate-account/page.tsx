@@ -1,9 +1,26 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import AdminShell from "@/components/admin/admin-shell";
+import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import DuplicateAccountConfigurationClient from "./duplicate-account-configuration-client";
 
 export const metadata = {
   title: "Duplicate Account Protection | FixTradeZone",
 };
 
-export default function DuplicateAccountSettingsPage() {
-  return <DuplicateAccountConfigurationClient />;
+export default async function DuplicateAccountSettingsPage() {
+  const cookieStore = await cookies();
+
+  const hasSession =
+    cookieStore.has(ACCESS_COOKIE) || cookieStore.has(REFRESH_COOKIE);
+
+  if (!hasSession) {
+    redirect("/login");
+  }
+
+  return (
+    <AdminShell>
+      <DuplicateAccountConfigurationClient />
+    </AdminShell>
+  );
 }
