@@ -4,6 +4,7 @@ import {
   Get,
   Header,
   HttpCode,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -23,9 +24,11 @@ import {
   RefreshTokenDto,
   RegisterDto,
   ResendEmailVerificationDto,
+  UpdateOwnProfileDto,
   VerifyEmailDto,
 } from './dto';
 import { EmailVerificationService } from './email-verification.service';
+import { OwnProfileService } from './own-profile.service';
 import { Public } from './public.decorator';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
@@ -38,6 +41,7 @@ export class AuthController {
     private readonly reauthenticationService: ReauthenticationService,
     private readonly registrationService: RegistrationService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly ownProfileService: OwnProfileService,
   ) {}
 
   @Public()
@@ -142,5 +146,19 @@ export class AuthController {
     return {
       user,
     };
+  }
+
+  @Header('Cache-Control', 'no-store')
+  @Patch('me/profile')
+  updateOwnProfile(
+    @Body() dto: UpdateOwnProfileDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.ownProfileService.update(
+      user,
+      dto,
+      getRequestContext(request),
+    );
   }
 }
