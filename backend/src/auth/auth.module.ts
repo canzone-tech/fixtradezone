@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { CaptchaModule } from '../captcha/captcha.module';
+import { DuplicateAccountModule } from '../duplicate-account/duplicate-account.module';
 import { ReferralsModule } from '../referrals/referrals.module';
 import { SecurityConfigModule } from '../security-config/security-config.module';
 import { AuthController } from './auth.controller';
@@ -23,6 +24,7 @@ import { TokenService } from './token.service';
 @Module({
   imports: [
     CaptchaModule,
+    DuplicateAccountModule,
     ReferralsModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
