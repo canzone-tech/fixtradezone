@@ -116,14 +116,19 @@ describe('OwnProfileService', () => {
       }),
     );
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+      data: {
         actorUserId: activeUser.id,
         action: 'UPDATE',
+        entityType: 'User',
+        entityId: activeUser.id,
+        description: 'User updated optional profile details.',
         metadata: {
           source: 'SELF_PROFILE',
           changedFields: ['firstName', 'lastName', 'phone'],
         },
-      }),
+        ipAddress: '127.0.0.1',
+        userAgent: 'Jest',
+      },
     });
     expect(result.user).toMatchObject({
       firstName: 'Prashant',
