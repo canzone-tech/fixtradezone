@@ -99,6 +99,10 @@ export const PACKAGE_CAP_REACHED_ACTIONS = [
 export type PackagePlanStatus = "DRAFT" | "PUBLISHED";
 export type PackageAvailability = (typeof PACKAGE_AVAILABILITIES)[number];
 export type PackageRewardRateMode = (typeof PACKAGE_REWARD_RATE_MODES)[number];
+export type PackagePrincipalReturn =
+  | "RETURN_EXACT_INVESTED_PRINCIPAL"
+  | "NO_CAPITAL_RETURN"
+  | "LEGACY_INCLUDED_IN_TOTAL_RETURN";
 
 export interface PackagePlanItem {
   id: string;
@@ -109,6 +113,10 @@ export interface PackagePlanItem {
   sortOrder: number;
   availability: PackageAvailability;
   price: string;
+  minimumInvestment: string;
+  maximumInvestment: string | null;
+  rangeConfigured: boolean;
+  durationDays: number;
   currency: string;
   rewardRateMode: PackageRewardRateMode;
   fixedRewardRate: string | null;
@@ -118,6 +126,7 @@ export interface PackagePlanItem {
   capBasis: string;
   capMultiplier: string;
   principalTreatment: string;
+  principalReturn: PackagePrincipalReturn;
   maximumTotalReturn: string;
   maximumProfit: string;
   goalDays: number;
@@ -234,4 +243,25 @@ export function rewardRateLabel(item: PackagePlanItem): string {
   return `${decimalLabel(item.minimumRewardRate ?? "0")}–${decimalLabel(
     item.maximumRewardRate ?? "0",
   )}%`;
+}
+
+export function investmentRangeLabel(item: PackagePlanItem): string {
+  const minimum = decimalLabel(item.minimumInvestment);
+  if (!item.rangeConfigured) {
+    return minimum;
+  }
+  if (item.maximumInvestment === null) {
+    return `${minimum}+`;
+  }
+  return `${minimum}–${decimalLabel(item.maximumInvestment)}`;
+}
+
+export function principalReturnLabel(item: PackagePlanItem): string {
+  if (item.principalReturn === "RETURN_EXACT_INVESTED_PRINCIPAL") {
+    return "Exact invested principal returns at duration end";
+  }
+  if (item.principalReturn === "NO_CAPITAL_RETURN") {
+    return "No capital return";
+  }
+  return "Principal follows legacy total-return terms";
 }
