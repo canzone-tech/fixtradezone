@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCrossSiteRequest } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 export async function POST(request: NextRequest) {
   if (isCrossSiteRequest(request)) {
@@ -28,7 +33,9 @@ export async function POST(request: NextRequest) {
   try {
     const response = await backendFetch("/auth/email-verification/resend", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardedBackendHeaders(request, {
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify({ email }),
     });
     const payload = await readJson(response);
