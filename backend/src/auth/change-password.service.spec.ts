@@ -23,7 +23,7 @@ describe('ChangePasswordService', () => {
   const passwordService = {
     verifyForAuthentication: jest.fn(),
     hash: jest.fn(),
-  } as unknown as PasswordService;
+  };
 
   let service: ChangePasswordService;
 
@@ -37,17 +37,17 @@ describe('ChangePasswordService', () => {
     prisma.user.updateMany.mockResolvedValue({ count: 1 });
     prisma.authSession.updateMany.mockResolvedValue({ count: 2 });
     prisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
-    passwordService.hash = jest.fn().mockResolvedValue('new-hash');
+    passwordService.verifyForAuthentication.mockResolvedValue(false);
+    passwordService.hash.mockResolvedValue('new-hash');
+
     service = new ChangePasswordService(
       prisma as unknown as PrismaService,
-      passwordService,
+      passwordService as unknown as PasswordService,
     );
   });
 
   it('rejects an incorrect current password', async () => {
-    (passwordService.verifyForAuthentication as jest.Mock).mockResolvedValueOnce(
-      false,
-    );
+    passwordService.verifyForAuthentication.mockResolvedValueOnce(false);
 
     await expect(
       service.change('user-1', 'wrong-password', 'New-password-123!'),
@@ -55,7 +55,7 @@ describe('ChangePasswordService', () => {
   });
 
   it('rejects reuse of the current password', async () => {
-    (passwordService.verifyForAuthentication as jest.Mock)
+    passwordService.verifyForAuthentication
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true);
 
@@ -65,7 +65,7 @@ describe('ChangePasswordService', () => {
   });
 
   it('updates the credential, revokes active sessions and audits success', async () => {
-    (passwordService.verifyForAuthentication as jest.Mock)
+    passwordService.verifyForAuthentication
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(false);
 
