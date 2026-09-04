@@ -18,6 +18,7 @@ import {
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
 import {
+  SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES,
   SIMULATED_ACTIVITY_MAX_PER_DAY,
   SIMULATED_ACTIVITY_OUTCOMES,
   type SimulatedActivityOutcome,
@@ -117,6 +118,13 @@ export class UpdateSimulatedActivityPolicyDto extends AuditedSimulationPolicyRev
   @Min(1)
   @Max(SIMULATED_ACTIVITY_MAX_PER_DAY)
   activitiesPerDay?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES)
+  minimumGapMinutes?: number;
 
   @IsOptional()
   @IsArray()
