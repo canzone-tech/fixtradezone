@@ -9,4 +9,15 @@ export class CommunicationService {
   sendEmail(message: EmailMessage): Promise<EmailDeliveryResult> {
     return this.emailTransport.send(message);
   }
+
+  getEmailConfigurationStatus(): {
+    mode: 'CONSOLE' | 'HTTP' | 'SMTP';
+    configured: boolean;
+  } {
+    const status = this.emailTransport.getConfigurationStatus();
+    return {
+      mode: status.mode,
+      configured: status.configured,
+    };
+  }
 }
