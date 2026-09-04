@@ -18,6 +18,7 @@ interface EffectivePolicy {
   status: "PUBLISHED";
   enabled: boolean;
   activitiesPerDay: number;
+  minimumGapMinutes: number;
   assetSymbols: string[];
   winWeight: number;
   lossWeight: number;
@@ -32,7 +33,7 @@ interface EffectivePolicy {
   financialEffect: "NONE";
 }
 
-interface SimulatedEvent {
+interface TradeActivityEvent {
   id: string;
   sourceKey: string;
   subscriptionId: string;
@@ -57,7 +58,7 @@ interface ActivityPayload extends ApiMessagePayload {
   financialEffect: "NONE";
   activeEligibleSubscriptions: number;
   effectivePolicy: EffectivePolicy | null;
-  events: SimulatedEvent[];
+  events: TradeActivityEvent[];
   page: number;
   limit: number;
   total: number;
@@ -136,15 +137,15 @@ async function fetchWorkspace(): Promise<{
     throw new Error("USER session is incomplete.");
   }
 
-  // Start the data request only after session refresh/validation completes so a
-  // rotating refresh token cannot be consumed by parallel BFF requests.
+  // Internal API naming remains stable for backwards compatibility. The portal
+  // presents the client-facing feature as Trade Activity.
   const activityResponse = await fetch(
     "/api/user/simulated-activity?page=1&limit=100",
     { cache: "no-store" },
   );
   const activity = await checkedUserJson<ActivityPayload>(
     activityResponse,
-    "Could not load simulated activity.",
+    "Could not load trade activity.",
   );
   return { session, activity };
 }
@@ -171,9 +172,7 @@ export default function UserSimulatedActivityClient() {
         return;
       }
       setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not load simulated activity.",
+        caught instanceof Error ? caught.message : "Could not load trade activity.",
       );
     } finally {
       setLoading(false);
@@ -200,7 +199,7 @@ export default function UserSimulatedActivityClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Could not load simulated activity.",
+            : "Could not load trade activity.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -230,7 +229,7 @@ export default function UserSimulatedActivityClient() {
       <UserShell session={null}>
         <div className="ftz-dashboard-loading">
           <span />
-          <p>Loading simulated activity…</p>
+          <p>Loading trade activity…</p>
         </div>
       </UserShell>
     );
@@ -241,15 +240,15 @@ export default function UserSimulatedActivityClient() {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>SIM-01 / DISPLAY-ONLY ACTIVITY</p>
-            <h2>Simulated Trade Activity</h2>
+            <p className={styles.eyebrow}>TRADE ACTIVITY / ACTIVE PACKAGES</p>
+            <h2>Daily Trades</h2>
             <p>
-              View deterministic simulated activity associated with your ACTIVE
-              package subscriptions. These rows are display simulations only and
-              never represent broker/exchange execution or withdrawable profit.
+              Each ACTIVE package subscription receives its own deterministic
+              daily trade schedule. Trade activity is system-generated according
+              to package rules and does not represent external market execution.
             </p>
           </div>
-          <span className={styles.disclosurePill}>SIMULATED RESULTS</span>
+          <span className={styles.disclosurePill}>TRADE ACTIVITY</span>
         </section>
 
         {error ? (
@@ -264,7 +263,7 @@ export default function UserSimulatedActivityClient() {
             <strong>{activity?.activeEligibleSubscriptions ?? 0}</strong>
           </article>
           <article className={styles.stat}>
-            <small>Activities / day / package</small>
+            <small>Trades / day / package</small>
             <strong>{policy?.enabled ? policy.activitiesPerDay : "—"}</strong>
           </article>
           <article className={styles.stat}>
@@ -274,7 +273,7 @@ export default function UserSimulatedActivityClient() {
             </strong>
           </article>
           <article className={styles.stat}>
-            <small>Financial effect</small>
+            <small>External execution</small>
             <strong>NONE</strong>
           </article>
         </section>
@@ -282,7 +281,7 @@ export default function UserSimulatedActivityClient() {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.eyebrow}>CURRENT SIMULATION POLICY</p>
+              <p className={styles.eyebrow}>CURRENT TRADE ACTIVITY POLICY</p>
               <h3>
                 {policy
                   ? `Published V${policy.versionNumber}`
@@ -304,6 +303,14 @@ export default function UserSimulatedActivityClient() {
               <div>
                 <dt>Generation</dt>
                 <dd>{policy.enabled ? "Enabled" : "Disabled"}</dd>
+              </div>
+              <div>
+                <dt>Minimum trade gap</dt>
+                <dd>
+                  {policy.minimumGapMinutes > 0
+                    ? `${policy.minimumGapMinutes} minutes`
+                    : "Legacy schedule"}
+                </dd>
               </div>
               <div>
                 <dt>Allowed assets</dt>
@@ -343,8 +350,8 @@ export default function UserSimulatedActivityClient() {
             </dl>
           ) : (
             <div className={styles.empty}>
-              No published simulated activity policy is effective yet. No
-              simulation rows will be invented while policy is unavailable.
+              No published Trade Activity policy is effective yet. No trade rows
+              will be invented while policy is unavailable.
             </div>
           )}
         </section>
@@ -353,7 +360,7 @@ export default function UserSimulatedActivityClient() {
           <div className={styles.cardHeader}>
             <div>
               <p className={styles.eyebrow}>IMMUTABLE HISTORY</p>
-              <h3>My simulated activity</h3>
+              <h3>My daily trades</h3>
             </div>
             <span className={styles.badge} data-tone="muted">
               {activity?.total ?? 0} total
@@ -362,8 +369,8 @@ export default function UserSimulatedActivityClient() {
 
           {!activity || activity.events.length === 0 ? (
             <div className={styles.empty}>
-              No due simulated activity has been generated for your ACTIVE
-              packages yet.
+              No due trade activity has been generated for your ACTIVE packages
+              yet.
             </div>
           ) : (
             <div className={styles.tableWrap}>
@@ -371,11 +378,11 @@ export default function UserSimulatedActivityClient() {
                 <thead>
                   <tr>
                     <th>Package</th>
-                    <th>Simulated time</th>
+                    <th>Trade time</th>
                     <th>Asset</th>
                     <th>Outcome</th>
-                    <th>Simulated result</th>
-                    <th>Slot</th>
+                    <th>Result</th>
+                    <th>Trade #</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,12 +435,12 @@ export default function UserSimulatedActivityClient() {
         <section className={styles.disclosure}>
           <i className="iconoir-warning-triangle" />
           <div>
-            <strong>SIMULATED RESULTS</strong>
+            <strong>SYSTEM-GENERATED TRADE ACTIVITY</strong>
+            <p>{activity?.disclosure ?? "Trade activity does not represent external market execution."}</p>
             <p>
-              Simulated activity never changes Main Wallet, Package Earnings,
-              Referral Commission, Rewards, package caps or any accounting
-              ledger balance. There are no Buy, Sell, Close or real-trade
-              controls in this workspace.
+              This workspace does not itself change Main Wallet, Package
+              Earnings, Referral Commission, Rewards, package caps or accounting
+              ledger balances, and it exposes no Buy, Sell or Close controls.
             </p>
           </div>
         </section>
