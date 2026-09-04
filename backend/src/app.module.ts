@@ -10,11 +10,13 @@ import { DepositsModule } from './deposits/deposits.module';
 import { DuplicateAccountModule } from './duplicate-account/duplicate-account.module';
 import { HealthModule } from './health/health.module';
 import { InternalTradingModule } from './internal-trading/internal-trading.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PackagesModule } from './packages/packages.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { RbacModule } from './rbac/rbac.module';
 import { RedisModule } from './redis/redis.module';
+import { ReportsModule } from './reports/reports.module';
 import { RewardsModule } from './rewards/rewards.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
 import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
@@ -50,6 +52,8 @@ import { WalletModule } from './wallet/wallet.module';
     SimulatedActivityModule,
     InternalTradingModule,
     PayoutsModule,
+    NotificationsModule,
+    ReportsModule,
     DashboardModule,
     HealthModule,
   ],

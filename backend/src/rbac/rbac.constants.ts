@@ -29,6 +29,9 @@ export const PERMISSIONS = {
   PAYOUTS_READ: 'payouts.read',
   PAYOUTS_REVIEW: 'payouts.review',
   PAYOUTS_POLICY_MANAGE: 'payouts.policy.manage',
+  NOTIFICATIONS_READ: 'notifications.read',
+  NOTIFICATIONS_MANAGE: 'notifications.manage',
+  REPORTS_READ: 'reports.read',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -162,6 +165,20 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.PAYOUTS_POLICY_MANAGE,
     description: 'Create, edit and publish versioned payout policies',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_READ,
+    description:
+      'View administration notification delivery and read state',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_MANAGE,
+    description: 'Create targeted or broadcast in-app user notifications',
+  },
+  {
+    code: PERMISSIONS.REPORTS_READ,
+    description:
+      'View read-only administration operational and financial reports',
   },
   {
     code: PERMISSIONS.RBAC_READ,

@@ -115,6 +115,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                   <i className="iconoir-user" />
                   <span>My Profile</span>
                 </Link>
+
+                <Link
+                  href="/user/notifications"
+                  className={`ftz-nav-link ${
+                    isActive("/user/notifications") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-bell" />
+                  <span>Notifications</span>
+                </Link>
               </>
             )}
           </div>

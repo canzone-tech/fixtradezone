@@ -124,6 +124,20 @@ const sections: Array<{
     label: "PLATFORM",
     items: [
       {
+        href: "/notifications",
+        label: "Notifications",
+        icon: "iconoir-bell",
+        permission: "notifications.read",
+        enabled: true,
+      },
+      {
+        href: "/reports",
+        label: "Reports",
+        icon: "iconoir-graph-up",
+        permission: "reports.read",
+        enabled: true,
+      },
+      {
         href: "/templates",
         label: "Templates / CMS",
         icon: "iconoir-page",
