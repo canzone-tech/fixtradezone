@@ -152,6 +152,8 @@ const sections: Array<{
         href: "/audit-logs",
         label: "Audit Logs",
         icon: "iconoir-journal-page",
+        permission: "audit_logs.read",
+        enabled: true,
       },
     ],
   },

@@ -32,6 +32,7 @@ export const PERMISSIONS = {
   NOTIFICATIONS_READ: 'notifications.read',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
   REPORTS_READ: 'reports.read',
+  AUDIT_LOGS_READ: 'audit_logs.read',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -179,6 +180,10 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.REPORTS_READ,
     description:
       'View read-only administration operational and financial reports',
+  },
+  {
+    code: PERMISSIONS.AUDIT_LOGS_READ,
+    description: 'View immutable administration audit logs',
   },
   {
     code: PERMISSIONS.RBAC_READ,
