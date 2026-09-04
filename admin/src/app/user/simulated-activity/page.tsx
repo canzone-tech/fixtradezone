@@ -1,10 +1,5 @@
-import type { Metadata } from "next";
-import UserSimulatedActivityClient from "./user-simulated-activity-client";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Simulated Trade Activity | FixTradeZone",
-};
-
-export default function UserSimulatedActivityPage() {
-  return <UserSimulatedActivityClient />;
+export default function LegacyUserSimulatedActivityPage() {
+  redirect("/user/trade-activity");
 }
