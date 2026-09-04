@@ -95,6 +95,11 @@ const routeHeadings: Array<{
     subtitle: "Immutable administration activity and security history",
   },
   {
+    path: "/settings/email",
+    title: "Email Delivery",
+    subtitle: "Safe transport status and controlled delivery testing",
+  },
+  {
     path: "/settings",
     title: "Settings",
     subtitle: "Platform and security configuration",
@@ -195,6 +200,17 @@ export default function Topbar() {
             <small>{user?.roles.join(" · ") ?? "SUPER_ADMIN"}</small>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="ftz-signout-button"
+          onClick={() => router.push("/change-password")}
+          aria-label="Change password"
+          title="Change password"
+        >
+          <i className="iconoir-key" />
+          <span>Change Password</span>
+        </button>
 
         <button
           type="button"
