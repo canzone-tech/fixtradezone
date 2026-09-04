@@ -29,6 +29,7 @@ import {
 } from './simulated-activity.calculation';
 import {
   SIMULATED_ACTIVITY_BATCH_LIMIT,
+  SIMULATED_ACTIVITY_DEFAULT_MINIMUM_GAP_MINUTES,
   SIMULATED_ACTIVITY_DISCLOSURE,
   SIMULATED_ACTIVITY_MAX_PER_DAY,
   simulatedActivitySourceKey,
@@ -54,6 +55,7 @@ interface PolicyRow {
   revision: number;
   enabled: boolean | number;
   activitiesPerDay: number;
+  minimumGapMinutes: number | null;
   assetSymbols: unknown;
   winWeight: number;
   lossWeight: number;
@@ -149,6 +151,7 @@ interface ProcessSubscriptionResult {
 interface NormalizedPolicyConfig {
   enabled: boolean;
   activitiesPerDay: number;
+  minimumGapMinutes: number;
   assetSymbols: string[];
   winWeight: number;
   lossWeight: number;
@@ -227,11 +230,15 @@ export class SimulatedActivityService {
       `);
       const versionNumber = (maxRows[0]?.maxVersion ?? 0) + 1;
       const id = randomUUID();
+      const minimumGapMinutes =
+        source.minimumGapMinutes === null
+          ? SIMULATED_ACTIVITY_DEFAULT_MINIMUM_GAP_MINUTES
+          : sourceConfig.minimumGapMinutes;
 
       await transaction.$executeRaw(Prisma.sql`
         INSERT INTO simulated_activity_policy_versions (
           id, versionNumber, status, revision, enabled, activitiesPerDay,
-          assetSymbols, winWeight, lossWeight,
+          minimumGapMinutes, assetSymbols, winWeight, lossWeight,
           winMinimumPercent, winMaximumPercent,
           lossMinimumPercent, lossMaximumPercent,
           timingWindows, timezoneSnapshot,
@@ -242,6 +249,7 @@ export class SimulatedActivityService {
         ) VALUES (
           ${id}, ${versionNumber}, 'DRAFT', 1,
           ${sourceConfig.enabled}, ${sourceConfig.activitiesPerDay},
+          ${minimumGapMinutes},
           ${JSON.stringify(sourceConfig.assetSymbols)},
           ${sourceConfig.winWeight}, ${sourceConfig.lossWeight},
           ${sourceConfig.winMinimumPercent}, ${sourceConfig.winMaximumPercent},
@@ -308,6 +316,8 @@ export class SimulatedActivityService {
         enabled: dto.enabled ?? currentConfig.enabled,
         activitiesPerDay:
           dto.activitiesPerDay ?? currentConfig.activitiesPerDay,
+        minimumGapMinutes:
+          dto.minimumGapMinutes ?? currentConfig.minimumGapMinutes,
         assetSymbols: dto.assetSymbols ?? currentConfig.assetSymbols,
         winWeight: dto.winWeight ?? currentConfig.winWeight,
         lossWeight: dto.lossWeight ?? currentConfig.lossWeight,
@@ -328,6 +338,7 @@ export class SimulatedActivityService {
         SET
           enabled = ${next.enabled},
           activitiesPerDay = ${next.activitiesPerDay},
+          minimumGapMinutes = ${next.minimumGapMinutes},
           assetSymbols = ${JSON.stringify(next.assetSymbols)},
           winWeight = ${next.winWeight},
           lossWeight = ${next.lossWeight},
@@ -678,6 +689,7 @@ export class SimulatedActivityService {
       localActivityDate,
       timezoneSnapshot: policy.timezoneSnapshot,
       activitiesPerDay: policy.activitiesPerDay,
+      minimumGapMinutes: Number(policy.minimumGapMinutes ?? 0),
       eligibleSubscriptions,
       eventsToday: this.countNumber(eventRows[0]?.total),
       configuredMaximumSlotsToday:
@@ -961,6 +973,7 @@ export class SimulatedActivityService {
           localActivityDate,
           slotNumber,
           activitiesPerDay: config.activitiesPerDay,
+          minimumGapMinutes: config.minimumGapMinutes,
           assetSymbols: config.assetSymbols,
           winWeight: config.winWeight,
           lossWeight: config.lossWeight,
@@ -1110,6 +1123,7 @@ export class SimulatedActivityService {
     return {
       enabled: Boolean(row.enabled),
       activitiesPerDay: Number(row.activitiesPerDay),
+      minimumGapMinutes: Number(row.minimumGapMinutes ?? 0),
       assetSymbols: this.jsonArray<string>(
         row.assetSymbols,
         'assetSymbols',
@@ -1175,7 +1189,11 @@ export class SimulatedActivityService {
       );
     }
 
-    validateTimingWindows(config.timingWindows, config.activitiesPerDay);
+    validateTimingWindows(
+      config.timingWindows,
+      config.activitiesPerDay,
+      config.minimumGapMinutes,
+    );
   }
 
   private policySnapshot(row: PolicyRow) {
