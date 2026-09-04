@@ -112,8 +112,8 @@ const sections: Array<{
         enabled: true,
       },
       {
-        href: "/simulated-trades",
-        label: "Simulated Trade Activity",
+        href: "/trade-activity",
+        label: "Trade Activity",
         icon: "iconoir-graph-up",
         permission: "simulated_activity.read",
         enabled: true,
