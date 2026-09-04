@@ -135,10 +135,12 @@ export default function EmailDiagnosticsClient() {
           the SMTP/provider and recipient mail system.
         </p>
 
-        <form className={styles.form} onSubmit={sendTest}>
-          <label>
-            Recipient email
+        <form className={styles.formGrid} onSubmit={sendTest}>
+          <div className={`${styles.field} ${styles.fieldFull}`}>
+            <label htmlFor="email-test-recipient">Recipient email</label>
             <input
+              id="email-test-recipient"
+              className={styles.input}
               type="email"
               value={to}
               onChange={(event) => setTo(event.target.value)}
@@ -147,12 +149,12 @@ export default function EmailDiagnosticsClient() {
               disabled={sending || !status?.configured}
               placeholder="qa@example.com"
             />
-          </label>
+          </div>
 
-          <div className={styles.actions}>
+          <div className={`${styles.actions} ${styles.fieldFull}`}>
             <button
               type="submit"
-              className={styles.buttonPrimary}
+              className={styles.button}
               disabled={sending || !status?.configured}
             >
               {sending ? "Sending…" : "Send test email"}
