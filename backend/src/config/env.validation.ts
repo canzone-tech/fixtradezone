@@ -9,6 +9,8 @@ export const envValidationSchema = Joi.object({
 
   PORT: Joi.number().port().default(3000),
 
+  TRUST_PROXY: Joi.string().max(255).default('loopback'),
+
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['mysql'] })
     .required(),
