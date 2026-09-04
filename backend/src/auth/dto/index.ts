@@ -1,3 +1,4 @@
+export { ChangePasswordDto } from './change-password.dto';
 export { ChangeRequiredPasswordDto } from './change-required-password.dto';
 export { LoginDto } from './login.dto';
 export { LogoutDto } from './logout.dto';
