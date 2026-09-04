@@ -1,5 +1,7 @@
 import * as Joi from 'joi';
 
+const boolean = Joi.boolean().truthy('true').falsy('false');
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -30,7 +32,7 @@ export const envValidationSchema = Joi.object({
   PUBLIC_APP_URL: Joi.string().uri().default('https://localhost:3001'),
 
   COMMUNICATION_EMAIL_MODE: Joi.string()
-    .valid('CONSOLE', 'HTTP')
+    .valid('CONSOLE', 'HTTP', 'SMTP')
     .default('CONSOLE'),
 
   COMMUNICATION_EMAIL_FROM: Joi.string()
@@ -40,6 +42,34 @@ export const envValidationSchema = Joi.object({
   COMMUNICATION_EMAIL_HTTP_URL: Joi.string().uri().allow('').default(''),
 
   COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: Joi.string().allow('').default(''),
+
+  COMMUNICATION_EMAIL_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .max(120_000)
+    .default(10_000),
+
+  SMTP_HOST: Joi.when('COMMUNICATION_EMAIL_MODE', {
+    is: 'SMTP',
+    then: Joi.string().min(1).required(),
+    otherwise: Joi.string().allow('').default(''),
+  }),
+
+  SMTP_PORT: Joi.number().port().default(587),
+
+  SMTP_SECURE: boolean.default(false),
+
+  SMTP_REQUIRE_TLS: boolean.default(true),
+
+  SMTP_REJECT_UNAUTHORIZED: boolean.default(true),
+
+  SMTP_USER: Joi.string().allow('').default(''),
+
+  SMTP_PASSWORD: Joi.string().allow('').default(''),
+
+  SMTP_FROM_EMAIL: Joi.string().email().allow('').default(''),
+
+  SMTP_FROM_NAME: Joi.string().max(120).allow('').default('FixTradeZone'),
 
   EMAIL_VERIFICATION_TTL_MINUTES: Joi.number()
     .integer()
@@ -53,10 +83,19 @@ export const envValidationSchema = Joi.object({
     .max(3600)
     .default(60),
 
-  REWARD_WORKER_ENABLED: Joi.boolean()
-    .truthy('true')
-    .falsy('false')
-    .default(false),
+  PASSWORD_RESET_TTL_MINUTES: Joi.number()
+    .integer()
+    .min(5)
+    .max(180)
+    .default(30),
+
+  PASSWORD_RESET_RESEND_COOLDOWN_SECONDS: Joi.number()
+    .integer()
+    .min(10)
+    .max(3600)
+    .default(60),
+
+  REWARD_WORKER_ENABLED: boolean.default(false),
 
   REWARD_WORKER_INTERVAL_MS: Joi.number()
     .integer()
@@ -64,10 +103,7 @@ export const envValidationSchema = Joi.object({
     .max(3_600_000)
     .default(60_000),
 
-  SIMULATED_ACTIVITY_WORKER_ENABLED: Joi.boolean()
-    .truthy('true')
-    .falsy('false')
-    .default(false),
+  SIMULATED_ACTIVITY_WORKER_ENABLED: boolean.default(false),
 
   SIMULATED_ACTIVITY_WORKER_INTERVAL_MS: Joi.number()
     .integer()
@@ -75,10 +111,7 @@ export const envValidationSchema = Joi.object({
     .max(3_600_000)
     .default(60_000),
 
-  INTERNAL_TRADING_WORKER_ENABLED: Joi.boolean()
-    .truthy('true')
-    .falsy('false')
-    .default(false),
+  INTERNAL_TRADING_WORKER_ENABLED: boolean.default(false),
 
   INTERNAL_TRADING_WORKER_INTERVAL_MS: Joi.number()
     .integer()
@@ -97,4 +130,37 @@ export const envValidationSchema = Joi.object({
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),
 
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
-}).unknown(true);
+})
+  .custom((value: Record<string, unknown>, helpers) => {
+    if (value.COMMUNICATION_EMAIL_MODE === 'SMTP') {
+      const user = String(value.SMTP_USER ?? '').trim();
+      const password = String(value.SMTP_PASSWORD ?? '').trim();
+
+      if (Boolean(user) !== Boolean(password)) {
+        return helpers.error('any.custom', {
+          message: 'SMTP_USER and SMTP_PASSWORD must be configured together',
+        });
+      }
+
+      const smtpFrom = String(value.SMTP_FROM_EMAIL ?? '').trim();
+      const legacyFrom = String(value.COMMUNICATION_EMAIL_FROM ?? '').trim();
+      if (!smtpFrom && !legacyFrom) {
+        return helpers.error('any.custom', {
+          message:
+            'SMTP_FROM_EMAIL or COMMUNICATION_EMAIL_FROM is required in SMTP mode',
+        });
+      }
+    }
+
+    if (
+      value.COMMUNICATION_EMAIL_MODE === 'HTTP' &&
+      !String(value.COMMUNICATION_EMAIL_HTTP_URL ?? '').trim()
+    ) {
+      return helpers.error('any.custom', {
+        message: 'COMMUNICATION_EMAIL_HTTP_URL is required in HTTP mode',
+      });
+    }
+
+    return value;
+  })
+  .unknown(true);
