@@ -1,7 +1,4 @@
-import {
-  HttpException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
 import type { RedisService } from '../redis/redis.service';
@@ -84,9 +81,16 @@ describe('PublicAuthRateLimitGuard', () => {
     incr.mockResolvedValue(3);
     ttl.mockResolvedValue(41);
 
-    await expect(guard.canActivate(context())).rejects.toMatchObject({
-      status: 429,
-    } satisfies Partial<HttpException>);
+    try {
+      await guard.canActivate(context());
+      throw new Error('Expected the rate limit guard to reject the request.');
+    } catch (error: unknown) {
+      expect(error).toMatchObject({
+        getStatus: expect.any(Function),
+      });
+      const status = (error as { getStatus(): number }).getStatus();
+      expect(status).toBe(429);
+    }
 
     expect(ttl).toHaveBeenCalledTimes(1);
   });
