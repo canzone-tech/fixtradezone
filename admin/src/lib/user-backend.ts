@@ -14,7 +14,11 @@ import {
   REFRESH_COOKIE,
   setAuthCookies,
 } from "@/lib/auth";
-import { backendFetch, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  readJson,
+} from "@/lib/backend";
 
 async function mirrorBackendResponse(
   backendResponse: Response,
@@ -29,9 +33,7 @@ async function mirrorBackendResponse(
     },
     {
       status: backendResponse.status,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: { "Cache-Control": "no-store" },
     },
   );
 }
@@ -47,9 +49,7 @@ function rejectSession(status = 401, redirectTo = "/login"): NextResponse {
     },
     {
       status,
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: { "Cache-Control": "no-store" },
     },
   );
 
@@ -67,15 +67,8 @@ export async function proxyUserRequest(
 ): Promise<NextResponse> {
   if (isCrossSiteRequest(request)) {
     return NextResponse.json(
-      {
-        message: "Cross-site USER requests are not allowed.",
-      },
-      {
-        status: 403,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
+      { message: "Cross-site USER requests are not allowed." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
     );
   }
 
@@ -86,14 +79,10 @@ export async function proxyUserRequest(
   )?.value;
 
   const invoke = (token: string) => {
-    const headers = new Headers(init.headers);
-
+    const headers = forwardedBackendHeaders(request, init.headers);
     headers.set("Authorization", `Bearer ${token}`);
 
-    return backendFetch(path, {
-      ...init,
-      headers,
-    });
+    return backendFetch(path, { ...init, headers });
   };
 
   try {
@@ -122,12 +111,10 @@ export async function proxyUserRequest(
 
     const refreshResponse = await backendFetch("/auth/refresh", {
       method: "POST",
-      headers: {
+      headers: forwardedBackendHeaders(request, {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        refreshToken,
       }),
+      body: JSON.stringify({ refreshToken }),
     });
 
     const refreshPayload = await readJson(refreshResponse);
@@ -144,10 +131,7 @@ export async function proxyUserRequest(
         isAdministrator(auth.user) ? "/dashboard" : "/login",
       );
 
-      // Refresh-token rotation already occurred. Preserve the new valid
-      // session so the browser is not left with a consumed refresh token.
       setAuthCookies(response, auth);
-
       return response;
     }
 
@@ -160,19 +144,11 @@ export async function proxyUserRequest(
     }
 
     setAuthCookies(response, auth);
-
     return response;
   } catch {
     return NextResponse.json(
-      {
-        message: "USER API is temporarily unavailable.",
-      },
-      {
-        status: 503,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
+      { message: "USER API is temporarily unavailable." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
