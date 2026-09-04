@@ -39,6 +39,11 @@ const routeHeadings: Array<{
     subtitle: "Daily package settlement, cap progress and lifecycle controls",
   },
   {
+    path: "/payouts",
+    title: "Payouts",
+    subtitle: "Withdrawal policy, request review and settlement operations",
+  },
+  {
     path: "/internal-trading",
     title: "Internal Trading",
     subtitle:
@@ -73,6 +78,21 @@ const routeHeadings: Array<{
     path: "/rbac",
     title: "Roles & Permissions",
     subtitle: "Backend-authoritative access management",
+  },
+  {
+    path: "/notifications",
+    title: "Notifications",
+    subtitle: "Targeted and broadcast in-app user communication",
+  },
+  {
+    path: "/reports",
+    title: "Reports",
+    subtitle: "Read-only operational and financial reporting",
+  },
+  {
+    path: "/audit-logs",
+    title: "Audit Logs",
+    subtitle: "Immutable administration activity and security history",
   },
   {
     path: "/settings",
