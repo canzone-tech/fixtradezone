@@ -18,6 +18,7 @@ interface Policy {
   revision: number;
   enabled: boolean;
   activitiesPerDay: number;
+  minimumGapMinutes: number;
   assetSymbols: string[];
   winWeight: number;
   lossWeight: number;
@@ -78,6 +79,7 @@ interface ReconciliationPayload {
   localActivityDate: string | null;
   timezoneSnapshot?: string;
   activitiesPerDay?: number;
+  minimumGapMinutes?: number;
   eligibleSubscriptions: number;
   eventsToday: number;
   configuredMaximumSlotsToday: number;
@@ -109,6 +111,7 @@ interface BatchPayload {
 interface FormState {
   enabled: boolean;
   activitiesPerDay: string;
+  minimumGapMinutes: string;
   assetSymbols: string;
   winWeight: string;
   lossWeight: string;
@@ -123,6 +126,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   enabled: true,
   activitiesPerDay: "5",
+  minimumGapMinutes: "240",
   assetSymbols: "BTCUSDT, ETHUSDT, SOLUSDT",
   winWeight: "3",
   lossWeight: "2",
@@ -130,7 +134,7 @@ const EMPTY_FORM: FormState = {
   winMaximumPercent: "2.500000",
   lossMinimumPercent: "0.250000",
   lossMaximumPercent: "1.500000",
-  timingWindows: "09:00-21:00",
+  timingWindows: "00:00-23:59",
   reason: "",
 };
 
@@ -158,6 +162,7 @@ function formFor(policy: Policy): FormState {
   return {
     enabled: policy.enabled,
     activitiesPerDay: String(policy.activitiesPerDay),
+    minimumGapMinutes: String(policy.minimumGapMinutes),
     assetSymbols: policy.assetSymbols.join(", "),
     winWeight: String(policy.winWeight),
     lossWeight: String(policy.lossWeight),
@@ -263,7 +268,7 @@ export default function SimulatedTradesClient() {
       const canRead = hasPermission(user, "simulated_activity.read");
       const canReconcile = hasPermission(user, "simulated_activity.reconcile");
       if (!canRead) {
-        throw new Error("You do not have simulated activity read permission.");
+        throw new Error("You do not have Trade Activity read permission.");
       }
 
       const [policiesResponse, eventsResponse, workerResponse] =
@@ -296,23 +301,17 @@ export default function SimulatedTradesClient() {
 
       if (!policiesResponse.ok || !policiesPayload?.policies) {
         throw new Error(
-          messageFrom(
-            policiesPayload,
-            "Unable to load simulated activity policies.",
-          ),
+          messageFrom(policiesPayload, "Unable to load Trade Activity policies."),
         );
       }
       if (!eventsResponse.ok || !eventsPayload?.events) {
         throw new Error(
-          messageFrom(eventsPayload, "Unable to load simulated events."),
+          messageFrom(eventsPayload, "Unable to load generated trade events."),
         );
       }
       if (!workerResponse.ok || !workerPayload) {
         throw new Error(
-          messageFrom(
-            workerPayload,
-            "Unable to load simulation worker health.",
-          ),
+          messageFrom(workerPayload, "Unable to load Trade Activity worker health."),
         );
       }
 
@@ -334,7 +333,7 @@ export default function SimulatedTradesClient() {
           throw new Error(
             messageFrom(
               reconciliationPayload,
-              "Unable to load simulation reconciliation.",
+              "Unable to load Trade Activity reconciliation.",
             ),
           );
         }
@@ -353,7 +352,7 @@ export default function SimulatedTradesClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to load simulated activity workspace.",
+          : "Unable to load Trade Activity workspace.",
       );
     } finally {
       setLoading(false);
@@ -394,6 +393,7 @@ export default function SimulatedTradesClient() {
             reason: form.reason.trim(),
             enabled: form.enabled,
             activitiesPerDay: Number(form.activitiesPerDay),
+            minimumGapMinutes: Number(form.minimumGapMinutes),
             assetSymbols: parseAssets(form.assetSymbols),
             winWeight: Number(form.winWeight),
             lossWeight: Number(form.lossWeight),
@@ -410,7 +410,7 @@ export default function SimulatedTradesClient() {
       >(response);
       if (!response.ok || !payload) {
         throw new Error(
-          messageFrom(payload, "Unable to save simulated activity policy."),
+          messageFrom(payload, "Unable to save Trade Activity policy."),
         );
       }
       setNotice(
@@ -436,7 +436,7 @@ export default function SimulatedTradesClient() {
     }
     if (
       !window.confirm(
-        `Publish simulated activity policy V${draft.versionNumber}? It will become effective at the next Platform Operations local calendar-day boundary.`,
+        `Publish Trade Activity policy V${draft.versionNumber}? It will become effective at the next Platform Operations local calendar-day boundary.`,
       )
     ) {
       return;
@@ -462,11 +462,11 @@ export default function SimulatedTradesClient() {
       >(response);
       if (!response.ok || !payload) {
         throw new Error(
-          messageFrom(payload, "Unable to publish simulated activity policy."),
+          messageFrom(payload, "Unable to publish Trade Activity policy."),
         );
       }
       setNotice(
-        `Policy V${payload.versionNumber} published for its next local-day boundary. Historical simulated events remain immutable.`,
+        `Policy V${payload.versionNumber} published for its next local-day boundary. Historical trade events remain immutable.`,
       );
       await loadWorkspace();
     } catch (caught) {
@@ -506,7 +506,7 @@ export default function SimulatedTradesClient() {
       >(response);
       if (!response.ok || !payload) {
         throw new Error(
-          messageFrom(payload, "Unable to create simulation policy draft."),
+          messageFrom(payload, "Unable to create Trade Activity policy draft."),
         );
       }
       setNotice(
@@ -535,7 +535,7 @@ export default function SimulatedTradesClient() {
       const payload = await readPayload<BatchPayload>(response);
       if (!response.ok || !payload) {
         throw new Error(
-          messageFrom(payload, "Unable to reconcile simulated activity."),
+          messageFrom(payload, "Unable to reconcile Trade Activity."),
         );
       }
       setNotice(
@@ -544,9 +544,7 @@ export default function SimulatedTradesClient() {
       await loadWorkspace();
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : "Unable to process simulation slots.",
+        caught instanceof Error ? caught.message : "Unable to process trade slots.",
       );
     } finally {
       setProcessing(false);
@@ -557,7 +555,7 @@ export default function SimulatedTradesClient() {
     return (
       <div className="ftz-dashboard-loading">
         <span />
-        <p>Loading simulated activity…</p>
+        <p>Loading Trade Activity…</p>
       </div>
     );
   }
@@ -568,15 +566,16 @@ export default function SimulatedTradesClient() {
     <div className={styles.page}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>SIM-01 / DISPLAY-ONLY ACTIVITY</p>
-          <h2>Simulated Trade Activity</h2>
+          <p className={styles.eyebrow}>TRADE ACTIVITY / POLICY CONTROL</p>
+          <h2>Trade Activity</h2>
           <p>
-            Versioned, deterministic simulation rows for eligible ACTIVE package
-            subscriptions. This module never executes a trade and never posts
-            wallet, ledger, package earnings, commission, reward or cap money.
+            Versioned deterministic trade rows are generated independently for
+            every eligible ACTIVE package subscription. This workspace does not
+            represent external broker or exchange execution and has no direct
+            wallet or ledger mutation path.
           </p>
         </div>
-        <span className={styles.disclosurePill}>SIMULATED RESULTS</span>
+        <span className={styles.disclosurePill}>SYSTEM-GENERATED</span>
       </section>
 
       {error ? (
@@ -604,7 +603,7 @@ export default function SimulatedTradesClient() {
           </strong>
         </article>
         <article className={styles.stat}>
-          <small>Events today</small>
+          <small>Trades today</small>
           <strong>{reconciliation ? reconciliation.eventsToday : "—"}</strong>
         </article>
         <article className={styles.stat}>
@@ -647,11 +646,11 @@ export default function SimulatedTradesClient() {
                   }
                   disabled={!isSuperAdmin || saving}
                 />
-                Policy generation enabled
+                Trade generation enabled
               </label>
               <div className={styles.field}>
                 <label htmlFor="activitiesPerDay">
-                  Activities / day / ACTIVE subscription
+                  Trades / day / ACTIVE subscription
                 </label>
                 <input
                   id="activitiesPerDay"
@@ -661,6 +660,20 @@ export default function SimulatedTradesClient() {
                   value={form.activitiesPerDay}
                   onChange={(event) =>
                     updateForm("activitiesPerDay", event.target.value)
+                  }
+                  disabled={!isSuperAdmin || saving}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="minimumGapMinutes">Minimum gap (minutes)</label>
+                <input
+                  id="minimumGapMinutes"
+                  type="number"
+                  min="0"
+                  max="1439"
+                  value={form.minimumGapMinutes}
+                  onChange={(event) =>
+                    updateForm("minimumGapMinutes", event.target.value)
                   }
                   disabled={!isSuperAdmin || saving}
                 />
@@ -760,6 +773,10 @@ export default function SimulatedTradesClient() {
                   }
                   disabled={!isSuperAdmin || saving}
                 />
+                <small className={styles.muted}>
+                  Five trades with a 240-minute minimum gap require at least a
+                  16-hour span between the first and last scheduled trade.
+                </small>
               </div>
               <div className={styles.fieldWide}>
                 <label htmlFor="reason">Audited reason</label>
@@ -768,7 +785,7 @@ export default function SimulatedTradesClient() {
                   value={form.reason}
                   onChange={(event) => updateForm("reason", event.target.value)}
                   disabled={!isSuperAdmin || saving}
-                  placeholder="Why are these simulation settings changing?"
+                  placeholder="Why are these Trade Activity settings changing?"
                 />
               </div>
               <div className={`${styles.actions} ${styles.fieldWide}`}>
@@ -798,8 +815,16 @@ export default function SimulatedTradesClient() {
                   <dd>{latestPublished.enabled ? "Enabled" : "Disabled"}</dd>
                 </div>
                 <div>
-                  <dt>Activities/day/subscription</dt>
+                  <dt>Trades/day/subscription</dt>
                   <dd>{latestPublished.activitiesPerDay}</dd>
+                </div>
+                <div>
+                  <dt>Minimum trade gap</dt>
+                  <dd>
+                    {latestPublished.minimumGapMinutes > 0
+                      ? `${latestPublished.minimumGapMinutes} minutes`
+                      : "Legacy schedule"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Assets</dt>
@@ -853,9 +878,7 @@ export default function SimulatedTradesClient() {
               ) : null}
             </>
           ) : (
-            <div className={styles.empty}>
-              No simulation policy is available.
-            </div>
+            <div className={styles.empty}>No Trade Activity policy is available.</div>
           )}
         </article>
 
@@ -896,8 +919,16 @@ export default function SimulatedTradesClient() {
               <dd>{reconciliation?.localActivityDate ?? "—"}</dd>
             </div>
             <div>
-              <dt>Configured slots today</dt>
+              <dt>Configured trades today</dt>
               <dd>{reconciliation?.configuredMaximumSlotsToday ?? "—"}</dd>
+            </div>
+            <div>
+              <dt>Minimum trade gap</dt>
+              <dd>
+                {reconciliation?.minimumGapMinutes !== undefined
+                  ? `${reconciliation.minimumGapMinutes} minutes`
+                  : "—"}
+              </dd>
             </div>
             <div>
               <dt>Last worker run</dt>
@@ -916,7 +947,7 @@ export default function SimulatedTradesClient() {
                 onClick={() => void processDue()}
                 disabled={processing}
               >
-                {processing ? "Processing…" : "Process Due Simulation Slots"}
+                {processing ? "Processing…" : "Process Due Trade Slots"}
               </button>
             </div>
           ) : null}
@@ -932,7 +963,7 @@ export default function SimulatedTradesClient() {
         <div className={styles.cardHeader}>
           <div>
             <p className={styles.eyebrow}>IMMUTABLE HISTORY</p>
-            <h3>Generated simulated events</h3>
+            <h3>Generated trade events</h3>
           </div>
           <span className={styles.badge} data-tone="muted">
             {events.length} loaded
@@ -940,7 +971,7 @@ export default function SimulatedTradesClient() {
         </div>
         {events.length === 0 ? (
           <div className={styles.empty}>
-            No due simulated activity has been generated yet.
+            No due Trade Activity has been generated yet.
           </div>
         ) : (
           <div className={styles.tableWrap}>
@@ -949,12 +980,12 @@ export default function SimulatedTradesClient() {
                 <tr>
                   <th>User</th>
                   <th>Package</th>
-                  <th>Simulated time</th>
+                  <th>Trade time</th>
                   <th>Asset</th>
                   <th>Outcome</th>
-                  <th>Simulated result</th>
+                  <th>Result</th>
                   <th>Source</th>
-                  <th>Slot</th>
+                  <th>Trade #</th>
                 </tr>
               </thead>
               <tbody>
@@ -1003,19 +1034,21 @@ export default function SimulatedTradesClient() {
       <section className={styles.disclosure}>
         <i className="iconoir-warning-triangle" />
         <div>
-          <strong>SIMULATED RESULTS</strong>
+          <strong>SYSTEM-GENERATED TRADE ACTIVITY</strong>
           <p>
-            These rows are generated display simulations only. They are not
-            broker/exchange executions, do not represent realized or
-            withdrawable trading profit, and never mutate wallet, ledger,
-            reward, cap or commission accounting.
+            {presentedPolicy?.disclosure ??
+              "Trade activity does not represent external market execution."}
+          </p>
+          <p>
+            This module has no direct wallet, ledger, reward, cap or commission
+            mutation path and does not expose arbitrary manual trade outcomes.
           </p>
         </div>
       </section>
 
       {presentedPolicy?.financialEffect !== "NONE" ? (
         <div className={styles.alert} data-tone="error">
-          Simulation policy financial isolation is inconsistent. Generation is
+          Trade Activity financial isolation is inconsistent. Generation is
           blocked until configuration is repaired.
         </div>
       ) : null}
