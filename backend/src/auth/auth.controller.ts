@@ -34,6 +34,8 @@ import {
 import { EmailVerificationService } from './email-verification.service';
 import { OwnProfileService } from './own-profile.service';
 import { PasswordResetService } from './password-reset.service';
+import { PublicAuthRateLimit } from './public-auth-rate-limit.decorator';
+import { PublicAuthRateLimitGuard } from './public-auth-rate-limit.guard';
 import { Public } from './public.decorator';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
@@ -59,7 +61,14 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(CaptchaGuard)
+  @UseGuards(PublicAuthRateLimitGuard, CaptchaGuard)
+  @PublicAuthRateLimit({
+    name: 'register',
+    limit: 30,
+    windowSeconds: 3600,
+    identityField: 'email',
+    identityLimit: 5,
+  })
   @RequireCaptcha(CaptchaPurpose.REGISTRATION)
   @Header('Cache-Control', 'no-store')
   @Post('register')
@@ -68,6 +77,12 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(PublicAuthRateLimitGuard)
+  @PublicAuthRateLimit({
+    name: 'email-verify',
+    limit: 60,
+    windowSeconds: 900,
+  })
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('email-verification/verify')
@@ -79,6 +94,14 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(PublicAuthRateLimitGuard)
+  @PublicAuthRateLimit({
+    name: 'email-resend',
+    limit: 30,
+    windowSeconds: 3600,
+    identityField: 'email',
+    identityLimit: 6,
+  })
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('email-verification/resend')
@@ -93,6 +116,14 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(PublicAuthRateLimitGuard)
+  @PublicAuthRateLimit({
+    name: 'password-reset-request',
+    limit: 30,
+    windowSeconds: 3600,
+    identityField: 'email',
+    identityLimit: 6,
+  })
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('password-reset/request')
@@ -107,6 +138,12 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(PublicAuthRateLimitGuard)
+  @PublicAuthRateLimit({
+    name: 'password-reset-complete',
+    limit: 30,
+    windowSeconds: 900,
+  })
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('password-reset/complete')
@@ -119,7 +156,14 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(CaptchaGuard)
+  @UseGuards(PublicAuthRateLimitGuard, CaptchaGuard)
+  @PublicAuthRateLimit({
+    name: 'login',
+    limit: 120,
+    windowSeconds: 900,
+    identityField: 'identifier',
+    identityLimit: 12,
+  })
   @RequireCaptcha(CaptchaPurpose.LOGIN)
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
@@ -129,6 +173,12 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(PublicAuthRateLimitGuard)
+  @PublicAuthRateLimit({
+    name: 'required-password-change',
+    limit: 30,
+    windowSeconds: 900,
+  })
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('change-required-password')
