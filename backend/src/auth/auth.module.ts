@@ -18,6 +18,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { OwnProfileService } from './own-profile.service';
 import { PasswordResetService } from './password-reset.service';
 import { PasswordService } from './password.service';
+import { PublicAuthRateLimitGuard } from './public-auth-rate-limit.guard';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
@@ -47,6 +48,7 @@ import { TokenService } from './token.service';
     OwnProfileService,
     PasswordResetService,
     PasswordService,
+    PublicAuthRateLimitGuard,
     ReauthenticationService,
     RegistrationService,
     RbacBootstrapService,
