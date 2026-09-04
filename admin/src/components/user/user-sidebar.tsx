@@ -191,14 +191,14 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             </Link>
 
             <Link
-              href="/user/simulated-activity"
+              href="/user/trade-activity"
               className={`ftz-nav-link ${
-                isActive("/user/simulated-activity") ? "is-active" : ""
+                isActive("/user/trade-activity") ? "is-active" : ""
               }`}
               onClick={close}
             >
               <i className="iconoir-graph-up" />
-              <span>Simulated Trade Activity</span>
+              <span>Daily Trades</span>
             </Link>
           </div>
         </nav>
