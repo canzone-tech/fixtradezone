@@ -23,12 +23,15 @@ import {
   ReauthenticateDto,
   RefreshTokenDto,
   RegisterDto,
+  RequestPasswordResetDto,
   ResendEmailVerificationDto,
+  ResetPasswordDto,
   UpdateOwnProfileDto,
   VerifyEmailDto,
 } from './dto';
 import { EmailVerificationService } from './email-verification.service';
 import { OwnProfileService } from './own-profile.service';
+import { PasswordResetService } from './password-reset.service';
 import { Public } from './public.decorator';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
@@ -41,6 +44,7 @@ export class AuthController {
     private readonly reauthenticationService: ReauthenticationService,
     private readonly registrationService: RegistrationService,
     private readonly emailVerificationService: EmailVerificationService,
+    private readonly passwordResetService: PasswordResetService,
     private readonly ownProfileService: OwnProfileService,
   ) {}
 
@@ -81,6 +85,32 @@ export class AuthController {
   ) {
     return this.emailVerificationService.resend(
       dto.email,
+      getRequestContext(request),
+    );
+  }
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('password-reset/request')
+  requestPasswordReset(
+    @Body() dto: RequestPasswordResetDto,
+    @Req() request: Request,
+  ) {
+    return this.passwordResetService.request(
+      dto.email,
+      getRequestContext(request),
+    );
+  }
+
+  @Public()
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('password-reset/complete')
+  resetPassword(@Body() dto: ResetPasswordDto, @Req() request: Request) {
+    return this.passwordResetService.reset(
+      dto.token,
+      dto.newPassword,
       getRequestContext(request),
     );
   }
