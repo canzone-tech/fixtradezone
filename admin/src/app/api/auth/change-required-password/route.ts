@@ -4,7 +4,12 @@ import {
   clearPasswordChangeCookie,
   isCrossSiteRequest,
 } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 interface ChangePasswordBody {
   newPassword?: unknown;
@@ -56,9 +61,9 @@ export async function POST(request: NextRequest) {
       "/auth/change-required-password",
       {
         method: "POST",
-        headers: {
+        headers: forwardedBackendHeaders(request, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           passwordChangeToken,
           newPassword: body.newPassword,
@@ -97,7 +102,6 @@ export async function POST(request: NextRequest) {
     );
 
     clearPasswordChangeCookie(response);
-
     return response;
   } catch {
     return NextResponse.json(
