@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCrossSiteRequest } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 interface RegisterBody {
   email?: string;
@@ -17,26 +22,18 @@ interface RegisterBody {
 }
 
 function optionalString(value: unknown, maxLength: number): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
+  if (value === undefined) return undefined;
   if (typeof value !== "string" || value.length > maxLength) {
     throw new Error("Invalid registration request.");
   }
-
   return value;
 }
 
 function optionalBoolean(value: unknown): boolean | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
+  if (value === undefined) return undefined;
   if (typeof value !== "boolean") {
     throw new Error("Invalid registration request.");
   }
-
   return value;
 }
 
@@ -45,39 +42,25 @@ function referralCodeFromRequest(
   source: Record<string, unknown>,
 ): string | undefined {
   const explicit = optionalString(source.referralCode, 64)?.trim();
-
-  if (explicit) {
-    return explicit;
-  }
+  if (explicit) return explicit;
 
   const referer = request.headers.get("referer");
-
-  if (!referer) {
-    return undefined;
-  }
+  if (!referer) return undefined;
 
   let refererUrl: URL;
-
   try {
     refererUrl = new URL(referer);
   } catch {
     return undefined;
   }
 
-  if (refererUrl.origin !== request.nextUrl.origin) {
-    return undefined;
-  }
+  if (refererUrl.origin !== request.nextUrl.origin) return undefined;
 
   const referralCode = refererUrl.searchParams.get("ref")?.trim();
-
-  if (!referralCode) {
-    return undefined;
-  }
-
+  if (!referralCode) return undefined;
   if (referralCode.length > 64) {
     throw new Error("Invalid registration request.");
   }
-
   return referralCode;
 }
 
@@ -93,7 +76,6 @@ export async function POST(request: NextRequest) {
 
   try {
     const source = (await request.json()) as Record<string, unknown>;
-
     body = {
       email: optionalString(source.email, 191),
       password: optionalString(source.password, 128),
@@ -117,7 +99,9 @@ export async function POST(request: NextRequest) {
   try {
     const response = await backendFetch("/auth/register", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardedBackendHeaders(request, {
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify(body),
     });
     const payload = await readJson(response);
