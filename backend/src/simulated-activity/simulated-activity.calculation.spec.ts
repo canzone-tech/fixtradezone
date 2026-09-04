@@ -107,24 +107,28 @@ describe('simulated activity deterministic calculation', () => {
       minimumGapMinutes: 240,
       timingWindows: [{ start: '00:00', end: '23:59' }],
     };
-    const slots = Array.from({ length: spacedBase.activitiesPerDay }, (_, index) => {
-      const slotNumber = index + 1;
-      return deterministicSimulatedSlot({
-        ...spacedBase,
-        slotNumber,
-        sourceKey: simulatedActivitySourceKey(
-          subscriptionId,
-          policyVersionId,
-          spacedBase.localActivityDate,
+    const slots = Array.from(
+      { length: spacedBase.activitiesPerDay },
+      (_, index) => {
+        const slotNumber = index + 1;
+        return deterministicSimulatedSlot({
+          ...spacedBase,
           slotNumber,
-        ),
-      });
-    });
+          sourceKey: simulatedActivitySourceKey(
+            subscriptionId,
+            policyVersionId,
+            spacedBase.localActivityDate,
+            slotNumber,
+          ),
+        });
+      },
+    );
 
     expect(slots).toHaveLength(5);
     for (let index = 1; index < slots.length; index += 1) {
       expect(
-        slots[index].scheduledAt.getTime() - slots[index - 1].scheduledAt.getTime(),
+        slots[index].scheduledAt.getTime() -
+          slots[index - 1].scheduledAt.getTime(),
       ).toBeGreaterThanOrEqual(240 * 60 * 1000);
     }
   });
