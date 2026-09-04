@@ -20,3 +20,14 @@ UPDATE `simulated_activity_policy_versions`
 SET `minimumGapMinutes` = 240
 WHERE `status` = 'DRAFT'
   AND `minimumGapMinutes` IS NULL;
+
+-- The original seeded 09:00-21:00 window cannot fit five trades with four-hour
+-- minimum gaps. Only untouched DRAFTs with that exact seed window are widened;
+-- custom draft windows and every PUBLISHED historical policy remain unchanged.
+UPDATE `simulated_activity_policy_versions`
+SET `timingWindows` = JSON_ARRAY(JSON_OBJECT('start', '00:00', 'end', '23:59'))
+WHERE `status` = 'DRAFT'
+  AND `minimumGapMinutes` = 240
+  AND JSON_LENGTH(`timingWindows`) = 1
+  AND JSON_UNQUOTE(JSON_EXTRACT(`timingWindows`, '$[0].start')) = '09:00'
+  AND JSON_UNQUOTE(JSON_EXTRACT(`timingWindows`, '$[0].end')) = '21:00';
