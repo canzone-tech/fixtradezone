@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import {
+  SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES,
   SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES,
   type SimulatedActivityOutcome,
   type SimulatedTimingWindow,
@@ -60,6 +61,7 @@ export function deterministicSimulatedSlot(input: {
   localActivityDate: string;
   slotNumber: number;
   activitiesPerDay: number;
+  minimumGapMinutes?: number | null;
   assetSymbols: string[];
   winWeight: number;
   lossWeight: number;
@@ -112,6 +114,7 @@ export function deterministicSimulatedSlot(input: {
       localActivityDate: input.localActivityDate,
       slotNumber: input.slotNumber,
       activitiesPerDay: input.activitiesPerDay,
+      minimumGapMinutes: input.minimumGapMinutes,
       timingWindows: input.timingWindows,
       timezoneSnapshot: input.timezoneSnapshot,
     }),
@@ -131,35 +134,15 @@ export function deterministicScheduledAt(input: {
   localActivityDate: string;
   slotNumber: number;
   activitiesPerDay: number;
+  minimumGapMinutes?: number | null;
   timingWindows: SimulatedTimingWindow[];
   timezoneSnapshot: string;
 }): Date {
-  const windows = input.timingWindows.map((window) => ({
-    start: clockMinute(window.start),
-    end: clockMinute(window.end),
-  }));
-  if (windows.length === 0) {
-    throw new BadRequestException(
-      'At least one simulated timing window is required.',
-    );
-  }
-
-  let previousEnd = -1;
-  let totalMinutes = 0;
-  for (const window of windows) {
-    if (window.end <= window.start) {
-      throw new BadRequestException(
-        'Simulated timing windows must end after they start on the same local day.',
-      );
-    }
-    if (window.start < previousEnd) {
-      throw new BadRequestException(
-        'Simulated timing windows cannot overlap or be out of order.',
-      );
-    }
-    previousEnd = window.end;
-    totalMinutes += window.end - window.start;
-  }
+  const windows = normalizedWindows(input.timingWindows);
+  const totalMinutes = windows.reduce(
+    (total, window) => total + window.end - window.start,
+    0,
+  );
 
   if (
     !Number.isInteger(input.activitiesPerDay) ||
@@ -171,28 +154,30 @@ export function deterministicScheduledAt(input: {
     );
   }
 
-  const segmentStart = Math.floor(
-    (totalMinutes * (input.slotNumber - 1)) / input.activitiesPerDay,
-  );
-  const segmentEnd = Math.floor(
-    (totalMinutes * input.slotNumber) / input.activitiesPerDay,
-  );
-  const segmentSpan = Math.max(1, segmentEnd - segmentStart);
-  const linearMinute =
-    segmentStart + deterministicIndex(`${input.sourceKey}:time`, segmentSpan);
+  const minimumGapMinutes = input.minimumGapMinutes ?? 0;
+  validateMinimumGap(minimumGapMinutes);
 
-  let remaining = linearMinute;
-  let localMinute: number | null = null;
-  for (const window of windows) {
-    const duration = window.end - window.start;
-    if (remaining < duration) {
-      localMinute = window.start + remaining;
-      break;
-    }
-    remaining -= duration;
-  }
-  if (localMinute === null) {
-    throw new BadRequestException('Unable to resolve simulated activity time.');
+  let localMinute: number;
+  if (minimumGapMinutes > 0 && input.activitiesPerDay > 1) {
+    const scheduleKey = commonScheduleKey(input.sourceKey, input.slotNumber);
+    const schedule = deterministicSpacedMinutes({
+      scheduleKey,
+      activitiesPerDay: input.activitiesPerDay,
+      minimumGapMinutes,
+      windows,
+    });
+    localMinute = schedule[input.slotNumber - 1];
+  } else {
+    const segmentStart = Math.floor(
+      (totalMinutes * (input.slotNumber - 1)) / input.activitiesPerDay,
+    );
+    const segmentEnd = Math.floor(
+      (totalMinutes * input.slotNumber) / input.activitiesPerDay,
+    );
+    const segmentSpan = Math.max(1, segmentEnd - segmentStart);
+    const linearMinute =
+      segmentStart + deterministicIndex(`${input.sourceKey}:time`, segmentSpan);
+    localMinute = linearMinuteToLocalMinute(linearMinute, windows);
   }
 
   return localDateTimeUtc(
@@ -206,12 +191,14 @@ export function deterministicScheduledAt(input: {
 export function validateTimingWindows(
   timingWindows: SimulatedTimingWindow[],
   activitiesPerDay: number,
+  minimumGapMinutes: number | null = null,
 ): void {
   deterministicScheduledAt({
-    sourceKey: 'SIMULATED_ACTIVITY:VALIDATION',
+    sourceKey: 'SIMULATED_ACTIVITY:VALIDATION:1',
     localActivityDate: '2026-01-15',
     slotNumber: 1,
     activitiesPerDay,
+    minimumGapMinutes,
     timingWindows,
     timezoneSnapshot: 'UTC',
   });
@@ -219,6 +206,120 @@ export function validateTimingWindows(
 
 export function validateIanaTimezone(timeZone: string): void {
   dateFormatter(timeZone);
+}
+
+function normalizedWindows(timingWindows: SimulatedTimingWindow[]) {
+  const windows = timingWindows.map((window) => ({
+    start: clockMinute(window.start),
+    end: clockMinute(window.end),
+  }));
+  if (windows.length === 0) {
+    throw new BadRequestException(
+      'At least one simulated timing window is required.',
+    );
+  }
+
+  let previousEnd = -1;
+  for (const window of windows) {
+    if (window.end <= window.start) {
+      throw new BadRequestException(
+        'Simulated timing windows must end after they start on the same local day.',
+      );
+    }
+    if (window.start < previousEnd) {
+      throw new BadRequestException(
+        'Simulated timing windows cannot overlap or be out of order.',
+      );
+    }
+    previousEnd = window.end;
+  }
+  return windows;
+}
+
+function validateMinimumGap(minimumGapMinutes: number): void {
+  if (
+    !Number.isInteger(minimumGapMinutes) ||
+    minimumGapMinutes < 0 ||
+    minimumGapMinutes > SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES
+  ) {
+    throw new BadRequestException(
+      `minimumGapMinutes must be between 0 and ${SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES}.`,
+    );
+  }
+}
+
+function deterministicSpacedMinutes(input: {
+  scheduleKey: string;
+  activitiesPerDay: number;
+  minimumGapMinutes: number;
+  windows: Array<{ start: number; end: number }>;
+}): number[] {
+  const allowedMinutes: number[] = [];
+  for (const window of input.windows) {
+    for (let minute = window.start; minute < window.end; minute += 1) {
+      allowedMinutes.push(minute);
+    }
+  }
+
+  const latest = new Array<number>(input.activitiesPerDay);
+  let cursor = allowedMinutes.length - 1;
+  for (let slot = input.activitiesPerDay - 1; slot >= 0; slot -= 1) {
+    const upper =
+      slot === input.activitiesPerDay - 1
+        ? Number.POSITIVE_INFINITY
+        : latest[slot + 1] - input.minimumGapMinutes;
+    while (cursor >= 0 && allowedMinutes[cursor] > upper) cursor -= 1;
+    if (cursor < 0) {
+      throw new BadRequestException(
+        `Trade timing windows cannot fit ${input.activitiesPerDay} daily trades with a minimum ${input.minimumGapMinutes}-minute gap.`,
+      );
+    }
+    latest[slot] = allowedMinutes[cursor];
+    cursor -= 1;
+  }
+
+  const result: number[] = [];
+  let minimum = Number.NEGATIVE_INFINITY;
+  for (let slot = 0; slot < input.activitiesPerDay; slot += 1) {
+    const candidates = allowedMinutes.filter(
+      (minute) => minute >= minimum && minute <= latest[slot],
+    );
+    if (candidates.length === 0) {
+      throw new BadRequestException(
+        'Unable to build a deterministic spaced trade schedule.',
+      );
+    }
+    const selected =
+      candidates[
+        deterministicIndex(
+          `${input.scheduleKey}:spaced-time:${slot + 1}`,
+          candidates.length,
+        )
+      ];
+    result.push(selected);
+    minimum = selected + input.minimumGapMinutes;
+  }
+  return result;
+}
+
+function commonScheduleKey(sourceKey: string, slotNumber: number): string {
+  const suffix = `:${slotNumber}`;
+  return sourceKey.endsWith(suffix)
+    ? sourceKey.slice(0, -suffix.length)
+    : `${sourceKey}:schedule`;
+}
+
+function linearMinuteToLocalMinute(
+  linearMinute: number,
+  windows: Array<{ start: number; end: number }>,
+): number {
+  let remaining = linearMinute;
+  for (const window of windows) {
+    const duration = window.end - window.start;
+    if (remaining < duration) return window.start + remaining;
+    remaining -= duration;
+  }
+  throw new BadRequestException('Unable to resolve simulated activity time.');
 }
 
 function deterministicPercent(
