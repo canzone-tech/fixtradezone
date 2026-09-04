@@ -61,38 +61,48 @@ export default function UserTopbar({
             title: "My Wallet",
             subtitle: "Ledger-backed balances and immutable activity",
           }
-        : pathname.startsWith("/user/referrals")
+        : pathname.startsWith("/user/payouts")
           ? {
-              title: "My Referrals",
-              subtitle: "Referral identity and direct network",
+              title: "Payouts",
+              subtitle: "Withdrawal requests, fees and settlement history",
             }
-          : pathname.startsWith("/user/trading")
+          : pathname.startsWith("/user/referrals")
             ? {
-                title: "Trading",
-                subtitle:
-                  "Package trading progress, earnings and trade history",
+                title: "My Referrals",
+                subtitle: "Referral identity and direct network",
               }
-            : pathname.startsWith("/user/trade-activity")
+            : pathname.startsWith("/user/notifications")
               ? {
-                  title: "Daily Trades",
-                  subtitle:
-                    "System-generated daily trade activity for active package subscriptions",
+                  title: "Notifications",
+                  subtitle: "Account, finance, security and platform updates",
                 }
-              : pathname.startsWith("/user/simulated-activity")
+              : pathname.startsWith("/user/trading")
                 ? {
-                    title: "Daily Trades",
+                    title: "Trading",
                     subtitle:
-                      "System-generated daily trade activity for active package subscriptions",
+                      "Package trading progress, earnings and trade history",
                   }
-                : pathname === "/user/profile"
+                : pathname.startsWith("/user/trade-activity")
                   ? {
-                      title: "My Profile",
-                      subtitle: "Account identity, security and session",
+                      title: "Daily Trades",
+                      subtitle:
+                        "System-generated daily trade activity for active package subscriptions",
                     }
-                  : {
-                      title: "User Dashboard",
-                      subtitle: "Overview of your FixTradeZone account",
-                    };
+                  : pathname.startsWith("/user/simulated-activity")
+                    ? {
+                        title: "Daily Trades",
+                        subtitle:
+                          "System-generated daily trade activity for active package subscriptions",
+                      }
+                    : pathname === "/user/profile"
+                      ? {
+                          title: "My Profile",
+                          subtitle: "Account identity, security and session",
+                        }
+                      : {
+                          title: "User Dashboard",
+                          subtitle: "Overview of your FixTradeZone account",
+                        };
 
   async function logout() {
     if (loggingOut) return;
