@@ -15,8 +15,10 @@ import { RequireCaptcha } from '../captcha/require-captcha.decorator';
 import { CaptchaPurpose } from '../captcha/captcha.types';
 import { AuthService } from './auth.service';
 import type { AuthenticatedUser } from './auth-user';
+import { ChangePasswordService } from './change-password.service';
 import { CurrentUser } from './current-user.decorator';
 import {
+  ChangePasswordDto,
   ChangeRequiredPasswordDto,
   LoginDto,
   LogoutDto,
@@ -45,6 +47,7 @@ export class AuthController {
     private readonly registrationService: RegistrationService,
     private readonly emailVerificationService: EmailVerificationService,
     private readonly passwordResetService: PasswordResetService,
+    private readonly changePasswordService: ChangePasswordService,
     private readonly ownProfileService: OwnProfileService,
   ) {}
 
@@ -166,6 +169,22 @@ export class AuthController {
     return this.reauthenticationService.reauthenticate(
       user,
       dto,
+      getRequestContext(request),
+    );
+  }
+
+  @Header('Cache-Control', 'no-store')
+  @HttpCode(200)
+  @Post('change-password')
+  changePassword(
+    @Body() dto: ChangePasswordDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.changePasswordService.change(
+      user.id,
+      dto.currentPassword,
+      dto.newPassword,
       getRequestContext(request),
     );
   }
