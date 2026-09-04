@@ -345,9 +345,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Total Payouts</small>
-                  <strong>—</strong>
-                  <span>Awaiting live Payout API</span>
+                  <small>Payouts</small>
+                  <strong>LIVE</strong>
+                  <span>Open Payouts for request and settlement history</span>
                 </div>
               </article>
 
@@ -402,8 +402,9 @@ export default function UserDashboardClient() {
 
                   <p>
                     Exact financial totals remain in the dedicated live Wallet,
-                    Deposits, Packages and Referrals workspaces to avoid unsafe
-                    cross-currency aggregation on this overview.
+                    Deposits, Payouts, Packages, Commissions, Rewards and Referrals
+                    workspaces to avoid unsafe cross-currency aggregation on this
+                    overview.
                   </p>
                 </div>
 
@@ -415,15 +416,15 @@ export default function UserDashboardClient() {
                   </div>
 
                   <div>
-                    <small>Total Payouts</small>
-                    <strong>—</strong>
-                    <span className="purple">Awaiting API</span>
+                    <small>Payouts</small>
+                    <strong>LIVE</strong>
+                    <span className="purple">Dedicated payout workspace</span>
                   </div>
 
                   <div>
                     <small>Referral Earnings</small>
                     <strong>LIVE</strong>
-                    <span>Ledger-backed wallet bucket</span>
+                    <span>Commission history + ledger-backed wallet bucket</span>
                   </div>
 
                   <div>
@@ -476,9 +477,7 @@ export default function UserDashboardClient() {
                     <div>
                       <small>Package Workspace</small>
                       <strong>Lifecycle API live</strong>
-                      <span>
-                        No package value is fabricated on the overview
-                      </span>
+                      <span>No package value is fabricated on the overview</span>
                     </div>
                   </div>
                 </article>
@@ -512,9 +511,7 @@ export default function UserDashboardClient() {
                           <i className="iconoir-database" />
 
                           <div>
-                            <strong>
-                              Open My Wallet for immutable history
-                            </strong>
+                            <strong>Open My Wallet for immutable history</strong>
                             <span>
                               Exact ledger activity stays in the ledger-backed
                               wallet workspace.
@@ -563,7 +560,7 @@ export default function UserDashboardClient() {
                 <div>
                   <small>Referral Earnings</small>
                   <strong>LIVE</strong>
-                  <span>Ledger-backed wallet bucket</span>
+                  <span>Commission history + wallet bucket</span>
                 </div>
               </div>
             </article>
