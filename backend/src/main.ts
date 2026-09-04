@@ -7,7 +7,7 @@ import { PermissionsGuard } from './auth/permissions.guard';
 import { SecurityConfigService } from './security-config/security-config.service';
 
 function applySecurityHeaders(
-  request: Request,
+  _request: Request,
   response: Response,
   next: NextFunction,
 ): void {
@@ -44,6 +44,7 @@ async function bootstrap() {
   expressApp.set('trust proxy', trustProxy === 'false' ? false : trustProxy);
 
   app.use(applySecurityHeaders);
+  app.enableShutdownHooks();
 
   app.useGlobalPipes(
     new ValidationPipe({
