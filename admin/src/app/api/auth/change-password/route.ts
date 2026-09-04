@@ -9,7 +9,12 @@ import {
   REFRESH_COOKIE,
   setAuthCookies,
 } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 function invalidSession(): NextResponse {
   const response = NextResponse.json(
@@ -62,10 +67,10 @@ export async function POST(request: NextRequest) {
   const invoke = (token: string) =>
     backendFetch("/auth/change-password", {
       method: "POST",
-      headers: {
+      headers: forwardedBackendHeaders(request, {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
-      },
+      }),
       body: JSON.stringify({ currentPassword, newPassword }),
     });
 
@@ -95,7 +100,9 @@ export async function POST(request: NextRequest) {
 
     const refreshResponse = await backendFetch("/auth/refresh", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardedBackendHeaders(request, {
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify({ refreshToken }),
     });
     const refreshPayload = await readJson(refreshResponse);
@@ -128,7 +135,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       {
-        message: getApiErrorMessage(error, "Password change service is unavailable."),
+        message: getApiErrorMessage(
+          error,
+          "Password change service is unavailable.",
+        ),
       },
       { status: 503, headers: { "Cache-Control": "no-store" } },
     );
