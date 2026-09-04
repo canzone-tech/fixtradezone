@@ -25,6 +25,19 @@ const GENERIC_REQUEST_MESSAGE =
   'If the account is eligible, a password reset email has been sent.';
 const INVALID_RESET_MESSAGE = 'Password reset link is invalid or expired.';
 
+const CONSUME_RESET_TOKEN_SCRIPT = `
+local payload = redis.call('GET', KEYS[1])
+if not payload then
+  return nil
+end
+local current = redis.call('GET', KEYS[2])
+if current ~= ARGV[1] then
+  return nil
+end
+redis.call('DEL', KEYS[1], KEYS[2])
+return payload
+`;
+
 @Injectable()
 export class PasswordResetService {
   private readonly logger = new Logger(PasswordResetService.name);
@@ -60,11 +73,7 @@ export class PasswordResetService {
     }
 
     const user = users[0];
-    if (
-      !user.email ||
-      !user.emailVerifiedAt ||
-      user.status !== 'ACTIVE'
-    ) {
+    if (!user.email || !user.emailVerifiedAt || user.status !== 'ACTIVE') {
       return { message: GENERIC_REQUEST_MESSAGE };
     }
 
@@ -122,7 +131,8 @@ export class PasswordResetService {
     }
 
     const stored = this.parseStoredToken(storedValue);
-    const currentTokenHash = await redis.get(this.userKey(stored.userId));
+    const userKey = this.userKey(stored.userId);
+    const currentTokenHash = await redis.get(userKey);
     if (currentTokenHash !== tokenHash) {
       throw new BadRequestException(INVALID_RESET_MESSAGE);
     }
@@ -158,61 +168,82 @@ export class PasswordResetService {
       );
     }
 
+    const consumedPayload = await redis.eval(
+      CONSUME_RESET_TOKEN_SCRIPT,
+      2,
+      tokenKey,
+      userKey,
+      tokenHash,
+    );
+
+    if (typeof consumedPayload !== 'string') {
+      throw new BadRequestException(INVALID_RESET_MESSAGE);
+    }
+
+    const consumed = this.parseStoredToken(consumedPayload);
+    if (
+      consumed.userId !== stored.userId ||
+      consumed.email.toLowerCase() !== stored.email.toLowerCase()
+    ) {
+      throw new BadRequestException(INVALID_RESET_MESSAGE);
+    }
+
     const passwordHash = await this.passwordService.hash(newPassword);
     const changedAt = new Date();
 
-    await this.prisma.$transaction(
-      async (transaction) => {
-        const updated = await transaction.user.updateMany({
-          where: {
-            id: user.id,
-            status: 'ACTIVE',
-          },
-          data: {
-            passwordHash,
-            mustChangePassword: false,
-          },
-        });
-
-        if (updated.count !== 1) {
-          throw new BadRequestException(INVALID_RESET_MESSAGE);
-        }
-
-        const revoked = await transaction.authSession.updateMany({
-          where: {
-            userId: user.id,
-            revokedAt: null,
-          },
-          data: {
-            revokedAt: changedAt,
-            revocationReason: 'PASSWORD_RESET',
-          },
-        });
-
-        await transaction.auditLog.create({
-          data: {
-            actorUserId: user.id,
-            action: 'UPDATE',
-            entityType: 'UserCredential',
-            entityId: user.id,
-            description: 'User password reset completed.',
-            metadata: {
-              event: 'PASSWORD_RESET_COMPLETED',
-              revokedSessionCount: revoked.count,
+    try {
+      await this.prisma.$transaction(
+        async (transaction) => {
+          const updated = await transaction.user.updateMany({
+            where: {
+              id: user.id,
+              status: 'ACTIVE',
             },
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-          },
-        });
-      },
-      { isolationLevel: 'Serializable' },
-    );
+            data: {
+              passwordHash,
+              mustChangePassword: false,
+            },
+          });
 
-    await redis.del(
-      tokenKey,
-      this.userKey(user.id),
-      this.cooldownKey(user.id),
-    );
+          if (updated.count !== 1) {
+            throw new BadRequestException(INVALID_RESET_MESSAGE);
+          }
+
+          const revoked = await transaction.authSession.updateMany({
+            where: {
+              userId: user.id,
+              revokedAt: null,
+            },
+            data: {
+              revokedAt: changedAt,
+              revocationReason: 'PASSWORD_RESET',
+            },
+          });
+
+          await transaction.auditLog.create({
+            data: {
+              actorUserId: user.id,
+              action: 'UPDATE',
+              entityType: 'UserCredential',
+              entityId: user.id,
+              description: 'User password reset completed.',
+              metadata: {
+                event: 'PASSWORD_RESET_COMPLETED',
+                revokedSessionCount: revoked.count,
+              },
+              ipAddress: context.ipAddress,
+              userAgent: context.userAgent,
+            },
+          });
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      await redis.del(this.cooldownKey(user.id)).catch(() => undefined);
+      throw error;
+    }
+
+    await redis.del(this.cooldownKey(user.id));
 
     return {
       message: 'Password reset successfully. Please sign in with your new password.',
@@ -287,7 +318,7 @@ export class PasswordResetService {
         context,
       });
     } catch (error) {
-      await redis.del(tokenKey, currentKey);
+      await redis.del(this.tokenKey(tokenHash), currentKey);
       throw error;
     }
   }
