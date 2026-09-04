@@ -166,6 +166,28 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Wallet</span>
             </Link>
 
+            <Link
+              href="/user/commissions"
+              className={`ftz-nav-link ${
+                isActive("/user/commissions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-coins" />
+              <span>Referral Commissions</span>
+            </Link>
+
+            <Link
+              href="/user/rewards"
+              className={`ftz-nav-link ${
+                isActive("/user/rewards") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-trophy" />
+              <span>Rewards & Caps</span>
+            </Link>
+
             {!impersonated ? (
               <Link
                 href="/user/payouts"
