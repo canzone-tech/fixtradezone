@@ -55,9 +55,7 @@ export class AuditLogsService {
     const fromFilter = from
       ? Prisma.sql`AND al.createdAt >= ${from}`
       : Prisma.empty;
-    const toFilter = to
-      ? Prisma.sql`AND al.createdAt < ${to}`
-      : Prisma.empty;
+    const toFilter = to ? Prisma.sql`AND al.createdAt < ${to}` : Prisma.empty;
     const searchFilter = searchPattern
       ? Prisma.sql`AND (
           al.description LIKE ${searchPattern}
