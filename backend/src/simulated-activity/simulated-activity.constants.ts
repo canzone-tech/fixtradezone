@@ -19,6 +19,8 @@ export type SimulatedActivityGenerationSource =
 
 export const SIMULATED_ACTIVITY_DEFAULT_PER_DAY = 5;
 export const SIMULATED_ACTIVITY_MAX_PER_DAY = 50;
+export const SIMULATED_ACTIVITY_DEFAULT_MINIMUM_GAP_MINUTES = 240;
+export const SIMULATED_ACTIVITY_MAX_MINIMUM_GAP_MINUTES = 1439;
 export const SIMULATED_ACTIVITY_PERCENT_DECIMAL_PLACES = 6;
 export const SIMULATED_ACTIVITY_DEFAULT_INTERVAL_MS = 60_000;
 export const SIMULATED_ACTIVITY_WORKER_LOCK_KEY =
@@ -26,7 +28,8 @@ export const SIMULATED_ACTIVITY_WORKER_LOCK_KEY =
 export const SIMULATED_ACTIVITY_WORKER_MIN_LOCK_TTL_MS = 15 * 60_000;
 export const SIMULATED_ACTIVITY_BATCH_LIMIT = 250;
 
-export const SIMULATED_ACTIVITY_DISCLOSURE = 'SIMULATED RESULTS';
+export const SIMULATED_ACTIVITY_DISCLOSURE =
+  'Trade activity is system-generated according to your active package rules and does not represent external market execution.';
 
 export interface SimulatedTimingWindow {
   start: string;
