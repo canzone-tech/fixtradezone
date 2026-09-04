@@ -8,6 +8,7 @@ import { PasswordResetService } from './password-reset.service';
 
 describe('PasswordResetService', () => {
   const redisStore = new Map<string, string>();
+
   const redisClient = {
     set: jest.fn(
       async (
@@ -30,6 +31,26 @@ describe('PasswordResetService', () => {
       }
       return count;
     }),
+    eval: jest.fn(
+      async (
+        _script: string,
+        _numberOfKeys: number,
+        tokenKey: string,
+        userKey: string,
+        expectedHash: string,
+      ) => {
+        const payload = redisStore.get(tokenKey);
+        const currentHash = redisStore.get(userKey);
+
+        if (!payload || currentHash !== expectedHash) {
+          return null;
+        }
+
+        redisStore.delete(tokenKey);
+        redisStore.delete(userKey);
+        return payload;
+      },
+    ),
     multi: jest.fn(() => {
       const operations: Array<() => void> = [];
       const chain = {
@@ -69,7 +90,7 @@ describe('PasswordResetService', () => {
 
   const redisService = {
     getClient: () => redisClient,
-  } as unknown as RedisService;
+  };
 
   const configService = {
     get: jest.fn((key: string) => {
@@ -78,33 +99,41 @@ describe('PasswordResetService', () => {
       if (key === 'PASSWORD_RESET_RESEND_COOLDOWN_SECONDS') return 60;
       return undefined;
     }),
-  } as unknown as ConfigService;
+  };
 
   const communicationService = {
     sendEmail: jest.fn().mockResolvedValue({ transport: 'SMTP', accepted: true }),
-  } as unknown as CommunicationService;
+  };
 
   const passwordService = {
     verifyForAuthentication: jest.fn().mockResolvedValue(false),
     hash: jest.fn().mockResolvedValue('new-hash'),
-  } as unknown as PasswordService;
+  };
 
   let service: PasswordResetService;
 
   beforeEach(() => {
     jest.clearAllMocks();
     redisStore.clear();
+
     prisma.user.findMany.mockResolvedValue([]);
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.user.updateMany.mockResolvedValue({ count: 1 });
     prisma.authSession.updateMany.mockResolvedValue({ count: 2 });
     prisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
+    communicationService.sendEmail.mockResolvedValue({
+      transport: 'SMTP',
+      accepted: true,
+    });
+    passwordService.verifyForAuthentication.mockResolvedValue(false);
+    passwordService.hash.mockResolvedValue('new-hash');
+
     service = new PasswordResetService(
       prisma as unknown as PrismaService,
-      redisService,
-      configService,
-      communicationService,
-      passwordService,
+      redisService as unknown as RedisService,
+      configService as unknown as ConfigService,
+      communicationService as unknown as CommunicationService,
+      passwordService as unknown as PasswordService,
     );
   });
 
@@ -150,7 +179,7 @@ describe('PasswordResetService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('changes the password and revokes active sessions for a valid token', async () => {
+  it('changes the password, consumes the token and revokes active sessions', async () => {
     prisma.user.findMany.mockResolvedValue([
       {
         id: 'user-1',
@@ -178,12 +207,15 @@ describe('PasswordResetService', () => {
       status: 'ACTIVE',
     });
 
+    const decodedToken = decodeURIComponent(token);
+
     await expect(
-      service.reset(decodeURIComponent(token), 'A-different-password-123!'),
+      service.reset(decodedToken, 'A-different-password-123!'),
     ).resolves.toEqual({
       message: 'Password reset successfully. Please sign in with your new password.',
     });
 
+    expect(redisClient.eval).toHaveBeenCalledTimes(1);
     expect(passwordService.hash).toHaveBeenCalledWith(
       'A-different-password-123!',
     );
@@ -200,5 +232,9 @@ describe('PasswordResetService', () => {
         data: expect.objectContaining({ revocationReason: 'PASSWORD_RESET' }),
       }),
     );
+
+    await expect(
+      service.reset(decodedToken, 'Another-different-password-456!'),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
