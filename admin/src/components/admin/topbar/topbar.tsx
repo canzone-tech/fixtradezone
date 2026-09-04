@@ -45,9 +45,14 @@ const routeHeadings: Array<{
       "Automatic package trading, financial settlement and recovery controls",
   },
   {
+    path: "/trade-activity",
+    title: "Trade Activity",
+    subtitle: "System-generated daily trade activity for active package subscriptions",
+  },
+  {
     path: "/simulated-trades",
-    title: "Simulated Trade Activity",
-    subtitle: "Display-only simulated results — never real trading",
+    title: "Trade Activity",
+    subtitle: "System-generated daily trade activity for active package subscriptions",
   },
   {
     path: "/packages",
