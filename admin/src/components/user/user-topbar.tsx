@@ -200,16 +200,27 @@ export default function UserTopbar({
                 <span>{returning ? "Returning..." : "Return to Admin"}</span>
               </button>
             ) : (
-              <button
-                type="button"
-                className="ftz-signout-button"
-                disabled={loggingOut}
-                onClick={() => void logout()}
-                title="Sign out"
-              >
-                <i className="iconoir-log-out" />
-                <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="ftz-signout-button"
+                  onClick={() => router.push("/change-password")}
+                  title="Change password"
+                >
+                  <i className="iconoir-key" />
+                  <span>Change Password</span>
+                </button>
+                <button
+                  type="button"
+                  className="ftz-signout-button"
+                  disabled={loggingOut}
+                  onClick={() => void logout()}
+                  title="Sign out"
+                >
+                  <i className="iconoir-log-out" />
+                  <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
+                </button>
+              </>
             )}
           </>
         ) : (
