@@ -132,7 +132,9 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
 })
   .custom((value: Record<string, unknown>, helpers) => {
-    if (value.COMMUNICATION_EMAIL_MODE === 'SMTP') {
+    const emailMode = String(value.COMMUNICATION_EMAIL_MODE ?? 'CONSOLE');
+
+    if (emailMode === 'SMTP') {
       const user = String(value.SMTP_USER ?? '').trim();
       const password = String(value.SMTP_PASSWORD ?? '').trim();
 
@@ -153,12 +155,59 @@ export const envValidationSchema = Joi.object({
     }
 
     if (
-      value.COMMUNICATION_EMAIL_MODE === 'HTTP' &&
+      emailMode === 'HTTP' &&
       !String(value.COMMUNICATION_EMAIL_HTTP_URL ?? '').trim()
     ) {
       return helpers.error('any.custom', {
         message: 'COMMUNICATION_EMAIL_HTTP_URL is required in HTTP mode',
       });
+    }
+
+    if (value.NODE_ENV === 'production') {
+      if (emailMode === 'CONSOLE') {
+        return helpers.error('any.custom', {
+          message:
+            'COMMUNICATION_EMAIL_MODE must use SMTP or HTTP in production',
+        });
+      }
+
+      const publicAppUrl = String(value.PUBLIC_APP_URL ?? '');
+      try {
+        const parsed = new URL(publicAppUrl);
+        if (
+          parsed.protocol !== 'https:' ||
+          ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
+        ) {
+          return helpers.error('any.custom', {
+            message:
+              'PUBLIC_APP_URL must be a public HTTPS URL in production',
+          });
+        }
+      } catch {
+        return helpers.error('any.custom', {
+          message: 'PUBLIC_APP_URL must be a valid URL in production',
+        });
+      }
+
+      if (emailMode === 'SMTP' && value.SMTP_REJECT_UNAUTHORIZED === false) {
+        return helpers.error('any.custom', {
+          message:
+            'SMTP_REJECT_UNAUTHORIZED cannot be false in production',
+        });
+      }
+
+      for (const key of [
+        'MYSQL_PASSWORD',
+        'CAPTCHA_HMAC_SECRET',
+        'JWT_ACCESS_SECRET',
+        'JWT_REFRESH_SECRET',
+      ]) {
+        if (String(value[key] ?? '').includes('REPLACE_ME')) {
+          return helpers.error('any.custom', {
+            message: `${key} still contains a placeholder value`,
+          });
+        }
+      }
     }
 
     return value;
