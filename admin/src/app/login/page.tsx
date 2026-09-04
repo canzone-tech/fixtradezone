@@ -2,6 +2,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
@@ -118,18 +119,12 @@ export default function LoginPage() {
 
     void requestLoginCaptcha()
       .then((challenge) => {
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         setCaptcha(challenge.enabled ? challenge : null);
         setCaptchaError("");
       })
       .catch((loadError: unknown) => {
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         setCaptcha(null);
         setCaptchaError(
           loadError instanceof Error
@@ -138,9 +133,7 @@ export default function LoginPage() {
         );
       })
       .finally(() => {
-        if (!cancelled) {
-          setCaptchaLoading(false);
-        }
+        if (!cancelled) setCaptchaLoading(false);
       });
 
     return () => {
@@ -150,7 +143,6 @@ export default function LoginPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setError("");
 
     if (captchaLoading) {
@@ -197,11 +189,7 @@ export default function LoginPage() {
             ? payload.message
             : "Unable to sign in.",
         );
-
-        if (captcha) {
-          void loadCaptcha();
-        }
-
+        if (captcha) void loadCaptcha();
         return;
       }
 
@@ -221,11 +209,8 @@ export default function LoginPage() {
       router.replace(redirectTo);
       router.refresh();
     } catch {
-      setError("Unable to reach the admin service. Please try again.");
-
-      if (captcha) {
-        void loadCaptcha();
-      }
+      setError("Unable to reach the authentication service. Please try again.");
+      if (captcha) void loadCaptcha();
     } finally {
       setIsSubmitting(false);
     }
@@ -239,7 +224,7 @@ export default function LoginPage() {
         <div className="ftz-auth-brand">
           <Image
             src="/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
-            alt="FixTradeZone Admin Portal"
+            alt="FixTradeZone Secure Portal"
             width={200}
             height={53}
             priority
@@ -249,39 +234,45 @@ export default function LoginPage() {
         <div className="ftz-auth-story">
           <span className="ftz-auth-pill">
             <i className="iconoir-shield-check" />
-            Secure Administration
+            Secure Account Access
           </span>
 
           <h1>
-            Control your crypto
-            <span> ecosystem with precision.</span>
+            Access your FixTradeZone
+            <span> workspace securely.</span>
           </h1>
 
           <p>
-            Secure access to users, permissions, platform operations,
-            configuration and real-time insights.
+            One authenticated entry point routes users, administrators and
+            super administrators to the correct permission-controlled workspace.
           </p>
 
-          <div className="ftz-auth-market-row" aria-label="Market preview">
+          <div className="ftz-auth-market-row" aria-label="Platform security capabilities">
             <div>
-              <span className="ftz-auth-coin bitcoin">₿</span>
-              <small>BTC/USDT</small>
-              <strong>$67,452.21</strong>
-              <b>+2.45%</b>
+              <span className="ftz-auth-coin bitcoin">
+                <i className="iconoir-lock" />
+              </span>
+              <small>SESSION</small>
+              <strong>SECURE</strong>
+              <b>HttpOnly</b>
             </div>
 
             <div>
-              <span className="ftz-auth-coin ethereum">Ξ</span>
-              <small>ETH/USDT</small>
-              <strong>$3,512.48</strong>
-              <b>+2.18%</b>
+              <span className="ftz-auth-coin ethereum">
+                <i className="iconoir-shield-check" />
+              </span>
+              <small>ACCESS</small>
+              <strong>ROLE AWARE</strong>
+              <b>RBAC</b>
             </div>
 
             <div>
-              <span className="ftz-auth-coin solana">S</span>
-              <small>SOL/USDT</small>
-              <strong>$145.91</strong>
-              <b>+4.12%</b>
+              <span className="ftz-auth-coin solana">
+                <i className="iconoir-fingerprint" />
+              </span>
+              <small>AUDIT</small>
+              <strong>RECORDED</strong>
+              <b>Traceable</b>
             </div>
           </div>
         </div>
@@ -305,7 +296,7 @@ export default function LoginPage() {
         <div className="ftz-auth-mobile-brand">
           <Image
             src="/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
-            alt="FixTradeZone Admin Portal"
+            alt="FixTradeZone Secure Portal"
             width={190}
             height={50}
             priority
@@ -314,18 +305,15 @@ export default function LoginPage() {
 
         <div className="ftz-login-card">
           <div className="ftz-login-head">
-            <span>ADMIN PORTAL</span>
+            <span>SECURE PORTAL</span>
             <h2>Welcome back</h2>
             <p>
-              Sign in to continue to the FixTradeZone control center.
+              Sign in to continue to your FixTradeZone workspace.
               <br />
               New here?{" "}
-              <a
-                href="/register"
-                style={{ color: "#19e6d3", fontWeight: 700 }}
-              >
+              <Link href="/register" style={{ color: "#19e6d3", fontWeight: 700 }}>
                 Create an account
-              </a>
+              </Link>
               .
             </p>
           </div>
@@ -335,7 +323,6 @@ export default function LoginPage() {
 
             <div className="ftz-auth-input">
               <i className="iconoir-user" aria-hidden="true" />
-
               <input
                 id="identifier"
                 name="identifier"
@@ -352,12 +339,11 @@ export default function LoginPage() {
 
             <div className="ftz-auth-label-row">
               <label htmlFor="password">Password</label>
-              <small>Secure access</small>
+              <Link href="/forgot-password">Forgot password?</Link>
             </div>
 
             <div className="ftz-auth-input">
               <i className="iconoir-lock" aria-hidden="true" />
-
               <input
                 id="password"
                 name="password"
@@ -377,11 +363,7 @@ export default function LoginPage() {
                 aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword((current) => !current)}
               >
-                <i
-                  className={
-                    showPassword ? "iconoir-eye-closed" : "iconoir-eye"
-                  }
-                />
+                <i className={showPassword ? "iconoir-eye-closed" : "iconoir-eye"} />
               </button>
             </div>
 
@@ -395,7 +377,6 @@ export default function LoginPage() {
             {captchaError ? (
               <div className="ftz-captcha-error">
                 <span>{captchaError}</span>
-
                 <button type="button" onClick={() => void loadCaptcha()}>
                   Retry
                 </button>
@@ -409,7 +390,6 @@ export default function LoginPage() {
                     <strong>Security verification</strong>
                     <small>Challenge expires automatically</small>
                   </div>
-
                   <button
                     type="button"
                     title="New CAPTCHA"
@@ -422,17 +402,12 @@ export default function LoginPage() {
                 </div>
 
                 <div className="ftz-captcha-image">
-                  <img
-                    src={captcha.imageDataUri}
-                    alt="CAPTCHA security challenge"
-                  />
+                  <img src={captcha.imageDataUri} alt="CAPTCHA security challenge" />
                 </div>
 
                 <label htmlFor="captchaAnswer">CAPTCHA answer</label>
-
                 <div className="ftz-auth-input">
                   <i className="iconoir-key" aria-hidden="true" />
-
                   <input
                     id="captchaAnswer"
                     name="captchaAnswer"
@@ -472,20 +447,17 @@ export default function LoginPage() {
 
           <div className="ftz-auth-security-note">
             <i className="iconoir-shield-check" />
-
             <div>
-              <strong>Authorized administrators only</strong>
+              <strong>Authorized account access only</strong>
               <small>
-                Access is protected by server-side authentication and role
-                permissions.
+                Authentication, account status and role permissions determine
+                the workspace you can access.
               </small>
             </div>
           </div>
         </div>
 
-        <p className="ftz-auth-footer">
-          © 2026 FixTradeZone · Secure Administration
-        </p>
+        <p className="ftz-auth-footer">© 2026 FixTradeZone · Secure Portal</p>
       </section>
     </main>
   );
