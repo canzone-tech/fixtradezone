@@ -7,6 +7,7 @@ import { ReferralsModule } from '../referrals/referrals.module';
 import { SecurityConfigModule } from '../security-config/security-config.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { ChangePasswordService } from './change-password.service';
 import { EmailVerificationService } from './email-verification.service';
 import { FounderSuperAdminBootstrapService } from './founder-super-admin-bootstrap.service';
 import { FullImpersonationGuard } from './full-impersonation.guard';
@@ -36,6 +37,7 @@ import { TokenService } from './token.service';
   controllers: [AuthController, ImpersonationController],
   providers: [
     AuthService,
+    ChangePasswordService,
     EmailVerificationService,
     FounderSuperAdminBootstrapService,
     FullImpersonationGuard,
@@ -52,6 +54,7 @@ import { TokenService } from './token.service';
   ],
   exports: [
     AuthService,
+    ChangePasswordService,
     EmailVerificationService,
     FounderSuperAdminBootstrapService,
     OwnProfileService,
