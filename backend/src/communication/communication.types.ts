@@ -6,6 +6,6 @@ export interface EmailMessage {
 }
 
 export interface EmailDeliveryResult {
-  transport: 'CONSOLE' | 'HTTP';
+  transport: 'CONSOLE' | 'HTTP' | 'SMTP';
   accepted: boolean;
 }
