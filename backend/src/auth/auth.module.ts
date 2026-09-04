@@ -15,6 +15,7 @@ import { ImpersonationController } from './impersonation.controller';
 import { ImpersonationStrategy } from './impersonation.strategy';
 import { JwtStrategy } from './jwt.strategy';
 import { OwnProfileService } from './own-profile.service';
+import { PasswordResetService } from './password-reset.service';
 import { PasswordService } from './password.service';
 import { ReauthenticationService } from './reauthentication.service';
 import { RegistrationService } from './registration.service';
@@ -42,6 +43,7 @@ import { TokenService } from './token.service';
     ImpersonationStrategy,
     JwtStrategy,
     OwnProfileService,
+    PasswordResetService,
     PasswordService,
     ReauthenticationService,
     RegistrationService,
@@ -53,6 +55,7 @@ import { TokenService } from './token.service';
     EmailVerificationService,
     FounderSuperAdminBootstrapService,
     OwnProfileService,
+    PasswordResetService,
     PasswordService,
     RegistrationService,
     RbacBootstrapService,
