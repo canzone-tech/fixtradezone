@@ -149,6 +149,12 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/settings/email",
+        label: "Email Delivery",
+        icon: "iconoir-mail",
+        enabled: true,
+      },
+      {
         href: "/audit-logs",
         label: "Audit Logs",
         icon: "iconoir-journal-page",
