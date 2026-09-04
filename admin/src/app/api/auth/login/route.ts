@@ -9,7 +9,12 @@ import {
   setAuthCookies,
   setPasswordChangeCookie,
 } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 interface LoginBody {
   identifier?: unknown;
@@ -69,9 +74,9 @@ export async function POST(request: NextRequest) {
   try {
     const backendResponse = await backendFetch("/auth/login", {
       method: "POST",
-      headers: {
+      headers: forwardedBackendHeaders(request, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         identifier: body.identifier,
         password: body.password,
@@ -86,9 +91,7 @@ export async function POST(request: NextRequest) {
 
     if (!backendResponse.ok) {
       return NextResponse.json(
-        {
-          message: getApiErrorMessage(payload, "Unable to sign in."),
-        },
+        { message: getApiErrorMessage(payload, "Unable to sign in.") },
         { status: backendResponse.status },
       );
     }
@@ -103,7 +106,6 @@ export async function POST(request: NextRequest) {
 
       clearAuthCookies(response);
       setPasswordChangeCookie(response, payload);
-
       return response;
     }
 
@@ -120,30 +122,20 @@ export async function POST(request: NextRequest) {
     if (!redirectTo) {
       await backendFetch("/auth/logout", {
         method: "POST",
-        headers: {
+        headers: forwardedBackendHeaders(request, {
           "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refreshToken: auth.refreshToken,
         }),
+        body: JSON.stringify({ refreshToken: auth.refreshToken }),
       }).catch(() => undefined);
 
       return NextResponse.json(
-        {
-          message:
-            "This account does not have access to a FixTradeZone portal.",
-        },
+        { message: "This account does not have access to a FixTradeZone portal." },
         { status: 403 },
       );
     }
 
-    const response = NextResponse.json({
-      user: auth.user,
-      redirectTo,
-    });
-
+    const response = NextResponse.json({ user: auth.user, redirectTo });
     setAuthCookies(response, auth);
-
     return response;
   } catch {
     return NextResponse.json(
