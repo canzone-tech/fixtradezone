@@ -72,4 +72,26 @@ describe('envValidationSchema release guardrails', () => {
 
     expect(result.error).toBeDefined();
   });
+
+  it('rejects a remote plaintext HTTP email gateway in production', () => {
+    const result = envValidationSchema.validate({
+      ...productionEnv(),
+      COMMUNICATION_EMAIL_MODE: 'HTTP',
+      COMMUNICATION_EMAIL_HTTP_URL: 'http://mailer.example.com/send',
+      COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: '',
+    });
+
+    expect(result.error).toBeDefined();
+  });
+
+  it('allows a loopback HTTP email sidecar in production', () => {
+    const result = envValidationSchema.validate({
+      ...productionEnv(),
+      COMMUNICATION_EMAIL_MODE: 'HTTP',
+      COMMUNICATION_EMAIL_HTTP_URL: 'http://127.0.0.1:8080/send',
+      COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: '',
+    });
+
+    expect(result.error).toBeUndefined();
+  });
 });
