@@ -6,6 +6,10 @@ import type { ReportWindowQueryDto } from './dto/report.dto';
 type Scalar = bigint | number | string | Prisma.Decimal | null;
 type AggregateRow = Record<string, Scalar>;
 
+type CurrencyAggregateRow = AggregateRow & {
+  currency: string;
+};
+
 interface WalletBalanceRow {
   bucket: string;
   currency: string;
@@ -72,6 +76,12 @@ export class ReportsService {
       payoutRows,
       ledgerRows,
       walletRows,
+      depositCurrencyRows,
+      subscriptionCurrencyRows,
+      commissionCurrencyRows,
+      rewardCurrencyRows,
+      payoutCurrencyRows,
+      ledgerCurrencyRows,
     ] = await Promise.all([
       this.prisma.$queryRaw<AggregateRow[]>(Prisma.sql`
         SELECT
@@ -183,6 +193,95 @@ export class ReportsService {
         GROUP BY la.bucket, la.currency
         ORDER BY la.currency ASC, la.bucket ASC
       `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          currency,
+          COUNT(*) AS total,
+          COALESCE(SUM(amount), 0) AS requestedAmount,
+          COALESCE(
+            SUM(CASE WHEN status = 'APPROVED' THEN amount ELSE 0 END),
+            0
+          ) AS approvedAmount
+        FROM deposits
+        WHERE 1 = 1
+          ${depositsWindow}
+        GROUP BY currency
+        ORDER BY currency ASC
+      `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          currency,
+          COUNT(*) AS total,
+          COALESCE(SUM(price), 0) AS activatedPackageValue
+        FROM user_package_subscriptions
+        WHERE 1 = 1
+          ${subscriptionsWindow}
+        GROUP BY currency
+        ORDER BY currency ASC
+      `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          currency,
+          COUNT(*) AS total,
+          COALESCE(SUM(commissionAmount), 0) AS calculatedAmount,
+          COALESCE(
+            SUM(CASE WHEN status = 'AVAILABLE' THEN commissionAmount ELSE 0 END),
+            0
+          ) AS availableAmount
+        FROM referral_commission_events
+        WHERE 1 = 1
+          ${commissionsWindow}
+        GROUP BY currency
+        ORDER BY currency ASC
+      `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          currency,
+          COUNT(*) AS total,
+          COALESCE(SUM(calculatedReward), 0) AS calculatedAmount,
+          COALESCE(SUM(postedReward), 0) AS postedAmount
+        FROM package_reward_events
+        WHERE 1 = 1
+          ${rewardsWindow}
+        GROUP BY currency
+        ORDER BY currency ASC
+      `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          asset AS currency,
+          COUNT(*) AS total,
+          COALESCE(SUM(grossAmount), 0) AS grossAmount,
+          COALESCE(SUM(feeAmount), 0) AS feeAmount,
+          COALESCE(SUM(netAmount), 0) AS netAmount,
+          COALESCE(
+            SUM(CASE WHEN status = 'COMPLETED' THEN netAmount ELSE 0 END),
+            0
+          ) AS completedNetAmount
+        FROM payout_requests
+        WHERE 1 = 1
+          ${payoutsWindow}
+        GROUP BY asset
+        ORDER BY asset ASC
+      `),
+      this.prisma.$queryRaw<CurrencyAggregateRow[]>(Prisma.sql`
+        SELECT
+          lt.currency,
+          COUNT(DISTINCT lt.id) AS transactionCount,
+          COALESCE(
+            SUM(CASE WHEN le.side = 'DEBIT' THEN le.amount ELSE 0 END),
+            0
+          ) AS debitTotal,
+          COALESCE(
+            SUM(CASE WHEN le.side = 'CREDIT' THEN le.amount ELSE 0 END),
+            0
+          ) AS creditTotal
+        FROM ledger_transactions lt
+        INNER JOIN ledger_entries le ON le.transactionId = lt.id
+        WHERE 1 = 1
+          ${ledgerWindow}
+        GROUP BY lt.currency
+        ORDER BY lt.currency ASC
+      `),
     ]);
 
     const users = this.first(userRows);
@@ -195,6 +294,29 @@ export class ReportsService {
 
     const debitTotal = this.money(ledger.debitTotal);
     const creditTotal = this.money(ledger.creditTotal);
+    const ledgerByCurrency = ledgerCurrencyRows.map((row) => {
+      const rowDebitTotal = this.money(row.debitTotal);
+      const rowCreditTotal = this.money(row.creditTotal);
+      return {
+        currency: row.currency,
+        transactionCount: this.count(row.transactionCount),
+        debitTotal: rowDebitTotal,
+        creditTotal: rowCreditTotal,
+        balanced: new Prisma.Decimal(rowDebitTotal).equals(rowCreditTotal),
+      };
+    });
+
+    const currencies = Array.from(
+      new Set([
+        ...depositCurrencyRows.map((row) => row.currency),
+        ...subscriptionCurrencyRows.map((row) => row.currency),
+        ...commissionCurrencyRows.map((row) => row.currency),
+        ...rewardCurrencyRows.map((row) => row.currency),
+        ...payoutCurrencyRows.map((row) => row.currency),
+        ...ledgerCurrencyRows.map((row) => row.currency),
+        ...walletRows.map((row) => row.currency),
+      ]),
+    ).sort();
 
     return {
       generatedAt: new Date().toISOString(),
@@ -202,6 +324,7 @@ export class ReportsService {
         from: from?.toISOString() ?? null,
         toExclusive: to?.toISOString() ?? null,
       },
+      currencies,
       users: {
         total: this.count(users.total),
         active: this.count(users.active),
@@ -254,11 +377,45 @@ export class ReportsService {
         netAmount: this.money(payouts.netAmount),
         completedNetAmount: this.money(payouts.completedNetAmount),
       },
+      financialByCurrency: {
+        deposits: depositCurrencyRows.map((row) => ({
+          currency: row.currency,
+          total: this.count(row.total),
+          requestedAmount: this.money(row.requestedAmount),
+          approvedAmount: this.money(row.approvedAmount),
+        })),
+        subscriptions: subscriptionCurrencyRows.map((row) => ({
+          currency: row.currency,
+          total: this.count(row.total),
+          activatedPackageValue: this.money(row.activatedPackageValue),
+        })),
+        commissions: commissionCurrencyRows.map((row) => ({
+          currency: row.currency,
+          total: this.count(row.total),
+          calculatedAmount: this.money(row.calculatedAmount),
+          availableAmount: this.money(row.availableAmount),
+        })),
+        rewards: rewardCurrencyRows.map((row) => ({
+          currency: row.currency,
+          total: this.count(row.total),
+          calculatedAmount: this.money(row.calculatedAmount),
+          postedAmount: this.money(row.postedAmount),
+        })),
+        payouts: payoutCurrencyRows.map((row) => ({
+          currency: row.currency,
+          total: this.count(row.total),
+          grossAmount: this.money(row.grossAmount),
+          feeAmount: this.money(row.feeAmount),
+          netAmount: this.money(row.netAmount),
+          completedNetAmount: this.money(row.completedNetAmount),
+        })),
+      },
       ledger: {
         transactionCount: this.count(ledger.transactionCount),
         debitTotal,
         creditTotal,
-        balanced: new Prisma.Decimal(debitTotal).equals(creditTotal),
+        balanced: ledgerByCurrency.every((row) => row.balanced),
+        byCurrency: ledgerByCurrency,
       },
       currentUserWalletBalances: walletRows.map((row) => ({
         bucket: row.bucket,
