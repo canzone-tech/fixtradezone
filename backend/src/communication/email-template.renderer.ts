@@ -13,6 +13,17 @@ interface DeliveryTestTemplateInput {
   triggeredAt: Date;
 }
 
+export interface ManagedEmailTemplateInput {
+  to: string;
+  subject: string;
+  preheader: string;
+  headline: string;
+  body: string;
+  actionLabel?: string;
+  actionUrl?: string;
+  footer: string;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -30,13 +41,15 @@ function safeDisplayName(value: string): string {
 function brandedHtml(input: {
   preheader: string;
   heading: string;
-  displayName: string;
+  displayName?: string;
   body: string;
   actionLabel?: string;
   actionUrl?: string;
   footer: string;
 }): string {
-  const name = escapeHtml(safeDisplayName(input.displayName));
+  const greeting = input.displayName
+    ? `<tr><td style="padding:8px 32px;color:#c9d3e2;font-size:15px;line-height:1.7">Hi ${escapeHtml(safeDisplayName(input.displayName))},</td></tr>`
+    : '';
   const action =
     input.actionLabel && input.actionUrl
       ? `<tr><td style="padding:8px 32px 24px"><a href="${escapeHtml(input.actionUrl)}" style="display:inline-block;background:#66e3c4;color:#071019;text-decoration:none;font-weight:800;padding:13px 20px;border-radius:10px">${escapeHtml(input.actionLabel)}</a></td></tr>`
@@ -53,13 +66,44 @@ function brandedHtml(input: {
     '<div style="margin-top:5px;font-size:11px;letter-spacing:1.8px;color:#7f91aa">SECURE ACCOUNT MESSAGE</div>',
     '</td></tr>',
     `<tr><td style="padding:30px 32px 10px"><div style="font-size:24px;line-height:1.25;font-weight:800">${escapeHtml(input.heading)}</div></td></tr>`,
-    `<tr><td style="padding:8px 32px;color:#c9d3e2;font-size:15px;line-height:1.7">Hi ${name},</td></tr>`,
+    greeting,
     `<tr><td style="padding:4px 32px 18px;color:#c9d3e2;font-size:15px;line-height:1.7">${input.body}</td></tr>`,
     action,
     `<tr><td style="padding:20px 32px 28px;border-top:1px solid #24324a;color:#7f91aa;font-size:12px;line-height:1.6">${escapeHtml(input.footer)}</td></tr>`,
     '</table></td></tr></table>',
     '</body></html>',
   ].join('');
+}
+
+export function renderManagedEmailTemplate(
+  input: ManagedEmailTemplateInput,
+): EmailMessage {
+  const actionLine =
+    input.actionLabel && input.actionUrl
+      ? `${input.actionLabel}: ${input.actionUrl}`
+      : null;
+  const escapedBody = escapeHtml(input.body).replaceAll('\n', '<br>');
+
+  return {
+    to: input.to,
+    subject: input.subject.trim(),
+    text: [
+      input.headline,
+      '',
+      input.body,
+      ...(actionLine ? ['', actionLine] : []),
+      '',
+      input.footer,
+    ].join('\n'),
+    html: brandedHtml({
+      preheader: input.preheader,
+      heading: input.headline,
+      body: escapedBody,
+      actionLabel: input.actionLabel,
+      actionUrl: input.actionUrl,
+      footer: input.footer,
+    }),
+  };
 }
 
 export function renderEmailVerificationTemplate(
