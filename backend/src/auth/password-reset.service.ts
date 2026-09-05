@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommunicationService } from '../communication/communication.service';
+import { renderPasswordResetTemplate } from '../communication/email-template.renderer';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
 import { RedisService } from '../redis/redis.service';
@@ -290,20 +291,14 @@ export class PasswordResetService {
     const ttlMinutes = Math.ceil(ttlSeconds / 60);
 
     try {
-      const delivery = await this.communicationService.sendEmail({
-        to: user.email,
-        subject: 'Reset your FixTradeZone password',
-        text: [
-          `Hi ${displayName},`,
-          '',
-          'A password reset was requested for your FixTradeZone account.',
-          resetUrl,
-          '',
-          `This reset link expires in ${ttlMinutes} minutes and can be used once.`,
-          'If you did not request this change, you can ignore this message.',
-        ].join('\n'),
-        html: `<p>Hi ${this.escapeHtml(displayName)},</p><p>A password reset was requested for your FixTradeZone account.</p><p><a href="${this.escapeHtml(resetUrl)}">Reset Password</a></p><p>This link expires in ${ttlMinutes} minutes and can be used once.</p><p>If you did not request this change, you can ignore this message.</p>`,
-      });
+      const delivery = await this.communicationService.sendEmail(
+        renderPasswordResetTemplate({
+          to: user.email,
+          displayName,
+          actionUrl: resetUrl,
+          ttlMinutes,
+        }),
+      );
 
       await this.writeAuditSafe({
         actorUserId: user.id,
@@ -403,14 +398,5 @@ export class PasswordResetService {
 
   private cooldownKey(userId: string): string {
     return `${RESET_KEY_PREFIX}:cooldown:${userId}`;
-  }
-
-  private escapeHtml(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
   }
 }
