@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
 interface UserApiPayload {
@@ -88,14 +89,6 @@ function redirectFor(error: unknown): string | null {
 function compactDecimal(value: string): string {
   if (!value.includes(".")) return value;
   return value.replace(/0+$/, "").replace(/\.$/, "");
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 function statusTone(status: CommissionEvent["status"]): "success" | "warning" | undefined {
@@ -287,7 +280,9 @@ export default function UserCommissionsClient() {
                           <div className={styles.meta}>{event.ineligibilityReason}</div>
                         ) : null}
                       </td>
-                      <td>{formatDate(event.availableAt ?? event.createdAt)}</td>
+                      <td>
+                        {formatPlatformDateTime(event.availableAt ?? event.createdAt)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
