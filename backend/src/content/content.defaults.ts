@@ -36,6 +36,7 @@ export interface LandingContent {
 }
 
 export interface EmailTemplateContent {
+  [key: string]: string;
   subject: string;
   preheader: string;
   headline: string;

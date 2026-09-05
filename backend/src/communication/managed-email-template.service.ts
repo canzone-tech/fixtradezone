@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type {
-  EmailContentKey,
-  EmailTemplateContent,
-} from '../content/content.defaults';
+import type { EmailTemplateContent } from '../content/content.defaults';
 import { ContentService } from '../content/content.service';
 import type { EmailMessage } from './communication.types';
 import { renderManagedEmailTemplate } from './email-template.renderer';
@@ -22,7 +19,7 @@ export class ManagedEmailTemplateService {
     }
 
     const content = await this.contentService.getPublishedEmailTemplate(
-      context.contentKey as EmailContentKey,
+      context.contentKey,
     );
     const appUrl = (
       this.configService.get<string>('PUBLIC_APP_URL') ?? 'https://localhost:3001'
