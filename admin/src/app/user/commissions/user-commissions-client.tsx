@@ -111,8 +111,6 @@ export default function UserCommissionsClient() {
       setError(null);
 
       try {
-        // Validate/refresh the USER session first. Keeping this sequential avoids
-        // concurrent refresh-token rotation across multiple USER BFF requests.
         const sessionResponse = await fetch("/api/user/session", {
           cache: "no-store",
         });
@@ -152,7 +150,11 @@ export default function UserCommissionsClient() {
   );
 
   useEffect(() => {
-    void load(1);
+    const timeoutId = window.setTimeout(() => {
+      void load(1);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
