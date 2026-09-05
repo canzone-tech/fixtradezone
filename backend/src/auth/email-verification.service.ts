@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommunicationService } from '../communication/communication.service';
+import { renderEmailVerificationTemplate } from '../communication/email-template.renderer';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
 import { RedisService } from '../redis/redis.service';
@@ -352,20 +353,14 @@ export class EmailVerificationService {
       'FixTradeZone user';
     const ttlMinutes = Math.ceil(ttlSeconds / 60);
 
-    const delivery = await this.communicationService.sendEmail({
-      to: user.email,
-      subject: 'Verify your FixTradeZone account',
-      text: [
-        `Hi ${displayName},`,
-        '',
-        'Verify your email address to activate your FixTradeZone account:',
-        verificationUrl,
-        '',
-        `This verification link expires in ${ttlMinutes} minutes.`,
-        'If you did not create this account, you can ignore this message.',
-      ].join('\n'),
-      html: `<p>Hi ${this.escapeHtml(displayName)},</p><p>Verify your email address to activate your FixTradeZone account.</p><p><a href="${this.escapeHtml(verificationUrl)}">Verify Email</a></p><p>This verification link expires in ${ttlMinutes} minutes.</p>`,
-    });
+    const delivery = await this.communicationService.sendEmail(
+      renderEmailVerificationTemplate({
+        to: user.email,
+        displayName,
+        actionUrl: verificationUrl,
+        ttlMinutes,
+      }),
+    );
 
     await this.writeAuditSafe({
       actorUserId: user.id,
@@ -447,14 +442,5 @@ export class EmailVerificationService {
 
   private cooldownKey(userId: string): string {
     return `${VERIFY_KEY_PREFIX}:cooldown:${userId}`;
-  }
-
-  private escapeHtml(value: string): string {
-    return value
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
   }
 }
