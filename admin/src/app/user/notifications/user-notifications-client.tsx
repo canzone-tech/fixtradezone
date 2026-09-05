@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
 interface NotificationRecord {
@@ -68,13 +69,6 @@ function redirectFor(error: unknown): string | null {
     return error.redirectTo === "/dashboard" ? "/dashboard" : "/login";
   }
   return null;
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 export default function UserNotificationsClient() {
@@ -256,7 +250,9 @@ export default function UserNotificationsClient() {
                       <span className={styles.badge}>{row.category}</span>
                       <strong>{row.title}</strong>
                     </div>
-                    <span className={styles.meta}>{formatDate(row.createdAt)}</span>
+                    <span className={styles.meta}>
+                      {formatPlatformDateTime(row.createdAt)}
+                    </span>
                   </div>
                   <p>{row.message}</p>
                   {!row.readAt ? (
