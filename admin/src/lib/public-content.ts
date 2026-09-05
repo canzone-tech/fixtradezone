@@ -69,15 +69,67 @@ export const FALLBACK_LANDING_CONTENT: LandingContent = {
     "Secure FixTradeZone access for packages, deposits, referrals, rewards, payouts and clearly disclosed simulated activity.",
 };
 
-function isLandingContent(value: unknown): value is LandingContent {
-  if (typeof value !== "object" || value === null) return false;
-  const candidate = value as Partial<LandingContent>;
+function isStringWithin(value: unknown, maxLength: number): value is string {
   return (
-    typeof candidate.brandName === "string" &&
-    typeof candidate.heroTitle === "string" &&
-    typeof candidate.heroAccent === "string" &&
-    typeof candidate.heroDescription === "string" &&
-    Array.isArray(candidate.features)
+    typeof value === "string" &&
+    value.trim().length > 0 &&
+    value.length <= maxLength
+  );
+}
+
+function isSafeHref(value: unknown): value is string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 300) {
+    return false;
+  }
+
+  const href = value.trim();
+
+  if (href.startsWith("/") && !href.startsWith("//")) {
+    return true;
+  }
+
+  try {
+    return new URL(href).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isLandingContent(value: unknown): value is LandingContent {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as Partial<LandingContent>;
+  const features = candidate.features;
+
+  return (
+    isStringWithin(candidate.brandName, 80) &&
+    isStringWithin(candidate.badge, 100) &&
+    isStringWithin(candidate.heroTitle, 180) &&
+    isStringWithin(candidate.heroAccent, 120) &&
+    isStringWithin(candidate.heroDescription, 800) &&
+    isStringWithin(candidate.primaryCtaLabel, 60) &&
+    isSafeHref(candidate.primaryCtaHref) &&
+    isStringWithin(candidate.secondaryCtaLabel, 60) &&
+    isSafeHref(candidate.secondaryCtaHref) &&
+    Array.isArray(features) &&
+    features.length >= 1 &&
+    features.length <= 6 &&
+    features.every(
+      (feature) =>
+        typeof feature === "object" &&
+        feature !== null &&
+        !Array.isArray(feature) &&
+        isStringWithin((feature as LandingFeatureContent).title, 80) &&
+        isStringWithin((feature as LandingFeatureContent).description, 320),
+    ) &&
+    isStringWithin(candidate.trustTitle, 160) &&
+    isStringWithin(candidate.trustDescription, 700) &&
+    isStringWithin(candidate.disclosure, 1000) &&
+    isStringWithin(candidate.footerText, 240) &&
+    isStringWithin(candidate.seoTitle, 120) &&
+    isStringWithin(candidate.seoDescription, 320)
   );
 }
 
@@ -86,7 +138,10 @@ export async function getPublicLandingContent(): Promise<LandingContent> {
     const response = await backendFetch("/public/content/landing", {
       method: "GET",
     });
-    const payload = (await readJson(response)) as Partial<PublicLandingPayload> | null;
+    const payload = (await readJson(response)) as
+      | Partial<PublicLandingPayload>
+      | null;
+
     if (response.ok && payload && isLandingContent(payload.content)) {
       return payload.content;
     }

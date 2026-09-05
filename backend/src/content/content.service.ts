@@ -49,7 +49,7 @@ export class ContentService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPublicLanding() {
-    const revision = await this.findLatestPublished(CONTENT_KEYS.LANDING_PAGE);
+    const revision = await this.findCurrentPublished(CONTENT_KEYS.LANDING_PAGE);
     const content = revision
       ? this.asLandingContent(revision.payload)
       : DEFAULT_LANDING_CONTENT;
@@ -95,10 +95,11 @@ export class ContentService {
   async getPublishedEmailTemplate(
     contentKey: EmailContentKey,
   ): Promise<EmailTemplateContent> {
-    const revision = await this.findLatestPublished(contentKey);
+    const revision = await this.findCurrentPublished(contentKey);
     if (!revision) {
       return DEFAULT_EMAIL_CONTENT[contentKey];
     }
+
     return this.asEmailTemplateContent(revision.payload, contentKey);
   }
 
@@ -176,8 +177,10 @@ export class ContentService {
     templateKey: string,
     defaultContent: LandingContent | EmailTemplateContent,
   ) {
-    const revisions = await this.findRevisions(contentKey);
-    const published = revisions.find((revision) => revision.status === 'PUBLISHED');
+    const [revisions, published] = await Promise.all([
+      this.findRevisions(contentKey),
+      this.findCurrentPublished(contentKey),
+    ]);
 
     return {
       contentKey,
@@ -245,6 +248,7 @@ export class ContentService {
             if (!revision) {
               throw new Error('Content revision insert did not read back.');
             }
+
             return revision;
           },
           { isolationLevel: 'Serializable' },
@@ -273,30 +277,40 @@ export class ContentService {
         if (!revision) {
           throw new NotFoundException('Content revision not found.');
         }
-        if (revision.status === 'PUBLISHED') {
-          return {
-            message: 'Content revision is already published.',
-            revision: this.serializeRevision(revision),
-          };
+
+        const isFirstPublication = revision.status === 'DRAFT';
+
+        if (isFirstPublication) {
+          const changed = await transaction.$executeRaw`
+            UPDATE \`content_revisions\`
+            SET
+              \`status\` = 'PUBLISHED',
+              \`publishedByUserId\` = ${actor.id},
+              \`publishedAt\` = CURRENT_TIMESTAMP(3),
+              \`updatedAt\` = CURRENT_TIMESTAMP(3)
+            WHERE \`id\` = ${revisionId}
+              AND \`contentKey\` = ${contentKey}
+              AND \`status\` = 'DRAFT'
+          `;
+
+          if (changed !== 1) {
+            throw new BadRequestException(
+              'Only an existing draft or published revision can be selected.',
+            );
+          }
         }
 
-        const changed = await transaction.$executeRaw`
-          UPDATE \`content_revisions\`
-          SET
-            \`status\` = 'PUBLISHED',
-            \`publishedByUserId\` = ${actor.id},
-            \`publishedAt\` = CURRENT_TIMESTAMP(3),
+        await transaction.$executeRaw`
+          INSERT INTO \`content_publications\`
+            (\`contentKey\`, \`revisionId\`, \`publishedByUserId\`, \`publishedAt\`, \`createdAt\`, \`updatedAt\`)
+          VALUES
+            (${contentKey}, ${revisionId}, ${actor.id}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))
+          ON DUPLICATE KEY UPDATE
+            \`revisionId\` = VALUES(\`revisionId\`),
+            \`publishedByUserId\` = VALUES(\`publishedByUserId\`),
+            \`publishedAt\` = VALUES(\`publishedAt\`),
             \`updatedAt\` = CURRENT_TIMESTAMP(3)
-          WHERE \`id\` = ${revisionId}
-            AND \`contentKey\` = ${contentKey}
-            AND \`status\` = 'DRAFT'
         `;
-
-        if (changed !== 1) {
-          throw new BadRequestException(
-            'Only an existing draft revision can be published.',
-          );
-        }
 
         await transaction.auditLog.create({
           data: {
@@ -304,11 +318,14 @@ export class ContentService {
             action: 'APPROVE',
             entityType: 'ContentRevision',
             entityId: revisionId,
-            description: 'Administrator published a content revision.',
+            description: isFirstPublication
+              ? 'Administrator published a content revision.'
+              : 'Administrator selected an existing published content revision as current.',
             metadata: {
               source: 'ADMIN_API',
               contentKey,
               version: Number(revision.version),
+              publicationAction: isFirstPublication ? 'PUBLISH' : 'ROLLBACK',
             },
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
@@ -325,7 +342,9 @@ export class ContentService {
         }
 
         return {
-          message: 'Content revision published.',
+          message: isFirstPublication
+            ? 'Content revision published.'
+            : 'Current publication moved to the selected published revision.',
           revision: this.serializeRevision(published),
         };
       },
@@ -333,18 +352,21 @@ export class ContentService {
     );
   }
 
-  private async findLatestPublished(
+  private async findCurrentPublished(
     contentKey: string,
   ): Promise<ContentRevisionRow | null> {
     const rows = await this.prisma.$queryRaw<ContentRevisionRow[]>`
       SELECT
-        \`id\`, \`contentKey\`, \`version\`, \`status\`, \`templateKey\`, \`payload\`,
-        \`createdByUserId\`, \`publishedByUserId\`, \`createdAt\`, \`updatedAt\`, \`publishedAt\`
-      FROM \`content_revisions\`
-      WHERE \`contentKey\` = ${contentKey} AND \`status\` = 'PUBLISHED'
-      ORDER BY \`version\` DESC
+        cr.\`id\`, cr.\`contentKey\`, cr.\`version\`, cr.\`status\`, cr.\`templateKey\`, cr.\`payload\`,
+        cr.\`createdByUserId\`, cr.\`publishedByUserId\`, cr.\`createdAt\`, cr.\`updatedAt\`, cr.\`publishedAt\`
+      FROM \`content_publications\` cp
+      INNER JOIN \`content_revisions\` cr
+        ON cr.\`id\` = cp.\`revisionId\`
+       AND cr.\`contentKey\` = cp.\`contentKey\`
+      WHERE cp.\`contentKey\` = ${contentKey}
       LIMIT 1
     `;
+
     return rows[0] ? this.normalizeRevision(rows[0]) : null;
   }
 
@@ -358,6 +380,7 @@ export class ContentService {
       ORDER BY \`version\` DESC
       LIMIT 100
     `;
+
     return rows.map((row) => this.normalizeRevision(row));
   }
 
@@ -374,11 +397,13 @@ export class ContentService {
       WHERE \`id\` = ${revisionId} AND \`contentKey\` = ${contentKey}
       LIMIT 1
     `;
+
     return rows[0] ? this.normalizeRevision(rows[0]) : null;
   }
 
   private normalizeRevision(row: ContentRevisionRow): ContentRevisionRow {
     let payload = row.payload;
+
     if (typeof payload === 'string') {
       try {
         payload = JSON.parse(payload) as unknown;
@@ -403,17 +428,21 @@ export class ContentService {
 
   private assertEmailContentKey(rawContentKey: string): EmailContentKey {
     const contentKey = rawContentKey.trim().toUpperCase();
+
     if (!isEmailContentKey(contentKey)) {
       throw new NotFoundException('Email template not found.');
     }
+
     return contentKey;
   }
 
   private assertSafeHref(value: string, fieldName: string) {
     const href = value.trim();
+
     if (href.startsWith('/') && !href.startsWith('//')) {
       return;
     }
+
     try {
       const parsed = new URL(href);
       if (parsed.protocol === 'https:') {
@@ -422,6 +451,7 @@ export class ContentService {
     } catch {
       // handled below
     }
+
     throw new BadRequestException(
       `${fieldName} must be a local absolute path or an HTTPS URL.`,
     );
@@ -438,6 +468,7 @@ export class ContentService {
     for (const value of values) {
       for (const match of value.matchAll(variablePattern)) {
         const variable = match[1];
+
         if (!allowed.has(variable)) {
           throw new BadRequestException(
             `Template variable {{${variable}}} is not allowed for ${contentKey}.`,
@@ -451,6 +482,7 @@ export class ContentService {
     if (!this.isRecord(payload)) {
       return DEFAULT_LANDING_CONTENT;
     }
+
     const requiredStrings = [
       'brandName',
       'badge',
@@ -468,12 +500,32 @@ export class ContentService {
       'seoTitle',
       'seoDescription',
     ];
+
     if (requiredStrings.some((key) => typeof payload[key] !== 'string')) {
       return DEFAULT_LANDING_CONTENT;
     }
-    if (!Array.isArray(payload.features)) {
+
+    if (
+      !Array.isArray(payload.features) ||
+      payload.features.length < 1 ||
+      payload.features.length > 6 ||
+      payload.features.some(
+        (feature) =>
+          !this.isRecord(feature) ||
+          typeof feature.title !== 'string' ||
+          typeof feature.description !== 'string',
+      )
+    ) {
       return DEFAULT_LANDING_CONTENT;
     }
+
+    try {
+      this.assertSafeHref(String(payload.primaryCtaHref), 'primaryCtaHref');
+      this.assertSafeHref(String(payload.secondaryCtaHref), 'secondaryCtaHref');
+    } catch {
+      return DEFAULT_LANDING_CONTENT;
+    }
+
     return payload as unknown as LandingContent;
   }
 
@@ -484,6 +536,7 @@ export class ContentService {
     if (!this.isRecord(payload)) {
       return DEFAULT_EMAIL_CONTENT[contentKey];
     }
+
     const keys: Array<keyof EmailTemplateContent> = [
       'subject',
       'preheader',
@@ -492,9 +545,11 @@ export class ContentService {
       'ctaLabel',
       'footer',
     ];
+
     if (keys.some((key) => typeof payload[key] !== 'string')) {
       return DEFAULT_EMAIL_CONTENT[contentKey];
     }
+
     return payload as unknown as EmailTemplateContent;
   }
 

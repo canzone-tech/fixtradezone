@@ -148,6 +148,8 @@ const sections: Array<{
         href: "/templates",
         label: "Templates / CMS",
         icon: "iconoir-page",
+        permission: "content.read",
+        enabled: true,
       },
       {
         href: "/settings",
