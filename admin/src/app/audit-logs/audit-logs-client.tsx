@@ -138,7 +138,11 @@ export default function AuditLogsClient() {
   );
 
   useEffect(() => {
-    void load("?page=1&limit=50");
+    const timeoutId = window.setTimeout(() => {
+      void load("?page=1&limit=50");
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   function runFilter() {
