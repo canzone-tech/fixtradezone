@@ -77,6 +77,27 @@ body {
   max-height: 92vh;
 }
 
+.ftz-topbar-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.ftz-topbar-title > div {
+  min-width: 0;
+}
+
+.ftz-topbar-title h1,
+.ftz-topbar-title p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ftz-topbar-actions {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
 @media (max-width: 991px) {
   body.ftz-nav-open {
     overflow: hidden;
@@ -128,6 +149,44 @@ body {
   :where(.ftz-main > *, main > *) {
     max-width: 100%;
   }
+
+  .ftz-topbar {
+    gap: 8px;
+  }
+
+  .ftz-topbar-title {
+    gap: 8px;
+  }
+
+  .ftz-topbar-title h1 {
+    max-width: min(42vw, 220px);
+  }
+
+  .ftz-topbar-actions {
+    gap: 6px;
+  }
+
+  .ftz-secure-pill,
+  .ftz-topbar-profile {
+    display: none;
+  }
+
+  .ftz-signout-button {
+    display: inline-grid;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    place-items: center;
+  }
+
+  .ftz-signout-button span {
+    display: none;
+  }
+
+  .ftz-signout-button i {
+    margin: 0;
+  }
 }
 
 @media (max-width: 520px) {
@@ -153,6 +212,16 @@ body {
 
   .ftz-sidebar {
     width: min(86vw, 320px);
+  }
+
+  .ftz-topbar-title h1 {
+    max-width: 34vw;
+  }
+
+  /* Keep shared topbar icon actions compact; generic action-group rules above
+     intentionally expand only module toolbars/forms. */
+  .ftz-topbar-actions > .ftz-signout-button {
+    width: 44px;
   }
 }
 
