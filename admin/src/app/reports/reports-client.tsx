@@ -1,25 +1,52 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/closeout/closeout.module.css";
-import { formatPlatformDateTime } from "@/lib/platform-time";
+import {
+  formatPlatformDateTime,
+  getRuntimePlatformTimezone,
+  platformLocalDateTimeToIso,
+} from "@/lib/platform-time";
+
+interface CurrencyMetrics {
+  currency: string;
+  total: number;
+  [key: string]: number | string;
+}
+
+interface LedgerCurrencyRow {
+  currency: string;
+  transactionCount: number;
+  debitTotal: string;
+  creditTotal: string;
+  balanced: boolean;
+}
 
 interface ReportOverview {
   generatedAt: string;
   window: { from: string | null; toExclusive: string | null };
+  currencies: string[];
   users: Record<string, number>;
   deposits: Record<string, number | string>;
   subscriptions: Record<string, number | string>;
   commissions: Record<string, number | string>;
   rewards: Record<string, number | string>;
   payouts: Record<string, number | string>;
+  financialByCurrency: {
+    deposits: CurrencyMetrics[];
+    subscriptions: CurrencyMetrics[];
+    commissions: CurrencyMetrics[];
+    rewards: CurrencyMetrics[];
+    payouts: CurrencyMetrics[];
+  };
   ledger: {
     transactionCount: number;
     debitTotal: string;
     creditTotal: string;
     balanced: boolean;
+    byCurrency: LedgerCurrencyRow[];
   };
   currentUserWalletBalances: Array<{
     bucket: string;
@@ -51,8 +78,12 @@ function looksMoney(key: string): boolean {
   return /(amount|value|debitTotal|creditTotal|balance)$/i.test(key);
 }
 
-function displayValue(key: string, value: number | string): string {
-  if (looksMoney(key)) return `${value} USDT`;
+function displayValue(
+  key: string,
+  value: number | string,
+  currency?: string,
+): string {
+  if (looksMoney(key) && currency) return `${value} ${currency}`;
   return String(value);
 }
 
@@ -62,8 +93,8 @@ function csvEscape(value: string | number | boolean | null): string {
 }
 
 function makeCsv(report: ReportOverview): string {
-  const lines: string[] = ["section,metric,value"];
-  const sections: Array<[
+  const lines: string[] = ["section,currency,metric,value"];
+  const operationalSections: Array<[
     string,
     Record<string, number | string | boolean>,
   ]> = [
@@ -73,13 +104,45 @@ function makeCsv(report: ReportOverview): string {
     ["commissions", report.commissions],
     ["rewards", report.rewards],
     ["payouts", report.payouts],
-    ["ledger", report.ledger],
   ];
 
-  for (const [section, values] of sections) {
+  for (const [section, values] of operationalSections) {
     for (const [metric, value] of Object.entries(values)) {
+      if (looksMoney(metric)) continue;
       lines.push(
-        [csvEscape(section), csvEscape(metric), csvEscape(value)].join(","),
+        [csvEscape(section), csvEscape(""), csvEscape(metric), csvEscape(value)].join(
+          ",",
+        ),
+      );
+    }
+  }
+
+  for (const [section, rows] of Object.entries(report.financialByCurrency)) {
+    for (const row of rows) {
+      for (const [metric, value] of Object.entries(row)) {
+        if (metric === "currency") continue;
+        lines.push(
+          [
+            csvEscape(section),
+            csvEscape(row.currency),
+            csvEscape(metric),
+            csvEscape(value),
+          ].join(","),
+        );
+      }
+    }
+  }
+
+  for (const row of report.ledger.byCurrency) {
+    for (const [metric, value] of Object.entries(row)) {
+      if (metric === "currency") continue;
+      lines.push(
+        [
+          csvEscape("ledger"),
+          csvEscape(row.currency),
+          csvEscape(metric),
+          csvEscape(value),
+        ].join(","),
       );
     }
   }
@@ -88,7 +151,8 @@ function makeCsv(report: ReportOverview): string {
     lines.push(
       [
         csvEscape("wallet"),
-        csvEscape(`${wallet.currency}:${wallet.bucket}`),
+        csvEscape(wallet.currency),
+        csvEscape(wallet.bucket),
         csvEscape(wallet.balance),
       ].join(","),
     );
@@ -100,20 +164,58 @@ function makeCsv(report: ReportOverview): string {
 function MetricSection({
   title,
   values,
+  currency,
+  hideMoney = false,
 }: {
   title: string;
   values: Record<string, number | string>;
+  currency?: string;
+  hideMoney?: boolean;
 }) {
+  const entries = Object.entries(values).filter(
+    ([key]) => !(hideMoney && looksMoney(key)),
+  );
+
   return (
     <section className={styles.card}>
       <h2>{title}</h2>
       <div className={styles.grid}>
-        {Object.entries(values).map(([key, value]) => (
+        {entries.map(([key, value]) => (
           <div className={styles.metric} key={key}>
             <small>{label(key)}</small>
-            <strong>{displayValue(key, value)}</strong>
+            <strong>{displayValue(key, value, currency)}</strong>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function FinancialCurrencySection({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: CurrencyMetrics[];
+}) {
+  if (rows.length === 0) return null;
+
+  return (
+    <section className={styles.card}>
+      <h2>{title} by currency</h2>
+      <div className={styles.grid}>
+        {rows.flatMap((row) =>
+          Object.entries(row)
+            .filter(([key]) => key !== "currency" && key !== "total")
+            .map(([key, value]) => (
+              <div className={styles.metric} key={`${row.currency}:${key}`}>
+                <small>
+                  {row.currency} · {label(key)}
+                </small>
+                <strong>{displayValue(key, value, row.currency)}</strong>
+              </div>
+            )),
+        )}
       </div>
     </section>
   );
@@ -126,14 +228,6 @@ export default function ReportsClient() {
   const [to, setTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const query = useMemo(() => {
-    const params = new URLSearchParams();
-    if (from) params.set("from", new Date(from).toISOString());
-    if (to) params.set("to", new Date(to).toISOString());
-    const value = params.toString();
-    return value ? `?${value}` : "";
-  }, [from, to]);
 
   const load = useCallback(
     async (reportQuery: string) => {
@@ -170,6 +264,32 @@ export default function ReportsClient() {
     return () => window.clearTimeout(timeoutId);
   }, [load]);
 
+  function runReport() {
+    const params = new URLSearchParams();
+    const timezone = getRuntimePlatformTimezone();
+
+    if (from) {
+      const fromIso = platformLocalDateTimeToIso(from, timezone);
+      if (!fromIso) {
+        setError(`Invalid From time for platform timezone ${timezone}.`);
+        return;
+      }
+      params.set("from", fromIso);
+    }
+
+    if (to) {
+      const toIso = platformLocalDateTimeToIso(to, timezone);
+      if (!toIso) {
+        setError(`Invalid To time for platform timezone ${timezone}.`);
+        return;
+      }
+      params.set("to", toIso);
+    }
+
+    const value = params.toString();
+    void load(value ? `?${value}` : "");
+  }
+
   function exportCsv() {
     if (!report) return;
 
@@ -181,6 +301,9 @@ export default function ReportsClient() {
     anchor.click();
     URL.revokeObjectURL(url);
   }
+
+  const singleCurrency = report?.currencies.length === 1 ? report.currencies[0] : undefined;
+  const mixedCurrency = (report?.currencies.length ?? 0) > 1;
 
   return (
     <div className={styles.page}>
@@ -226,7 +349,7 @@ export default function ReportsClient() {
           <button
             className={styles.button}
             type="button"
-            onClick={() => void load(query)}
+            onClick={runReport}
             disabled={loading}
           >
             {loading ? "Loading…" : "Run report"}
@@ -240,6 +363,10 @@ export default function ReportsClient() {
             Export CSV
           </button>
         </div>
+        <p className={styles.meta}>
+          Filter inputs use configured platform timezone {getRuntimePlatformTimezone()}.
+          The To value is exclusive.
+        </p>
       </section>
 
       {report ? (
@@ -269,26 +396,85 @@ export default function ReportsClient() {
                 <small>Transactions</small>
                 <strong>{report.ledger.transactionCount}</strong>
               </div>
-              <div className={styles.metric}>
-                <small>Debit total</small>
-                <strong>{report.ledger.debitTotal} USDT</strong>
-              </div>
-              <div className={styles.metric}>
-                <small>Credit total</small>
-                <strong>{report.ledger.creditTotal} USDT</strong>
-              </div>
+              {report.ledger.byCurrency.map((row) => (
+                <div className={styles.metric} key={row.currency}>
+                  <small>{row.currency} ledger</small>
+                  <strong>
+                    {row.debitTotal} / {row.creditTotal} {row.currency}
+                  </strong>
+                  <span
+                    className={row.balanced ? styles.statusGood : styles.statusBad}
+                  >
+                    {row.balanced ? "Balanced" : "Out of balance"}
+                  </span>
+                </div>
+              ))}
             </div>
           </section>
 
+          {mixedCurrency ? (
+            <section className={styles.card}>
+              <p className={styles.eyebrow}>Currency Control</p>
+              <h2>Mixed-currency report window</h2>
+              <p>
+                Monetary values are shown per currency/asset below. Cross-currency
+                amounts are never added together into a misleading money total.
+              </p>
+            </section>
+          ) : null}
+
           <MetricSection title="Users" values={report.users} />
-          <MetricSection title="Deposits" values={report.deposits} />
-          <MetricSection title="Subscriptions" values={report.subscriptions} />
+          <MetricSection
+            title="Deposits"
+            values={report.deposits}
+            currency={singleCurrency}
+            hideMoney={mixedCurrency}
+          />
+          <MetricSection
+            title="Subscriptions"
+            values={report.subscriptions}
+            currency={singleCurrency}
+            hideMoney={mixedCurrency}
+          />
           <MetricSection
             title="Referral Commissions"
             values={report.commissions}
+            currency={singleCurrency}
+            hideMoney={mixedCurrency}
           />
-          <MetricSection title="Rewards" values={report.rewards} />
-          <MetricSection title="Payouts" values={report.payouts} />
+          <MetricSection
+            title="Rewards"
+            values={report.rewards}
+            currency={singleCurrency}
+            hideMoney={mixedCurrency}
+          />
+          <MetricSection
+            title="Payouts"
+            values={report.payouts}
+            currency={singleCurrency}
+            hideMoney={mixedCurrency}
+          />
+
+          <FinancialCurrencySection
+            title="Deposits"
+            rows={report.financialByCurrency.deposits}
+          />
+          <FinancialCurrencySection
+            title="Subscriptions"
+            rows={report.financialByCurrency.subscriptions}
+          />
+          <FinancialCurrencySection
+            title="Referral commissions"
+            rows={report.financialByCurrency.commissions}
+          />
+          <FinancialCurrencySection
+            title="Rewards"
+            rows={report.financialByCurrency.rewards}
+          />
+          <FinancialCurrencySection
+            title="Payouts"
+            rows={report.financialByCurrency.payouts}
+          />
 
           <section className={styles.card}>
             <h2>Current USER wallet balances</h2>
@@ -309,7 +495,9 @@ export default function ReportsClient() {
                       <tr key={`${row.currency}:${row.bucket}`}>
                         <td>{row.currency}</td>
                         <td>{row.bucket}</td>
-                        <td>{row.balance}</td>
+                        <td>
+                          {row.balance} {row.currency}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
