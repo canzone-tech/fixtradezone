@@ -99,7 +99,11 @@ export default function NotificationsAdminClient() {
   }, [router]);
 
   useEffect(() => {
-    void load();
+    const timeoutId = window.setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   async function createNotification(event: FormEvent<HTMLFormElement>) {
