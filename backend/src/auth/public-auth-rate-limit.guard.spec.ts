@@ -12,20 +12,33 @@ type RateLimitMetadata = {
   identityLimit?: number;
 };
 
+type StatusError = {
+  getStatus(): number;
+};
+
 function asDependency<T>(value: unknown): T {
   return value as T;
 }
 
+function hasStatus(error: unknown): error is StatusError {
+  if (typeof error !== 'object' || error === null || !('getStatus' in error)) {
+    return false;
+  }
+
+  const candidate = error as { getStatus?: unknown };
+  return typeof candidate.getStatus === 'function';
+}
+
 describe('PublicAuthRateLimitGuard', () => {
-  const getAllAndOverride = jest.fn(
-    (_metadataKey: unknown, _targets: unknown[]): RateLimitMetadata | undefined =>
-      undefined,
-  );
-  const incr = jest.fn((_key: string): Promise<number> => Promise.resolve(1));
-  const expire = jest.fn(
-    (_key: string, _seconds: number): Promise<number> => Promise.resolve(1),
-  );
-  const ttl = jest.fn((_key: string): Promise<number> => Promise.resolve(60));
+  const getAllAndOverride = jest.fn<
+    (
+      metadataKey: unknown,
+      targets: unknown[],
+    ) => RateLimitMetadata | undefined
+  >();
+  const incr = jest.fn<(key: string) => Promise<number>>();
+  const expire = jest.fn<(key: string, seconds: number) => Promise<number>>();
+  const ttl = jest.fn<(key: string) => Promise<number>>();
 
   const reflector = asDependency<Reflector>({
     getAllAndOverride,
@@ -102,15 +115,7 @@ describe('PublicAuthRateLimitGuard', () => {
       await guard.canActivate(context());
       throw new Error('Expected the rate limit guard to reject the request.');
     } catch (error: unknown) {
-      if (
-        typeof error !== 'object' ||
-        error === null ||
-        !('getStatus' in error) ||
-        typeof error.getStatus !== 'function'
-      ) {
-        throw error;
-      }
-
+      if (!hasStatus(error)) throw error;
       expect(error.getStatus()).toBe(429);
     }
 
