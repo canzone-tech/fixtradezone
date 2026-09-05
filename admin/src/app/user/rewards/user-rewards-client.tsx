@@ -169,7 +169,11 @@ export default function UserRewardsClient() {
   );
 
   useEffect(() => {
-    void load(1);
+    const timeoutId = window.setTimeout(() => {
+      void load(1);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
