@@ -1,0 +1,169 @@
+/*
+ * FixTradeZone project-wide responsive hardening layer.
+ * Imported after theme + readability so shared Admin/User/Auth surfaces keep
+ * safe overflow, touch targets and usable form controls from 320px upward.
+ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-width: 320px;
+}
+
+:where(
+  .ftz-admin-app,
+  .ftz-main,
+  .ftz-dashboard,
+  main,
+  section,
+  article,
+  form,
+  fieldset,
+  [class*="page" i],
+  [class*="card" i],
+  [class*="panel" i],
+  [class*="grid" i],
+  [class*="content" i]
+) {
+  min-width: 0;
+}
+
+:where(img, svg, canvas, video) {
+  max-width: 100%;
+}
+
+:where(
+  p,
+  dd,
+  td,
+  th,
+  code,
+  pre,
+  [class*="address" i],
+  [class*="hash" i],
+  [class*="txid" i],
+  [class*="transaction" i],
+  [class*="accountKey" i],
+  [class*="sourceKey" i]
+) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+:where(input, select, textarea, button) {
+  max-width: 100%;
+}
+
+:where(button, [role="button"], a.ftz-nav-link, .ftz-icon-button) {
+  touch-action: manipulation;
+}
+
+:where(
+  [class*="tableWrap" i],
+  [class*="table-wrap" i],
+  .ftz-table-wrap
+) {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+:where(dialog, [role="dialog"], [class*="modal" i]) {
+  max-width: min(94vw, 760px);
+  max-height: 92vh;
+}
+
+@media (max-width: 991px) {
+  body.ftz-nav-open {
+    overflow: hidden;
+  }
+
+  .ftz-sidebar {
+    max-width: min(86vw, var(--ftz-sidebar));
+  }
+
+  .ftz-topbar,
+  .ftz-main {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  :where(
+    input:not([type="checkbox"]):not([type="radio"]),
+    select,
+    textarea
+  ) {
+    /* 16px prevents unwanted mobile browser zoom on focus. */
+    font-size: 16px !important;
+  }
+
+  :where(button, [role="button"], .ftz-icon-button) {
+    min-height: 44px;
+  }
+
+  :where(
+    [class*="toolbar" i],
+    [class*="actions" i],
+    [class*="controls" i],
+    [class*="filters" i]
+  ) {
+    min-width: 0;
+  }
+
+  :where(
+    [class*="toolbar" i] > button,
+    [class*="actions" i] > button,
+    [class*="controls" i] > button,
+    [class*="toolbar" i] > a,
+    [class*="actions" i] > a
+  ) {
+    min-height: 44px;
+  }
+
+  :where(.ftz-main > *, main > *) {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  :where(
+    [class*="toolbar" i],
+    [class*="actions" i],
+    [class*="controls" i],
+    [class*="filters" i]
+  ) {
+    align-items: stretch;
+  }
+
+  :where(
+    [class*="toolbar" i] > button,
+    [class*="actions" i] > button,
+    [class*="controls" i] > button,
+    [class*="toolbar" i] > a,
+    [class*="actions" i] > a
+  ) {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .ftz-sidebar {
+    width: min(86vw, 320px);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 991px) {
+  .ftz-sidebar-profile {
+    margin-top: 6px;
+    margin-bottom: 6px;
+    padding-block: 9px;
+  }
+
+  .ftz-logo {
+    height: 66px;
+  }
+}
