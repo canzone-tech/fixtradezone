@@ -212,6 +212,19 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Referrals</span>
             </Link>
 
+            {!impersonated ? (
+              <Link
+                href="/user/genealogy"
+                className={`ftz-nav-link ${
+                  isActive("/user/genealogy") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-network" />
+                <span>Genealogy Tree</span>
+              </Link>
+            ) : null}
+
             <Link
               href="/user/trading"
               className={`ftz-nav-link ${
