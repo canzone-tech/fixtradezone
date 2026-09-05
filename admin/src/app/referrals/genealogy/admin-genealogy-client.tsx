@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import GenealogyTree from "@/components/genealogy/genealogy-tree";
 import {
@@ -28,6 +28,16 @@ export default function AdminGenealogyClient() {
   const [rootUserId, setRootUserId] = useState<string | undefined>();
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+
+  const handleAccessError = useCallback(
+    (status: number) => {
+      if (status === 401) {
+        router.replace("/login");
+        router.refresh();
+      }
+    },
+    [router],
+  );
 
   async function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,12 +157,7 @@ export default function AdminGenealogyClient() {
         key={rootUserId ?? "configured-root"}
         apiPath="/api/admin/referrals/genealogy"
         rootUserId={rootUserId}
-        onAccessError={(status) => {
-          if (status === 401) {
-            router.replace("/login");
-            router.refresh();
-          }
-        }}
+        onAccessError={handleAccessError}
       />
     </div>
   );
