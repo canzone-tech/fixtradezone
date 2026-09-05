@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCrossSiteRequest } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 interface CaptchaRequestBody {
   purpose?: unknown;
@@ -16,6 +21,7 @@ async function wait(milliseconds: number): Promise<void> {
 
 async function fetchCaptchaChallenge(
   purpose: "LOGIN" | "REGISTRATION",
+  headers: HeadersInit,
 ): Promise<Response> {
   let lastError: unknown;
 
@@ -23,9 +29,7 @@ async function fetchCaptchaChallenge(
     try {
       return await backendFetch("/auth/captcha", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ purpose }),
         signal: AbortSignal.timeout(CAPTCHA_BACKEND_TIMEOUT_MS),
       });
@@ -70,7 +74,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const backendResponse = await fetchCaptchaChallenge(body.purpose);
+    const backendResponse = await fetchCaptchaChallenge(
+      body.purpose,
+      forwardedBackendHeaders(request, {
+        "Content-Type": "application/json",
+      }),
+    );
     const payload = await readJson(backendResponse);
 
     if (!backendResponse.ok) {
