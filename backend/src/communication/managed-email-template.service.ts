@@ -22,7 +22,8 @@ export class ManagedEmailTemplateService {
       context.contentKey,
     );
     const appUrl = (
-      this.configService.get<string>('PUBLIC_APP_URL') ?? 'https://localhost:3001'
+      this.configService.get<string>('PUBLIC_APP_URL') ??
+      'https://localhost:3001'
     ).replace(/\/+$/, '');
     const values = {
       ...context.values,
@@ -51,7 +52,10 @@ export class ManagedEmailTemplateService {
     });
   }
 
-  private interpolate(template: string, values: Record<string, string>): string {
+  private interpolate(
+    template: string,
+    values: Record<string, string>,
+  ): string {
     return template.replace(
       /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g,
       (_match, variable: string) => values[variable] ?? '',

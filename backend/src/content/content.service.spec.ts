@@ -95,11 +95,10 @@ describe('ContentService', () => {
     } as unknown as PrismaService;
     const service = new ContentService(prisma);
 
-    const result = await service.publishLanding(
-      publishedRevision.id,
-      actor,
-      { ipAddress: '127.0.0.1', userAgent: 'jest' },
-    );
+    const result = await service.publishLanding(publishedRevision.id, actor, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'jest',
+    });
 
     expect(result.message).toBe(
       'Current publication moved to the selected published revision.',

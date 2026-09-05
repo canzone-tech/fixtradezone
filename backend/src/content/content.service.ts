@@ -72,8 +72,8 @@ export class ContentService {
 
   async getEmailTemplateWorkspaces() {
     return Promise.all(
-      (Object.keys(DEFAULT_EMAIL_CONTENT) as EmailContentKey[]).map((contentKey) =>
-        this.getEmailTemplateWorkspace(contentKey),
+      (Object.keys(DEFAULT_EMAIL_CONTENT) as EmailContentKey[]).map(
+        (contentKey) => this.getEmailTemplateWorkspace(contentKey),
       ),
     );
   }
@@ -370,7 +370,9 @@ export class ContentService {
     return rows[0] ? this.normalizeRevision(rows[0]) : null;
   }
 
-  private async findRevisions(contentKey: string): Promise<ContentRevisionRow[]> {
+  private async findRevisions(
+    contentKey: string,
+  ): Promise<ContentRevisionRow[]> {
     const rows = await this.prisma.$queryRaw<ContentRevisionRow[]>`
       SELECT
         \`id\`, \`contentKey\`, \`version\`, \`status\`, \`templateKey\`, \`payload\`,
@@ -408,7 +410,9 @@ export class ContentService {
       try {
         payload = JSON.parse(payload) as unknown;
       } catch {
-        throw new BadRequestException('Stored content revision payload is invalid.');
+        throw new BadRequestException(
+          'Stored content revision payload is invalid.',
+        );
       }
     }
 
