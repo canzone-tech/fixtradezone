@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
 interface UserApiPayload {
@@ -107,14 +108,6 @@ function redirectFor(error: unknown): string | null {
 function compactDecimal(value: string): string {
   if (!value.includes(".")) return value;
   return value.replace(/0+$/, "").replace(/\.$/, "");
-}
-
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 function stateTone(status: RewardState["status"]): "success" | "warning" | undefined {
@@ -261,7 +254,7 @@ export default function UserRewardsClient() {
                     </div>
                     <div className={styles.metric}>
                       <small>Next reward</small>
-                      <strong>{formatDate(state.nextRewardAt)}</strong>
+                      <strong>{formatPlatformDateTime(state.nextRewardAt)}</strong>
                     </div>
                   </div>
 
@@ -356,7 +349,7 @@ export default function UserRewardsClient() {
                       <td>
                         {compactDecimal(event.capConsumedAfter)} / {compactDecimal(event.capLimit)} {event.currency}
                       </td>
-                      <td>{formatDate(event.postedAt)}</td>
+                      <td>{formatPlatformDateTime(event.postedAt)}</td>
                     </tr>
                   ))}
                 </tbody>
