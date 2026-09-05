@@ -185,8 +185,7 @@ export const envValidationSchema = Joi.object({
           ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)
         ) {
           return helpers.error('any.custom', {
-            message:
-              'PUBLIC_APP_URL must be a public HTTPS URL in production',
+            message: 'PUBLIC_APP_URL must be a public HTTPS URL in production',
           });
         }
       } catch {
@@ -197,8 +196,7 @@ export const envValidationSchema = Joi.object({
 
       if (emailMode === 'SMTP' && value.SMTP_REJECT_UNAUTHORIZED === false) {
         return helpers.error('any.custom', {
-          message:
-            'SMTP_REJECT_UNAUTHORIZED cannot be false in production',
+          message: 'SMTP_REJECT_UNAUTHORIZED cannot be false in production',
         });
       }
 

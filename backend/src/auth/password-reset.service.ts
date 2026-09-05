@@ -246,7 +246,8 @@ export class PasswordResetService {
     await redis.del(this.cooldownKey(user.id));
 
     return {
-      message: 'Password reset successfully. Please sign in with your new password.',
+      message:
+        'Password reset successfully. Please sign in with your new password.',
     };
   }
 

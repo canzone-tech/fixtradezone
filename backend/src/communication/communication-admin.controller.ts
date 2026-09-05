@@ -58,7 +58,8 @@ export class CommunicationAdminController {
         action: 'CREATE',
         entityType: 'CommunicationEmailTest',
         entityId: actor.id,
-        description: 'Super administrator sent an email transport test message.',
+        description:
+          'Super administrator sent an email transport test message.',
         metadata: {
           event: 'EMAIL_TRANSPORT_TEST_SENT',
           transport: delivery.transport,

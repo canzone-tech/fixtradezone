@@ -5,7 +5,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { EmailDeliveryResult, EmailMessage } from './communication.types';
-import { sendViaSmtp, type SmtpEmailTransportConfig } from './smtp-email-transport';
+import {
+  sendViaSmtp,
+  type SmtpEmailTransportConfig,
+} from './smtp-email-transport';
 
 type EmailTransportMode = 'CONSOLE' | 'HTTP' | 'SMTP';
 
@@ -195,7 +198,8 @@ export class EmailTransportService {
   private getTimeoutMs(): number {
     return Math.max(
       1_000,
-      this.configService.get<number>('COMMUNICATION_EMAIL_TIMEOUT_MS') ?? 10_000,
+      this.configService.get<number>('COMMUNICATION_EMAIL_TIMEOUT_MS') ??
+        10_000,
     );
   }
 

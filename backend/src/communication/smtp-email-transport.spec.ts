@@ -13,7 +13,9 @@ describe('SMTP email MIME builder', () => {
       text: 'Your account security settings changed.',
     });
 
-    expect(mime).toContain('From: "FixTradeZone" <no-reply@fixtradezone.example>');
+    expect(mime).toContain(
+      'From: "FixTradeZone" <no-reply@fixtradezone.example>',
+    );
     expect(mime).toContain('To: <user@example.com>');
     expect(mime).toContain('Subject: Security update');
     expect(mime).toContain('Content-Type: text/plain; charset=UTF-8');

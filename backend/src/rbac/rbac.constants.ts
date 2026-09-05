@@ -169,8 +169,7 @@ export const SYSTEM_PERMISSIONS = [
   },
   {
     code: PERMISSIONS.NOTIFICATIONS_READ,
-    description:
-      'View administration notification delivery and read state',
+    description: 'View administration notification delivery and read state',
   },
   {
     code: PERMISSIONS.NOTIFICATIONS_MANAGE,

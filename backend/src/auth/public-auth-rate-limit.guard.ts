@@ -25,10 +25,11 @@ export class PublicAuthRateLimitGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const options = this.reflector.getAllAndOverride<PublicAuthRateLimitOptions>(
-      PUBLIC_AUTH_RATE_LIMIT_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const options =
+      this.reflector.getAllAndOverride<PublicAuthRateLimitOptions>(
+        PUBLIC_AUTH_RATE_LIMIT_KEY,
+        [context.getHandler(), context.getClass()],
+      );
 
     if (!options) return true;
 

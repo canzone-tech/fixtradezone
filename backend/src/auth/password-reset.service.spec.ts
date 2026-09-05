@@ -124,7 +124,8 @@ describe('PasswordResetService', () => {
       redisEvalCount += 1;
       const payload = redisStore.get(tokenKey);
       const currentHash = redisStore.get(userKey);
-      if (!payload || currentHash !== expectedHash) return Promise.resolve(null);
+      if (!payload || currentHash !== expectedHash)
+        return Promise.resolve(null);
       redisStore.delete(tokenKey);
       redisStore.delete(userKey);
       return Promise.resolve(payload);
@@ -216,7 +217,9 @@ describe('PasswordResetService', () => {
   };
 
   const communicationService = {
-    sendEmail(message: EmailMessage): Promise<{ transport: string; accepted: boolean }> {
+    sendEmail(
+      message: EmailMessage,
+    ): Promise<{ transport: string; accepted: boolean }> {
       emailMessages.push(message);
       return Promise.resolve({ transport: 'SMTP', accepted: true });
     },
@@ -262,7 +265,8 @@ describe('PasswordResetService', () => {
 
   it('returns a generic response for an unknown account without sending email', async () => {
     await expect(service.request('missing@example.com')).resolves.toEqual({
-      message: 'If the account is eligible, a password reset email has been sent.',
+      message:
+        'If the account is eligible, a password reset email has been sent.',
     });
     expect(emailMessages).toHaveLength(0);
   });
@@ -280,7 +284,8 @@ describe('PasswordResetService', () => {
     ];
 
     await expect(service.request('USER@example.com')).resolves.toEqual({
-      message: 'If the account is eligible, a password reset email has been sent.',
+      message:
+        'If the account is eligible, a password reset email has been sent.',
     });
 
     expect(emailMessages).toHaveLength(1);
@@ -291,9 +296,9 @@ describe('PasswordResetService', () => {
     expect(issuedEmail.text).toContain(
       'https://app.example.com/reset-password?token=',
     );
-    expect(
-      [...redisStore.keys()].some((key) => key.includes(':token:')),
-    ).toBe(true);
+    expect([...redisStore.keys()].some((key) => key.includes(':token:'))).toBe(
+      true,
+    );
     expect(
       auditInputs.some((entry) => entry.data.entityType === 'PasswordReset'),
     ).toBe(true);
@@ -337,7 +342,8 @@ describe('PasswordResetService', () => {
     await expect(
       service.reset(decodedToken, 'A-different-password-123!'),
     ).resolves.toEqual({
-      message: 'Password reset successfully. Please sign in with your new password.',
+      message:
+        'Password reset successfully. Please sign in with your new password.',
     });
 
     expect(redisEvalCount).toBe(1);
@@ -347,7 +353,8 @@ describe('PasswordResetService', () => {
     expect(userUpdateArgs.data.passwordHash).toBe('new-hash');
     expect(userUpdateArgs.data.mustChangePassword).toBe(false);
 
-    if (!sessionUpdateArgs) throw new Error('Expected session revocation call.');
+    if (!sessionUpdateArgs)
+      throw new Error('Expected session revocation call.');
     expect(sessionUpdateArgs.data.revocationReason).toBe('PASSWORD_RESET');
 
     await expect(

@@ -144,7 +144,11 @@ describe('ChangePasswordService', () => {
     verifyResults = [true, true];
 
     await expect(
-      service.change('user-1', 'Current-password-123!', 'Current-password-123!'),
+      service.change(
+        'user-1',
+        'Current-password-123!',
+        'Current-password-123!',
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -152,12 +156,10 @@ describe('ChangePasswordService', () => {
     verifyResults = [true, false];
 
     await expect(
-      service.change(
-        'user-1',
-        'Current-password-123!',
-        'New-password-123!',
-        { ipAddress: '203.0.113.8', userAgent: 'jest' },
-      ),
+      service.change('user-1', 'Current-password-123!', 'New-password-123!', {
+        ipAddress: '203.0.113.8',
+        userAgent: 'jest',
+      }),
     ).resolves.toEqual({
       message: 'Password changed successfully. Please sign in again.',
     });
@@ -168,7 +170,8 @@ describe('ChangePasswordService', () => {
     expect(userUpdateArgs.data.passwordHash).toBe('new-hash');
     expect(userUpdateArgs.data.mustChangePassword).toBe(false);
 
-    if (!sessionUpdateArgs) throw new Error('Expected session revocation call.');
+    if (!sessionUpdateArgs)
+      throw new Error('Expected session revocation call.');
     expect(sessionUpdateArgs.data.revocationReason).toBe('PASSWORD_CHANGED');
 
     if (!auditCreateArgs) throw new Error('Expected audit log call.');

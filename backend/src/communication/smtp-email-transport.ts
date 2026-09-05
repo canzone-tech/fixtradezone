@@ -34,7 +34,9 @@ interface PendingResponse {
 }
 
 function smtpError(message: string, response?: SmtpResponse): Error {
-  const suffix = response ? ` (${response.code}: ${response.lines.join(' | ')})` : '';
+  const suffix = response
+    ? ` (${response.code}: ${response.lines.join(' | ')})`
+    : '';
   return new Error(`${message}${suffix}`);
 }
 
@@ -333,9 +335,9 @@ async function authenticate(
   username: string,
   password: string,
 ): Promise<void> {
-  const plainPayload = Buffer.from(`\u0000${username}\u0000${password}`).toString(
-    'base64',
-  );
+  const plainPayload = Buffer.from(
+    `\u0000${username}\u0000${password}`,
+  ).toString('base64');
 
   if (capabilities.includes('AUTH') && capabilities.includes('PLAIN')) {
     const response = await connection.command(`AUTH PLAIN ${plainPayload}`);
@@ -408,7 +410,9 @@ export async function sendViaSmtp(
       );
     }
 
-    const mailFrom = await connection.command(`MAIL FROM:<${config.fromEmail}>`);
+    const mailFrom = await connection.command(
+      `MAIL FROM:<${config.fromEmail}>`,
+    );
     expectCode(mailFrom, 250, 'MAIL FROM');
 
     const recipient = await connection.command(`RCPT TO:<${message.to}>`);
