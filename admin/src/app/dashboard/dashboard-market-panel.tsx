@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./dashboard-market.module.css";
 
 type MarketSymbol =
@@ -94,15 +95,6 @@ function compactPrice(value: string): string {
     minimumFractionDigits: numeric >= 100 ? 2 : 0,
     maximumFractionDigits,
   }).format(numeric);
-}
-
-function formatTime(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
 }
 
 export default function DashboardMarketPanel() {
@@ -311,7 +303,7 @@ export default function DashboardMarketPanel() {
             <tbody>
               {recentCandles.map((candle) => (
                 <tr key={`${candle.openTime}-${candle.closeTime}`}>
-                  <td>{formatTime(candle.openTime)}</td>
+                  <td>{formatPlatformDateTime(candle.openTime)}</td>
                   <td>{compactPrice(candle.open)}</td>
                   <td>{compactPrice(candle.high)}</td>
                   <td>{compactPrice(candle.low)}</td>
