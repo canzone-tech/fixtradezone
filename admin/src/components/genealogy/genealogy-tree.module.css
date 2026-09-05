@@ -1,0 +1,266 @@
+.treeCard {
+  border: 1px solid rgba(129, 151, 185, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(16, 26, 43, 0.96), rgba(10, 17, 29, 0.98));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.treeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  border-bottom: 1px solid rgba(129, 151, 185, 0.16);
+}
+
+.treeHeader span {
+  display: block;
+  color: #69dfc2;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.treeHeader h3 {
+  margin: 4px 0 0;
+  color: #f5f8fd;
+  font-size: 22px;
+}
+
+.treeHeader b {
+  color: #8fa1bb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tree {
+  padding: 18px;
+  overflow-x: auto;
+}
+
+.branch {
+  min-width: 720px;
+}
+
+.node {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.1fr) minmax(280px, 1.4fr) minmax(170px, 0.7fr);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(129, 151, 185, 0.18);
+  border-radius: 14px;
+  background: rgba(14, 24, 40, 0.92);
+  position: relative;
+}
+
+.node::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  width: 12px;
+  height: 1px;
+  background: rgba(105, 223, 194, 0.35);
+}
+
+.rootNode {
+  border-color: rgba(105, 223, 194, 0.42);
+  background: linear-gradient(100deg, rgba(27, 62, 67, 0.46), rgba(14, 24, 40, 0.96));
+}
+
+.rootNode::before {
+  display: none;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 12px;
+  background: rgba(105, 223, 194, 0.12);
+  border: 1px solid rgba(105, 223, 194, 0.32);
+  color: #8ef0d8;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.identity strong,
+.identity span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity strong {
+  color: #f5f8fd;
+  font-size: 14px;
+}
+
+.identity span {
+  margin-top: 3px;
+  color: #8193ad;
+  font-size: 12px;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.badges span,
+.leaf {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(95, 116, 148, 0.12);
+  border: 1px solid rgba(129, 151, 185, 0.15);
+  color: #a8b6ca;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.badges .activePackage {
+  color: #8ef0d8;
+  background: rgba(105, 223, 194, 0.1);
+  border-color: rgba(105, 223, 194, 0.28);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.actions small {
+  color: #71839d;
+  font-size: 10px;
+  max-width: 95px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions button,
+.loadMore {
+  border: 1px solid rgba(105, 223, 194, 0.32);
+  border-radius: 9px;
+  background: rgba(105, 223, 194, 0.08);
+  color: #8ef0d8;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+}
+
+.actions button:disabled,
+.loadMore:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.children {
+  position: relative;
+}
+
+.children::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: -10px;
+  bottom: 14px;
+  width: 1px;
+  background: rgba(105, 223, 194, 0.18);
+}
+
+.loadMore {
+  margin: 0 0 12px 44px;
+  padding: 9px 12px;
+}
+
+.error {
+  margin: 14px 18px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 112, 112, 0.08);
+  border: 1px solid rgba(255, 112, 112, 0.24);
+  color: #ffb1b1;
+  font-size: 12px;
+}
+
+.loading,
+.empty {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  padding: 28px;
+  border: 1px solid rgba(129, 151, 185, 0.18);
+  border-radius: 18px;
+  background: rgba(12, 20, 34, 0.8);
+  text-align: center;
+}
+
+.loading span {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(105, 223, 194, 0.16);
+  border-top-color: #69dfc2;
+  border-radius: 999px;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading p,
+.empty p {
+  margin: 10px 0 0;
+  color: #8294ae;
+  font-size: 13px;
+}
+
+.empty i {
+  color: #69dfc2;
+  font-size: 30px;
+}
+
+.empty strong {
+  margin-top: 8px;
+  color: #eef4fc;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 800px) {
+  .treeHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tree {
+    padding: 12px;
+  }
+}
