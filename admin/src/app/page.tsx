@@ -1,17 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ChartNoAxesCombined,
-  CircleCheckBig,
-  Network,
-  ShieldCheck,
-  WalletCards,
-} from "lucide-react";
 import { getPublicLandingContent } from "@/lib/public-content";
 import styles from "./landing.module.css";
 
-const featureIcons = [WalletCards, Network, ChartNoAxesCombined];
+const featureMarks = ["01", "02", "03"];
 
 export async function generateMetadata(): Promise<Metadata> {
   const content = await getPublicLandingContent();
@@ -51,7 +43,7 @@ export default async function Home() {
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <span className={styles.badge}>
-            <ShieldCheck size={15} aria-hidden="true" />
+            <span aria-hidden="true">◆</span>
             {content.badge}
           </span>
 
@@ -65,7 +57,7 @@ export default async function Home() {
           <div className={styles.actions}>
             <a className={styles.primaryAction} href={content.primaryCtaHref}>
               {content.primaryCtaLabel}
-              <ArrowRight size={18} aria-hidden="true" />
+              <span aria-hidden="true">→</span>
             </a>
             <a className={styles.secondaryAction} href={content.secondaryCtaHref}>
               {content.secondaryCtaLabel}
@@ -73,9 +65,9 @@ export default async function Home() {
           </div>
 
           <div className={styles.assurance}>
-            <span><CircleCheckBig size={16} /> Structured CMS content</span>
-            <span><CircleCheckBig size={16} /> RBAC protected administration</span>
-            <span><CircleCheckBig size={16} /> Versioned publication history</span>
+            <span><span aria-hidden="true">✓</span> Structured CMS content</span>
+            <span><span aria-hidden="true">✓</span> RBAC protected administration</span>
+            <span><span aria-hidden="true">✓</span> Versioned publication history</span>
           </div>
         </div>
 
@@ -105,16 +97,15 @@ export default async function Home() {
         </div>
 
         <div className={styles.featureGrid}>
-          {content.features.map((feature, index) => {
-            const Icon = featureIcons[index % featureIcons.length];
-            return (
-              <article className={styles.featureCard} key={`${feature.title}-${index}`}>
-                <span className={styles.featureIcon}><Icon size={22} /></span>
-                <h3>{feature.title}</h3>
-                <p>{feature.description}</p>
-              </article>
-            );
-          })}
+          {content.features.map((feature, index) => (
+            <article className={styles.featureCard} key={`${feature.title}-${index}`}>
+              <span className={styles.featureIcon} aria-hidden="true">
+                {featureMarks[index % featureMarks.length]}
+              </span>
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -125,9 +116,9 @@ export default async function Home() {
           <p>{content.trustDescription}</p>
         </div>
         <div className={styles.trustList}>
-          <span><ShieldCheck size={18} /> Deny-by-default protected APIs</span>
-          <span><ShieldCheck size={18} /> Permission-scoped administration</span>
-          <span><ShieldCheck size={18} /> Audited content publication</span>
+          <span><span aria-hidden="true">✓</span> Deny-by-default protected APIs</span>
+          <span><span aria-hidden="true">✓</span> Permission-scoped administration</span>
+          <span><span aria-hidden="true">✓</span> Audited content publication</span>
         </div>
       </section>
 
@@ -144,7 +135,7 @@ export default async function Home() {
         <div className={styles.actions}>
           <a className={styles.primaryAction} href={content.primaryCtaHref}>
             {content.primaryCtaLabel}
-            <ArrowRight size={18} />
+            <span aria-hidden="true">→</span>
           </a>
           <a className={styles.secondaryAction} href={content.secondaryCtaHref}>
             {content.secondaryCtaLabel}
