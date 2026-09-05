@@ -83,7 +83,10 @@ export const DEFAULT_LANDING_CONTENT: LandingContent = {
     'Secure FixTradeZone access for packages, deposits, referrals, rewards, payouts and clearly disclosed simulated activity.',
 };
 
-export const DEFAULT_EMAIL_CONTENT: Record<EmailContentKey, EmailTemplateContent> = {
+export const DEFAULT_EMAIL_CONTENT: Record<
+  EmailContentKey,
+  EmailTemplateContent
+> = {
   EMAIL_VERIFICATION: {
     subject: 'Verify your FixTradeZone email',
     preheader: 'Confirm your email address to continue using FixTradeZone.',
@@ -102,7 +105,8 @@ export const DEFAULT_EMAIL_CONTENT: Record<EmailContentKey, EmailTemplateContent
   },
   DELIVERY_TEST: {
     subject: 'FixTradeZone email delivery test',
-    preheader: 'This controlled message confirms the configured email transport.',
+    preheader:
+      'This controlled message confirms the configured email transport.',
     headline: 'Email delivery test',
     body: 'This is a controlled FixTradeZone email delivery test requested by {{requestedBy}}.',
     ctaLabel: 'Open FixTradeZone',
@@ -110,12 +114,11 @@ export const DEFAULT_EMAIL_CONTENT: Record<EmailContentKey, EmailTemplateContent
   },
 };
 
-export const EMAIL_ALLOWED_VARIABLES: Record<EmailContentKey, readonly string[]> = {
-  EMAIL_VERIFICATION: [
-    'displayName',
-    'verificationUrl',
-    'expiresInMinutes',
-  ],
+export const EMAIL_ALLOWED_VARIABLES: Record<
+  EmailContentKey,
+  readonly string[]
+> = {
+  EMAIL_VERIFICATION: ['displayName', 'verificationUrl', 'expiresInMinutes'],
   PASSWORD_RESET: ['displayName', 'resetUrl', 'expiresInMinutes'],
   DELIVERY_TEST: ['requestedBy', 'appUrl'],
 };
