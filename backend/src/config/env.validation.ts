@@ -6,6 +6,26 @@ function readString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
+function readNumber(value: unknown, fallback: number): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  return fallback;
+}
+
+function normalizeDatabaseHost(host: string): string {
+  const normalized = host.trim().toLowerCase();
+  return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(normalized)
+    ? 'loopback'
+    : normalized;
+}
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -138,6 +158,32 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
 })
   .custom((value: Record<string, unknown>, helpers) => {
+    const databaseUrl = readString(value.DATABASE_URL);
+    try {
+      const parsed = new URL(databaseUrl);
+      const urlHost = normalizeDatabaseHost(parsed.hostname);
+      const runtimeHost = normalizeDatabaseHost(readString(value.MYSQL_HOST));
+      const urlPort = parsed.port ? Number(parsed.port) : 3306;
+      const runtimePort = readNumber(value.MYSQL_PORT, 3306);
+      const urlDatabase = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+      const runtimeDatabase = readString(value.MYSQL_DATABASE);
+
+      if (
+        urlHost !== runtimeHost ||
+        urlPort !== runtimePort ||
+        urlDatabase !== runtimeDatabase
+      ) {
+        return helpers.error('any.custom', {
+          message:
+            'DATABASE_URL and MYSQL_* must target the same host, port, and database',
+        });
+      }
+    } catch {
+      return helpers.error('any.custom', {
+        message: 'DATABASE_URL must be a valid MySQL URL',
+      });
+    }
+
     const emailMode = readString(value.COMMUNICATION_EMAIL_MODE, 'CONSOLE');
 
     if (emailMode === 'SMTP') {
@@ -194,19 +240,34 @@ export const envValidationSchema = Joi.object({
         });
       }
 
-      if (emailMode === 'SMTP' && value.SMTP_REJECT_UNAUTHORIZED === false) {
-        return helpers.error('any.custom', {
-          message: 'SMTP_REJECT_UNAUTHORIZED cannot be false in production',
-        });
+      if (emailMode === 'SMTP') {
+        if (
+          value.SMTP_SECURE !== true &&
+          value.SMTP_REQUIRE_TLS !== true
+        ) {
+          return helpers.error('any.custom', {
+            message:
+              'SMTP_SECURE or SMTP_REQUIRE_TLS must be true in production',
+          });
+        }
+
+        if (value.SMTP_REJECT_UNAUTHORIZED === false) {
+          return helpers.error('any.custom', {
+            message: 'SMTP_REJECT_UNAUTHORIZED cannot be false in production',
+          });
+        }
       }
 
       for (const key of [
+        'DATABASE_URL',
         'MYSQL_PASSWORD',
         'CAPTCHA_HMAC_SECRET',
         'JWT_ACCESS_SECRET',
         'JWT_REFRESH_SECRET',
+        'SMTP_PASSWORD',
+        'COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN',
       ]) {
-        if (readString(value[key]).includes('REPLACE_ME')) {
+        if (readString(value[key]).toUpperCase().includes('REPLACE_ME')) {
           return helpers.error('any.custom', {
             message: `${key} still contains a placeholder value`,
           });
