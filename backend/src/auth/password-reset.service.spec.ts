@@ -38,25 +38,48 @@ type EmailResult = {
   accepted: boolean;
 };
 
+type UserUpdateArgs = {
+  where: { id: string; status: string };
+  data: { passwordHash: string; mustChangePassword: boolean };
+};
+
+type SessionUpdateArgs = {
+  where: { userId: string; revokedAt: null };
+  data: { revokedAt: Date; revocationReason: string };
+};
+
+type AuditCreateArgs = {
+  data: {
+    actorUserId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    description: string;
+    metadata: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+  };
+};
+
 type TransactionClient = {
   user: {
     updateMany: jest.MockedFunction<
-      (args: unknown) => Promise<CountResult>
+      (args: UserUpdateArgs) => Promise<CountResult>
     >;
   };
   authSession: {
     updateMany: jest.MockedFunction<
-      (args: unknown) => Promise<CountResult>
+      (args: SessionUpdateArgs) => Promise<CountResult>
     >;
   };
   auditLog: {
-    create: jest.MockedFunction<(args: unknown) => Promise<AuditResult>>;
+    create: jest.MockedFunction<(args: AuditCreateArgs) => Promise<AuditResult>>;
   };
 };
 
 type RedisMulti = {
   del(key: string): RedisMulti;
-  set(key: string, value: string): RedisMulti;
+  set(key: string, value: string, mode?: string, ttl?: number): RedisMulti;
   exec(): Promise<unknown[]>;
 };
 
@@ -67,49 +90,57 @@ function asDependency<T>(value: unknown): T {
 describe('PasswordResetService', () => {
   const redisStore = new Map<string, string>();
 
-  const redisSet = jest.fn(
+  const redisSet = jest.fn<
     (
       key: string,
       value: string,
-      _ex: string,
-      _ttl: number,
+      mode: string,
+      ttl: number,
       nx?: string,
-    ): Promise<string | null> => {
-      if (nx === 'NX' && redisStore.has(key)) return Promise.resolve(null);
-      redisStore.set(key, value);
-      return Promise.resolve('OK');
-    },
-  );
-  const redisGet = jest.fn((key: string): Promise<string | null> => {
-    return Promise.resolve(redisStore.get(key) ?? null);
+    ) => Promise<string | null>
+  >((key, value, ...options) => {
+    const nx = options.at(-1) === 'NX' ? 'NX' : undefined;
+    if (nx === 'NX' && redisStore.has(key)) return Promise.resolve(null);
+    redisStore.set(key, value);
+    return Promise.resolve('OK');
   });
-  const redisDel = jest.fn((...keys: string[]): Promise<number> => {
+
+  const redisGet = jest.fn<(key: string) => Promise<string | null>>((key) =>
+    Promise.resolve(redisStore.get(key) ?? null),
+  );
+
+  const redisDel = jest.fn<(...keys: string[]) => Promise<number>>((...keys) => {
     let count = 0;
     for (const key of keys) {
       if (redisStore.delete(key)) count += 1;
     }
     return Promise.resolve(count);
   });
-  const redisEval = jest.fn(
+
+  const redisEval = jest.fn<
     (
-      _script: string,
-      _numberOfKeys: number,
+      script: string,
+      numberOfKeys: number,
       tokenKey: string,
       userKey: string,
       expectedHash: string,
-    ): Promise<string | null> => {
-      const payload = redisStore.get(tokenKey);
-      const currentHash = redisStore.get(userKey);
+    ) => Promise<string | null>
+  >((...args) => {
+    const tokenKey = args[2];
+    const userKey = args[3];
+    const expectedHash = args[4];
+    const payload = redisStore.get(tokenKey);
+    const currentHash = redisStore.get(userKey);
 
-      if (!payload || currentHash !== expectedHash) {
-        return Promise.resolve(null);
-      }
+    if (!payload || currentHash !== expectedHash) {
+      return Promise.resolve(null);
+    }
 
-      redisStore.delete(tokenKey);
-      redisStore.delete(userKey);
-      return Promise.resolve(payload);
-    },
-  );
+    redisStore.delete(tokenKey);
+    redisStore.delete(userKey);
+    return Promise.resolve(payload);
+  });
+
   const redisMulti = jest.fn((): RedisMulti => {
     const operations: Array<() => void> = [];
     const chain: RedisMulti = {
@@ -141,21 +172,21 @@ describe('PasswordResetService', () => {
     multi: redisMulti,
   };
 
-  const userFindMany = jest.fn(
-    (_args: unknown): Promise<RequestUser[]> => Promise.resolve([]),
-  );
-  const userFindUnique = jest.fn(
-    (_args: unknown): Promise<ResetUser | null> => Promise.resolve(null),
-  );
-  const userUpdateMany = jest.fn(
-    (_args: unknown): Promise<CountResult> => Promise.resolve({ count: 1 }),
-  );
-  const authSessionUpdateMany = jest.fn(
-    (_args: unknown): Promise<CountResult> => Promise.resolve({ count: 0 }),
-  );
-  const auditLogCreate = jest.fn(
-    (_args: unknown): Promise<AuditResult> => Promise.resolve({ id: 'audit-1' }),
-  );
+  const userFindMany = jest.fn<
+    (args: unknown) => Promise<RequestUser[]>
+  >();
+  const userFindUnique = jest.fn<
+    (args: unknown) => Promise<ResetUser | null>
+  >();
+  const userUpdateMany = jest.fn<
+    (args: UserUpdateArgs) => Promise<CountResult>
+  >();
+  const authSessionUpdateMany = jest.fn<
+    (args: SessionUpdateArgs) => Promise<CountResult>
+  >();
+  const auditLogCreate = jest.fn<
+    (args: AuditCreateArgs) => Promise<AuditResult>
+  >();
 
   const transactionClient: TransactionClient = {
     user: { updateMany: userUpdateMany },
@@ -163,17 +194,20 @@ describe('PasswordResetService', () => {
     auditLog: { create: auditLogCreate },
   };
 
-  const transaction = jest.fn(
+  const transaction = jest.fn<
     (
       callback: (tx: TransactionClient) => Promise<void>,
-      _options?: unknown,
-    ): Promise<void> => callback(transactionClient),
-  );
+      options?: unknown,
+    ) => Promise<void>
+  >((callback) => callback(transactionClient));
 
   const prisma = {
     user: {
       findMany: userFindMany,
       findUnique: userFindUnique,
+    },
+    auditLog: {
+      create: auditLogCreate,
     },
     $transaction: transaction,
   };
@@ -192,21 +226,15 @@ describe('PasswordResetService', () => {
     get: configGet,
   };
 
-  const sendEmail = jest.fn(
-    (_message: EmailMessage): Promise<EmailResult> =>
-      Promise.resolve({ transport: 'SMTP', accepted: true }),
-  );
+  const sendEmail = jest.fn<(message: EmailMessage) => Promise<EmailResult>>();
   const communicationService = {
     sendEmail,
   };
 
-  const verifyForAuthentication = jest.fn(
-    (_passwordHash: string | null, _password: string): Promise<boolean> =>
-      Promise.resolve(false),
-  );
-  const hash = jest.fn(
-    (_password: string): Promise<string> => Promise.resolve('new-hash'),
-  );
+  const verifyForAuthentication = jest.fn<
+    (passwordHash: string | null, password: string) => Promise<boolean>
+  >();
+  const hash = jest.fn<(password: string) => Promise<string>>();
   const passwordService = {
     verifyForAuthentication,
     hash,
@@ -263,18 +291,21 @@ describe('PasswordResetService', () => {
     });
 
     expect(sendEmail).toHaveBeenCalledTimes(1);
-    expect(sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: 'user@example.com',
-        subject: 'Reset your FixTradeZone password',
-        text: expect.stringContaining(
-          'https://app.example.com/reset-password?token=',
-        ),
-      }),
+    const issuedEmail = sendEmail.mock.calls[0]?.[0];
+    if (!issuedEmail) throw new Error('Expected password reset email fixture.');
+    expect(issuedEmail.to).toBe('user@example.com');
+    expect(issuedEmail.subject).toBe('Reset your FixTradeZone password');
+    expect(issuedEmail.text).toContain(
+      'https://app.example.com/reset-password?token=',
     );
     expect(
       [...redisStore.keys()].some((key) => key.includes(':token:')),
     ).toBe(true);
+
+    const issuedAudit = auditLogCreate.mock.calls.find(
+      ([args]) => args.data.entityType === 'PasswordReset',
+    );
+    expect(issuedAudit).toBeDefined();
   });
 
   it('rejects an invalid or expired reset token', async () => {
@@ -321,19 +352,15 @@ describe('PasswordResetService', () => {
 
     expect(redisEval).toHaveBeenCalledTimes(1);
     expect(hash).toHaveBeenCalledWith('A-different-password-123!');
-    expect(userUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          passwordHash: 'new-hash',
-          mustChangePassword: false,
-        }),
-      }),
-    );
-    expect(authSessionUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ revocationReason: 'PASSWORD_RESET' }),
-      }),
-    );
+
+    const updateArgs = userUpdateMany.mock.calls[0]?.[0];
+    if (!updateArgs) throw new Error('Expected user update call.');
+    expect(updateArgs.data.passwordHash).toBe('new-hash');
+    expect(updateArgs.data.mustChangePassword).toBe(false);
+
+    const revokeArgs = authSessionUpdateMany.mock.calls[0]?.[0];
+    if (!revokeArgs) throw new Error('Expected session revocation call.');
+    expect(revokeArgs.data.revocationReason).toBe('PASSWORD_RESET');
 
     await expect(
       service.reset(decodedToken, 'Another-different-password-456!'),
