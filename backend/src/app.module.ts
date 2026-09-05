@@ -5,6 +5,7 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { AuthModule } from './auth/auth.module';
 import { CommunicationModule } from './communication/communication.module';
 import { envValidationSchema } from './config/env.validation';
+import { ContentModule } from './content/content.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PrismaModule } from './database/prisma.module';
 import { DepositsModule } from './deposits/deposits.module';
@@ -39,6 +40,7 @@ import { WalletModule } from './wallet/wallet.module';
     PrismaModule,
     RedisModule,
     AuditLogsModule,
+    ContentModule,
     CommunicationModule,
     DuplicateAccountModule,
     AuthModule,
