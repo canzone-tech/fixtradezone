@@ -4,24 +4,41 @@ import type { Reflector } from '@nestjs/core';
 import type { RedisService } from '../redis/redis.service';
 import { PublicAuthRateLimitGuard } from './public-auth-rate-limit.guard';
 
+type RateLimitMetadata = {
+  name: string;
+  limit: number;
+  windowSeconds: number;
+  identityField?: string;
+  identityLimit?: number;
+};
+
+function asDependency<T>(value: unknown): T {
+  return value as T;
+}
+
 describe('PublicAuthRateLimitGuard', () => {
-  const getAllAndOverride = jest.fn();
-  const incr = jest.fn();
-  const expire = jest.fn();
-  const ttl = jest.fn();
+  const getAllAndOverride = jest.fn(
+    (_metadataKey: unknown, _targets: unknown[]): RateLimitMetadata | undefined =>
+      undefined,
+  );
+  const incr = jest.fn((_key: string): Promise<number> => Promise.resolve(1));
+  const expire = jest.fn(
+    (_key: string, _seconds: number): Promise<number> => Promise.resolve(1),
+  );
+  const ttl = jest.fn((_key: string): Promise<number> => Promise.resolve(60));
 
-  const reflector = {
+  const reflector = asDependency<Reflector>({
     getAllAndOverride,
-  } as unknown as Reflector;
+  });
 
-  const redisService = {
+  const redisService = asDependency<RedisService>({
     getClient: () => ({ incr, expire, ttl }),
-  } as unknown as RedisService;
+  });
 
   const guard = new PublicAuthRateLimitGuard(reflector, redisService);
 
   function context(body: Record<string, unknown> = {}): ExecutionContext {
-    return {
+    return asDependency<ExecutionContext>({
       getHandler: () => function handler() {},
       getClass: () => class TestController {},
       switchToHttp: () => ({
@@ -31,7 +48,7 @@ describe('PublicAuthRateLimitGuard', () => {
           body,
         }),
       }),
-    } as unknown as ExecutionContext;
+    });
   }
 
   beforeEach(() => {
@@ -62,7 +79,7 @@ describe('PublicAuthRateLimitGuard', () => {
     ).resolves.toBe(true);
 
     expect(incr).toHaveBeenCalledTimes(2);
-    const keys = incr.mock.calls.map(([key]) => String(key));
+    const keys = incr.mock.calls.map(([key]) => key);
     expect(keys[0]).toMatch(/^ftz:auth:rate-limit:login:ip:[a-f0-9]{32}$/);
     expect(keys[1]).toMatch(
       /^ftz:auth:rate-limit:login:identity:[a-f0-9]{32}$/,
@@ -85,11 +102,16 @@ describe('PublicAuthRateLimitGuard', () => {
       await guard.canActivate(context());
       throw new Error('Expected the rate limit guard to reject the request.');
     } catch (error: unknown) {
-      expect(error).toMatchObject({
-        getStatus: expect.any(Function),
-      });
-      const status = (error as { getStatus(): number }).getStatus();
-      expect(status).toBe(429);
+      if (
+        typeof error !== 'object' ||
+        error === null ||
+        !('getStatus' in error) ||
+        typeof error.getStatus !== 'function'
+      ) {
+        throw error;
+      }
+
+      expect(error.getStatus()).toBe(429);
     }
 
     expect(ttl).toHaveBeenCalledTimes(1);
