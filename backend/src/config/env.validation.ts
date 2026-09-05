@@ -165,7 +165,9 @@ export const envValidationSchema = Joi.object({
       const runtimeHost = normalizeDatabaseHost(readString(value.MYSQL_HOST));
       const urlPort = parsed.port ? Number(parsed.port) : 3306;
       const runtimePort = readNumber(value.MYSQL_PORT, 3306);
-      const urlDatabase = decodeURIComponent(parsed.pathname.replace(/^\/+/, ''));
+      const urlDatabase = decodeURIComponent(
+        parsed.pathname.replace(/^\/+/, ''),
+      );
       const runtimeDatabase = readString(value.MYSQL_DATABASE);
 
       if (
@@ -245,7 +247,8 @@ export const envValidationSchema = Joi.object({
           const parsed = new URL(
             readString(value.COMMUNICATION_EMAIL_HTTP_URL),
           );
-          const loopback = normalizeDatabaseHost(parsed.hostname) === 'loopback';
+          const loopback =
+            normalizeDatabaseHost(parsed.hostname) === 'loopback';
           if (parsed.protocol !== 'https:' && !loopback) {
             return helpers.error('any.custom', {
               message:
@@ -261,10 +264,7 @@ export const envValidationSchema = Joi.object({
       }
 
       if (emailMode === 'SMTP') {
-        if (
-          value.SMTP_SECURE !== true &&
-          value.SMTP_REQUIRE_TLS !== true
-        ) {
+        if (value.SMTP_SECURE !== true && value.SMTP_REQUIRE_TLS !== true) {
           return helpers.error('any.custom', {
             message:
               'SMTP_SECURE or SMTP_REQUIRE_TLS must be true in production',
