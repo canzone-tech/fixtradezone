@@ -2,7 +2,8 @@
 """Generate FixTradeZone local Postman MASTER v3 from the accepted v2 base.
 
 v3 preserves every v2 request and appends release-closeout auth recovery,
-password-change and email-delivery diagnostics. It performs no network or DB I/O.
+CAPTCHA, password-change and email-delivery diagnostics. It performs no network
+or DB I/O.
 """
 
 from __future__ import annotations
@@ -157,6 +158,13 @@ def main() -> int:
                     "GET",
                     "/health",
                     description="Readiness must report MySQL and Redis up; email exposes mode/configured only.",
+                ),
+                request(
+                    "CAPTCHA Issue — LOGIN",
+                    "POST",
+                    "/auth/captcha",
+                    body={"purpose": "LOGIN"},
+                    description="Safe CAPTCHA issuance smoke test for the Redis-backed public rate-limit path. Do not hammer the endpoint during acceptance.",
                 ),
                 request(
                     "Request Password Reset (MANUAL)",
