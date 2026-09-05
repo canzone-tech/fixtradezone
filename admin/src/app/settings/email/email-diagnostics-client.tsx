@@ -51,7 +51,11 @@ export default function EmailDiagnosticsClient() {
   }
 
   useEffect(() => {
-    void loadStatus();
+    const timeoutId = window.setTimeout(() => {
+      void loadStatus();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   async function sendTest(event: FormEvent<HTMLFormElement>) {
