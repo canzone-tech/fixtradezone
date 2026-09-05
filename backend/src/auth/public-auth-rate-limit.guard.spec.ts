@@ -1,4 +1,7 @@
-import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  HttpException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import type { Reflector } from '@nestjs/core';
 import type { RedisService } from '../redis/redis.service';
@@ -12,40 +15,43 @@ type RateLimitMetadata = {
   identityLimit?: number;
 };
 
-type StatusError = {
-  getStatus(): number;
-};
-
 function asDependency<T>(value: unknown): T {
   return value as T;
 }
 
-function hasStatus(error: unknown): error is StatusError {
-  if (typeof error !== 'object' || error === null || !('getStatus' in error)) {
-    return false;
-  }
-
-  const candidate = error as { getStatus?: unknown };
-  return typeof candidate.getStatus === 'function';
-}
-
 describe('PublicAuthRateLimitGuard', () => {
-  const getAllAndOverride = jest.fn<
-    (
-      metadataKey: unknown,
-      targets: unknown[],
-    ) => RateLimitMetadata | undefined
-  >();
-  const incr = jest.fn<(key: string) => Promise<number>>();
-  const expire = jest.fn<(key: string, seconds: number) => Promise<number>>();
-  const ttl = jest.fn<(key: string) => Promise<number>>();
+  let metadata: RateLimitMetadata | undefined;
+  let incrResult: number;
+  let ttlResult: number;
+  let incrError: Error | null;
+  const incrKeys: string[] = [];
+  const expireCalls: Array<{ key: string; seconds: number }> = [];
+  const ttlKeys: string[] = [];
 
   const reflector = asDependency<Reflector>({
-    getAllAndOverride,
+    getAllAndOverride(metadataKey: unknown, targets: unknown[]) {
+      void metadataKey;
+      void targets;
+      return metadata;
+    },
   });
 
   const redisService = asDependency<RedisService>({
-    getClient: () => ({ incr, expire, ttl }),
+    getClient: () => ({
+      incr(key: string): Promise<number> {
+        incrKeys.push(key);
+        if (incrError) return Promise.reject(incrError);
+        return Promise.resolve(incrResult);
+      },
+      expire(key: string, seconds: number): Promise<number> {
+        expireCalls.push({ key, seconds });
+        return Promise.resolve(1);
+      },
+      ttl(key: string): Promise<number> {
+        ttlKeys.push(key);
+        return Promise.resolve(ttlResult);
+      },
+    }),
   });
 
   const guard = new PublicAuthRateLimitGuard(reflector, redisService);
@@ -65,70 +71,77 @@ describe('PublicAuthRateLimitGuard', () => {
   }
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    incr.mockResolvedValue(1);
-    expire.mockResolvedValue(1);
-    ttl.mockResolvedValue(60);
+    metadata = undefined;
+    incrResult = 1;
+    ttlResult = 60;
+    incrError = null;
+    incrKeys.length = 0;
+    expireCalls.length = 0;
+    ttlKeys.length = 0;
   });
 
   it('allows routes without rate limit metadata', async () => {
-    getAllAndOverride.mockReturnValue(undefined);
-
     await expect(guard.canActivate(context())).resolves.toBe(true);
-    expect(incr).not.toHaveBeenCalled();
+    expect(incrKeys).toHaveLength(0);
   });
 
   it('enforces both IP and normalized identity buckets', async () => {
-    getAllAndOverride.mockReturnValue({
+    metadata = {
       name: 'login',
       limit: 120,
       windowSeconds: 900,
       identityField: 'identifier',
       identityLimit: 12,
-    });
+    };
 
     await expect(
       guard.canActivate(context({ identifier: ' USER@Example.COM ' })),
     ).resolves.toBe(true);
 
-    expect(incr).toHaveBeenCalledTimes(2);
-    const keys = incr.mock.calls.map(([key]) => key);
-    expect(keys[0]).toMatch(/^ftz:auth:rate-limit:login:ip:[a-f0-9]{32}$/);
-    expect(keys[1]).toMatch(
+    expect(incrKeys).toHaveLength(2);
+    const ipKey = incrKeys[0];
+    const identityKey = incrKeys[1];
+    if (!ipKey || !identityKey) {
+      throw new Error('Expected IP and identity rate-limit keys.');
+    }
+
+    expect(ipKey).toMatch(/^ftz:auth:rate-limit:login:ip:[a-f0-9]{32}$/);
+    expect(identityKey).toMatch(
       /^ftz:auth:rate-limit:login:identity:[a-f0-9]{32}$/,
     );
-    expect(expire).toHaveBeenCalledTimes(2);
-    expect(expire).toHaveBeenNthCalledWith(1, keys[0], 900);
-    expect(expire).toHaveBeenNthCalledWith(2, keys[1], 900);
+    expect(expireCalls).toEqual([
+      { key: ipKey, seconds: 900 },
+      { key: identityKey, seconds: 900 },
+    ]);
   });
 
   it('returns 429 after the configured limit is exceeded', async () => {
-    getAllAndOverride.mockReturnValue({
+    metadata = {
       name: 'login',
       limit: 2,
       windowSeconds: 60,
-    });
-    incr.mockResolvedValue(3);
-    ttl.mockResolvedValue(41);
+    };
+    incrResult = 3;
+    ttlResult = 41;
 
     try {
       await guard.canActivate(context());
       throw new Error('Expected the rate limit guard to reject the request.');
     } catch (error: unknown) {
-      if (!hasStatus(error)) throw error;
+      if (!(error instanceof HttpException)) throw error;
       expect(error.getStatus()).toBe(429);
     }
 
-    expect(ttl).toHaveBeenCalledTimes(1);
+    expect(ttlKeys).toHaveLength(1);
   });
 
   it('fails closed when Redis protection is unavailable', async () => {
-    getAllAndOverride.mockReturnValue({
+    metadata = {
       name: 'register',
       limit: 10,
       windowSeconds: 60,
-    });
-    incr.mockRejectedValue(new Error('Redis unavailable'));
+    };
+    incrError = new Error('Redis unavailable');
 
     await expect(guard.canActivate(context())).rejects.toBeInstanceOf(
       ServiceUnavailableException,
