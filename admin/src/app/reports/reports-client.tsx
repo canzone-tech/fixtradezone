@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/closeout/closeout.module.css";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 
 interface ReportOverview {
   generatedAt: string;
@@ -256,7 +257,7 @@ export default function ReportsClient() {
                 </h2>
               </div>
               <span className={styles.meta}>
-                Generated {new Date(report.generatedAt).toLocaleString()}
+                Generated {formatPlatformDateTime(report.generatedAt)}
               </span>
             </div>
             <div className={styles.grid}>
