@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/closeout/closeout.module.css";
 import { resolveAdminSession } from "@/lib/admin-session-client";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 
 type NotificationCategory = "GENERAL" | "SYSTEM" | "FINANCE" | "SECURITY";
 type NotificationAudience = "USER" | "ALL_USERS";
@@ -42,13 +43,6 @@ async function json<T>(response: Response, fallback: string): Promise<T> {
   }
 
   return payload;
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 }
 
 export default function NotificationsAdminClient() {
@@ -326,7 +320,7 @@ export default function NotificationsAdminClient() {
                         {row.readAt ? "READ" : "UNREAD"}
                       </span>
                     </td>
-                    <td>{formatDate(row.createdAt)}</td>
+                    <td>{formatPlatformDateTime(row.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
