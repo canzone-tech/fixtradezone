@@ -5,6 +5,7 @@ export const PERMISSIONS = {
   USERS_STATUS_MANAGE: 'users.status.manage',
   USERS_ROLES_MANAGE: 'users.roles.manage',
   USERS_IMPERSONATE: 'users.impersonate',
+  REFERRALS_READ: 'referrals.read',
   REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
   PACKAGES_READ: 'packages.read',
   PACKAGES_DRAFT_MANAGE: 'packages.draft.manage',
@@ -61,6 +62,10 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.USERS_IMPERSONATE,
     description: 'Temporarily access an eligible user account for support',
+  },
+  {
+    code: PERMISSIONS.REFERRALS_READ,
+    description: 'View referral genealogy and network hierarchy',
   },
   {
     code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
