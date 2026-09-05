@@ -126,7 +126,11 @@ export default function UserNotificationsClient() {
   );
 
   useEffect(() => {
-    void load(unreadOnly);
+    const timeoutId = window.setTimeout(() => {
+      void load(unreadOnly);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [load, unreadOnly]);
 
   async function markRead(notificationId: string) {
