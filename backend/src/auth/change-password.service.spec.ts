@@ -9,9 +9,6 @@ type UserRecord = {
   status: 'ACTIVE' | 'SUSPENDED';
 };
 
-type CountResult = { count: number };
-type AuditResult = { id: string };
-
 type UserUpdateArgs = {
   where: { id: string; status: string };
   data: { passwordHash: string; mustChangePassword: boolean };
@@ -37,17 +34,13 @@ type AuditCreateArgs = {
 
 type TransactionClient = {
   user: {
-    updateMany: jest.MockedFunction<
-      (args: UserUpdateArgs) => Promise<CountResult>
-    >;
+    updateMany(args: UserUpdateArgs): Promise<{ count: number }>;
   };
   authSession: {
-    updateMany: jest.MockedFunction<
-      (args: SessionUpdateArgs) => Promise<CountResult>
-    >;
+    updateMany(args: SessionUpdateArgs): Promise<{ count: number }>;
   };
   auditLog: {
-    create: jest.MockedFunction<(args: AuditCreateArgs) => Promise<AuditResult>>;
+    create(args: AuditCreateArgs): Promise<{ id: string }>;
   };
 };
 
@@ -56,63 +49,82 @@ function asDependency<T>(value: unknown): T {
 }
 
 describe('ChangePasswordService', () => {
-  const userFindUnique = jest.fn<
-    (args: unknown) => Promise<UserRecord | null>
-  >();
-  const userUpdateMany = jest.fn<
-    (args: UserUpdateArgs) => Promise<CountResult>
-  >();
-  const authSessionUpdateMany = jest.fn<
-    (args: SessionUpdateArgs) => Promise<CountResult>
-  >();
-  const auditLogCreate = jest.fn<
-    (args: AuditCreateArgs) => Promise<AuditResult>
-  >();
+  let findUniqueResult: UserRecord | null;
+  let updateCount: number;
+  let revokedCount: number;
+  let verifyResults: boolean[];
+  let hashedPassword: string | null;
+  let userUpdateArgs: UserUpdateArgs | null;
+  let sessionUpdateArgs: SessionUpdateArgs | null;
+  let auditCreateArgs: AuditCreateArgs | null;
 
   const transactionClient: TransactionClient = {
-    user: { updateMany: userUpdateMany },
-    authSession: { updateMany: authSessionUpdateMany },
-    auditLog: { create: auditLogCreate },
+    user: {
+      updateMany(args) {
+        userUpdateArgs = args;
+        return Promise.resolve({ count: updateCount });
+      },
+    },
+    authSession: {
+      updateMany(args) {
+        sessionUpdateArgs = args;
+        return Promise.resolve({ count: revokedCount });
+      },
+    },
+    auditLog: {
+      create(args) {
+        auditCreateArgs = args;
+        return Promise.resolve({ id: 'audit-1' });
+      },
+    },
   };
-
-  const transaction = jest.fn<
-    (
-      callback: (tx: TransactionClient) => Promise<void>,
-      options?: unknown,
-    ) => Promise<void>
-  >((callback) => callback(transactionClient));
 
   const prisma = {
     user: {
-      findUnique: userFindUnique,
+      findUnique(args: unknown): Promise<UserRecord | null> {
+        void args;
+        return Promise.resolve(findUniqueResult);
+      },
     },
-    $transaction: transaction,
+    $transaction(
+      callback: (tx: TransactionClient) => Promise<void>,
+      options?: unknown,
+    ): Promise<void> {
+      void options;
+      return callback(transactionClient);
+    },
   };
 
-  const verifyForAuthentication = jest.fn<
-    (passwordHash: string | null, password: string) => Promise<boolean>
-  >();
-  const hash = jest.fn<(password: string) => Promise<string>>();
-
   const passwordService = {
-    verifyForAuthentication,
-    hash,
+    verifyForAuthentication(
+      passwordHash: string | null,
+      password: string,
+    ): Promise<boolean> {
+      void passwordHash;
+      void password;
+      return Promise.resolve(verifyResults.shift() ?? false);
+    },
+    hash(password: string): Promise<string> {
+      hashedPassword = password;
+      return Promise.resolve('new-hash');
+    },
   };
 
   let service: ChangePasswordService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    userFindUnique.mockResolvedValue({
+    findUniqueResult = {
       id: 'user-1',
       passwordHash: 'old-hash',
       status: 'ACTIVE',
-    });
-    userUpdateMany.mockResolvedValue({ count: 1 });
-    authSessionUpdateMany.mockResolvedValue({ count: 2 });
-    auditLogCreate.mockResolvedValue({ id: 'audit-1' });
-    verifyForAuthentication.mockResolvedValue(false);
-    hash.mockResolvedValue('new-hash');
+    };
+    updateCount = 1;
+    revokedCount = 2;
+    verifyResults = [];
+    hashedPassword = null;
+    userUpdateArgs = null;
+    sessionUpdateArgs = null;
+    auditCreateArgs = null;
 
     service = new ChangePasswordService(
       asDependency<PrismaService>(prisma),
@@ -121,7 +133,7 @@ describe('ChangePasswordService', () => {
   });
 
   it('rejects an incorrect current password', async () => {
-    verifyForAuthentication.mockResolvedValueOnce(false);
+    verifyResults = [false];
 
     await expect(
       service.change('user-1', 'wrong-password', 'New-password-123!'),
@@ -129,7 +141,7 @@ describe('ChangePasswordService', () => {
   });
 
   it('rejects reuse of the current password', async () => {
-    verifyForAuthentication.mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    verifyResults = [true, true];
 
     await expect(
       service.change('user-1', 'Current-password-123!', 'Current-password-123!'),
@@ -137,7 +149,7 @@ describe('ChangePasswordService', () => {
   });
 
   it('updates the credential, revokes active sessions and audits success', async () => {
-    verifyForAuthentication.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    verifyResults = [true, false];
 
     await expect(
       service.change(
@@ -150,21 +162,18 @@ describe('ChangePasswordService', () => {
       message: 'Password changed successfully. Please sign in again.',
     });
 
-    expect(hash).toHaveBeenCalledWith('New-password-123!');
+    expect(hashedPassword).toBe('New-password-123!');
 
-    const updateArgs = userUpdateMany.mock.calls[0]?.[0];
-    if (!updateArgs) throw new Error('Expected user update call.');
-    expect(updateArgs.data.passwordHash).toBe('new-hash');
-    expect(updateArgs.data.mustChangePassword).toBe(false);
+    if (!userUpdateArgs) throw new Error('Expected user update call.');
+    expect(userUpdateArgs.data.passwordHash).toBe('new-hash');
+    expect(userUpdateArgs.data.mustChangePassword).toBe(false);
 
-    const revokeArgs = authSessionUpdateMany.mock.calls[0]?.[0];
-    if (!revokeArgs) throw new Error('Expected session revocation call.');
-    expect(revokeArgs.data.revocationReason).toBe('PASSWORD_CHANGED');
+    if (!sessionUpdateArgs) throw new Error('Expected session revocation call.');
+    expect(sessionUpdateArgs.data.revocationReason).toBe('PASSWORD_CHANGED');
 
-    const auditArgs = auditLogCreate.mock.calls[0]?.[0];
-    if (!auditArgs) throw new Error('Expected audit log call.');
-    expect(auditArgs.data.actorUserId).toBe('user-1');
-    expect(auditArgs.data.entityType).toBe('UserCredential');
-    expect(auditArgs.data.ipAddress).toBe('203.0.113.8');
+    if (!auditCreateArgs) throw new Error('Expected audit log call.');
+    expect(auditCreateArgs.data.actorUserId).toBe('user-1');
+    expect(auditCreateArgs.data.entityType).toBe('UserCredential');
+    expect(auditCreateArgs.data.ipAddress).toBe('203.0.113.8');
   });
 });
