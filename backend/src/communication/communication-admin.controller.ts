@@ -16,6 +16,7 @@ import { PrismaService } from '../database/prisma.service';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import { CommunicationService } from './communication.service';
 import { TestEmailDto } from './dto/test-email.dto';
+import { renderEmailDeliveryTestTemplate } from './email-template.renderer';
 
 @Controller('admin/communication/email')
 @UseGuards(SuperAdminOnlyGuard)
@@ -39,17 +40,13 @@ export class CommunicationAdminController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const delivery = await this.communicationService.sendEmail({
-      to: dto.to,
-      subject: 'FixTradeZone email delivery test',
-      text: [
-        'FixTradeZone email delivery test succeeded.',
-        '',
-        `Triggered by ${actor.username}.`,
-        `Time: ${new Date().toISOString()}`,
-      ].join('\n'),
-      html: '<p><strong>FixTradeZone email delivery test succeeded.</strong></p><p>This message confirms the configured email transport accepted a test message.</p>',
-    });
+    const delivery = await this.communicationService.sendEmail(
+      renderEmailDeliveryTestTemplate({
+        to: dto.to,
+        actorUsername: actor.username,
+        triggeredAt: new Date(),
+      }),
+    );
 
     const context = getRequestContext(request);
     await this.prisma.auditLog.create({
