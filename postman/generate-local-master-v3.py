@@ -2,8 +2,8 @@
 """Generate FixTradeZone local Postman MASTER v3 from the accepted v2 base.
 
 v3 preserves every v2 request and appends release-closeout auth recovery,
-CAPTCHA, password-change and email-delivery diagnostics. It performs no network
-or DB I/O.
+CAPTCHA, password-change, email-delivery and genealogy acceptance contracts.
+It performs no network or DB I/O.
 """
 
 from __future__ import annotations
@@ -141,17 +141,24 @@ def main() -> int:
         "newTestPassword",
         "currentTestPassword",
         "smtpTestRecipient",
+        "genealogyUserAccessToken",
+        "genealogyRootUserId",
+        "genealogyParentUserId",
+        "genealogySearchQuery",
     ]:
         add_env(environment, key)
 
-    folder_name = "23 Release Security & Email"
+    release_folder_name = "23 Release Security & Email"
+    genealogy_folder_name = "24 Referral Genealogy"
     collection["item"] = [
-        folder for folder in collection.get("item", []) if folder.get("name") != folder_name
+        folder
+        for folder in collection.get("item", [])
+        if folder.get("name") not in {release_folder_name, genealogy_folder_name}
     ]
 
     collection["item"].append(
         {
-            "name": folder_name,
+            "name": release_folder_name,
             "item": [
                 request(
                     "Health — MySQL + Redis + Email Status",
@@ -211,7 +218,43 @@ def main() -> int:
                     body={"to": "{{smtpTestRecipient}}"},
                     bearer_variable=superadmin_token,
                     state_change=True,
-                    description="Controlled transport test to an address you own. SMTP acceptance is followed by inbox verification.",
+                    description="Controlled transport test to an address you own. SMTP acceptance is followed by inbox verification of the branded template.",
+                ),
+            ],
+        }
+    )
+
+    collection["item"].append(
+        {
+            "name": genealogy_folder_name,
+            "item": [
+                request(
+                    "User Genealogy — Own Root",
+                    "GET",
+                    "/referrals/me/genealogy?page=1&limit=25",
+                    bearer_variable="genealogyUserAccessToken",
+                    description="Use an ACTIVE USER access token. Response must be limited to that users own subtree and expose no email, package amount or earnings data.",
+                ),
+                request(
+                    "Admin Genealogy — Primary Root",
+                    "GET",
+                    "/admin/referrals/genealogy?page=1&limit=25",
+                    bearer_variable=superadmin_token,
+                    description="Read-only lazy genealogy page from the configured primary referral root. Requires referrals.read.",
+                ),
+                request(
+                    "Admin Genealogy — Search Member",
+                    "GET",
+                    "/admin/referrals/genealogy/search?query={{genealogySearchQuery}}",
+                    bearer_variable=superadmin_token,
+                    description="Search enrolled referral members by username, email or name before selecting a subtree root.",
+                ),
+                request(
+                    "Admin Genealogy — Expand Selected Parent",
+                    "GET",
+                    "/admin/referrals/genealogy?rootUserId={{genealogyRootUserId}}&parentUserId={{genealogyParentUserId}}&page=1&limit=25",
+                    bearer_variable=superadmin_token,
+                    description="Parent must be the root or a descendant of rootUserId; unrelated traversal must be rejected.",
                 ),
             ],
         }
