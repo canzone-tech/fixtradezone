@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DatabaseModule } from '../database/database.module';
+import { PrismaModule } from '../database/prisma.module';
 import {
   AdminContentController,
   PublicContentController,
@@ -7,7 +7,7 @@ import {
 import { ContentService } from './content.service';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [PrismaModule],
   controllers: [PublicContentController, AdminContentController],
   providers: [ContentService],
   exports: [ContentService],

@@ -106,6 +106,8 @@ export class CreateLandingDraftDto {
 }
 
 export class CreateEmailTemplateDraftDto {
+  [key: string]: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(180)

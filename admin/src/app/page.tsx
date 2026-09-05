@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   ArrowRight,
   ChartNoAxesCombined,
@@ -29,10 +30,10 @@ export default async function Home() {
       <div className={styles.gridGlow} aria-hidden="true" />
 
       <header className={styles.header}>
-        <a href="/" className={styles.brand} aria-label={`${content.brandName} home`}>
+        <Link href="/" className={styles.brand} aria-label={`${content.brandName} home`}>
           <span className={styles.brandMark}>FTZ</span>
           <span>{content.brandName}</span>
-        </a>
+        </Link>
 
         <nav className={styles.nav} aria-label="Public navigation">
           <a className={styles.navLink} href="#platform">
