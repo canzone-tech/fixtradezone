@@ -105,6 +105,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/referrals/genealogy",
+        label: "Genealogy Tree",
+        icon: "iconoir-network",
+        permission: "referrals.read",
+        enabled: true,
+      },
+      {
         href: "/internal-trading",
         label: "Internal Trading",
         icon: "iconoir-graph-up",
