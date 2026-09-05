@@ -4,16 +4,16 @@ function productionEnv(): Record<string, unknown> {
   return {
     NODE_ENV: 'production',
     DATABASE_URL:
-      'mysql://fixtradezone:database-secret@db.example.com:3306/fixtradezone',
-    MYSQL_HOST: 'db.example.com',
+      'mysql://fixtradezone:database-secret@db.fixtradezone.com:3306/fixtradezone',
+    MYSQL_HOST: 'db.fixtradezone.com',
     MYSQL_PORT: 3306,
     MYSQL_DATABASE: 'fixtradezone',
     MYSQL_USER: 'fixtradezone',
     MYSQL_PASSWORD: 'database-secret',
-    PUBLIC_APP_URL: 'https://app.fixtradezone.example',
+    PUBLIC_APP_URL: 'https://app.fixtradezone.com',
     COMMUNICATION_EMAIL_MODE: 'SMTP',
-    COMMUNICATION_EMAIL_FROM: 'no-reply@fixtradezone.example',
-    SMTP_HOST: 'smtp.example.com',
+    COMMUNICATION_EMAIL_FROM: 'no-reply@fixtradezone.com',
+    SMTP_HOST: 'smtp.fixtradezone.com',
     SMTP_PORT: 587,
     SMTP_SECURE: false,
     SMTP_REQUIRE_TLS: true,
@@ -47,7 +47,7 @@ describe('envValidationSchema release guardrails', () => {
     const result = envValidationSchema.validate({
       ...productionEnv(),
       DATABASE_URL:
-        'mysql://fixtradezone:database-secret@other-db.example.com:3306/fixtradezone',
+        'mysql://fixtradezone:database-secret@other-db.fixtradezone.com:3306/fixtradezone',
     });
 
     expect(result.error).toBeDefined();
@@ -66,7 +66,7 @@ describe('envValidationSchema release guardrails', () => {
     const result = envValidationSchema.validate({
       ...productionEnv(),
       COMMUNICATION_EMAIL_MODE: 'HTTP',
-      COMMUNICATION_EMAIL_HTTP_URL: 'https://mailer.example.com/send',
+      COMMUNICATION_EMAIL_HTTP_URL: 'https://mailer.fixtradezone.com/send',
       COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: 'REPLACE_ME_EMAIL_TOKEN',
     });
 
@@ -77,7 +77,7 @@ describe('envValidationSchema release guardrails', () => {
     const result = envValidationSchema.validate({
       ...productionEnv(),
       COMMUNICATION_EMAIL_MODE: 'HTTP',
-      COMMUNICATION_EMAIL_HTTP_URL: 'http://mailer.example.com/send',
+      COMMUNICATION_EMAIL_HTTP_URL: 'http://mailer.fixtradezone.com/send',
       COMMUNICATION_EMAIL_HTTP_BEARER_TOKEN: '',
     });
 
