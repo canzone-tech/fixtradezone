@@ -34,6 +34,9 @@ export const PERMISSIONS = {
   NOTIFICATIONS_MANAGE: 'notifications.manage',
   REPORTS_READ: 'reports.read',
   AUDIT_LOGS_READ: 'audit_logs.read',
+  CONTENT_READ: 'content.read',
+  CONTENT_MANAGE: 'content.manage',
+  CONTENT_PUBLISH: 'content.publish',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -188,6 +191,18 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.AUDIT_LOGS_READ,
     description: 'View immutable administration audit logs',
+  },
+  {
+    code: PERMISSIONS.CONTENT_READ,
+    description: 'View administration content and template revisions',
+  },
+  {
+    code: PERMISSIONS.CONTENT_MANAGE,
+    description: 'Create versioned landing and email-template drafts',
+  },
+  {
+    code: PERMISSIONS.CONTENT_PUBLISH,
+    description: 'Publish approved landing and email-template revisions',
   },
   {
     code: PERMISSIONS.RBAC_READ,
