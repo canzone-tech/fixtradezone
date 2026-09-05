@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import styles from "@/components/closeout/closeout.module.css";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 
 const AUDIT_ACTIONS = [
   "CREATE",
@@ -341,7 +342,7 @@ export default function AuditLogsClient() {
               <tbody>
                 {data.auditLogs.map((item) => (
                   <tr key={item.id}>
-                    <td>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td>{formatPlatformDateTime(item.createdAt)}</td>
                     <td>
                       <strong>{actorLabel(item)}</strong>
                       {item.actorUserId ? (
