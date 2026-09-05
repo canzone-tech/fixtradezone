@@ -27,7 +27,8 @@ describe('email template renderer', () => {
     const message = renderPasswordResetTemplate({
       to: 'user@example.com',
       displayName: 'Test User',
-      actionUrl: 'https://app.fixtradezone.com/reset-password?token=reset-token',
+      actionUrl:
+        'https://app.fixtradezone.com/reset-password?token=reset-token',
       ttlMinutes: 20,
     });
 

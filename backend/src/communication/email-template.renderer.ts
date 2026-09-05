@@ -83,7 +83,8 @@ export function renderEmailVerificationTemplate(
       'FixTradeZone Security',
     ].join('\n'),
     html: brandedHtml({
-      preheader: 'Verify your email address to activate your FixTradeZone account.',
+      preheader:
+        'Verify your email address to activate your FixTradeZone account.',
       heading: 'Verify your email address',
       displayName,
       body: `Confirm this email address to activate your account. This verification link expires in <strong>${ttlMinutes} minutes</strong>.`,
@@ -116,7 +117,8 @@ export function renderPasswordResetTemplate(
       'FixTradeZone Security',
     ].join('\n'),
     html: brandedHtml({
-      preheader: 'A password reset was requested for your FixTradeZone account.',
+      preheader:
+        'A password reset was requested for your FixTradeZone account.',
       heading: 'Reset your password',
       displayName,
       body: `Use the secure button below to choose a new password. This link expires in <strong>${ttlMinutes} minutes</strong> and can be used once.`,

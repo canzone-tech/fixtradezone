@@ -56,7 +56,8 @@ export class GenealogyService {
   }
 
   async getAdmin(query: AdminGenealogyPageQueryDto) {
-    const rootUserId = query.rootUserId ?? (await this.getConfiguredRootUserId());
+    const rootUserId =
+      query.rootUserId ?? (await this.getConfiguredRootUserId());
     const parentUserId = query.parentUserId ?? rootUserId;
     const level = await this.assertDescendantOrSelf(rootUserId, parentUserId);
 
@@ -295,7 +296,9 @@ export class GenealogyService {
 
     return new Map(
       rows.flatMap((row) =>
-        row.sponsorUserId ? [[row.sponsorUserId, row._count._all] as const] : [],
+        row.sponsorUserId
+          ? [[row.sponsorUserId, row._count._all] as const]
+          : [],
       ),
     );
   }
@@ -307,7 +310,9 @@ export class GenealogyService {
       return new Map();
     }
 
-    const rows = await this.prisma.$queryRaw<ActivePackageCountRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      ActivePackageCountRow[]
+    >(Prisma.sql`
       SELECT userId, COUNT(*) AS total
       FROM user_package_subscriptions
       WHERE status = 'ACTIVE'
