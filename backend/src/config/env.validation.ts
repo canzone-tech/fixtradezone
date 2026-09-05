@@ -2,6 +2,10 @@ import * as Joi from 'joi';
 
 const boolean = Joi.boolean().truthy('true').falsy('false');
 
+function readString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
@@ -134,11 +138,11 @@ export const envValidationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
 })
   .custom((value: Record<string, unknown>, helpers) => {
-    const emailMode = String(value.COMMUNICATION_EMAIL_MODE ?? 'CONSOLE');
+    const emailMode = readString(value.COMMUNICATION_EMAIL_MODE, 'CONSOLE');
 
     if (emailMode === 'SMTP') {
-      const user = String(value.SMTP_USER ?? '').trim();
-      const password = String(value.SMTP_PASSWORD ?? '').trim();
+      const user = readString(value.SMTP_USER).trim();
+      const password = readString(value.SMTP_PASSWORD).trim();
 
       if (Boolean(user) !== Boolean(password)) {
         return helpers.error('any.custom', {
@@ -146,8 +150,8 @@ export const envValidationSchema = Joi.object({
         });
       }
 
-      const smtpFrom = String(value.SMTP_FROM_EMAIL ?? '').trim();
-      const legacyFrom = String(value.COMMUNICATION_EMAIL_FROM ?? '').trim();
+      const smtpFrom = readString(value.SMTP_FROM_EMAIL).trim();
+      const legacyFrom = readString(value.COMMUNICATION_EMAIL_FROM).trim();
       if (!smtpFrom && !legacyFrom) {
         return helpers.error('any.custom', {
           message:
@@ -158,7 +162,7 @@ export const envValidationSchema = Joi.object({
 
     if (
       emailMode === 'HTTP' &&
-      !String(value.COMMUNICATION_EMAIL_HTTP_URL ?? '').trim()
+      !readString(value.COMMUNICATION_EMAIL_HTTP_URL).trim()
     ) {
       return helpers.error('any.custom', {
         message: 'COMMUNICATION_EMAIL_HTTP_URL is required in HTTP mode',
@@ -173,7 +177,7 @@ export const envValidationSchema = Joi.object({
         });
       }
 
-      const publicAppUrl = String(value.PUBLIC_APP_URL ?? '');
+      const publicAppUrl = readString(value.PUBLIC_APP_URL);
       try {
         const parsed = new URL(publicAppUrl);
         if (
@@ -204,7 +208,7 @@ export const envValidationSchema = Joi.object({
         'JWT_ACCESS_SECRET',
         'JWT_REFRESH_SECRET',
       ]) {
-        if (String(value[key] ?? '').includes('REPLACE_ME')) {
+        if (readString(value[key]).includes('REPLACE_ME')) {
           return helpers.error('any.custom', {
             message: `${key} still contains a placeholder value`,
           });
