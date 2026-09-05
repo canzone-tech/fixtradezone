@@ -14,6 +14,7 @@ import {
   type PackagePlan,
   type PackagePlanSummary,
 } from "@/lib/packages";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./simple-packages.module.css";
 
 interface PlanListPayload extends ApiErrorPayload {
@@ -69,15 +70,8 @@ function matchesLockedProfile(plan: PackagePlan | null): boolean {
 
 function formatWhen(value: string | null): string {
   if (!value) return "No end date";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Not set";
-  return date.toLocaleString([], {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const formatted = formatPlatformDateTime(value);
+  return formatted === "—" ? "Not set" : formatted;
 }
 
 function currentEffectivePlan(
@@ -136,10 +130,6 @@ export default function SimplePackagesClient() {
   const [success, setSuccess] = useState("");
 
   const liveSummary = useMemo(() => currentEffectivePlan(plans), [plans]);
-  const draftSummary = useMemo(
-    () => plans.find((plan) => plan.status === "DRAFT") ?? null,
-    [plans],
-  );
   const selectedPlan = draftPlan ?? livePlan;
   const draftReady = matchesLockedProfile(draftPlan);
   const isSuperAdmin = actor?.roles.includes("SUPER_ADMIN") ?? false;
