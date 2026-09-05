@@ -172,6 +172,17 @@ const sections: Array<{
   },
 ];
 
+function isActiveNavItem(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (!pathname.startsWith(`${href}/`)) return false;
+
+  if (href === "/referrals" && pathname.startsWith("/referrals/genealogy")) {
+    return false;
+  }
+
+  return true;
+}
+
 export default function Startbar() {
   const pathname = usePathname();
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -229,9 +240,7 @@ export default function Startbar() {
               <div className="ftz-nav-section" key={section.label}>
                 <div className="ftz-nav-label">{section.label}</div>
                 {visibleItems.map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                  const active = isActiveNavItem(pathname, item.href);
 
                   if (!item.enabled) {
                     return (
