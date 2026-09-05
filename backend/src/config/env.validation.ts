@@ -240,6 +240,26 @@ export const envValidationSchema = Joi.object({
         });
       }
 
+      if (emailMode === 'HTTP') {
+        try {
+          const parsed = new URL(
+            readString(value.COMMUNICATION_EMAIL_HTTP_URL),
+          );
+          const loopback = normalizeDatabaseHost(parsed.hostname) === 'loopback';
+          if (parsed.protocol !== 'https:' && !loopback) {
+            return helpers.error('any.custom', {
+              message:
+                'COMMUNICATION_EMAIL_HTTP_URL must use HTTPS in production unless it targets loopback',
+            });
+          }
+        } catch {
+          return helpers.error('any.custom', {
+            message:
+              'COMMUNICATION_EMAIL_HTTP_URL must be a valid URL in production',
+          });
+        }
+      }
+
       if (emailMode === 'SMTP') {
         if (
           value.SMTP_SECURE !== true &&
