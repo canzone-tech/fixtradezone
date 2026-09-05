@@ -137,6 +137,15 @@ export function renderEmailVerificationTemplate(
       footer:
         'If you did not create this account, you can ignore this message. Never share verification links or security codes.',
     }),
+    managedTemplate: {
+      contentKey: 'EMAIL_VERIFICATION',
+      values: {
+        displayName,
+        verificationUrl: input.actionUrl,
+        expiresInMinutes: String(ttlMinutes),
+      },
+      actionUrl: input.actionUrl,
+    },
   };
 }
 
@@ -171,6 +180,15 @@ export function renderPasswordResetTemplate(
       footer:
         'If you did not request this password reset, you can ignore this message. Never share password-reset links or account credentials.',
     }),
+    managedTemplate: {
+      contentKey: 'PASSWORD_RESET',
+      values: {
+        displayName,
+        resetUrl: input.actionUrl,
+        expiresInMinutes: String(ttlMinutes),
+      },
+      actionUrl: input.actionUrl,
+    },
   };
 }
 
@@ -199,5 +217,12 @@ export function renderEmailDeliveryTestTemplate(
       footer:
         'This diagnostic message was triggered from the FixTradeZone SUPER_ADMIN email-delivery workspace.',
     }),
+    managedTemplate: {
+      contentKey: 'DELIVERY_TEST',
+      values: {
+        requestedBy: actorUsername,
+        triggeredAt: timestamp,
+      },
+    },
   };
 }
