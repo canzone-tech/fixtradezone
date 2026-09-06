@@ -94,7 +94,10 @@ export function assertPublishablePlan(plan: PlanWithItems) {
         );
       }
 
-      assertDerivedRangeTechnicalTerms(itemTerms(item), item.packageDefinition.code);
+      assertDerivedRangeTechnicalTerms(
+        itemTerms(item),
+        item.packageDefinition.code,
+      );
     }
 
     if (item.capReachedAction === 'AUTO_RENEW') {
