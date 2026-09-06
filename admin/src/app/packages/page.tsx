@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
-import SimplePackagesClient from "./simple-packages-client";
+import PackagesEntryClient from "./packages-entry-client";
 
 export const metadata: Metadata = {
   title: "Packages",
@@ -20,7 +20,7 @@ export default async function PackagesPage() {
 
   return (
     <AdminShell>
-      <SimplePackagesClient />
+      <PackagesEntryClient />
     </AdminShell>
   );
 }
