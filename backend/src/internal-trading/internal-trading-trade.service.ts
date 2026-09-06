@@ -575,10 +575,7 @@ export class InternalTradingTradeService {
               grossResultAmount,
             );
 
-            if (
-              outcome === 'WIN' &&
-              projected.gte(dailyGrossTarget)
-            ) {
+            if (outcome === 'WIN' && projected.gte(dailyGrossTarget)) {
               const protectedTrade = deterministicInternalTradeSlot({
                 sourceKey: `${sourceKey}:DAILY_TARGET_PROTECTION`,
                 localTradeDate,
