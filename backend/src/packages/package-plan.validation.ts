@@ -1,6 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { itemTerms } from './package-plan.mapper';
+import {
+  RANGE_PACKAGE_TECHNICAL_TERMS,
+  rangeCompatibilityCapMultiplier,
+} from './package-range-terms';
 import { PACKAGE_CURRENCY } from './packages.constants';
 import type { ItemTerms, PlanWithItems } from './packages.types';
 
@@ -74,7 +78,7 @@ export function assertPublishablePlan(plan: PlanWithItems) {
       if (
         item.goalDays !== item.durationDays ||
         item.cycleDays !== item.durationDays ||
-        item.cycleEndAction !== 'COMPLETE_PACKAGE'
+        item.cycleEndAction !== RANGE_PACKAGE_TECHNICAL_TERMS.cycleEndAction
       ) {
         throw new BadRequestException(
           `${item.packageDefinition.code} range lifecycle must complete at its configured duration.`,
@@ -89,6 +93,8 @@ export function assertPublishablePlan(plan: PlanWithItems) {
           `${item.packageDefinition.code} range lifecycle must explicitly define capital return or no capital return.`,
         );
       }
+
+      assertDerivedRangeTechnicalTerms(itemTerms(item), item.packageDefinition.code);
     }
 
     if (item.capReachedAction === 'AUTO_RENEW') {
@@ -158,6 +164,8 @@ export function validateAndConvertItemTerms(terms: ItemTerms) {
         'Range packages must keep compatibility price equal to minimumInvestment.',
       );
     }
+
+    assertDerivedRangeTechnicalTerms(terms);
   } else if (maximumInvestment !== null) {
     throw new BadRequestException(
       'maximumInvestment cannot be configured without minimumInvestment.',
@@ -251,6 +259,46 @@ export function assertValidTimezone(timezone: string) {
   } catch {
     throw new BadRequestException(
       'settlementTimezone must be a valid IANA timezone.',
+    );
+  }
+}
+
+function assertDerivedRangeTechnicalTerms(
+  terms: ItemTerms,
+  packageCode = 'Range package',
+): void {
+  if (terms.durationDays == null) {
+    throw new BadRequestException(
+      `${packageCode} range terms require durationDays.`,
+    );
+  }
+
+  const expectedCapMultiplier = rangeCompatibilityCapMultiplier({
+    rewardRateMode: terms.rewardRateMode,
+    fixedRewardRate: terms.fixedRewardRate,
+    minimumRewardRate: terms.minimumRewardRate,
+    maximumRewardRate: terms.maximumRewardRate,
+    durationDays: terms.durationDays,
+  });
+
+  const mismatch =
+    terms.currency !== RANGE_PACKAGE_TECHNICAL_TERMS.currency ||
+    terms.rewardRateMeaning !==
+      RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning ||
+    terms.capBasis !== RANGE_PACKAGE_TECHNICAL_TERMS.capBasis ||
+    !new Prisma.Decimal(terms.capMultiplier).eq(expectedCapMultiplier) ||
+    terms.goalDays !== terms.durationDays ||
+    terms.cycleDays !== terms.durationDays ||
+    terms.rewardStartMode !== RANGE_PACKAGE_TECHNICAL_TERMS.rewardStartMode ||
+    terms.rewardFrequency !== RANGE_PACKAGE_TECHNICAL_TERMS.rewardFrequency ||
+    terms.cycleDayMode !== RANGE_PACKAGE_TECHNICAL_TERMS.cycleDayMode ||
+    terms.rewardDayMode !== RANGE_PACKAGE_TECHNICAL_TERMS.rewardDayMode ||
+    terms.cycleEndAction !== RANGE_PACKAGE_TECHNICAL_TERMS.cycleEndAction ||
+    terms.capReachedAction !== RANGE_PACKAGE_TECHNICAL_TERMS.capReachedAction;
+
+  if (mismatch) {
+    throw new BadRequestException(
+      `${packageCode} range technical lifecycle fields must be system-derived from its USER net daily rate and duration.`,
     );
   }
 }
