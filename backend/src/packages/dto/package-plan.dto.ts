@@ -71,10 +71,11 @@ class AuditedRevisionDto {
 
 export class CreatePackagePlanDraftDto {
   @Transform(trimString)
+  @IsOptional()
   @IsString()
   @IsUUID()
   @MaxLength(36)
-  sourcePlanVersionId!: string;
+  sourcePlanVersionId?: string;
 
   @Transform(trimString)
   @IsString()
