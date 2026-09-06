@@ -18,6 +18,12 @@ import {
   calculateTargetReconciliationTransition,
   deterministicInternalTradeSlot,
 } from './internal-trading-calculation';
+import {
+  addLocalDays,
+  grossTargetForUserNet,
+  packageUserNetAmount,
+  packageUserNetRateForDate,
+} from './internal-trading-package-earnings';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 const MAX_RECONCILE_DAYS = 1500;
@@ -60,6 +66,20 @@ interface StateRow {
   updatedAt: Date;
   username?: string;
   email?: string | null;
+}
+
+interface PackageEarningTermsRow {
+  rewardRateMode: 'FIXED' | 'RANDOM_RANGE' | 'MANUAL' | 'RULE_BASED';
+  fixedRewardRate: DecimalValue | null;
+  minimumRewardRate: DecimalValue | null;
+  maximumRewardRate: DecimalValue | null;
+  rewardRateMeaning: string;
+  goalDays: number;
+}
+
+interface ExistingSlotRow {
+  slotNumber: number;
+  userShareAmount: DecimalValue;
 }
 
 interface PolicyRow {
@@ -190,6 +210,7 @@ export class InternalTradingTradeService {
       scope: 'INTERNAL_TRADING',
       financialModel: 'GROSS_BEFORE_SPLIT',
       resultBasis: 'PACKAGE_PRINCIPAL',
+      earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
       highWaterSettlement: false,
       settlementMode: 'WIN_IMMEDIATE',
       highWaterTracking: true,
@@ -229,6 +250,7 @@ export class InternalTradingTradeService {
       scope: 'MY_INTERNAL_TRADING',
       financialModel: 'GROSS_BEFORE_SPLIT',
       resultBasis: 'PACKAGE_PRINCIPAL',
+      earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
       highWaterSettlement: false,
       settlementMode: 'WIN_IMMEDIATE',
       highWaterTracking: true,
@@ -335,6 +357,30 @@ export class InternalTradingTradeService {
         );
       }
 
+      const earningTerms = await this.requirePackageEarningTerms(
+        transaction,
+        subscriptionId,
+      );
+      const expectedFirstEarningLocalDate = addLocalDays(
+        this.localDateString(state.activationLocalDate),
+        1,
+      );
+      const expectedFinalEarningLocalDate = addLocalDays(
+        this.localDateString(state.activationLocalDate),
+        earningTerms.goalDays,
+      );
+
+      if (
+        this.localDateString(state.finalLocalDate) !==
+          expectedFinalEarningLocalDate ||
+        this.localDateString(state.nextTradeLocalDate) <
+          expectedFirstEarningLocalDate
+      ) {
+        throw new ServiceUnavailableException(
+          'Internal trading lifecycle date snapshot does not match the package earning duration contract.',
+        );
+      }
+
       const now = new Date();
       const currentLocalDate = this.localDateInTimezone(
         now,
@@ -374,16 +420,16 @@ export class InternalTradingTradeService {
           state.timezoneSnapshot,
         );
 
-        const existingSlots = await transaction.$queryRaw<
-          Array<{ slotNumber: number }>
-        >(Prisma.sql`
-          SELECT slotNumber
-          FROM internal_trade_events
-          WHERE subscriptionId = ${state.subscriptionId}
-            AND localTradeDate = ${localTradeDate}
-          ORDER BY slotNumber ASC
-          FOR UPDATE
-        `);
+        const existingSlots = await transaction.$queryRaw<ExistingSlotRow[]>(
+          Prisma.sql`
+            SELECT slotNumber, userShareAmount
+            FROM internal_trade_events
+            WHERE subscriptionId = ${state.subscriptionId}
+              AND localTradeDate = ${localTradeDate}
+            ORDER BY slotNumber ASC
+            FOR UPDATE
+          `,
+        );
 
         existingSlots.forEach((row, index) => {
           if (row.slotNumber !== index + 1) {
@@ -400,10 +446,54 @@ export class InternalTradingTradeService {
         }
 
         const tradeDayNumber =
-          this.daysBetween(
-            this.localDateString(state.activationLocalDate),
-            localTradeDate,
-          ) + 1;
+          this.daysBetween(expectedFirstEarningLocalDate, localTradeDate) + 1;
+
+        if (tradeDayNumber < 1 || tradeDayNumber > earningTerms.goalDays) {
+          throw new ServiceUnavailableException(
+            'Internal trading trade day is outside the package earning duration.',
+          );
+        }
+
+        const packageUserNetRate = packageUserNetRateForDate(
+          state.subscriptionId,
+          localTradeDate,
+          earningTerms,
+        );
+        const dailyUserNetTarget = packageUserNetAmount(
+          state.principalAmount,
+          packageUserNetRate,
+        );
+        const alreadyCreditedToday = existingSlots
+          .reduce(
+            (total, row) => total.add(new Prisma.Decimal(row.userShareAmount)),
+            new Prisma.Decimal(0),
+          )
+          .toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
+        const userCreditedBeforeDay = new Prisma.Decimal(
+          state.userCreditedAmount,
+        )
+          .sub(alreadyCreditedToday)
+          .toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
+
+        if (userCreditedBeforeDay.lt(0)) {
+          throw new ServiceUnavailableException(
+            'Internal trading daily USER credit baseline is invalid.',
+          );
+        }
+
+        const desiredUserCreditThroughDay = userCreditedBeforeDay
+          .add(dailyUserNetTarget)
+          .toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
+        const dailyGrossTarget = grossTargetForUserNet(
+          desiredUserCreditThroughDay,
+          state.userSharePercent,
+        );
+
+        if (dailyGrossTarget.gt(new Prisma.Decimal(state.grossTarget))) {
+          throw new ServiceUnavailableException(
+            'Daily internal trading gross target exceeds the immutable package lifetime target.',
+          );
+        }
 
         let completedDay = existingSlots.length === policy.activitiesPerDay;
 
@@ -444,8 +534,7 @@ export class InternalTradingTradeService {
             break;
           }
 
-          const finalSlot =
-            localTradeDate === finalLocalDate &&
+          const dailyReconciliationSlot =
             slotNumber === policy.activitiesPerDay;
 
           let outcome: 'WIN' | 'LOSS';
@@ -453,9 +542,9 @@ export class InternalTradingTradeService {
           let resultPercent: string;
           let transition;
 
-          if (finalSlot) {
+          if (dailyReconciliationSlot) {
             transition = calculateTargetReconciliationTransition({
-              grossTarget: state.grossTarget,
+              grossTarget: dailyGrossTarget,
               grossProgressBefore: state.grossNetProgress,
               grossHighWaterBefore: state.grossHighWaterMark,
               userSharePercent: state.userSharePercent,
@@ -488,10 +577,10 @@ export class InternalTradingTradeService {
 
             if (
               outcome === 'WIN' &&
-              projected.gte(new Prisma.Decimal(state.grossTarget))
+              projected.gte(dailyGrossTarget)
             ) {
               const protectedTrade = deterministicInternalTradeSlot({
-                sourceKey: `${sourceKey}:TARGET_PROTECTION`,
+                sourceKey: `${sourceKey}:DAILY_TARGET_PROTECTION`,
                 localTradeDate,
                 slotNumber,
                 activitiesPerDay: policy.activitiesPerDay,
@@ -522,7 +611,7 @@ export class InternalTradingTradeService {
 
             transition = calculateNormalTradeTransition(
               {
-                grossTarget: state.grossTarget,
+                grossTarget: dailyGrossTarget,
                 grossProgressBefore: state.grossNetProgress,
                 grossHighWaterBefore: state.grossHighWaterMark,
                 userSharePercent: state.userSharePercent,
@@ -548,6 +637,10 @@ export class InternalTradingTradeService {
                   userId: state.userId,
                   packageCode: state.packageCode,
                   currency: state.currency,
+                  localTradeDate,
+                  packageUserNetRate: packageUserNetRate.toFixed(6),
+                  dailyUserNetTarget: dailyUserNetTarget.toFixed(8),
+                  dailyGrossTarget: dailyGrossTarget.toFixed(8),
                   grossSettlementAmount: transition.grossSettlementAmount,
                   userShareAmount: transition.userSettlementAmount,
                   adminShareAmount: transition.adminSettlementAmount,
@@ -635,7 +728,10 @@ export class InternalTradingTradeService {
             )
           `);
 
-          const completing = finalSlot && transition.reachedGrossTarget;
+          const completing =
+            localTradeDate === finalLocalDate &&
+            dailyReconciliationSlot &&
+            transition.reachedGrossTarget;
 
           const updated = await transaction.$executeRaw(Prisma.sql`
             UPDATE internal_trade_subscription_states
@@ -746,6 +842,9 @@ export class InternalTradingTradeService {
               createdSettlements,
               eventIds: createdEventIds,
               financialModel: 'GROSS_BEFORE_SPLIT',
+              earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
+              packageRewardRateMode: earningTerms.rewardRateMode,
+              packageRewardRateMeaning: earningTerms.rewardRateMeaning,
               resultBasis: 'PACKAGE_PRINCIPAL',
               highWaterSettlement: false,
               settlementMode: 'WIN_IMMEDIATE',
@@ -856,6 +955,39 @@ export class InternalTradingTradeService {
     return policy;
   }
 
+  private async requirePackageEarningTerms(
+    transaction: Prisma.TransactionClient,
+    subscriptionId: string,
+  ): Promise<PackageEarningTermsRow> {
+    const rows = await transaction.$queryRaw<PackageEarningTermsRow[]>(
+      Prisma.sql`
+        SELECT
+          rewardRateMode,
+          fixedRewardRate,
+          minimumRewardRate,
+          maximumRewardRate,
+          rewardRateMeaning,
+          goalDays
+        FROM user_package_subscriptions
+        WHERE id = ${subscriptionId}
+          AND status = 'ACTIVE'
+          AND earningAuthority = 'INTERNAL_TRADING'
+        LIMIT 1
+        FOR SHARE
+      `,
+    );
+
+    const terms = rows[0];
+
+    if (!terms) {
+      throw new ServiceUnavailableException(
+        'Immutable package earning terms are unavailable for internal trading.',
+      );
+    }
+
+    return terms;
+  }
+
   private async requireState(
     client: PrismaService | Prisma.TransactionClient,
     subscriptionId: string,
@@ -902,6 +1034,10 @@ export class InternalTradingTradeService {
       userId: string;
       packageCode: string;
       currency: string;
+      localTradeDate: string;
+      packageUserNetRate: string;
+      dailyUserNetTarget: string;
+      dailyGrossTarget: string;
       grossSettlementAmount: string;
       userShareAmount: string;
       adminShareAmount: string;
@@ -982,6 +1118,11 @@ export class InternalTradingTradeService {
           subscriptionId: input.subscriptionId,
           eventId: input.eventId,
           packageCode: input.packageCode,
+          localTradeDate: input.localTradeDate,
+          earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
+          packageUserNetRate: input.packageUserNetRate,
+          dailyUserNetTarget: input.dailyUserNetTarget,
+          dailyGrossTarget: input.dailyGrossTarget,
           grossSettlementAmount: input.grossSettlementAmount,
           userShareAmount: input.userShareAmount,
           adminShareAmount: input.adminShareAmount,
@@ -1079,13 +1220,18 @@ export class InternalTradingTradeService {
         entityType: 'LedgerTransaction',
         entityId: ledgerTransactionId,
         description:
-          'Internal trading high-water settlement posted to immutable ledger.',
+          'Internal trading USER net daily-rate settlement posted to immutable ledger.',
         metadata: {
           source: 'INTERNAL_TRADING',
-          operation: 'POST_HIGH_WATER_SETTLEMENT',
+          operation: 'POST_DAILY_NET_SETTLEMENT',
           sourceKey: ledgerSourceKey,
           subscriptionId: input.subscriptionId,
           eventId: input.eventId,
+          localTradeDate: input.localTradeDate,
+          earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
+          packageUserNetRate: input.packageUserNetRate,
+          dailyUserNetTarget: input.dailyUserNetTarget,
+          dailyGrossTarget: input.dailyGrossTarget,
           grossSettlementAmount: input.grossSettlementAmount,
           userShareAmount: input.userShareAmount,
           adminShareAmount: input.adminShareAmount,
