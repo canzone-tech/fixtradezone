@@ -20,6 +20,10 @@ import {
   type PackagePlan,
   type PackagePlanItem,
 } from "@/lib/packages";
+import {
+  RANGE_PACKAGE_TECHNICAL_TERMS,
+  deriveRangeCompatibilityCapMultiplier,
+} from "@/lib/package-range-terms";
 import styles from "./simple-packages.module.css";
 
 interface MutationPayload extends ApiErrorPayload {
@@ -63,6 +67,14 @@ interface FormState {
   cycleEndAction: string;
   capReachedAction: string;
 }
+
+type InvestmentMode = "RANGE" | "LEGACY_FIXED";
+
+const RANGE_RATE_MODES = ["FIXED", "RANDOM_RANGE"] as const;
+const RANGE_PRINCIPAL_TREATMENTS = [
+  "RETURN_SEPARATELY",
+  "NON_REFUNDABLE_PACKAGE_VALUE",
+] as const;
 
 function emptyForm(): FormState {
   return {
@@ -187,6 +199,9 @@ function PackageItemEditorState({
   const [form, setForm] = useState<FormState>(() =>
     item ? formFromItem(item) : emptyForm(),
   );
+  const [investmentMode, setInvestmentMode] = useState<InvestmentMode>(() =>
+    item?.rangeConfigured === false ? "LEGACY_FIXED" : "RANGE",
+  );
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -195,12 +210,21 @@ function PackageItemEditorState({
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  function rangeCompatibilityMultiplier(): string {
+    return deriveRangeCompatibilityCapMultiplier({
+      rewardRateMode: form.rewardRateMode,
+      fixedRewardRate: form.fixedRewardRate,
+      maximumRewardRate: form.maximumRewardRate,
+      durationDays: form.durationDays,
+    });
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || reason.trim().length < 3) return;
 
     const fixedRate = form.rewardRateMode === "FIXED";
-    const body = {
+    const common = {
       expectedRevision: plan.revision,
       reason: reason.trim(),
       ...(mode === "create"
@@ -210,11 +234,6 @@ function PackageItemEditorState({
       slug: form.slug.trim().toLowerCase(),
       sortOrder: Number(form.sortOrder),
       availability: form.availability,
-      price: form.price.trim(),
-      minimumInvestment: nullableDecimal(form.minimumInvestment),
-      maximumInvestment: nullableDecimal(form.maximumInvestment),
-      durationDays: nullableInteger(form.durationDays),
-      currency: "USDT",
       rewardRateMode: form.rewardRateMode,
       fixedRewardRate: fixedRate ? nullableDecimal(form.fixedRewardRate) : null,
       minimumRewardRate: fixedRate
@@ -223,19 +242,80 @@ function PackageItemEditorState({
       maximumRewardRate: fixedRate
         ? null
         : nullableDecimal(form.maximumRewardRate),
-      rewardRateMeaning: form.rewardRateMeaning,
-      capBasis: form.capBasis,
-      capMultiplier: form.capMultiplier.trim(),
       principalTreatment: form.principalTreatment,
-      goalDays: Number(form.goalDays),
-      cycleDays: Number(form.cycleDays),
-      rewardStartMode: form.rewardStartMode,
-      rewardFrequency: form.rewardFrequency,
-      cycleDayMode: form.cycleDayMode,
-      rewardDayMode: form.rewardDayMode,
-      cycleEndAction: form.cycleEndAction,
-      capReachedAction: form.capReachedAction,
     };
+
+    let body: Record<string, unknown>;
+
+    try {
+      if (investmentMode === "RANGE") {
+        const minimumInvestment = form.minimumInvestment.trim();
+        const durationDays = nullableInteger(form.durationDays);
+        if (!minimumInvestment || durationDays === null) {
+          throw new Error(
+            "Range packages require minimum investment and duration days.",
+          );
+        }
+        if (!RANGE_RATE_MODES.includes(form.rewardRateMode as never)) {
+          throw new Error(
+            "Range packages support Fixed or Random Range USER daily profit only.",
+          );
+        }
+        if (
+          !RANGE_PRINCIPAL_TREATMENTS.includes(
+            form.principalTreatment as never,
+          )
+        ) {
+          throw new Error(
+            "Range packages must explicitly return invested principal or configure no capital return.",
+          );
+        }
+
+        body = {
+          ...common,
+          price: minimumInvestment,
+          minimumInvestment,
+          maximumInvestment: nullableDecimal(form.maximumInvestment),
+          durationDays,
+          currency: RANGE_PACKAGE_TECHNICAL_TERMS.currency,
+          rewardRateMeaning:
+            RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
+          capBasis: RANGE_PACKAGE_TECHNICAL_TERMS.capBasis,
+          capMultiplier: rangeCompatibilityMultiplier(),
+          goalDays: durationDays,
+          cycleDays: durationDays,
+          rewardStartMode: RANGE_PACKAGE_TECHNICAL_TERMS.rewardStartMode,
+          rewardFrequency: RANGE_PACKAGE_TECHNICAL_TERMS.rewardFrequency,
+          cycleDayMode: RANGE_PACKAGE_TECHNICAL_TERMS.cycleDayMode,
+          rewardDayMode: RANGE_PACKAGE_TECHNICAL_TERMS.rewardDayMode,
+          cycleEndAction: RANGE_PACKAGE_TECHNICAL_TERMS.cycleEndAction,
+          capReachedAction: RANGE_PACKAGE_TECHNICAL_TERMS.capReachedAction,
+        };
+      } else {
+        body = {
+          ...common,
+          price: form.price.trim(),
+          minimumInvestment: null,
+          maximumInvestment: null,
+          durationDays: null,
+          currency: "USDT",
+          rewardRateMeaning: form.rewardRateMeaning,
+          capBasis: form.capBasis,
+          capMultiplier: form.capMultiplier.trim(),
+          goalDays: Number(form.goalDays),
+          cycleDays: Number(form.cycleDays),
+          rewardStartMode: form.rewardStartMode,
+          rewardFrequency: form.rewardFrequency,
+          cycleDayMode: form.cycleDayMode,
+          rewardDayMode: form.rewardDayMode,
+          cycleEndAction: form.cycleEndAction,
+          capReachedAction: form.capReachedAction,
+        };
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Package terms are invalid.");
+      return;
+    }
 
     setBusy(true);
     setError("");
@@ -265,6 +345,21 @@ function PackageItemEditorState({
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  let derivedCompatibilityMultiplier = "—";
+  if (
+    investmentMode === "RANGE" &&
+    form.durationDays.trim() &&
+    (form.rewardRateMode === "FIXED"
+      ? form.fixedRewardRate.trim()
+      : form.maximumRewardRate.trim())
+  ) {
+    try {
+      derivedCompatibilityMultiplier = rangeCompatibilityMultiplier();
+    } catch {
+      derivedCompatibilityMultiplier = "Pending valid rate/duration";
     }
   }
 
@@ -339,46 +434,74 @@ function PackageItemEditorState({
           options={PACKAGE_AVAILABILITIES}
           onChange={(value) => set("availability", value)}
         />
-        <Field label="Price / minimum compatibility value (USDT)">
-          <input
+        <Field label="Investment type">
+          <select
             required
-            inputMode="decimal"
-            value={form.price}
-            onChange={(event) => set("price", event.target.value)}
-          />
+            value={investmentMode}
+            onChange={(event) =>
+              setInvestmentMode(event.target.value as InvestmentMode)
+            }
+          >
+            <option value="RANGE">Investment range</option>
+            <option value="LEGACY_FIXED">Legacy fixed price</option>
+          </select>
         </Field>
-        <Field label="Minimum investment (USDT)">
-          <input
-            inputMode="decimal"
-            value={form.minimumInvestment}
-            onChange={(event) => set("minimumInvestment", event.target.value)}
-          />
-        </Field>
-        <Field label="Maximum investment (USDT, blank = no upper bound)">
-          <input
-            inputMode="decimal"
-            value={form.maximumInvestment}
-            onChange={(event) => set("maximumInvestment", event.target.value)}
-          />
-        </Field>
-        <Field label="Duration days">
-          <input
-            type="number"
-            min={1}
-            max={36500}
-            value={form.durationDays}
-            onChange={(event) => set("durationDays", event.target.value)}
-          />
-        </Field>
-        <SelectField
-          label="Reward-rate mode"
-          value={form.rewardRateMode}
-          options={PACKAGE_REWARD_RATE_MODES}
-          onChange={(value) => set("rewardRateMode", value)}
-        />
+
+        {investmentMode === "RANGE" ? (
+          <>
+            <Field label="Minimum investment (USDT)">
+              <input
+                required
+                inputMode="decimal"
+                value={form.minimumInvestment}
+                onChange={(event) => set("minimumInvestment", event.target.value)}
+              />
+            </Field>
+            <Field label="Maximum investment (USDT, blank = unlimited)">
+              <input
+                inputMode="decimal"
+                value={form.maximumInvestment}
+                onChange={(event) => set("maximumInvestment", event.target.value)}
+              />
+            </Field>
+            <Field label="Duration / earning days">
+              <input
+                required
+                type="number"
+                min={1}
+                max={36500}
+                value={form.durationDays}
+                onChange={(event) => set("durationDays", event.target.value)}
+              />
+            </Field>
+            <SelectField
+              label="USER daily profit mode"
+              value={form.rewardRateMode}
+              options={RANGE_RATE_MODES}
+              onChange={(value) => set("rewardRateMode", value)}
+            />
+          </>
+        ) : (
+          <>
+            <Field label="Fixed price (USDT)">
+              <input
+                required
+                inputMode="decimal"
+                value={form.price}
+                onChange={(event) => set("price", event.target.value)}
+              />
+            </Field>
+            <SelectField
+              label="Reward-rate mode"
+              value={form.rewardRateMode}
+              options={PACKAGE_REWARD_RATE_MODES}
+              onChange={(value) => set("rewardRateMode", value)}
+            />
+          </>
+        )}
 
         {form.rewardRateMode === "FIXED" ? (
-          <Field label="Fixed reward rate %">
+          <Field label="USER daily profit %">
             <input
               required
               inputMode="decimal"
@@ -388,7 +511,7 @@ function PackageItemEditorState({
           </Field>
         ) : form.rewardRateMode ? (
           <>
-            <Field label="Minimum reward rate %">
+            <Field label="Minimum USER daily profit %">
               <input
                 required
                 inputMode="decimal"
@@ -398,7 +521,7 @@ function PackageItemEditorState({
                 }
               />
             </Field>
-            <Field label="Maximum reward rate %">
+            <Field label="Maximum USER daily profit %">
               <input
                 required
                 inputMode="decimal"
@@ -412,87 +535,120 @@ function PackageItemEditorState({
         ) : null}
 
         <SelectField
-          label="Reward-rate meaning"
-          value={form.rewardRateMeaning}
-          options={PACKAGE_REWARD_RATE_MEANINGS}
-          onChange={(value) => set("rewardRateMeaning", value)}
-        />
-        <SelectField
-          label="Cap basis"
-          value={form.capBasis}
-          options={PACKAGE_CAP_BASES}
-          onChange={(value) => set("capBasis", value)}
-        />
-        <Field label="Cap multiplier">
-          <input
-            required
-            inputMode="decimal"
-            value={form.capMultiplier}
-            onChange={(event) => set("capMultiplier", event.target.value)}
-          />
-        </Field>
-        <SelectField
-          label="Principal treatment"
+          label={
+            investmentMode === "RANGE"
+              ? "Capital return"
+              : "Principal treatment"
+          }
           value={form.principalTreatment}
-          options={PACKAGE_PRINCIPAL_TREATMENTS}
+          options={
+            investmentMode === "RANGE"
+              ? RANGE_PRINCIPAL_TREATMENTS
+              : PACKAGE_PRINCIPAL_TREATMENTS
+          }
           onChange={(value) => set("principalTreatment", value)}
         />
-        <Field label="Goal / lifetime days">
-          <input
-            required
-            type="number"
-            min={1}
-            max={36500}
-            value={form.goalDays}
-            onChange={(event) => set("goalDays", event.target.value)}
-          />
-        </Field>
-        <Field label="Cycle days">
-          <input
-            required
-            type="number"
-            min={1}
-            max={36500}
-            value={form.cycleDays}
-            onChange={(event) => set("cycleDays", event.target.value)}
-          />
-        </Field>
-        <SelectField
-          label="Reward start"
-          value={form.rewardStartMode}
-          options={PACKAGE_REWARD_START_MODES}
-          onChange={(value) => set("rewardStartMode", value)}
-        />
-        <SelectField
-          label="Reward frequency"
-          value={form.rewardFrequency}
-          options={PACKAGE_REWARD_FREQUENCIES}
-          onChange={(value) => set("rewardFrequency", value)}
-        />
-        <SelectField
-          label="Cycle-day mode"
-          value={form.cycleDayMode}
-          options={PACKAGE_CYCLE_DAY_MODES}
-          onChange={(value) => set("cycleDayMode", value)}
-        />
-        <SelectField
-          label="Reward-day mode"
-          value={form.rewardDayMode}
-          options={PACKAGE_REWARD_DAY_MODES}
-          onChange={(value) => set("rewardDayMode", value)}
-        />
-        <SelectField
-          label="Cycle-end action"
-          value={form.cycleEndAction}
-          options={PACKAGE_CYCLE_END_ACTIONS}
-          onChange={(value) => set("cycleEndAction", value)}
-        />
-        <SelectField
-          label="Cap-reached action"
-          value={form.capReachedAction}
-          options={PACKAGE_CAP_REACHED_ACTIONS}
-          onChange={(value) => set("capReachedAction", value)}
-        />
+
+        {investmentMode === "RANGE" ? (
+          <>
+            <Field label="Rate meaning (system derived)">
+              <input
+                readOnly
+                value={enumLabel(
+                  RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
+                )}
+              />
+            </Field>
+            <Field label="Compatibility multiplier (system derived)">
+              <input readOnly value={derivedCompatibilityMultiplier} />
+            </Field>
+            <Field label="Lifecycle (system derived)">
+              <input
+                readOnly
+                value="Next calendar day · Daily · Complete at duration"
+              />
+            </Field>
+          </>
+        ) : (
+          <>
+            <SelectField
+              label="Reward-rate meaning"
+              value={form.rewardRateMeaning}
+              options={PACKAGE_REWARD_RATE_MEANINGS}
+              onChange={(value) => set("rewardRateMeaning", value)}
+            />
+            <SelectField
+              label="Cap basis"
+              value={form.capBasis}
+              options={PACKAGE_CAP_BASES}
+              onChange={(value) => set("capBasis", value)}
+            />
+            <Field label="Cap multiplier">
+              <input
+                required
+                inputMode="decimal"
+                value={form.capMultiplier}
+                onChange={(event) => set("capMultiplier", event.target.value)}
+              />
+            </Field>
+            <Field label="Goal / lifetime days">
+              <input
+                required
+                type="number"
+                min={1}
+                max={36500}
+                value={form.goalDays}
+                onChange={(event) => set("goalDays", event.target.value)}
+              />
+            </Field>
+            <Field label="Cycle days">
+              <input
+                required
+                type="number"
+                min={1}
+                max={36500}
+                value={form.cycleDays}
+                onChange={(event) => set("cycleDays", event.target.value)}
+              />
+            </Field>
+            <SelectField
+              label="Reward start"
+              value={form.rewardStartMode}
+              options={PACKAGE_REWARD_START_MODES}
+              onChange={(value) => set("rewardStartMode", value)}
+            />
+            <SelectField
+              label="Reward frequency"
+              value={form.rewardFrequency}
+              options={PACKAGE_REWARD_FREQUENCIES}
+              onChange={(value) => set("rewardFrequency", value)}
+            />
+            <SelectField
+              label="Cycle-day mode"
+              value={form.cycleDayMode}
+              options={PACKAGE_CYCLE_DAY_MODES}
+              onChange={(value) => set("cycleDayMode", value)}
+            />
+            <SelectField
+              label="Reward-day mode"
+              value={form.rewardDayMode}
+              options={PACKAGE_REWARD_DAY_MODES}
+              onChange={(value) => set("rewardDayMode", value)}
+            />
+            <SelectField
+              label="Cycle-end action"
+              value={form.cycleEndAction}
+              options={PACKAGE_CYCLE_END_ACTIONS}
+              onChange={(value) => set("cycleEndAction", value)}
+            />
+            <SelectField
+              label="Cap-reached action"
+              value={form.capReachedAction}
+              options={PACKAGE_CAP_REACHED_ACTIONS}
+              onChange={(value) => set("capReachedAction", value)}
+            />
+          </>
+        )}
       </div>
 
       <Field label="Audit reason">
