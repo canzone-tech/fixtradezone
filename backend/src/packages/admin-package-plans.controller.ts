@@ -26,6 +26,7 @@ import {
   UpdatePackagePlanItemDto,
 } from './dto/package-plan.dto';
 import { PackageDefinitionsService } from './package-definitions.service';
+import { PackageDraftService } from './package-draft.service';
 import { PackagesService } from './packages.service';
 
 @Controller('admin/package-plans')
@@ -33,6 +34,7 @@ export class AdminPackagePlansController {
   constructor(
     private readonly packagesService: PackagesService,
     private readonly packageDefinitionsService: PackageDefinitionsService,
+    private readonly packageDraftService: PackageDraftService,
   ) {}
 
   @Get()
@@ -50,7 +52,7 @@ export class AdminPackagePlansController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.packagesService.createDraft(
+    return this.packageDraftService.createDraft(
       dto,
       actor,
       getRequestContext(request),
