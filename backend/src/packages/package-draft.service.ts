@@ -12,12 +12,19 @@ import type { CreatePackagePlanDraftDto } from './dto/package-plan.dto';
 import { toPlanSnapshot } from './package-plan.mapper';
 import { PLAN_INCLUDE } from './packages.types';
 
+type PackageDraftInput = Omit<
+  CreatePackagePlanDraftDto,
+  'sourcePlanVersionId'
+> & {
+  sourcePlanVersionId?: string;
+};
+
 @Injectable()
 export class PackageDraftService {
   constructor(private readonly prisma: PrismaService) {}
 
   async createDraft(
-    dto: CreatePackagePlanDraftDto,
+    dto: PackageDraftInput,
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
