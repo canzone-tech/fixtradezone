@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import {
   PACKAGE_AVAILABILITIES,
   PACKAGE_CAP_BASES,
@@ -138,7 +138,11 @@ function SelectField({
 }) {
   return (
     <Field label={label}>
-      <select required value={value} onChange={(event) => onChange(event.target.value)}>
+      <select
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
         <option value="">Select…</option>
         {options.map((option) => (
           <option value={option} key={option}>
@@ -180,12 +184,6 @@ export default function PackageItemEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setForm(item ? formFromItem(item) : emptyForm());
-    setReason("");
-    setError("");
-  }, [item, mode, plan.id]);
-
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
@@ -212,8 +210,12 @@ export default function PackageItemEditor({
       currency: "USDT",
       rewardRateMode: form.rewardRateMode,
       fixedRewardRate: fixedRate ? nullableDecimal(form.fixedRewardRate) : null,
-      minimumRewardRate: fixedRate ? null : nullableDecimal(form.minimumRewardRate),
-      maximumRewardRate: fixedRate ? null : nullableDecimal(form.maximumRewardRate),
+      minimumRewardRate: fixedRate
+        ? null
+        : nullableDecimal(form.minimumRewardRate),
+      maximumRewardRate: fixedRate
+        ? null
+        : nullableDecimal(form.maximumRewardRate),
       rewardRateMeaning: form.rewardRateMeaning,
       capBasis: form.capBasis,
       capMultiplier: form.capMultiplier.trim(),
@@ -248,13 +250,11 @@ export default function PackageItemEditor({
       }
 
       await onSaved(payload?.message ?? "Package item saved.");
-      if (mode === "create") {
-        setForm(emptyForm());
-      }
-      setReason("");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Package item request failed.",
+        caught instanceof Error
+          ? caught.message
+          : "Package item request failed.",
       );
     } finally {
       setBusy(false);
@@ -265,11 +265,22 @@ export default function PackageItemEditor({
     <form className={styles.editor} onSubmit={submit}>
       <div className={styles.editorHeader}>
         <div>
-          <small>{mode === "create" ? "NEW PACKAGE" : `EDIT ${item?.packageCode ?? "PACKAGE"}`}</small>
-          <h3>{mode === "create" ? "Create package item" : item?.displayName}</h3>
+          <small>
+            {mode === "create"
+              ? "NEW PACKAGE"
+              : `EDIT ${item?.packageCode ?? "PACKAGE"}`}
+          </small>
+          <h3>
+            {mode === "create" ? "Create package item" : item?.displayName}
+          </h3>
         </div>
         {onCancel ? (
-          <button type="button" className={styles.secondaryButton} onClick={onCancel} disabled={busy}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={onCancel}
+            disabled={busy}
+          >
             Cancel
           </button>
         ) : null}
@@ -289,62 +300,192 @@ export default function PackageItemEditor({
           />
         </Field>
         <Field label="Display name">
-          <input required maxLength={100} value={form.displayName} onChange={(event) => set("displayName", event.target.value)} />
+          <input
+            required
+            maxLength={100}
+            value={form.displayName}
+            onChange={(event) => set("displayName", event.target.value)}
+          />
         </Field>
         <Field label="Slug">
-          <input required maxLength={100} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={form.slug} onChange={(event) => set("slug", event.target.value)} />
+          <input
+            required
+            maxLength={100}
+            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+            value={form.slug}
+            onChange={(event) => set("slug", event.target.value)}
+          />
         </Field>
         <Field label="Sort order">
-          <input required type="number" min={1} max={10000} value={form.sortOrder} onChange={(event) => set("sortOrder", event.target.value)} />
+          <input
+            required
+            type="number"
+            min={1}
+            max={10000}
+            value={form.sortOrder}
+            onChange={(event) => set("sortOrder", event.target.value)}
+          />
         </Field>
-        <SelectField label="Availability" value={form.availability} options={PACKAGE_AVAILABILITIES} onChange={(value) => set("availability", value)} />
+        <SelectField
+          label="Availability"
+          value={form.availability}
+          options={PACKAGE_AVAILABILITIES}
+          onChange={(value) => set("availability", value)}
+        />
         <Field label="Price / minimum compatibility value (USDT)">
-          <input required inputMode="decimal" value={form.price} onChange={(event) => set("price", event.target.value)} />
+          <input
+            required
+            inputMode="decimal"
+            value={form.price}
+            onChange={(event) => set("price", event.target.value)}
+          />
         </Field>
         <Field label="Minimum investment (USDT)">
-          <input inputMode="decimal" value={form.minimumInvestment} onChange={(event) => set("minimumInvestment", event.target.value)} />
+          <input
+            inputMode="decimal"
+            value={form.minimumInvestment}
+            onChange={(event) => set("minimumInvestment", event.target.value)}
+          />
         </Field>
         <Field label="Maximum investment (USDT, blank = no upper bound)">
-          <input inputMode="decimal" value={form.maximumInvestment} onChange={(event) => set("maximumInvestment", event.target.value)} />
+          <input
+            inputMode="decimal"
+            value={form.maximumInvestment}
+            onChange={(event) => set("maximumInvestment", event.target.value)}
+          />
         </Field>
         <Field label="Duration days">
-          <input type="number" min={1} max={36500} value={form.durationDays} onChange={(event) => set("durationDays", event.target.value)} />
+          <input
+            type="number"
+            min={1}
+            max={36500}
+            value={form.durationDays}
+            onChange={(event) => set("durationDays", event.target.value)}
+          />
         </Field>
-        <SelectField label="Reward-rate mode" value={form.rewardRateMode} options={PACKAGE_REWARD_RATE_MODES} onChange={(value) => set("rewardRateMode", value)} />
+        <SelectField
+          label="Reward-rate mode"
+          value={form.rewardRateMode}
+          options={PACKAGE_REWARD_RATE_MODES}
+          onChange={(value) => set("rewardRateMode", value)}
+        />
 
         {form.rewardRateMode === "FIXED" ? (
           <Field label="Fixed reward rate %">
-            <input required inputMode="decimal" value={form.fixedRewardRate} onChange={(event) => set("fixedRewardRate", event.target.value)} />
+            <input
+              required
+              inputMode="decimal"
+              value={form.fixedRewardRate}
+              onChange={(event) => set("fixedRewardRate", event.target.value)}
+            />
           </Field>
         ) : form.rewardRateMode ? (
           <>
             <Field label="Minimum reward rate %">
-              <input required inputMode="decimal" value={form.minimumRewardRate} onChange={(event) => set("minimumRewardRate", event.target.value)} />
+              <input
+                required
+                inputMode="decimal"
+                value={form.minimumRewardRate}
+                onChange={(event) =>
+                  set("minimumRewardRate", event.target.value)
+                }
+              />
             </Field>
             <Field label="Maximum reward rate %">
-              <input required inputMode="decimal" value={form.maximumRewardRate} onChange={(event) => set("maximumRewardRate", event.target.value)} />
+              <input
+                required
+                inputMode="decimal"
+                value={form.maximumRewardRate}
+                onChange={(event) =>
+                  set("maximumRewardRate", event.target.value)
+                }
+              />
             </Field>
           </>
         ) : null}
 
-        <SelectField label="Reward-rate meaning" value={form.rewardRateMeaning} options={PACKAGE_REWARD_RATE_MEANINGS} onChange={(value) => set("rewardRateMeaning", value)} />
-        <SelectField label="Cap basis" value={form.capBasis} options={PACKAGE_CAP_BASES} onChange={(value) => set("capBasis", value)} />
+        <SelectField
+          label="Reward-rate meaning"
+          value={form.rewardRateMeaning}
+          options={PACKAGE_REWARD_RATE_MEANINGS}
+          onChange={(value) => set("rewardRateMeaning", value)}
+        />
+        <SelectField
+          label="Cap basis"
+          value={form.capBasis}
+          options={PACKAGE_CAP_BASES}
+          onChange={(value) => set("capBasis", value)}
+        />
         <Field label="Cap multiplier">
-          <input required inputMode="decimal" value={form.capMultiplier} onChange={(event) => set("capMultiplier", event.target.value)} />
+          <input
+            required
+            inputMode="decimal"
+            value={form.capMultiplier}
+            onChange={(event) => set("capMultiplier", event.target.value)}
+          />
         </Field>
-        <SelectField label="Principal treatment" value={form.principalTreatment} options={PACKAGE_PRINCIPAL_TREATMENTS} onChange={(value) => set("principalTreatment", value)} />
+        <SelectField
+          label="Principal treatment"
+          value={form.principalTreatment}
+          options={PACKAGE_PRINCIPAL_TREATMENTS}
+          onChange={(value) => set("principalTreatment", value)}
+        />
         <Field label="Goal / lifetime days">
-          <input required type="number" min={1} max={36500} value={form.goalDays} onChange={(event) => set("goalDays", event.target.value)} />
+          <input
+            required
+            type="number"
+            min={1}
+            max={36500}
+            value={form.goalDays}
+            onChange={(event) => set("goalDays", event.target.value)}
+          />
         </Field>
         <Field label="Cycle days">
-          <input required type="number" min={1} max={36500} value={form.cycleDays} onChange={(event) => set("cycleDays", event.target.value)} />
+          <input
+            required
+            type="number"
+            min={1}
+            max={36500}
+            value={form.cycleDays}
+            onChange={(event) => set("cycleDays", event.target.value)}
+          />
         </Field>
-        <SelectField label="Reward start" value={form.rewardStartMode} options={PACKAGE_REWARD_START_MODES} onChange={(value) => set("rewardStartMode", value)} />
-        <SelectField label="Reward frequency" value={form.rewardFrequency} options={PACKAGE_REWARD_FREQUENCIES} onChange={(value) => set("rewardFrequency", value)} />
-        <SelectField label="Cycle-day mode" value={form.cycleDayMode} options={PACKAGE_CYCLE_DAY_MODES} onChange={(value) => set("cycleDayMode", value)} />
-        <SelectField label="Reward-day mode" value={form.rewardDayMode} options={PACKAGE_REWARD_DAY_MODES} onChange={(value) => set("rewardDayMode", value)} />
-        <SelectField label="Cycle-end action" value={form.cycleEndAction} options={PACKAGE_CYCLE_END_ACTIONS} onChange={(value) => set("cycleEndAction", value)} />
-        <SelectField label="Cap-reached action" value={form.capReachedAction} options={PACKAGE_CAP_REACHED_ACTIONS} onChange={(value) => set("capReachedAction", value)} />
+        <SelectField
+          label="Reward start"
+          value={form.rewardStartMode}
+          options={PACKAGE_REWARD_START_MODES}
+          onChange={(value) => set("rewardStartMode", value)}
+        />
+        <SelectField
+          label="Reward frequency"
+          value={form.rewardFrequency}
+          options={PACKAGE_REWARD_FREQUENCIES}
+          onChange={(value) => set("rewardFrequency", value)}
+        />
+        <SelectField
+          label="Cycle-day mode"
+          value={form.cycleDayMode}
+          options={PACKAGE_CYCLE_DAY_MODES}
+          onChange={(value) => set("cycleDayMode", value)}
+        />
+        <SelectField
+          label="Reward-day mode"
+          value={form.rewardDayMode}
+          options={PACKAGE_REWARD_DAY_MODES}
+          onChange={(value) => set("rewardDayMode", value)}
+        />
+        <SelectField
+          label="Cycle-end action"
+          value={form.cycleEndAction}
+          options={PACKAGE_CYCLE_END_ACTIONS}
+          onChange={(value) => set("cycleEndAction", value)}
+        />
+        <SelectField
+          label="Cap-reached action"
+          value={form.capReachedAction}
+          options={PACKAGE_CAP_REACHED_ACTIONS}
+          onChange={(value) => set("capReachedAction", value)}
+        />
       </div>
 
       <Field label="Audit reason">
@@ -358,7 +499,11 @@ export default function PackageItemEditor({
         />
       </Field>
 
-      <button type="submit" className={styles.primaryButton} disabled={busy || reason.trim().length < 3}>
+      <button
+        type="submit"
+        className={styles.primaryButton}
+        disabled={busy || reason.trim().length < 3}
+      >
         {busy ? "Saving…" : mode === "create" ? "Create package" : "Save package"}
       </button>
     </form>
