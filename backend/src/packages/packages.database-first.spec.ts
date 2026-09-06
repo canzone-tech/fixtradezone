@@ -144,24 +144,42 @@ describe('PackagesService database-first lifecycle', () => {
       actor,
     );
 
-    expect(transaction.packagePlanVersion.create).toHaveBeenCalledWith({
-      data: {
-        versionNumber: 1,
-        status: 'DRAFT',
-        revision: 1,
-        createdByUserId: USER_ID,
-        updatedByUserId: USER_ID,
-      },
-      include: expect.any(Object),
+    const createCalls = transaction.packagePlanVersion.create.mock
+      .calls as unknown as Array<
+      [
+        {
+          data: {
+            versionNumber: number;
+            status: string;
+            revision: number;
+            createdByUserId: string;
+            updatedByUserId: string;
+          };
+          include: unknown;
+        },
+      ]
+    >;
+    expect(createCalls[0]?.[0].data).toEqual({
+      versionNumber: 1,
+      status: 'DRAFT',
+      revision: 1,
+      createdByUserId: USER_ID,
+      updatedByUserId: USER_ID,
     });
-    expect(transaction.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          metadata: expect.objectContaining({
-            operation: 'CREATE_INITIAL_DRAFT',
-          }),
-        }),
-      }),
+
+    const auditCalls = transaction.auditLog.create.mock.calls as unknown as Array<
+      [
+        {
+          data: {
+            metadata: {
+              operation: string;
+            };
+          };
+        },
+      ]
+    >;
+    expect(auditCalls[0]?.[0].data.metadata.operation).toBe(
+      'CREATE_INITIAL_DRAFT',
     );
     expect(result).toMatchObject({
       message: 'Package plan V1 initial draft created.',
