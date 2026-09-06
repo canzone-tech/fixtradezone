@@ -9,6 +9,7 @@ import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import type { AdminInternalTradingStateQueryDto } from './dto/internal-trading-lifecycle.dto';
+import { derivePackageLifetimeTarget } from './internal-trading-package-earnings';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -25,7 +26,11 @@ interface SubscriptionLifecycleRow {
   price: DecimalValue;
   currency: string;
   settlementTimezone: string;
-  capMultiplier: DecimalValue;
+  rewardRateMode: 'FIXED' | 'RANDOM_RANGE' | 'MANUAL' | 'RULE_BASED';
+  fixedRewardRate: DecimalValue | null;
+  minimumRewardRate: DecimalValue | null;
+  maximumRewardRate: DecimalValue | null;
+  rewardRateMeaning: string;
   goalDays: number;
   earningAuthority: EarningAuthority;
   internalTradeSplitPolicyVersionId: string | null;
@@ -117,14 +122,18 @@ export class InternalTradingLifecycleService {
             price,
             currency,
             settlementTimezone,
-            capMultiplier,
+            rewardRateMode,
+            fixedRewardRate,
+            minimumRewardRate,
+            maximumRewardRate,
+            rewardRateMeaning,
             goalDays,
             earningAuthority,
             internalTradeSplitPolicyVersionId,
             internalTradeUserSharePercent,
             internalTradeAdminSharePercent,
             activatedAt,
-          scheduledEndAt,
+            scheduledEndAt,
             status
           FROM user_package_subscriptions
           WHERE id = ${subscriptionId}
@@ -178,92 +187,13 @@ export class InternalTradingLifecycleService {
       const existing = existingRows[0];
 
       if (existing) {
-        const expectedFinalLocalDate = this.localDate(
-          subscription.scheduledEndAt,
-          subscription.settlementTimezone,
-        );
-        const currentFinalLocalDate = this.dateString(existing.finalLocalDate);
-
-        if (
-          expectedFinalLocalDate < this.dateString(existing.activationLocalDate)
-        ) {
-          throw new ConflictException(
-            'Internal trading final date cannot precede activation date.',
-          );
-        }
-
-        if (currentFinalLocalDate !== expectedFinalLocalDate) {
-          if (existing.status !== 'ACTIVE') {
-            throw new ConflictException(
-              'A completed or blocked internal trading lifecycle cannot be date-reconciled.',
-            );
-          }
-
-          await transaction.$executeRaw(Prisma.sql`
-            UPDATE internal_trade_subscription_states
-            SET
-              finalLocalDate = ${expectedFinalLocalDate},
-              revision = revision + 1,
-              updatedAt = CURRENT_TIMESTAMP(3)
-            WHERE subscriptionId = ${subscription.id}
-          `);
-
-          await transaction.auditLog.create({
-            data: {
-              actorUserId: actor.id,
-              action: 'UPDATE',
-              entityType: 'InternalTradeSubscriptionState',
-              entityId: subscription.id,
-              description:
-                'Internal trading lifecycle final date reconciled to authoritative package scheduled end date.',
-              metadata: {
-                source: 'INTERNAL_TRADING',
-                operation: 'RECONCILE_FINAL_LOCAL_DATE',
-                subscriptionId: subscription.id,
-                previousFinalLocalDate: currentFinalLocalDate,
-                finalLocalDate: expectedFinalLocalDate,
-                scheduledEndAt: subscription.scheduledEndAt.toISOString(),
-                timezoneSnapshot: subscription.settlementTimezone,
-              },
-              ipAddress: context.ipAddress,
-              userAgent: context.userAgent,
-            },
-          });
-
-          const reconciledRows = await transaction.$queryRaw<
-            InternalTradeStateRow[]
-          >(Prisma.sql`
-              SELECT *
-              FROM internal_trade_subscription_states
-              WHERE subscriptionId = ${subscription.id}
-              LIMIT 1
-            `);
-
-          const reconciled = reconciledRows[0];
-
-          if (!reconciled) {
-            throw new ServiceUnavailableException(
-              'Reconciled internal trading lifecycle state could not be read.',
-            );
-          }
-
-          return {
-            initialized: true,
-            created: false,
-            reconciled: true,
-            earningAuthority: 'INTERNAL_TRADING' as const,
-            state: this.stateSnapshot(reconciled),
-            message: 'Internal trading lifecycle final date was reconciled.',
-          };
-        }
-
         return {
           initialized: true,
           created: false,
           reconciled: false,
           earningAuthority: 'INTERNAL_TRADING' as const,
           state: this.stateSnapshot(existing),
-          message: 'Internal trading lifecycle is already synchronized.',
+          message: 'Internal trading lifecycle is already initialized.',
         };
       }
 
@@ -283,28 +213,26 @@ export class InternalTradingLifecycleService {
       }
 
       const principal = new Prisma.Decimal(subscription.price);
-      const multiplier = new Prisma.Decimal(subscription.capMultiplier);
-      const grossTarget = principal.mul(multiplier).toDecimalPlaces(8);
-
-      if (grossTarget.lte(0)) {
-        throw new ConflictException(
-          'Internal trading gross target must be positive.',
-        );
-      }
-
       const activationLocalDate = this.localDate(
         subscription.activatedAt,
         subscription.settlementTimezone,
       );
+      const target = derivePackageLifetimeTarget({
+        subscriptionId: subscription.id,
+        principalAmount: principal,
+        userSharePercent: subscription.internalTradeUserSharePercent,
+        activationLocalDate,
+        earningDays: subscription.goalDays,
+        rewardRateMode: subscription.rewardRateMode,
+        fixedRewardRate: subscription.fixedRewardRate,
+        minimumRewardRate: subscription.minimumRewardRate,
+        maximumRewardRate: subscription.maximumRewardRate,
+        rewardRateMeaning: subscription.rewardRateMeaning,
+      });
 
-      const finalLocalDate = this.localDate(
-        subscription.scheduledEndAt,
-        subscription.settlementTimezone,
-      );
-
-      if (finalLocalDate < activationLocalDate) {
+      if (target.grossTarget.lte(0)) {
         throw new ConflictException(
-          'Internal trading final date cannot precede activation date.',
+          'Internal trading gross target must be positive.',
         );
       }
 
@@ -346,8 +274,8 @@ export class InternalTradingLifecycleService {
           ${subscription.packageDisplayName},
           ${subscription.currency},
           ${principal.toFixed(8)},
-          ${multiplier.toFixed(4)},
-          ${grossTarget.toFixed(8)},
+          ${target.grossMultiplier.toFixed(4)},
+          ${target.grossTarget.toFixed(8)},
           ${new Prisma.Decimal(
             subscription.internalTradeUserSharePercent,
           ).toFixed(6)},
@@ -356,12 +284,12 @@ export class InternalTradingLifecycleService {
           ).toFixed(6)},
           ${subscription.settlementTimezone},
           ${activationLocalDate},
-          ${finalLocalDate},
+          ${target.finalEarningLocalDate},
           0.00000000,
           0.00000000,
           0.00000000,
           0.00000000,
-          ${activationLocalDate},
+          ${target.firstEarningLocalDate},
           0,
           'ACTIVE',
           1,
@@ -394,17 +322,34 @@ export class InternalTradingLifecycleService {
           entityType: 'InternalTradeSubscriptionState',
           entityId: subscription.id,
           description:
-            'Internal trading lifecycle initialized from immutable package and policy snapshots.',
+            'Internal trading lifecycle initialized from immutable package USER net earning and split-policy snapshots.',
           metadata: {
             source: 'INTERNAL_TRADING',
             operation: 'INITIALIZE_SUBSCRIPTION',
+            targetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
             subscriptionId: subscription.id,
             userId: subscription.userId,
             splitPolicyVersionId:
               subscription.internalTradeSplitPolicyVersionId,
             principalAmount: principal.toFixed(8),
-            grossMultiplier: multiplier.toFixed(4),
-            grossTarget: grossTarget.toFixed(8),
+            packageRewardRateMode: subscription.rewardRateMode,
+            packageFixedRewardRate:
+              subscription.fixedRewardRate === null
+                ? null
+                : new Prisma.Decimal(subscription.fixedRewardRate).toFixed(6),
+            packageMinimumRewardRate:
+              subscription.minimumRewardRate === null
+                ? null
+                : new Prisma.Decimal(subscription.minimumRewardRate).toFixed(6),
+            packageMaximumRewardRate:
+              subscription.maximumRewardRate === null
+                ? null
+                : new Prisma.Decimal(subscription.maximumRewardRate).toFixed(6),
+            packageRewardRateMeaning: subscription.rewardRateMeaning,
+            earningDays: subscription.goalDays,
+            userNetTarget: target.userNetTarget.toFixed(8),
+            grossMultiplier: target.grossMultiplier.toFixed(4),
+            grossTarget: target.grossTarget.toFixed(8),
             userSharePercent: new Prisma.Decimal(
               subscription.internalTradeUserSharePercent,
             ).toFixed(6),
@@ -413,7 +358,9 @@ export class InternalTradingLifecycleService {
             ).toFixed(6),
             timezoneSnapshot: subscription.settlementTimezone,
             activationLocalDate,
-            finalLocalDate,
+            firstEarningLocalDate: target.firstEarningLocalDate,
+            finalLocalDate: target.finalEarningLocalDate,
+            scheduledEndAt: subscription.scheduledEndAt.toISOString(),
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -550,18 +497,6 @@ export class InternalTradingLifecycleService {
         `Invalid settlement timezone: ${timezone}.`,
       );
     }
-  }
-
-  private addLocalDays(localDate: string, days: number): string {
-    const [year, month, day] = localDate.split('-').map(Number);
-
-    const date = new Date(Date.UTC(year, month - 1, day + days));
-
-    return [
-      date.getUTCFullYear(),
-      String(date.getUTCMonth() + 1).padStart(2, '0'),
-      String(date.getUTCDate()).padStart(2, '0'),
-    ].join('-');
   }
 
   private dateString(value: Date | string): string {
