@@ -214,8 +214,26 @@ describe('PackagesService database-first lifecycle', () => {
       actor,
     );
 
-    const createCall = transaction.packagePlanVersion.create.mock.calls[0][0];
-    expect(createCall.data.items.create[0]).toMatchObject({
+    const createCalls = transaction.packagePlanVersion.create.mock
+      .calls as unknown as Array<
+      [
+        {
+          data: {
+            items: {
+              create: Array<{
+                packageDefinitionId: string;
+                minimumInvestment: Prisma.Decimal | null;
+                maximumInvestment: Prisma.Decimal | null;
+                durationDays: number | null;
+              }>;
+            };
+          };
+        },
+      ]
+    >;
+    const clonedItem = createCalls[0]?.[0].data.items.create[0];
+
+    expect(clonedItem).toMatchObject({
       packageDefinitionId: DEFINITION_ID,
       minimumInvestment: sourceItem.minimumInvestment,
       maximumInvestment: sourceItem.maximumInvestment,
