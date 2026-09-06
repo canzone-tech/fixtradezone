@@ -75,7 +75,7 @@ export class CreatePackagePlanDraftDto {
   @IsString()
   @IsUUID()
   @MaxLength(36)
-  sourcePlanVersionId?: string;
+  sourcePlanVersionId!: string;
 
   @Transform(trimString)
   @IsString()
