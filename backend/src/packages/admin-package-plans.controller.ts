@@ -25,17 +25,11 @@ import {
   UpdatePackagePlanDto,
   UpdatePackagePlanItemDto,
 } from './dto/package-plan.dto';
-import { PackageDefinitionsService } from './package-definitions.service';
-import { PackageDraftService } from './package-draft.service';
 import { PackagesService } from './packages.service';
 
 @Controller('admin/package-plans')
 export class AdminPackagePlansController {
-  constructor(
-    private readonly packagesService: PackagesService,
-    private readonly packageDefinitionsService: PackageDefinitionsService,
-    private readonly packageDraftService: PackageDraftService,
-  ) {}
+  constructor(private readonly packagesService: PackagesService) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -52,7 +46,7 @@ export class AdminPackagePlansController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.packageDraftService.createDraft(
+    return this.packagesService.createDraft(
       dto,
       actor,
       getRequestContext(request),
@@ -89,14 +83,12 @@ export class AdminPackagePlansController {
   @Post(':planVersionId/items')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.PACKAGES_DRAFT_MANAGE)
-  async createPlanItem(
+  createPlanItem(
     @Param('planVersionId', new ParseUUIDPipe()) planVersionId: string,
     @Body() dto: CreatePackagePlanItemDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    await this.packageDefinitionsService.ensure(dto.packageCode);
-
     return this.packagesService.createPlanItem(
       planVersionId,
       dto,
