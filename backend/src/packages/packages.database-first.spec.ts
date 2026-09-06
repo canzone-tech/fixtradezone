@@ -167,7 +167,8 @@ describe('PackagesService database-first lifecycle', () => {
       updatedByUserId: USER_ID,
     });
 
-    const auditCalls = transaction.auditLog.create.mock.calls as unknown as Array<
+    const auditCalls = transaction.auditLog.create.mock
+      .calls as unknown as Array<
       [
         {
           data: {
