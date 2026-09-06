@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Generate FixTradeZone local Postman MASTER v3 from the accepted v2 base.
 
-v3 preserves every v2 request and appends release-closeout auth recovery,
-CAPTCHA, password-change, email-delivery and genealogy acceptance contracts.
+v3 preserves every still-supported v2 request and appends release-closeout auth
+recovery, CAPTCHA, password-change, email-delivery and genealogy acceptance
+contracts. Obsolete package-profile shortcuts are removed because package
+commercial terms are now managed through the generic versioned MySQL catalogue.
 It performs no network or DB I/O.
 """
 
@@ -115,6 +117,41 @@ def add_env(environment: dict[str, Any], key: str, value: str = "") -> None:
     )
 
 
+def request_url_text(item: dict[str, Any]) -> str:
+    request_data = item.get("request")
+    if not isinstance(request_data, dict):
+        return ""
+
+    url = request_data.get("url")
+    if isinstance(url, str):
+        return url
+    if isinstance(url, dict):
+        raw = url.get("raw")
+        return raw if isinstance(raw, str) else ""
+    return ""
+
+
+def remove_obsolete_package_profile_requests(collection: dict[str, Any]) -> None:
+    """Drop the retired canned profile endpoint inherited from MASTER v2."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "07 Packages":
+            continue
+
+        retained: list[dict[str, Any]] = []
+        for item in folder.get("item", []):
+            if not isinstance(item, dict):
+                continue
+
+            name = str(item.get("name", ""))
+            url_text = request_url_text(item)
+            if "Client Package Profile" in name or "/client-profile" in url_text:
+                continue
+            retained.append(item)
+
+        folder["item"] = retained
+
+
 def main() -> int:
     v2 = load_v2()
     collection = json.loads(
@@ -123,6 +160,8 @@ def main() -> int:
     environment = json.loads(
         v2.materialize(v2.ENVIRONMENT_GZIP_B64, v2.ENVIRONMENT_SHA256)
     )
+
+    remove_obsolete_package_profile_requests(collection)
 
     keys = environment_keys(environment)
     superadmin_token = first_existing(
