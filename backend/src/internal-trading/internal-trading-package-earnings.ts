@@ -48,10 +48,7 @@ export function packageUserNetRateForDate(
     );
   }
 
-  if (
-    terms.minimumRewardRate === null ||
-    terms.maximumRewardRate === null
-  ) {
+  if (terms.minimumRewardRate === null || terms.maximumRewardRate === null) {
     throw new BadRequestException(
       'RANDOM_RANGE package earning terms require minimumRewardRate and maximumRewardRate.',
     );
@@ -132,9 +129,7 @@ export function grossTargetForUserNet(
   );
 }
 
-export function derivePackageLifetimeTarget(
-  input: PackageLifetimeTargetInput,
-) {
+export function derivePackageLifetimeTarget(input: PackageLifetimeTargetInput) {
   if (!Number.isInteger(input.earningDays) || input.earningDays < 1) {
     throw new BadRequestException('Package earningDays must be at least 1.');
   }
