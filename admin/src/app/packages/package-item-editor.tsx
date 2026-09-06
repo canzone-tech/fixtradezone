@@ -28,6 +28,14 @@ interface MutationPayload extends ApiErrorPayload {
   item?: PackagePlanItem;
 }
 
+interface PackageItemEditorProps {
+  plan: PackagePlan;
+  item: PackagePlanItem | null;
+  mode: "create" | "edit";
+  onSaved: (message: string) => Promise<void>;
+  onCancel?: () => void;
+}
+
 interface FormState {
   packageCode: string;
   displayName: string;
@@ -164,19 +172,18 @@ function nullableInteger(value: string): number | null {
   return trimmed === "" ? null : Number(trimmed);
 }
 
-export default function PackageItemEditor({
+export default function PackageItemEditor(props: PackageItemEditorProps) {
+  const identity = `${props.plan.id}:${props.plan.revision}:${props.mode}:${props.item?.id ?? "new"}`;
+  return <PackageItemEditorState key={identity} {...props} />;
+}
+
+function PackageItemEditorState({
   plan,
   item,
   mode,
   onSaved,
   onCancel,
-}: {
-  plan: PackagePlan;
-  item: PackagePlanItem | null;
-  mode: "create" | "edit";
-  onSaved: (message: string) => Promise<void>;
-  onCancel?: () => void;
-}) {
+}: PackageItemEditorProps) {
   const [form, setForm] = useState<FormState>(() =>
     item ? formFromItem(item) : emptyForm(),
   );
@@ -504,7 +511,11 @@ export default function PackageItemEditor({
         className={styles.primaryButton}
         disabled={busy || reason.trim().length < 3}
       >
-        {busy ? "Saving…" : mode === "create" ? "Create package" : "Save package"}
+        {busy
+          ? "Saving…"
+          : mode === "create"
+            ? "Create package"
+            : "Save package"}
       </button>
     </form>
   );
