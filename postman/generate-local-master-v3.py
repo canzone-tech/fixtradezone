@@ -152,6 +152,54 @@ def remove_obsolete_package_profile_requests(collection: dict[str, Any]) -> None
         folder["item"] = retained
 
 
+def configure_package_draft_requests(
+    collection: dict[str, Any], superadmin_token: str
+) -> None:
+    """Expose first-plan bootstrap separately from published-plan cloning."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "07 Packages":
+            continue
+
+        items = [item for item in folder.get("item", []) if isinstance(item, dict)]
+        items = [
+            item
+            for item in items
+            if item.get("name") != "MANUAL - Create Initial Package Plan Draft"
+        ]
+
+        successor_index = len(items)
+        for index, item in enumerate(items):
+            if item.get("name") == "MANUAL - Create Package Plan Draft":
+                item["name"] = "MANUAL - Create Successor Package Plan Draft"
+                successor_index = index
+                break
+            if item.get("name") == "MANUAL - Create Successor Package Plan Draft":
+                successor_index = index
+                break
+
+        items.insert(
+            successor_index,
+            request(
+                "MANUAL - Create Initial Package Plan Draft",
+                "POST",
+                "/admin/package-plans/drafts",
+                body={
+                    "reason": "Initialize first database-backed package catalogue"
+                },
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description=(
+                    "Use only when GET List Package Plan Versions returns an empty list. "
+                    "Creates V1 as an empty MySQL-backed draft; no package commercial values "
+                    "are seeded from application code."
+                ),
+            ),
+        )
+        folder["item"] = items
+        return
+
+
 def main() -> int:
     v2 = load_v2()
     collection = json.loads(
@@ -173,6 +221,7 @@ def main() -> int:
             "superadminToken",
         ],
     )
+    configure_package_draft_requests(collection, superadmin_token)
 
     for key in [
         "passwordResetEmail",
