@@ -34,15 +34,19 @@ export class PackagesController {
       return catalogue;
     }
 
-    const activePackageDefinitionIds = new Set(
+    const activePackageDefinitionIds = new Set<string>(
       activePackageRows.map((row) => row.packageDefinitionId),
     );
 
     return {
       ...catalogue,
-      items: catalogue.items.filter(
-        (item) => !activePackageDefinitionIds.has(item.packageDefinitionId),
-      ),
+      items: catalogue.items.filter((item) => {
+        const packageDefinitionId = item.packageDefinitionId;
+        return (
+          typeof packageDefinitionId === 'string' &&
+          !activePackageDefinitionIds.has(packageDefinitionId)
+        );
+      }),
     };
   }
 }
