@@ -5,6 +5,16 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { PackagesService } from './packages.service';
 
+function packageDefinitionIdFrom(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const packageDefinitionId = candidate['packageDefinitionId'];
+  return typeof packageDefinitionId === 'string' ? packageDefinitionId : null;
+}
+
 @Controller('packages')
 export class PackagesController {
   constructor(
@@ -41,9 +51,9 @@ export class PackagesController {
     return {
       ...catalogue,
       items: catalogue.items.filter((item) => {
-        const packageDefinitionId = item.packageDefinitionId;
+        const packageDefinitionId = packageDefinitionIdFrom(item as unknown);
         return (
-          typeof packageDefinitionId === 'string' &&
+          packageDefinitionId === null ||
           !activePackageDefinitionIds.has(packageDefinitionId)
         );
       }),
