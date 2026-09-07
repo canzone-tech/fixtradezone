@@ -510,6 +510,24 @@ export class DepositsService {
         );
       }
 
+      const activeSamePackage = await transaction.$queryRaw<
+        Array<{ id: string }>
+      >(Prisma.sql`
+        SELECT ups.id
+        FROM user_package_subscriptions ups
+        WHERE ups.userId = ${actor.id}
+          AND ups.packageDefinitionId = ${item.packageDefinition.id}
+          AND ups.status = 'ACTIVE'
+        LIMIT 1
+        FOR UPDATE
+      `);
+
+      if (activeSamePackage.length > 0) {
+        throw new ConflictException(
+          'You already have an active subscription for this package.',
+        );
+      }
+
       if (
         plan.activationTrigger !== 'PAYMENT_APPROVED' &&
         plan.activationTrigger !== 'MANUAL_ACTIVATION'
