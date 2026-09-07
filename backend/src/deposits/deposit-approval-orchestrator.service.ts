@@ -155,7 +155,7 @@ export class DepositApprovalOrchestratorService {
       ...approval,
       message: downstream.downstreamPending
         ? 'Deposit approved, accounted, and package activated. One or more downstream earnings stages remain safely recoverable.'
-        : 'Deposit approved, accounted, package activated, commission processed, and reward lifecycle initialized automatically.',
+        : 'Deposit approved, accounted, package activated, and downstream earnings processing completed automatically.',
       operationsMode: operations.operationsMode,
       platformTimezone: operations.platformTimezone,
       accountingPostingMode: postingMode,
