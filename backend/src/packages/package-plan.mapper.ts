@@ -204,10 +204,10 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
           ? ('NO_CAPITAL_RETURN' as const)
           : ('LEGACY_INCLUDED_IN_TOTAL_RETURN' as const),
     maximumTotalReturn: rangeConfigured
-      ? rangeMaximums?.maximumTotalReturn.toFixed(8) ?? null
+      ? (rangeMaximums?.maximumTotalReturn.toFixed(8) ?? null)
       : legacyMaximumTotalReturn.toFixed(8),
     maximumProfit: rangeConfigured
-      ? rangeMaximums?.maximumProfit.toFixed(8) ?? null
+      ? (rangeMaximums?.maximumProfit.toFixed(8) ?? null)
       : legacyMaximumProfit.toFixed(8),
     goalDays: item.goalDays,
     cycleDays: item.cycleDays,
@@ -225,7 +225,10 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
 function rangeMaximumUserReturn(
   item: PlanItemWithDefinition,
   durationDays: number,
-): { maximumProfit: Prisma.Decimal; maximumTotalReturn: Prisma.Decimal } | null {
+): {
+  maximumProfit: Prisma.Decimal;
+  maximumTotalReturn: Prisma.Decimal;
+} | null {
   const principal = item.maximumInvestment;
   if (principal == null) {
     return null;
