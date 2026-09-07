@@ -1,11 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
+import { SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { RequestContext } from '../auth/auth.types';
 import { OperationsConfigService } from '../platform-config/operations-config.service';
 import { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
-import type { ReviewDepositDto } from './dto/deposit.dto';
+import type {
+  BulkApproveDepositsDto,
+  ReviewDepositDto,
+} from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
 
 @Injectable()
@@ -26,6 +30,8 @@ export class DepositApprovalOrchestratorService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
+    this.assertSuperAdmin(actor);
+
     const operations = await this.operationsConfigService.getOperations();
     const postingMode =
       operations.operationsMode === 'AUTOMATIC'
@@ -163,6 +169,64 @@ export class DepositApprovalOrchestratorService {
       ...downstream,
       automaticDownstreamProcessing: true,
     };
+  }
+
+  async approveDepositsBulk(
+    dto: BulkApproveDepositsDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    this.assertSuperAdmin(actor);
+
+    const results: Array<{
+      depositId: string;
+      ok: boolean;
+      message: string;
+      status?: string;
+      accountingPosted?: boolean;
+      packageActivated?: boolean;
+    }> = [];
+
+    for (const depositId of dto.depositIds) {
+      try {
+        const result = await this.approveDeposit(
+          depositId,
+          { note: dto.note },
+          actor,
+          context,
+        );
+        results.push({
+          depositId,
+          ok: true,
+          message: result.message,
+          status: result.deposit.status,
+          accountingPosted: result.accountingPosted,
+          packageActivated: result.packageActivated,
+        });
+      } catch (error) {
+        results.push({
+          depositId,
+          ok: false,
+          message: this.errorMessage(error, 'Deposit approval failed.'),
+        });
+      }
+    }
+
+    const approved = results.filter((result) => result.ok).length;
+    const failed = results.length - approved;
+
+    return {
+      message: `Bulk deposit approval completed: ${approved} approved, ${failed} failed.`,
+      approved,
+      failed,
+      results,
+    };
+  }
+
+  private assertSuperAdmin(actor: AuthenticatedUser): void {
+    if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
+      throw new ForbiddenException('Only SUPER_ADMIN may approve deposits.');
+    }
   }
 
   private errorMessage(error: unknown, fallback: string): string {

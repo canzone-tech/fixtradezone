@@ -1,5 +1,9 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -180,6 +184,20 @@ export class SubmitDepositTxidDto {
 }
 
 export class ReviewDepositDto {
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 1000)
+  note!: string;
+}
+
+export class BulkApproveDepositsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  depositIds!: string[];
+
   @Transform(trimString)
   @IsString()
   @Length(3, 1000)

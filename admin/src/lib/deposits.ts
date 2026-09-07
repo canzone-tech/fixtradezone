@@ -3,6 +3,7 @@ import type { PackagePlanItem } from "@/lib/packages";
 export type DepositStatus =
   | "AWAITING_TXID"
   | "PENDING_REVIEW"
+  | "READY_FOR_APPROVAL"
   | "APPROVED"
   | "REJECTED";
 
@@ -75,12 +76,20 @@ export interface Deposit {
   assignedQrCodeDataUrl: string;
   txid: string | null;
   submittedAt: string | null;
+  readyForApprovalByUserId: string | null;
+  readyForApprovalAt: string | null;
+  readyForApprovalNote: string | null;
   reviewedByUserId: string | null;
   reviewedAt: string | null;
   reviewNote: string | null;
   createdAt: string;
   updatedAt: string;
   user?: DepositUserSummary;
+  readyForApprovalBy?: {
+    id: string;
+    username: string;
+    email: string | null;
+  } | null;
   reviewedBy?: {
     id: string;
     username: string;
@@ -120,6 +129,7 @@ export interface PackageActivationOutcome {
 export interface DepositMutationResponse {
   message: string;
   deposit: Deposit;
+  alreadyApproved?: boolean;
   accountingPostingMode?: "AUTO_ON_APPROVAL" | "MANUAL_RECONCILIATION";
   accountingPosted?: boolean;
   packageActivated?: boolean;
@@ -131,6 +141,19 @@ export interface DepositMutationResponse {
     status: string;
     packageDisplayName?: string;
   };
+}
+
+export interface DepositBulkApprovalResponse extends ApiMessagePayload {
+  approved: number;
+  failed: number;
+  results: Array<{
+    depositId: string;
+    ok: boolean;
+    message: string;
+    status?: string;
+    accountingPosted?: boolean;
+    packageActivated?: boolean;
+  }>;
 }
 
 export interface DepositAccountingResponse extends ApiMessagePayload {
@@ -178,6 +201,23 @@ export function messageFrom(
 export function compactDecimal(value: string): string {
   if (!value.includes(".")) return value;
   return value.replace(/0+$/, "").replace(/\.$/, "") || "0";
+}
+
+export function sumDecimalStrings(values: string[]): string {
+  const scale = 100_000_000n;
+  let total = 0n;
+
+  for (const value of values) {
+    const match = /^(\d+)(?:\.(\d{1,8}))?$/.exec(value);
+    if (!match) throw new Error(`Invalid decimal amount: ${value}`);
+    const whole = BigInt(match[1]);
+    const fraction = BigInt((match[2] ?? "").padEnd(8, "0"));
+    total += whole * scale + fraction;
+  }
+
+  const whole = total / scale;
+  const fraction = (total % scale).toString().padStart(8, "0").replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : whole.toString();
 }
 
 export function normalizeTransactionId(
@@ -233,6 +273,8 @@ export function statusTone(status: DepositStatus): string {
       return "danger";
     case "PENDING_REVIEW":
       return "warning";
+    case "READY_FOR_APPROVAL":
+      return "info";
     default:
       return "info";
   }

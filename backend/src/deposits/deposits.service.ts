@@ -2,11 +2,13 @@ import { randomInt } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
+import { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
@@ -72,6 +74,13 @@ const DEPOSIT_INCLUDE = {
       email: true,
       firstName: true,
       lastName: true,
+    },
+  },
+  readyForApprovalBy: {
+    select: {
+      id: true,
+      username: true,
+      email: true,
     },
   },
   reviewedBy: {
@@ -788,13 +797,95 @@ export class DepositsService {
     return { deposit: this.depositSnapshot(deposit) };
   }
 
+  markReadyForApproval(
+    depositId: string,
+    dto: ReviewDepositDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    this.assertAdminMaker(actor);
+
+    return this.runSerializable(async (transaction) => {
+      const before = await transaction.deposit.findUnique({
+        where: { id: depositId },
+        include: DEPOSIT_INCLUDE,
+      });
+
+      if (!before) {
+        throw new NotFoundException('Deposit was not found.');
+      }
+
+      if (before.status !== 'PENDING_REVIEW') {
+        throw new ConflictException(
+          'Only a deposit pending review may be marked ready for approval.',
+        );
+      }
+
+      const readyForApprovalAt = new Date();
+      const updated = await transaction.deposit.updateMany({
+        where: {
+          id: depositId,
+          status: 'PENDING_REVIEW',
+          openKey: before.userId,
+        },
+        data: {
+          status: 'READY_FOR_APPROVAL',
+          readyForApprovalByUserId: actor.id,
+          readyForApprovalAt,
+          readyForApprovalNote: dto.note,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new ConflictException(
+          'Deposit changed concurrently; reload and retry.',
+        );
+      }
+
+      const after = await transaction.deposit.findUniqueOrThrow({
+        where: { id: depositId },
+        include: DEPOSIT_INCLUDE,
+      });
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: 'UPDATE',
+          entityType: 'Deposit',
+          entityId: depositId,
+          description:
+            'ADMIN reviewed a submitted deposit and marked it ready for SUPER_ADMIN approval.',
+          metadata: {
+            source: 'ADMIN_DEPOSIT_REVIEW',
+            operation: DEPOSIT_AUDIT_OPERATIONS.MARK_READY,
+            note: dto.note,
+            txid: before.txid,
+            amount: before.amount.toString(),
+            currency: before.currency,
+            assignedNetwork: before.assignedNetwork,
+            readyForApprovalAt: readyForApprovalAt.toISOString(),
+            readyForApprovalByUserId: actor.id,
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        },
+      });
+
+      return {
+        message: 'Deposit reviewed and marked ready for SUPER_ADMIN approval.',
+        deposit: this.depositSnapshot(after),
+      };
+    });
+  }
+
   approveDeposit(
     depositId: string,
     dto: ReviewDepositDto,
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
-    return this.reviewDeposit(depositId, 'APPROVED', dto, actor, context);
+    this.assertSuperAdmin(actor);
+    return this.finalizeDeposit(depositId, 'APPROVED', dto, actor, context);
   }
 
   rejectDeposit(
@@ -803,10 +894,11 @@ export class DepositsService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
-    return this.reviewDeposit(depositId, 'REJECTED', dto, actor, context);
+    this.assertReviewer(actor);
+    return this.finalizeDeposit(depositId, 'REJECTED', dto, actor, context);
   }
 
-  private async reviewDeposit(
+  private async finalizeDeposit(
     depositId: string,
     targetStatus: Extract<DepositStatus, 'APPROVED' | 'REJECTED'>,
     dto: ReviewDepositDto,
@@ -823,9 +915,27 @@ export class DepositsService {
         throw new NotFoundException('Deposit was not found.');
       }
 
-      if (before.status !== 'PENDING_REVIEW') {
+      if (targetStatus === 'APPROVED' && before.status === 'APPROVED') {
+        return {
+          message: 'Deposit was already approved.',
+          deposit: this.depositSnapshot(before),
+          alreadyApproved: true,
+        };
+      }
+
+      if (targetStatus === 'APPROVED' && before.status !== 'READY_FOR_APPROVAL') {
         throw new ConflictException(
-          'Only a deposit pending review may be approved or rejected.',
+          'Only an ADMIN-reviewed deposit ready for approval may be approved.',
+        );
+      }
+
+      if (
+        targetStatus === 'REJECTED' &&
+        before.status !== 'PENDING_REVIEW' &&
+        before.status !== 'READY_FOR_APPROVAL'
+      ) {
+        throw new ConflictException(
+          'Only a deposit pending review or ready for approval may be rejected.',
         );
       }
 
@@ -833,7 +943,7 @@ export class DepositsService {
       const updated = await transaction.deposit.updateMany({
         where: {
           id: depositId,
-          status: 'PENDING_REVIEW',
+          status: before.status,
           openKey: before.userId,
         },
         data: {
@@ -864,8 +974,8 @@ export class DepositsService {
           entityId: depositId,
           description:
             targetStatus === 'APPROVED'
-              ? 'Administrator approved a manually reviewed deposit.'
-              : 'Administrator rejected a manually reviewed deposit.',
+              ? 'SUPER_ADMIN approved an ADMIN-reviewed deposit.'
+              : 'Administrator rejected a reviewed deposit.',
           metadata: {
             source: 'ADMIN_DEPOSIT_REVIEW',
             operation:
@@ -880,6 +990,8 @@ export class DepositsService {
             assignedWalletAddress: before.assignedWalletAddress,
             assignedNetwork: before.assignedNetwork,
             assignedValidationProfile: before.assignedValidationProfile,
+            readyForApprovalByUserId: before.readyForApprovalByUserId,
+            readyForApprovalAt: before.readyForApprovalAt?.toISOString() ?? null,
             reviewedAt: reviewedAt.toISOString(),
             downstreamAccountingApplied: false,
             packageActivationApplied: false,
@@ -895,8 +1007,35 @@ export class DepositsService {
             ? 'Deposit approved. Accounting credit is deferred.'
             : 'Deposit rejected.',
         deposit: this.depositSnapshot(after),
+        alreadyApproved: false,
       };
     });
+  }
+
+  private assertAdminMaker(actor: AuthenticatedUser): void {
+    if (
+      actor.roles.includes(SUPER_ADMIN_ROLE_NAME) ||
+      !actor.roles.includes(ADMIN_ROLE_NAME)
+    ) {
+      throw new ForbiddenException(
+        'Only an ADMIN reviewer may mark a deposit ready for approval.',
+      );
+    }
+  }
+
+  private assertSuperAdmin(actor: AuthenticatedUser): void {
+    if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
+      throw new ForbiddenException('Only SUPER_ADMIN may approve deposits.');
+    }
+  }
+
+  private assertReviewer(actor: AuthenticatedUser): void {
+    if (
+      !actor.roles.includes(SUPER_ADMIN_ROLE_NAME) &&
+      !actor.roles.includes(ADMIN_ROLE_NAME)
+    ) {
+      throw new ForbiddenException('Administrator review access is required.');
+    }
   }
 
   private depositSnapshot(deposit: {
@@ -921,6 +1060,9 @@ export class DepositsService {
     assignedQrCodeDataUrl: string;
     txid: string | null;
     submittedAt: Date | null;
+    readyForApprovalByUserId: string | null;
+    readyForApprovalAt: Date | null;
+    readyForApprovalNote: string | null;
     reviewedByUserId: string | null;
     reviewedAt: Date | null;
     reviewNote: string | null;
@@ -933,6 +1075,11 @@ export class DepositsService {
       firstName: string | null;
       lastName: string | null;
     };
+    readyForApprovalBy: {
+      id: string;
+      username: string;
+      email: string | null;
+    } | null;
     reviewedBy: {
       id: string;
       username: string;
@@ -965,12 +1112,16 @@ export class DepositsService {
       assignedQrCodeDataUrl: deposit.assignedQrCodeDataUrl,
       txid: deposit.txid,
       submittedAt: deposit.submittedAt,
+      readyForApprovalByUserId: deposit.readyForApprovalByUserId,
+      readyForApprovalAt: deposit.readyForApprovalAt,
+      readyForApprovalNote: deposit.readyForApprovalNote,
       reviewedByUserId: deposit.reviewedByUserId,
       reviewedAt: deposit.reviewedAt,
       reviewNote: deposit.reviewNote,
       createdAt: deposit.createdAt,
       updatedAt: deposit.updatedAt,
       user: deposit.user,
+      readyForApprovalBy: deposit.readyForApprovalBy,
       reviewedBy: deposit.reviewedBy,
     };
   }

@@ -200,6 +200,75 @@ def configure_package_draft_requests(
         return
 
 
+
+
+def configure_deposit_maker_checker_requests(
+    collection: dict[str, Any], admin_token: str, superadmin_token: str
+) -> None:
+    """Replace the inherited direct-approval request with maker-checker acceptance."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "08 Deposits":
+            continue
+
+        retained: list[dict[str, Any]] = []
+        insert_at = len(folder.get("item", []))
+        for item in folder.get("item", []):
+            if not isinstance(item, dict):
+                continue
+            url_text = request_url_text(item)
+            if url_text.endswith("/admin/deposits/{{depositId}}/approve"):
+                insert_at = min(insert_at, len(retained))
+                continue
+            retained.append(item)
+
+        maker_checker = [
+            request(
+                "MANUAL REVIEW - Mark Deposit Ready for Approval",
+                "POST",
+                "/admin/deposits/{{depositId}}/ready-for-approval",
+                body={"note": "ADMIN verified the submitted payment evidence"},
+                bearer_variable=admin_token,
+                state_change=True,
+                description="ADMIN maker step. Must move only PENDING_REVIEW to READY_FOR_APPROVAL and must not post accounting.",
+            ),
+            request(
+                "MANUAL NEGATIVE - ADMIN Final Approval Must Be Forbidden",
+                "POST",
+                "/admin/deposits/{{depositId}}/approve",
+                body={"note": "ADMIN must not be able to approve"},
+                bearer_variable=admin_token,
+                state_change=True,
+                description="Expected HTTP 403. ADMIN may review/mark-ready/reject but never final-approve.",
+            ),
+            request(
+                "MANUAL FINANCIAL - SUPER_ADMIN Approve Deposit",
+                "POST",
+                "/admin/deposits/{{depositId}}/approve",
+                body={"note": "SUPER_ADMIN final approval after ADMIN review"},
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description="Final approval is SUPER_ADMIN-only and accepts only READY_FOR_APPROVAL. In AUTOMATIC operations it may post accounting, activate the package and run downstream earnings stages.",
+            ),
+            request(
+                "MANUAL FINANCIAL - SUPER_ADMIN Bulk Approve Selected",
+                "POST",
+                "/admin/deposits/bulk-approve",
+                body={
+                    "depositIds": ["{{depositId}}"],
+                    "note": "SUPER_ADMIN selected bulk final approval",
+                },
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description="Selected READY_FOR_APPROVAL deposits are processed independently; one failed item must not roll back successful approvals.",
+            ),
+        ]
+
+        retained[insert_at:insert_at] = maker_checker
+        folder["item"] = retained
+        return
+
+
 def main() -> int:
     v2 = load_v2()
     collection = json.loads(
@@ -221,7 +290,17 @@ def main() -> int:
             "superadminToken",
         ],
     )
+    admin_token = first_existing(
+        keys,
+        [
+            "adminAccessToken",
+            "adminToken",
+        ],
+    )
     configure_package_draft_requests(collection, superadmin_token)
+    configure_deposit_maker_checker_requests(
+        collection, admin_token, superadmin_token
+    )
 
     for key in [
         "passwordResetEmail",

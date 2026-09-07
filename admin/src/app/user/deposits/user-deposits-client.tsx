@@ -161,7 +161,8 @@ export default function UserDepositsClient() {
       deposits.find(
         (deposit) =>
           deposit.status === "AWAITING_TXID" ||
-          deposit.status === "PENDING_REVIEW",
+          deposit.status === "PENDING_REVIEW" ||
+          deposit.status === "READY_FOR_APPROVAL",
       ) ?? null,
     [deposits],
   );
@@ -519,8 +520,11 @@ export default function UserDepositsClient() {
               <div className={styles.notice}>
                 Transaction ID{" "}
                 <span className={styles.mono}>{openDeposit.txid}</span> was
-                submitted {formatDate(openDeposit.submittedAt)}. Manual review
-                is pending; do not send another payment for this request.
+                submitted {formatDate(openDeposit.submittedAt)}.{" "}
+                {openDeposit.status === "READY_FOR_APPROVAL"
+                  ? "ADMIN review is complete and final SUPER_ADMIN approval is pending."
+                  : "ADMIN review is pending."}{" "}
+                Do not send another payment for this request.
               </div>
             )}
           </section>

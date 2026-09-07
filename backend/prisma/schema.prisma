@@ -190,6 +190,7 @@ enum PackageCapReachedAction {
 enum DepositStatus {
   AWAITING_TXID
   PENDING_REVIEW
+  READY_FOR_APPROVAL
   APPROVED
   REJECTED
 }
@@ -275,6 +276,7 @@ model User {
   depositAccountsUpdated     DepositAccount[]     @relation("DepositAccountUpdatedBy")
   deposits                   Deposit[]            @relation("DepositOwner")
   depositsReviewed           Deposit[]            @relation("DepositReviewer")
+  depositsMarkedReady        Deposit[]            @relation("DepositReadyReviewer")
 
   @@index([status])
   @@index([createdAt])
@@ -772,6 +774,9 @@ model Deposit {
   assignedQrCodeDataUrl     String                   @db.MediumText
   txid                      String?                  @db.VarChar(191)
   submittedAt               DateTime?                @db.DateTime(3)
+  readyForApprovalByUserId  String?                  @db.Char(36)
+  readyForApprovalAt        DateTime?                @db.DateTime(3)
+  readyForApprovalNote      String?                  @db.VarChar(1000)
   reviewedByUserId          String?                  @db.Char(36)
   reviewedAt                DateTime?                @db.DateTime(3)
   reviewNote                String?                  @db.VarChar(1000)
@@ -782,7 +787,8 @@ model Deposit {
   packagePlanVersion     PackagePlanVersion @relation(fields: [packagePlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   packagePlanItem        PackagePlanItem    @relation(fields: [packagePlanItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   assignedDepositAccount DepositAccount     @relation(fields: [assignedDepositAccountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  reviewedBy             User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  readyForApprovalBy      User?              @relation("DepositReadyReviewer", fields: [readyForApprovalByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reviewedBy              User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([assignedNetwork, txid])
   @@index([userId, createdAt])
@@ -790,6 +796,7 @@ model Deposit {
   @@index([packagePlanVersionId])
   @@index([packagePlanItemId])
   @@index([assignedDepositAccountId])
+  @@index([readyForApprovalByUserId])
   @@index([reviewedByUserId])
   @@map("deposits")
 }

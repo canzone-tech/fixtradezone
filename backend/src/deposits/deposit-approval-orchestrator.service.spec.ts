@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { OperationsConfigService } from '../platform-config/operations-config.service';
 import type { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
@@ -20,6 +21,15 @@ const actor: AuthenticatedUser = {
   lastLoginAt: null,
   roles: ['SUPER_ADMIN'],
   permissions: [],
+};
+
+const adminActor: AuthenticatedUser = {
+  ...actor,
+  id: '33333333-3333-4333-8333-333333333333',
+  email: 'reviewer@example.com',
+  username: 'reviewer',
+  roles: ['ADMIN'],
+  permissions: ['deposits.review'],
 };
 
 describe('DepositApprovalOrchestratorService', () => {
@@ -95,6 +105,19 @@ describe('DepositApprovalOrchestratorService', () => {
       subscriptionsService as unknown as SubscriptionsService,
       postActivationService as unknown as SubscriptionPostActivationService,
     );
+  });
+
+  it('blocks ADMIN final approval before reading operations policy', async () => {
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'ADMIN must not approve' },
+        adminActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
+    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
   });
 
   it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {
@@ -214,6 +237,37 @@ describe('DepositApprovalOrchestratorService', () => {
       packageActivated: false,
       packageActivationPendingReason:
         'This plan allows only one active package for the USER.',
+    });
+  });
+
+  it('bulk approval isolates one failed deposit instead of rolling back successful items', async () => {
+    const secondDepositId = '44444444-4444-4444-8444-444444444444';
+    depositsService.approveDeposit
+      .mockResolvedValueOnce({
+        message: 'Deposit approved.',
+        deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+      })
+      .mockRejectedValueOnce(new Error('Deposit is not ready for approval.'));
+
+    const result = await service.approveDepositsBulk(
+      {
+        depositIds: [DEPOSIT_ID, secondDepositId],
+        note: 'Founder bulk final approval',
+      },
+      actor,
+    );
+
+    expect(result).toMatchObject({
+      approved: 1,
+      failed: 1,
+      results: [
+        { depositId: DEPOSIT_ID, ok: true },
+        {
+          depositId: secondDepositId,
+          ok: false,
+          message: 'Deposit is not ready for approval.',
+        },
+      ],
     });
   });
 

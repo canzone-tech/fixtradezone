@@ -16,7 +16,11 @@ import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
-import { AdminDepositQueryDto, ReviewDepositDto } from './dto/deposit.dto';
+import {
+  AdminDepositQueryDto,
+  BulkApproveDepositsDto,
+  ReviewDepositDto,
+} from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
 
 @Controller('admin/deposits')
@@ -38,6 +42,38 @@ export class AdminDepositsController {
   @RequirePermissions(PERMISSIONS.DEPOSITS_READ)
   getDeposit(@Param('depositId', new ParseUUIDPipe()) depositId: string) {
     return this.depositsService.getDeposit(depositId);
+  }
+
+  @Post(':depositId/ready-for-approval')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermissions(PERMISSIONS.DEPOSITS_REVIEW)
+  markReadyForApproval(
+    @Param('depositId', new ParseUUIDPipe()) depositId: string,
+    @Body() dto: ReviewDepositDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.depositsService.markReadyForApproval(
+      depositId,
+      dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Post('bulk-approve')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermissions(PERMISSIONS.DEPOSITS_REVIEW)
+  bulkApproveDeposits(
+    @Body() dto: BulkApproveDepositsDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.depositApprovalOrchestrator.approveDepositsBulk(
+      dto,
+      actor,
+      getRequestContext(request),
+    );
   }
 
   @Post(':depositId/approve')
