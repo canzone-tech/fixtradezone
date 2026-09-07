@@ -1,3 +1,4 @@
+import { Prisma } from '../generated/prisma/client';
 import type {
   CreatePackagePlanItemDto,
   UpdatePackagePlanItemDto,
@@ -152,21 +153,25 @@ export function toPlanSnapshot(plan: PlanWithItems) {
 }
 
 export function toItemSnapshot(item: PlanItemWithDefinition) {
-  const capAmount = item.price.mul(item.capMultiplier);
-  const maximumProfit =
-    item.capBasis === 'TOTAL_RETURN' &&
-    item.principalTreatment === 'INCLUDED_IN_TOTAL_RETURN'
-      ? capAmount.minus(item.price)
-      : capAmount;
-  const maximumTotalReturn =
-    item.capBasis === 'PROFIT_ONLY' &&
-    item.principalTreatment === 'RETURN_SEPARATELY'
-      ? capAmount.plus(item.price)
-      : capAmount;
-
   const minimumInvestment = item.minimumInvestment ?? item.price;
   const durationDays = item.durationDays ?? item.goalDays;
   const rangeConfigured = item.minimumInvestment != null;
+
+  const legacyCapAmount = item.price.mul(item.capMultiplier);
+  const legacyMaximumProfit =
+    item.capBasis === 'TOTAL_RETURN' &&
+    item.principalTreatment === 'INCLUDED_IN_TOTAL_RETURN'
+      ? legacyCapAmount.minus(item.price)
+      : legacyCapAmount;
+  const legacyMaximumTotalReturn =
+    item.capBasis === 'PROFIT_ONLY' &&
+    item.principalTreatment === 'RETURN_SEPARATELY'
+      ? legacyCapAmount.plus(item.price)
+      : legacyCapAmount;
+
+  const rangeMaximums = rangeConfigured
+    ? rangeMaximumUserReturn(item, durationDays)
+    : null;
 
   return {
     id: item.id,
@@ -198,8 +203,12 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
         : item.principalTreatment === 'NON_REFUNDABLE_PACKAGE_VALUE'
           ? ('NO_CAPITAL_RETURN' as const)
           : ('LEGACY_INCLUDED_IN_TOTAL_RETURN' as const),
-    maximumTotalReturn: maximumTotalReturn.toFixed(8),
-    maximumProfit: maximumProfit.toFixed(8),
+    maximumTotalReturn: rangeConfigured
+      ? rangeMaximums?.maximumTotalReturn.toFixed(8) ?? null
+      : legacyMaximumTotalReturn.toFixed(8),
+    maximumProfit: rangeConfigured
+      ? rangeMaximums?.maximumProfit.toFixed(8) ?? null
+      : legacyMaximumProfit.toFixed(8),
     goalDays: item.goalDays,
     cycleDays: item.cycleDays,
     rewardStartMode: item.rewardStartMode,
@@ -211,6 +220,35 @@ export function toItemSnapshot(item: PlanItemWithDefinition) {
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
   };
+}
+
+function rangeMaximumUserReturn(
+  item: PlanItemWithDefinition,
+  durationDays: number,
+): { maximumProfit: Prisma.Decimal; maximumTotalReturn: Prisma.Decimal } | null {
+  const principal = item.maximumInvestment;
+  if (principal == null) {
+    return null;
+  }
+
+  const upperRate =
+    item.rewardRateMode === 'FIXED'
+      ? item.fixedRewardRate
+      : item.rewardRateMode === 'RANDOM_RANGE'
+        ? item.maximumRewardRate
+        : null;
+
+  if (upperRate == null) {
+    return null;
+  }
+
+  const maximumProfit = principal.mul(upperRate).mul(durationDays).div(100);
+  const maximumTotalReturn =
+    item.principalTreatment === 'RETURN_SEPARATELY'
+      ? principal.add(maximumProfit)
+      : maximumProfit;
+
+  return { maximumProfit, maximumTotalReturn };
 }
 
 function iso(value: Date | null) {
