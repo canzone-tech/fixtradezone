@@ -797,7 +797,7 @@ export class DepositsService {
     return { deposit: this.depositSnapshot(deposit) };
   }
 
-  markReadyForApproval(
+  async markReadyForApproval(
     depositId: string,
     dto: ReviewDepositDto,
     actor: AuthenticatedUser,
@@ -878,7 +878,7 @@ export class DepositsService {
     });
   }
 
-  approveDeposit(
+  async approveDeposit(
     depositId: string,
     dto: ReviewDepositDto,
     actor: AuthenticatedUser,
@@ -923,7 +923,10 @@ export class DepositsService {
         };
       }
 
-      if (targetStatus === 'APPROVED' && before.status !== 'READY_FOR_APPROVAL') {
+      if (
+        targetStatus === 'APPROVED' &&
+        before.status !== 'READY_FOR_APPROVAL'
+      ) {
         throw new ConflictException(
           'Only an ADMIN-reviewed deposit ready for approval may be approved.',
         );
@@ -991,7 +994,8 @@ export class DepositsService {
             assignedNetwork: before.assignedNetwork,
             assignedValidationProfile: before.assignedValidationProfile,
             readyForApprovalByUserId: before.readyForApprovalByUserId,
-            readyForApprovalAt: before.readyForApprovalAt?.toISOString() ?? null,
+            readyForApprovalAt:
+              before.readyForApprovalAt?.toISOString() ?? null,
             reviewedAt: reviewedAt.toISOString(),
             downstreamAccountingApplied: false,
             packageActivationApplied: false,
