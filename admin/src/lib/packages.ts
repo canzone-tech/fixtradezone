@@ -127,8 +127,8 @@ export interface PackagePlanItem {
   capMultiplier: string;
   principalTreatment: string;
   principalReturn: PackagePrincipalReturn;
-  maximumTotalReturn: string;
-  maximumProfit: string;
+  maximumTotalReturn: string | null;
+  maximumProfit: string | null;
   goalDays: number;
   cycleDays: number;
   rewardStartMode: string;
