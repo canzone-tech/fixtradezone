@@ -30,6 +30,7 @@ import {
 } from "@/lib/packages";
 import {
   formatPlatformDateTime,
+  platformIsoToLocalDateTimeInput,
   platformLocalDateTimeToIso,
 } from "@/lib/platform-time";
 import styles from "./packages.module.css";
@@ -151,35 +152,6 @@ function maximumSummary(item: PackagePlanItem): string {
   return `${decimalLabel(item.maximumTotalReturn)} ${item.currency} max total`;
 }
 
-function isoToPlatformInput(value: string | null, timeZone: string): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-
-  const read = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-
-  const year = read("year");
-  const month = read("month");
-  const day = read("day");
-  const hour = read("hour");
-  const minute = read("minute");
-
-  return year && month && day && hour && minute
-    ? `${year}-${month}-${day}T${hour}:${minute}`
-    : "";
-}
-
 function utcPreview(value: string, timeZone: string): string {
   if (!value) return "Server publication time";
   return platformLocalDateTimeToIso(value, timeZone) ?? "Invalid local time";
@@ -188,6 +160,7 @@ function utcPreview(value: string, timeZone: string): string {
 export default function PackagesReviewClient() {
   const router = useRouter();
   const { timeZone } = usePlatformTime();
+
   const [actor, setActor] = useState<AdminUser | null>(null);
   const [plans, setPlans] = useState<PackagePlanSummary[]>([]);
   const [plan, setPlan] = useState<PackagePlan | null>(null);
@@ -213,11 +186,6 @@ export default function PackagesReviewClient() {
   const canManage = actor ? canManagePackages(actor) : false;
   const existingDraft = plans.find((candidate) => candidate.status === "DRAFT");
 
-  const selectedItem = useMemo(
-    () => plan?.items.find((item) => item.id === selectedItemId) ?? null,
-    [plan, selectedItemId],
-  );
-
   const sortedItems = useMemo(
     () =>
       plan
@@ -226,11 +194,16 @@ export default function PackagesReviewClient() {
     [plan],
   );
 
-  const settingsDirty = useMemo(() => {
-    if (!plan || !settings || plan.status !== "DRAFT") {
-      return false;
-    }
+  const selectedItem = useMemo(
+    () =>
+      sortedItems.find((item) => item.id === selectedItemId) ??
+      sortedItems[0] ??
+      null,
+    [selectedItemId, sortedItems],
+  );
 
+  const settingsDirty = useMemo(() => {
+    if (!plan || !settings || plan.status !== "DRAFT") return false;
     return JSON.stringify(settings) !== JSON.stringify(settingsFromPlan(plan));
   }, [plan, settings]);
 
@@ -238,11 +211,16 @@ export default function PackagesReviewClient() {
     setPlan(nextPlan);
     setSelectedPlanId(nextPlan.id);
     setSettings(settingsFromPlan(nextPlan));
-    setClosureAt(isoToPlatformInput(nextPlan.effectiveTo, timeZone));
+    setClosureAt(
+      platformIsoToLocalDateTimeInput(nextPlan.effectiveTo, timeZone),
+    );
 
+    const nextItems = [...nextPlan.items].sort(
+      (left, right) => left.sortOrder - right.sortOrder,
+    );
     const nextItem =
-      nextPlan.items.find((item) => item.id === selectedItemId) ??
-      [...nextPlan.items].sort((left, right) => left.sortOrder - right.sortOrder)[0] ??
+      nextItems.find((item) => item.id === selectedItemId) ??
+      nextItems[0] ??
       null;
 
     setSelectedItemId(nextItem?.id ?? "");
@@ -287,7 +265,10 @@ export default function PackagesReviewClient() {
     return payload.planVersions;
   }
 
-  async function refreshWorkspace(preferredPlanId?: string, message?: string) {
+  async function refreshWorkspace(
+    preferredPlanId?: string,
+    message?: string,
+  ) {
     const nextPlans = await loadPlanList();
     const targetId =
       (preferredPlanId &&
@@ -304,9 +285,7 @@ export default function PackagesReviewClient() {
       return;
     }
 
-    const nextPlan = await loadPlan(targetId);
-    applyPlan(nextPlan);
-
+    applyPlan(await loadPlan(targetId));
     if (message) setSuccess(message);
   }
 
@@ -328,6 +307,7 @@ export default function PackagesReviewClient() {
         }
 
         if (!mounted) return;
+
         setActor(session.user);
         if (!canReadPackages(session.user)) return;
 
@@ -357,12 +337,13 @@ export default function PackagesReviewClient() {
     }
 
     void load();
+
     return () => {
       mounted = false;
     };
-    // Session-first one-time load.
+    // Session-first initial load; plan loaders intentionally stay local.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, timeZone]);
 
   async function selectPlan(planVersionId: string) {
     if (planVersionId === selectedPlanId || loadingPlan) return;
@@ -382,16 +363,12 @@ export default function PackagesReviewClient() {
     try {
       applyPlan(await loadPlan(planVersionId));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to load plan.");
+      setError(
+        caught instanceof Error ? caught.message : "Unable to load plan.",
+      );
     } finally {
       setLoadingPlan(false);
     }
-  }
-
-  function selectItem(item: PackagePlanItem) {
-    setSelectedItemId(item.id);
-    setError("");
-    setSuccess("");
   }
 
   async function submitMutation(
@@ -415,10 +392,12 @@ export default function PackagesReviewClient() {
 
       if (!response.ok) {
         const message = apiMessage(payload, "Package plan request failed.");
+
         if (response.status === 409 && preferredPlanId) {
           await refreshWorkspace(preferredPlanId);
           throw new Error(`${message} Latest plan data has been reloaded.`);
         }
+
         throw new Error(message);
       }
 
@@ -531,10 +510,12 @@ export default function PackagesReviewClient() {
       setError(`Effective from is not a valid ${timeZone} local time.`);
       return;
     }
+
     if (publishTo && !effectiveTo) {
       setError(`Effective to is not a valid ${timeZone} local time.`);
       return;
     }
+
     if (effectiveFrom && effectiveTo && effectiveTo <= effectiveFrom) {
       setError("Effective to must be later than effective from.");
       return;
@@ -597,6 +578,7 @@ export default function PackagesReviewClient() {
     }
 
     const effectiveTo = platformLocalDateTimeToIso(closureAt, timeZone);
+
     if (!effectiveTo) {
       setError(`Closure time is not a valid ${timeZone} local time.`);
       return;
@@ -646,7 +628,7 @@ export default function PackagesReviewClient() {
         <strong>packages.read permission required</strong>
         <p>
           This route is hidden unless backend RBAC grants package catalogue
-          access. SUPER_ADMIN can delegate it from Roles &amp; Permissions.
+          access.
         </p>
       </div>
     );
@@ -659,9 +641,9 @@ export default function PackagesReviewClient() {
           <span>PKG-02 / ACTIVATION POLICY</span>
           <h2>Package Plan Control</h2>
           <p>
-            Review the commercial catalogue, manage lifecycle policy and publish
-            one complete version atomically. Package-item editing stays in the
-            main Packages workspace to avoid duplicate controls.
+            Review the commercial catalogue, manage lifecycle policy and
+            publish one complete version atomically. Commercial item editing
+            stays in the main Packages workspace.
           </p>
         </div>
 
@@ -686,7 +668,9 @@ export default function PackagesReviewClient() {
           aria-atomic="true"
         >
           {error ? <div className={styles.errorBanner}>{error}</div> : null}
-          {success ? <div className={styles.successBanner}>{success}</div> : null}
+          {success ? (
+            <div className={styles.successBanner}>{success}</div>
+          ) : null}
           {plan?.status === "DRAFT" && settingsDirty ? (
             <div className={styles.unsavedBanner}>
               <strong>UNSAVED LIFECYCLE CHANGES</strong>
@@ -711,7 +695,9 @@ export default function PackagesReviewClient() {
               <button
                 type="button"
                 className={`${styles.versionButton} ${
-                  selectedPlanId === candidate.id ? styles.selectedVersion : ""
+                  selectedPlanId === candidate.id
+                    ? styles.selectedVersion
+                    : ""
                 }`}
                 onClick={() => void selectPlan(candidate.id)}
                 disabled={loadingPlan}
@@ -819,6 +805,7 @@ export default function PackagesReviewClient() {
                         setSettings({ ...settings, activePackageMode: value })
                       }
                     />
+
                     <SelectField
                       label="Multiple-package basis"
                       value={settings.multipleActivePackageBasis}
@@ -831,6 +818,7 @@ export default function PackagesReviewClient() {
                         })
                       }
                     />
+
                     <SelectField
                       label="Activation trigger"
                       value={settings.activationTrigger}
@@ -840,6 +828,7 @@ export default function PackagesReviewClient() {
                         setSettings({ ...settings, activationTrigger: value })
                       }
                     />
+
                     <div className={styles.guardrail}>
                       <i className="iconoir-shield-check" />
                       <div>
@@ -851,14 +840,13 @@ export default function PackagesReviewClient() {
                               : "Activation engine deferred"}
                         </strong>
                         <p>
-                          {settings.activationTrigger === "PAYMENT_APPROVED"
-                            ? "Approved payment is posted to accounting first, then the purchased package activates automatically and idempotently."
-                            : settings.activationTrigger === "MANUAL_ACTIVATION"
-                              ? "Approved payment is posted to accounting first, then an authorized operator completes package activation."
-                              : "This trigger can be stored for a future plan, but activation remains blocked until its dedicated engine exists."}
+                          Approved payment is accounted first. Supported package
+                          activation then runs idempotently according to this
+                          trigger.
                         </p>
                       </div>
                     </div>
+
                     <SelectField
                       label="Migration mode"
                       value={settings.migrationMode}
@@ -868,6 +856,7 @@ export default function PackagesReviewClient() {
                         setSettings({ ...settings, migrationMode: value })
                       }
                     />
+
                     <SelectField
                       label="Renewal mode"
                       value={settings.renewalMode}
@@ -877,15 +866,16 @@ export default function PackagesReviewClient() {
                         setSettings({ ...settings, renewalMode: value })
                       }
                     />
+
                     <div className={styles.guardrail}>
                       <i className="iconoir-clock" />
                       <div>
                         <strong>Settlement timezone: {timeZone}</strong>
                         <p>
                           New package activations snapshot Platform Operations.
-                          Existing subscription snapshots remain immutable. Legacy
-                          plan value {plan.settlementTimezone} is retained for
-                          history only and is not editable here.
+                          Existing subscription snapshots remain immutable.
+                          Legacy plan value {plan.settlementTimezone} remains
+                          historical only.
                         </p>
                       </div>
                     </div>
@@ -959,9 +949,15 @@ export default function PackagesReviewClient() {
                     <button
                       type="button"
                       className={`${styles.itemCard} ${
-                        selectedItemId === item.id ? styles.selectedItem : ""
+                        selectedItem?.id === item.id
+                          ? styles.selectedItem
+                          : ""
                       }`}
-                      onClick={() => selectItem(item)}
+                      onClick={() => {
+                        setSelectedItemId(item.id);
+                        setError("");
+                        setSuccess("");
+                      }}
                       key={item.id}
                     >
                       <span className={styles.itemOrder}>
@@ -984,7 +980,9 @@ export default function PackagesReviewClient() {
                   <div className={styles.itemEditor}>
                     <div className={styles.editorHead}>
                       <div>
-                        <small>COMMERCIAL SNAPSHOT {selectedItem.packageCode}</small>
+                        <small>
+                          COMMERCIAL SNAPSHOT {selectedItem.packageCode}
+                        </small>
                         <h4>{selectedItem.displayName}</h4>
                       </div>
                       <span>{maximumSummary(selectedItem)}</span>
@@ -998,16 +996,28 @@ export default function PackagesReviewClient() {
                         />
                       </Field>
                       <Field label="USER net daily profit">
-                        <input readOnly value={`${rewardRateLabel(selectedItem)} / day`} />
+                        <input
+                          readOnly
+                          value={`${rewardRateLabel(selectedItem)} / day`}
+                        />
                       </Field>
                       <Field label="Earning duration">
-                        <input readOnly value={`${selectedItem.durationDays} days`} />
+                        <input
+                          readOnly
+                          value={`${selectedItem.durationDays} days`}
+                        />
                       </Field>
                       <Field label="Capital return">
-                        <input readOnly value={capitalReturnSummary(selectedItem)} />
+                        <input
+                          readOnly
+                          value={capitalReturnSummary(selectedItem)}
+                        />
                       </Field>
                       <Field label="Availability">
-                        <input readOnly value={enumLabel(selectedItem.availability)} />
+                        <input
+                          readOnly
+                          value={enumLabel(selectedItem.availability)}
+                        />
                       </Field>
                       <Field label="Compatibility price (system derived)">
                         <input
@@ -1040,9 +1050,18 @@ export default function PackagesReviewClient() {
                     <div className={styles.guardrail}>
                       <i className="iconoir-lock" />
                       <div>
-                        <strong>System-derived lifecycle terms are review-only</strong>
+                        <strong>
+                          System-derived lifecycle terms are review-only
+                        </strong>
                         <p>
-                          {enumLabel(selectedItem.rewardRateMeaning)} · {enumLabel(selectedItem.capBasis)} · compatibility multiplier {decimalLabel(selectedItem.capMultiplier)} · {enumLabel(selectedItem.rewardStartMode)} · {enumLabel(selectedItem.rewardFrequency)} · {enumLabel(selectedItem.cycleDayMode)} · {enumLabel(selectedItem.rewardDayMode)} · {enumLabel(selectedItem.cycleEndAction)}.
+                          {enumLabel(selectedItem.rewardRateMeaning)} ·{" "}
+                          {enumLabel(selectedItem.capBasis)} · compatibility
+                          multiplier {decimalLabel(selectedItem.capMultiplier)} ·{" "}
+                          {enumLabel(selectedItem.rewardStartMode)} ·{" "}
+                          {enumLabel(selectedItem.rewardFrequency)} ·{" "}
+                          {enumLabel(selectedItem.cycleDayMode)} ·{" "}
+                          {enumLabel(selectedItem.rewardDayMode)} ·{" "}
+                          {enumLabel(selectedItem.cycleEndAction)}.
                         </p>
                       </div>
                     </div>
@@ -1052,12 +1071,14 @@ export default function PackagesReviewClient() {
                         <div>
                           <strong>Edit commercial package terms</strong>
                           <p>
-                            The main Packages workspace is the single package-item
-                            editor. Advanced controls stay focused on lifecycle,
-                            version review and atomic publication.
+                            The main Packages workspace is the single
+                            package-item editor.
                           </p>
                         </div>
-                        <button type="button" onClick={() => router.push("/packages")}>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/packages")}
+                        >
                           Open package editor
                         </button>
                       </div>
@@ -1098,7 +1119,9 @@ export default function PackagesReviewClient() {
                             <input
                               type="datetime-local"
                               value={publishFrom}
-                              onChange={(event) => setPublishFrom(event.target.value)}
+                              onChange={(event) =>
+                                setPublishFrom(event.target.value)
+                              }
                             />
                           </Field>
                           <Field
@@ -1108,7 +1131,9 @@ export default function PackagesReviewClient() {
                             <input
                               type="datetime-local"
                               value={publishTo}
-                              onChange={(event) => setPublishTo(event.target.value)}
+                              onChange={(event) =>
+                                setPublishTo(event.target.value)
+                              }
                             />
                           </Field>
                         </div>
@@ -1118,9 +1143,14 @@ export default function PackagesReviewClient() {
                           <div>
                             <strong>Publication time preview</strong>
                             <p>
-                              From: {publishFrom || "Now"} {timeZone} → {utcPreview(publishFrom, timeZone)}
+                              From: {publishFrom || "Now"} {timeZone} →{" "}
+                              {utcPreview(publishFrom, timeZone)}
                               <br />
-                              To: {publishTo || "Open ended"} {publishTo ? timeZone : ""} → {publishTo ? utcPreview(publishTo, timeZone) : "Open ended"}
+                              To: {publishTo || "Open ended"}{" "}
+                              {publishTo ? timeZone : ""} →{" "}
+                              {publishTo
+                                ? utcPreview(publishTo, timeZone)
+                                : "Open ended"}
                             </p>
                           </div>
                         </div>
@@ -1131,10 +1161,13 @@ export default function PackagesReviewClient() {
                             minLength={3}
                             maxLength={500}
                             value={publishReason}
-                            onChange={(event) => setPublishReason(event.target.value)}
+                            onChange={(event) =>
+                              setPublishReason(event.target.value)
+                            }
                             placeholder="Confirm founder-reviewed publication."
                           />
                         </Field>
+
                         <button
                           type="submit"
                           disabled={
@@ -1184,13 +1217,18 @@ export default function PackagesReviewClient() {
                               minLength={3}
                               maxLength={500}
                               value={cloneReason}
-                              onChange={(event) => setCloneReason(event.target.value)}
+                              onChange={(event) =>
+                                setCloneReason(event.target.value)
+                              }
                               placeholder="Why is a successor version required?"
                             />
                           </Field>
                           <button
                             type="submit"
-                            disabled={busy !== "" || cloneReason.trim().length < 3}
+                            disabled={
+                              busy !== "" ||
+                              cloneReason.trim().length < 3
+                            }
                           >
                             {busy === "clone"
                               ? "Cloning…"
@@ -1215,7 +1253,10 @@ export default function PackagesReviewClient() {
                           <strong>SUPER_ADMIN closure only</strong>
                         </div>
                       ) : (
-                        <form className={styles.form} onSubmit={closePublishedPlan}>
+                        <form
+                          className={styles.form}
+                          onSubmit={closePublishedPlan}
+                        >
                           <Field
                             label={`Effective to (${timeZone})`}
                             help="Converted to UTC for the API."
@@ -1224,19 +1265,25 @@ export default function PackagesReviewClient() {
                               required
                               type="datetime-local"
                               value={closureAt}
-                              onChange={(event) => setClosureAt(event.target.value)}
+                              onChange={(event) =>
+                                setClosureAt(event.target.value)
+                              }
                             />
                           </Field>
+
                           <Field label="Closure reason">
                             <textarea
                               required
                               minLength={3}
                               maxLength={500}
                               value={closureReason}
-                              onChange={(event) => setClosureReason(event.target.value)}
+                              onChange={(event) =>
+                                setClosureReason(event.target.value)
+                              }
                               placeholder="Why should this published range close?"
                             />
                           </Field>
+
                           <button
                             type="submit"
                             disabled={

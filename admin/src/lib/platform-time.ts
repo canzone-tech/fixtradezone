@@ -60,6 +60,29 @@ function zonedParts(date: Date, timeZone: string) {
   };
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function platformIsoToLocalDateTimeInput(
+  value: string | Date | null | undefined,
+  timeZone?: string,
+): string {
+  if (!value) return "";
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const parts = zonedParts(date, resolveTimeZone(timeZone));
+  if (parts.year < 1 || parts.month < 1 || parts.day < 1) {
+    return "";
+  }
+
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}T${pad2(
+    parts.hour,
+  )}:${pad2(parts.minute)}`;
+}
+
 export function platformLocalDateTimeToIso(
   value: string,
   timeZone?: string,

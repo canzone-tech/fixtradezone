@@ -88,6 +88,22 @@ function formatWhen(value: string | null): string {
   return formatted === "—" ? "Not set" : formatted;
 }
 
+function capitalReturnShort(item: PackagePlanItem): string {
+  if (item.principalReturn === "RETURN_EXACT_INVESTED_PRINCIPAL") {
+    return "Capital Return · Yes";
+  }
+  if (item.principalReturn === "NO_CAPITAL_RETURN") {
+    return "Capital Return · No";
+  }
+  return "Capital Return · Legacy";
+}
+
+function capitalReturnTone(item: PackagePlanItem): string {
+  return item.principalReturn === "NO_CAPITAL_RETURN"
+    ? styles.capitalNo
+    : styles.capitalYes;
+}
+
 async function fetchPlan(planVersionId: string): Promise<PackagePlan> {
   const response = await fetch(
     `/api/admin/package-plans/${encodeURIComponent(planVersionId)}`,
@@ -297,17 +313,18 @@ export default function SimplePackagesClient() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div>
+        <div className={styles.headerCopy}>
           <span className={styles.eyebrow}>PACKAGE CONTROL</span>
           <h1>Packages</h1>
           <p>
-            Commercial package terms are loaded from the versioned MySQL
-            catalogue. Names, investment ranges, rates and durations are not
-            embedded in this Admin application.
+            Manage the commercial package catalogue stored in MySQL. Keep
+            package-item editing here; lifecycle policy, version review and
+            atomic release remain in Advanced controls.
           </p>
         </div>
         <Link className={styles.advancedLink} href="/packages/advanced">
-          Advanced lifecycle &amp; release controls
+          <span>Advanced lifecycle &amp; release</span>
+          <b aria-hidden="true">→</b>
         </Link>
       </header>
 
@@ -316,33 +333,50 @@ export default function SimplePackagesClient() {
 
       <section className={styles.statusGrid}>
         <article className={styles.statusCard}>
-          <small>LIVE FOR USERS</small>
-          <strong>{liveSummary ? `Plan V${liveSummary.versionNumber}` : "No effective plan"}</strong>
-          <span>
-            {liveSummary
-              ? `${liveItems.length} package items · ${formatWhen(liveSummary.effectiveTo)}`
-              : "No published package catalogue is currently effective."}
-          </span>
+          <div className={styles.statusIcon}>01</div>
+          <div>
+            <small>LIVE FOR USERS</small>
+            <strong>
+              {liveSummary
+                ? `Plan V${liveSummary.versionNumber}`
+                : "No effective plan"}
+            </strong>
+            <span>
+              {liveSummary
+                ? `${liveItems.length} package items · ${formatWhen(
+                    liveSummary.effectiveTo,
+                  )}`
+                : "No published package catalogue is currently effective."}
+            </span>
+          </div>
         </article>
         <article className={styles.statusCard}>
-          <small>EDITABLE DRAFT</small>
-          <strong>{draftSummary ? `Plan V${draftSummary.versionNumber}` : "No draft"}</strong>
-          <span>
-            {draftPlan
-              ? `${draftItems.length} package items · revision ${draftPlan.revision}`
-              : "Published plans stay immutable until a successor draft is created."}
-          </span>
+          <div className={styles.statusIcon}>02</div>
+          <div>
+            <small>EDITABLE DRAFT</small>
+            <strong>
+              {draftSummary ? `Plan V${draftSummary.versionNumber}` : "No draft"}
+            </strong>
+            <span>
+              {draftPlan
+                ? `${draftItems.length} package items · revision ${draftPlan.revision}`
+                : "Published plans stay immutable until a successor draft is created."}
+            </span>
+          </div>
         </article>
         <article className={styles.statusCard}>
-          <small>ACTIVATION POLICY</small>
-          <strong>
-            {draftPlan
-              ? enumLabel(draftPlan.activationTrigger)
-              : livePlan
-                ? enumLabel(livePlan.activationTrigger)
-                : "Not configured"}
-          </strong>
-          <span>Configure manual/automatic lifecycle policy in Advanced controls.</span>
+          <div className={styles.statusIcon}>03</div>
+          <div>
+            <small>ACTIVATION POLICY</small>
+            <strong>
+              {draftPlan
+                ? enumLabel(draftPlan.activationTrigger)
+                : livePlan
+                  ? enumLabel(livePlan.activationTrigger)
+                  : "Not configured"}
+            </strong>
+            <span>Manual/automatic lifecycle policy lives in Advanced controls.</span>
+          </div>
         </article>
       </section>
 
@@ -352,19 +386,22 @@ export default function SimplePackagesClient() {
             <div>
               <small>DATABASE READBACK</small>
               <h2>Current published catalogue</h2>
+              <p>Immutable terms currently available to users.</p>
             </div>
-            <span>Immutable published terms</span>
+            <span>V{livePlan.versionNumber} · immutable</span>
           </div>
           <div className={styles.cards}>
             {liveItems.map((item) => (
               <article className={styles.packageCard} key={item.id}>
                 <small>{item.packageCode}</small>
                 <strong>{item.displayName}</strong>
-                <span>
+                <b className={styles.packageRange}>
                   {investmentRangeLabel(item)} {item.currency}
-                </span>
-                <span>{item.durationDays} days</span>
-                <span>{rewardRateLabel(item)}</span>
+                </b>
+                <div className={styles.packageFacts}>
+                  <span>{rewardRateLabel(item)} USER net / day</span>
+                  <span>{item.durationDays} earning days</span>
+                </div>
                 <em>{principalReturnLabel(item)}</em>
               </article>
             ))}
@@ -384,8 +421,8 @@ export default function SimplePackagesClient() {
           {!sourceForClone ? (
             <p className={styles.note}>
               No published source plan exists. The initial catalogue must be
-              established through the approved database bootstrap/migration
-              path before Admin versioning can begin.
+              established through the approved database bootstrap path before
+              Admin versioning can begin.
             </p>
           ) : !canManage ? (
             <p className={styles.note}>
@@ -420,51 +457,76 @@ export default function SimplePackagesClient() {
           <div className={styles.sectionHeader}>
             <div>
               <small>EDITABLE MYSQL CATALOGUE</small>
-              <h2>Draft package items</h2>
+              <h2>Draft package catalogue</h2>
+              <p>
+                Select a package card to edit commercial terms. System-derived
+                lifecycle values stay read-only.
+              </p>
             </div>
-            {canManage ? (
-              <button
-                type="button"
-                className={styles.primaryButton}
-                onClick={() => {
-                  setCreatingItem(true);
-                  setSelectedItemId("");
-                  setError("");
-                  setSuccess("");
-                }}
-              >
-                Add package
-              </button>
-            ) : null}
+            <div className={styles.sectionActions}>
+              <span className={styles.revisionBadge}>
+                V{draftPlan.versionNumber} · REV {draftPlan.revision} ·{" "}
+                {draftItems.length} ITEMS
+              </span>
+              {canManage ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => {
+                    setCreatingItem(true);
+                    setSelectedItemId("");
+                    setError("");
+                    setSuccess("");
+                  }}
+                >
+                  + Add package
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {draftItems.length > 0 ? (
             <div className={styles.workspace}>
-              <aside className={styles.itemList}>
-                {draftItems.map((item) => (
-                  <button
-                    type="button"
-                    className={`${styles.itemButton} ${
-                      !creatingItem && selectedItem?.id === item.id
-                        ? styles.itemButtonActive
-                        : ""
-                    }`}
-                    onClick={() => {
-                      setCreatingItem(false);
-                      setSelectedItemId(item.id);
-                      setError("");
-                      setSuccess("");
-                    }}
-                    key={item.id}
-                  >
-                    <small>{item.packageCode}</small>
-                    <strong>{item.displayName}</strong>
-                    <span>
-                      {investmentRangeLabel(item)} {item.currency}
-                    </span>
-                  </button>
-                ))}
-              </aside>
+              <nav className={styles.itemList} aria-label="Draft packages">
+                {draftItems.map((item) => {
+                  const selected =
+                    !creatingItem && selectedItem?.id === item.id;
+                  return (
+                    <button
+                      type="button"
+                      className={`${styles.itemButton} ${
+                        selected ? styles.itemButtonActive : ""
+                      }`}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setCreatingItem(false);
+                        setSelectedItemId(item.id);
+                        setError("");
+                        setSuccess("");
+                      }}
+                      key={item.id}
+                    >
+                      <div className={styles.itemButtonTop}>
+                        <small>{item.packageCode}</small>
+                        <span className={styles.itemOrder}>
+                          {String(item.sortOrder).padStart(2, "0")}
+                        </span>
+                      </div>
+                      <strong>{item.displayName}</strong>
+                      <b className={styles.itemRange}>
+                        {investmentRangeLabel(item)} {item.currency}
+                      </b>
+                      <div className={styles.itemMeta}>
+                        <span>{rewardRateLabel(item)} / day</span>
+                        <span>{item.durationDays} days</span>
+                      </div>
+                      <em className={capitalReturnTone(item)}>
+                        {capitalReturnShort(item)}
+                      </em>
+                    </button>
+                  );
+                })}
+              </nav>
 
               <main className={styles.editorPanel}>
                 {creatingItem && canManage ? (
@@ -488,7 +550,9 @@ export default function SimplePackagesClient() {
                 ) : selectedItem ? (
                   <div className={styles.readOnly}>
                     <h3>{selectedItem.displayName}</h3>
-                    <p>Draft editing requires packages.draft.manage permission.</p>
+                    <p>
+                      Draft editing requires packages.draft.manage permission.
+                    </p>
                   </div>
                 ) : null}
               </main>
@@ -504,17 +568,23 @@ export default function SimplePackagesClient() {
           ) : (
             <div className={styles.empty}>
               <strong>This draft has no package items.</strong>
-              <p>Use Add package to create the first DB-backed package configuration.</p>
+              <p>
+                Use Add package to create the first DB-backed package
+                configuration.
+              </p>
             </div>
           )}
 
           <div className={styles.releaseNote}>
-            <strong>Publication is separate from editing.</strong>
-            <span>
-              Review lifecycle settings and publish the complete draft from
-              Advanced controls. No package profile is auto-applied by the UI.
-            </span>
-            <Link href="/packages/advanced">Open Advanced controls</Link>
+            <div className={styles.releaseIcon}>↗</div>
+            <div>
+              <strong>Publication is separate from commercial editing.</strong>
+              <span>
+                Review lifecycle policy, all nine package snapshots and the
+                effective time before publishing the complete draft.
+              </span>
+            </div>
+            <Link href="/packages/advanced">Review &amp; release</Link>
           </div>
         </section>
       )}

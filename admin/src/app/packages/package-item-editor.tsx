@@ -146,11 +146,20 @@ function formFromItem(item: PackagePlanItem): FormState {
   };
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  help,
+  children,
+}: {
+  label: string;
+  help?: string;
+  children: ReactNode;
+}) {
   return (
     <label className={styles.field}>
       <span>{label}</span>
       {children}
+      {help ? <small>{help}</small> : null}
     </label>
   );
 }
@@ -194,6 +203,12 @@ function nullableInteger(value: string): number | null {
   return trimmed === "" ? null : Number(trimmed);
 }
 
+function capitalReturnLabel(value: string): string {
+  if (value === "RETURN_SEPARATELY") return "Capital returns at duration end";
+  if (value === "NON_REFUNDABLE_PACKAGE_VALUE") return "No capital return";
+  return value ? enumLabel(value) : "Select capital treatment";
+}
+
 export default function PackageItemEditor(props: PackageItemEditorProps) {
   const identity = `${props.plan.id}:${props.plan.revision}:${props.mode}:${props.item?.id ?? "new"}`;
   return <PackageItemEditorState key={identity} {...props} />;
@@ -206,7 +221,10 @@ function PackageItemEditorState({
   onSaved,
   onCancel,
 }: PackageItemEditorProps) {
-  const initialForm = useMemo(() => (item ? formFromItem(item) : emptyForm()), [item]);
+  const initialForm = useMemo(
+    () => (item ? formFromItem(item) : emptyForm()),
+    [item],
+  );
   const initialInvestmentMode: InvestmentMode =
     item?.rangeConfigured === false ? "LEGACY_FIXED" : "RANGE";
 
@@ -240,7 +258,14 @@ function PackageItemEditorState({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || reason.trim().length < 3 || (mode === "edit" && !dirty)) return;
+
+    if (
+      busy ||
+      reason.trim().length < 3 ||
+      (mode === "edit" && !dirty)
+    ) {
+      return;
+    }
 
     const fixedRate = form.rewardRateMode === "FIXED";
     const common = {
@@ -254,7 +279,9 @@ function PackageItemEditorState({
       sortOrder: Number(form.sortOrder),
       availability: form.availability,
       rewardRateMode: form.rewardRateMode,
-      fixedRewardRate: fixedRate ? nullableDecimal(form.fixedRewardRate) : null,
+      fixedRewardRate: fixedRate
+        ? nullableDecimal(form.fixedRewardRate)
+        : null,
       minimumRewardRate: fixedRate
         ? null
         : nullableDecimal(form.minimumRewardRate),
@@ -270,16 +297,19 @@ function PackageItemEditorState({
       if (investmentMode === "RANGE") {
         const minimumInvestment = form.minimumInvestment.trim();
         const durationDays = nullableInteger(form.durationDays);
+
         if (!minimumInvestment || durationDays === null) {
           throw new Error(
             "Range packages require minimum investment and duration days.",
           );
         }
+
         if (!RANGE_RATE_MODES.includes(form.rewardRateMode as never)) {
           throw new Error(
             "Range packages support Fixed or Random Range USER daily profit only.",
           );
         }
+
         if (
           !RANGE_PRINCIPAL_TREATMENTS.includes(
             form.principalTreatment as never,
@@ -297,7 +327,8 @@ function PackageItemEditorState({
           maximumInvestment: nullableDecimal(form.maximumInvestment),
           durationDays,
           currency: RANGE_PACKAGE_TECHNICAL_TERMS.currency,
-          rewardRateMeaning: RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
+          rewardRateMeaning:
+            RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
           capBasis: RANGE_PACKAGE_TECHNICAL_TERMS.capBasis,
           capMultiplier: rangeCompatibilityMultiplier(),
           goalDays: durationDays,
@@ -332,7 +363,9 @@ function PackageItemEditorState({
       }
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Package terms are invalid.",
+        caught instanceof Error
+          ? caught.message
+          : "Package terms are invalid.",
       );
       return;
     }
@@ -345,6 +378,7 @@ function PackageItemEditorState({
         mode === "create"
           ? `/api/admin/package-plans/${encodeURIComponent(plan.id)}/items`
           : `/api/admin/package-plans/${encodeURIComponent(plan.id)}/items/${encodeURIComponent(item?.id ?? "")}`;
+
       const response = await fetch(url, {
         method: mode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -369,6 +403,7 @@ function PackageItemEditorState({
   }
 
   let derivedCompatibilityMultiplier = "—";
+
   if (
     investmentMode === "RANGE" &&
     form.durationDays.trim() &&
@@ -383,6 +418,15 @@ function PackageItemEditorState({
     }
   }
 
+  const rangeRateSummary =
+    form.rewardRateMode === "FIXED"
+      ? form.fixedRewardRate
+        ? `${form.fixedRewardRate}% USER net / day`
+        : "Fixed USER daily rate"
+      : form.minimumRewardRate && form.maximumRewardRate
+        ? `${form.minimumRewardRate}%–${form.maximumRewardRate}% USER net / day`
+        : "Random USER daily rate range";
+
   return (
     <form className={styles.editor} onSubmit={submit}>
       <div className={styles.editorHeader}>
@@ -395,202 +439,321 @@ function PackageItemEditorState({
           <h3>
             {mode === "create" ? "Create package item" : item?.displayName}
           </h3>
+          <p>
+            Commercial terms are editable here. System-derived lifecycle and
+            compatibility values stay locked to the approved package contract.
+          </p>
         </div>
-        {onCancel ? (
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={onCancel}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-        ) : null}
+
+        <div className={styles.editorHeaderActions}>
+          {mode === "edit" ? (
+            <span className={styles.changeState}>
+              {dirty ? "Unsaved changes" : "Saved snapshot"}
+            </span>
+          ) : null}
+          {onCancel ? (
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={onCancel}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
 
-      <div className={styles.formGrid}>
-        <Field label="Package code">
-          <input
-            required
-            maxLength={64}
-            pattern="[A-Za-z][A-Za-z0-9_]{2,63}"
-            value={form.packageCode}
-            disabled={mode === "edit"}
-            onChange={(event) => set("packageCode", event.target.value)}
-          />
-        </Field>
-        <Field label="Display name">
-          <input
-            required
-            maxLength={100}
-            value={form.displayName}
-            onChange={(event) => set("displayName", event.target.value)}
-          />
-        </Field>
-        <Field label="Slug">
-          <input
-            required
-            maxLength={100}
-            pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-            value={form.slug}
-            onChange={(event) => set("slug", event.target.value)}
-          />
-        </Field>
-        <Field label="Sort order">
-          <input
-            required
-            type="number"
-            min={1}
-            max={10000}
-            value={form.sortOrder}
-            onChange={(event) => set("sortOrder", event.target.value)}
-          />
-        </Field>
-        <SelectField
-          label="Availability"
-          value={form.availability}
-          options={PACKAGE_AVAILABILITIES}
-          onChange={(value) => set("availability", value)}
-        />
-        <Field label="Investment type">
-          <select
-            required
-            value={investmentMode}
-            onChange={(event) =>
-              setInvestmentMode(event.target.value as InvestmentMode)
-            }
-          >
-            <option value="RANGE">Investment range</option>
-            <option value="LEGACY_FIXED">Legacy fixed price</option>
-          </select>
-        </Field>
+      {investmentMode === "RANGE" ? (
+        <div className={styles.editorSummary}>
+          <div>
+            <small>INVESTMENT</small>
+            <strong>
+              {form.minimumInvestment || "—"}–
+              {form.maximumInvestment || "Unlimited"} USDT
+            </strong>
+          </div>
+          <div>
+            <small>USER DAILY PROFIT</small>
+            <strong>{rangeRateSummary}</strong>
+          </div>
+          <div>
+            <small>EARNING DURATION</small>
+            <strong>{form.durationDays || "—"} days</strong>
+          </div>
+          <div>
+            <small>CAPITAL</small>
+            <strong>{capitalReturnLabel(form.principalTreatment)}</strong>
+          </div>
+        </div>
+      ) : null}
 
-        {investmentMode === "RANGE" ? (
-          <>
-            <Field label="Minimum investment (USDT)">
-              <input
-                required
-                inputMode="decimal"
-                value={form.minimumInvestment}
-                onChange={(event) => set("minimumInvestment", event.target.value)}
-              />
-            </Field>
-            <Field label="Maximum investment (USDT, blank = unlimited)">
-              <input
-                inputMode="decimal"
-                value={form.maximumInvestment}
-                onChange={(event) => set("maximumInvestment", event.target.value)}
-              />
-            </Field>
-            <Field label="Duration / earning days">
-              <input
-                required
-                type="number"
-                min={1}
-                max={36500}
-                value={form.durationDays}
-                onChange={(event) => set("durationDays", event.target.value)}
-              />
-            </Field>
-            <SelectField
-              label="USER daily profit mode"
-              value={form.rewardRateMode}
-              options={RANGE_RATE_MODES}
-              onChange={(value) => set("rewardRateMode", value)}
-            />
-          </>
-        ) : (
-          <>
-            <Field label="Fixed price (USDT)">
-              <input
-                required
-                inputMode="decimal"
-                value={form.price}
-                onChange={(event) => set("price", event.target.value)}
-              />
-            </Field>
-            <SelectField
-              label="Reward-rate mode"
-              value={form.rewardRateMode}
-              options={PACKAGE_REWARD_RATE_MODES}
-              onChange={(value) => set("rewardRateMode", value)}
-            />
-          </>
-        )}
+      <section className={styles.editorSection}>
+        <div className={styles.editorSectionHead}>
+          <div>
+            <small>01 · IDENTITY &amp; AVAILABILITY</small>
+            <h4>Package identity</h4>
+          </div>
+          <p>Stable code, public label, ordering and catalogue availability.</p>
+        </div>
 
-        {form.rewardRateMode === "FIXED" ? (
-          <Field label="USER daily profit %">
+        <div className={styles.formGrid}>
+          <Field label="Package code">
             <input
               required
-              inputMode="decimal"
-              value={form.fixedRewardRate}
-              onChange={(event) => set("fixedRewardRate", event.target.value)}
+              maxLength={64}
+              pattern="[A-Za-z][A-Za-z0-9_]{2,63}"
+              value={form.packageCode}
+              disabled={mode === "edit"}
+              onChange={(event) => set("packageCode", event.target.value)}
             />
           </Field>
-        ) : form.rewardRateMode ? (
-          <>
-            <Field label="Minimum USER daily profit %">
+
+          <Field label="Display name">
+            <input
+              required
+              maxLength={100}
+              value={form.displayName}
+              onChange={(event) => set("displayName", event.target.value)}
+            />
+          </Field>
+
+          <Field label="Slug">
+            <input
+              required
+              maxLength={100}
+              pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+              value={form.slug}
+              onChange={(event) => set("slug", event.target.value)}
+            />
+          </Field>
+
+          <Field label="Sort order">
+            <input
+              required
+              type="number"
+              min={1}
+              max={10000}
+              value={form.sortOrder}
+              onChange={(event) => set("sortOrder", event.target.value)}
+            />
+          </Field>
+
+          <SelectField
+            label="Availability"
+            value={form.availability}
+            options={PACKAGE_AVAILABILITIES}
+            onChange={(value) => set("availability", value)}
+          />
+
+          <Field label="Investment type">
+            <select
+              required
+              value={investmentMode}
+              onChange={(event) =>
+                setInvestmentMode(event.target.value as InvestmentMode)
+              }
+            >
+              <option value="RANGE">Investment range</option>
+              <option value="LEGACY_FIXED">Legacy fixed price</option>
+            </select>
+          </Field>
+        </div>
+      </section>
+
+      <section className={styles.editorSection}>
+        <div className={styles.editorSectionHead}>
+          <div>
+            <small>02 · COMMERCIAL TERMS</small>
+            <h4>User-facing package economics</h4>
+          </div>
+          <p>
+            Investment amount, USER net daily earning rate, duration and capital
+            treatment.
+          </p>
+        </div>
+
+        <div className={styles.formGrid}>
+          {investmentMode === "RANGE" ? (
+            <>
+              <Field
+                label="Minimum investment (USDT)"
+                help="Also drives the compatibility price automatically."
+              >
+                <input
+                  required
+                  inputMode="decimal"
+                  value={form.minimumInvestment}
+                  onChange={(event) =>
+                    set("minimumInvestment", event.target.value)
+                  }
+                />
+              </Field>
+
+              <Field
+                label="Maximum investment (USDT)"
+                help="Leave blank only for an approved unlimited package."
+              >
+                <input
+                  inputMode="decimal"
+                  value={form.maximumInvestment}
+                  placeholder="Unlimited"
+                  onChange={(event) =>
+                    set("maximumInvestment", event.target.value)
+                  }
+                />
+              </Field>
+
+              <Field label="Duration / earning days">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  max={36500}
+                  value={form.durationDays}
+                  onChange={(event) =>
+                    set("durationDays", event.target.value)
+                  }
+                />
+              </Field>
+
+              <SelectField
+                label="USER daily profit mode"
+                value={form.rewardRateMode}
+                options={RANGE_RATE_MODES}
+                onChange={(value) => set("rewardRateMode", value)}
+              />
+            </>
+          ) : (
+            <>
+              <Field label="Fixed price (USDT)">
+                <input
+                  required
+                  inputMode="decimal"
+                  value={form.price}
+                  onChange={(event) => set("price", event.target.value)}
+                />
+              </Field>
+
+              <SelectField
+                label="Reward-rate mode"
+                value={form.rewardRateMode}
+                options={PACKAGE_REWARD_RATE_MODES}
+                onChange={(value) => set("rewardRateMode", value)}
+              />
+            </>
+          )}
+
+          {form.rewardRateMode === "FIXED" ? (
+            <Field label="USER daily profit %">
               <input
                 required
                 inputMode="decimal"
-                value={form.minimumRewardRate}
+                value={form.fixedRewardRate}
                 onChange={(event) =>
-                  set("minimumRewardRate", event.target.value)
+                  set("fixedRewardRate", event.target.value)
                 }
               />
             </Field>
-            <Field label="Maximum USER daily profit %">
-              <input
-                required
-                inputMode="decimal"
-                value={form.maximumRewardRate}
-                onChange={(event) =>
-                  set("maximumRewardRate", event.target.value)
-                }
-              />
-            </Field>
-          </>
-        ) : null}
+          ) : form.rewardRateMode ? (
+            <>
+              <Field label="Minimum USER daily profit %">
+                <input
+                  required
+                  inputMode="decimal"
+                  value={form.minimumRewardRate}
+                  onChange={(event) =>
+                    set("minimumRewardRate", event.target.value)
+                  }
+                />
+              </Field>
 
-        <SelectField
-          label={investmentMode === "RANGE" ? "Capital return" : "Principal treatment"}
-          value={form.principalTreatment}
-          options={
-            investmentMode === "RANGE"
-              ? RANGE_PRINCIPAL_TREATMENTS
-              : PACKAGE_PRINCIPAL_TREATMENTS
-          }
-          onChange={(value) => set("principalTreatment", value)}
-        />
+              <Field label="Maximum USER daily profit %">
+                <input
+                  required
+                  inputMode="decimal"
+                  value={form.maximumRewardRate}
+                  onChange={(event) =>
+                    set("maximumRewardRate", event.target.value)
+                  }
+                />
+              </Field>
+            </>
+          ) : null}
 
-        {investmentMode === "RANGE" ? (
-          <>
-            <Field label="Rate meaning (system derived)">
-              <input
-                readOnly
-                value={enumLabel(RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning)}
-              />
-            </Field>
-            <Field label="Compatibility multiplier (system derived)">
-              <input readOnly value={derivedCompatibilityMultiplier} />
-            </Field>
-            <Field label="Compatibility price (system derived)">
-              <input
-                readOnly
-                value={form.minimumInvestment || "Derived from minimum investment"}
-              />
-            </Field>
-            <Field label="Lifecycle (system derived)">
-              <input
-                readOnly
-                value="Next calendar day · Daily calendar · Complete at duration"
-              />
-            </Field>
-          </>
-        ) : (
-          <>
+          <SelectField
+            label={
+              investmentMode === "RANGE"
+                ? "Capital return"
+                : "Principal treatment"
+            }
+            value={form.principalTreatment}
+            options={
+              investmentMode === "RANGE"
+                ? RANGE_PRINCIPAL_TREATMENTS
+                : PACKAGE_PRINCIPAL_TREATMENTS
+            }
+            onChange={(value) => set("principalTreatment", value)}
+          />
+        </div>
+      </section>
+
+      {investmentMode === "RANGE" ? (
+        <section className={styles.derivedSection}>
+          <div className={styles.editorSectionHead}>
+            <div>
+              <small>03 · SYSTEM-DERIVED CONTRACT</small>
+              <h4>Locked lifecycle values</h4>
+            </div>
+            <span className={styles.readOnlyBadge}>READ ONLY</span>
+          </div>
+
+          <div className={styles.derivedGrid}>
+            <article className={styles.derivedCard}>
+              <small>RATE MEANING</small>
+              <strong>
+                {enumLabel(RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning)}
+              </strong>
+              <span>Configured percentages are the USER net daily earning rate.</span>
+            </article>
+
+            <article className={styles.derivedCard}>
+              <small>COMPATIBILITY PRICE</small>
+              <strong>{form.minimumInvestment || "—"} USDT</strong>
+              <span>Derived from minimum investment; not a separate business price.</span>
+            </article>
+
+            <article className={styles.derivedCard}>
+              <small>COMPATIBILITY MULTIPLIER</small>
+              <strong>{derivedCompatibilityMultiplier}</strong>
+              <span>Derived from upper USER net rate × earning duration.</span>
+            </article>
+
+            <article className={styles.derivedCard}>
+              <small>LIFECYCLE</small>
+              <strong>Next calendar day · Daily calendar</strong>
+              <span>
+                Calendar days · Every day · Complete package at duration/cap.
+              </span>
+            </article>
+          </div>
+        </section>
+      ) : (
+        <section className={styles.editorSection}>
+          <div className={styles.editorSectionHead}>
+            <div>
+              <small>03 · LEGACY TECHNICAL TERMS</small>
+              <h4>Legacy package lifecycle</h4>
+            </div>
+            <p>
+              Maintained only for backward-compatible fixed-price package
+              records.
+            </p>
+          </div>
+
+          <div className={styles.formGrid}>
             <SelectField
               label="Reward-rate meaning"
               value={form.rewardRateMeaning}
@@ -608,7 +771,9 @@ function PackageItemEditorState({
                 required
                 inputMode="decimal"
                 value={form.capMultiplier}
-                onChange={(event) => set("capMultiplier", event.target.value)}
+                onChange={(event) =>
+                  set("capMultiplier", event.target.value)
+                }
               />
             </Field>
             <Field label="Goal / lifetime days">
@@ -667,38 +832,59 @@ function PackageItemEditorState({
               options={PACKAGE_CAP_REACHED_ACTIONS}
               onChange={(value) => set("capReachedAction", value)}
             />
-          </>
-        )}
-      </div>
+          </div>
+        </section>
+      )}
 
-      <Field label="Audit reason">
-        <textarea
-          required
-          minLength={3}
-          maxLength={500}
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          placeholder="Why is this commercial package configuration changing?"
-        />
-      </Field>
+      <section className={styles.auditSection}>
+        <div className={styles.auditCopy}>
+          <small>04 · AUDITED SAVE</small>
+          <h4>
+            {mode === "create"
+              ? "Create this package"
+              : dirty
+                ? "Review and save changes"
+                : "Package matches the saved revision"}
+          </h4>
+          <p>
+            Every successful mutation advances the shared package-plan revision.
+          </p>
+        </div>
 
-      <button
-        type="submit"
-        className={styles.primaryButton}
-        disabled={
-          busy ||
-          reason.trim().length < 3 ||
-          (mode === "edit" && !dirty)
-        }
-      >
-        {busy
-          ? "Saving…"
-          : mode === "create"
-            ? "Create package"
-            : dirty
-              ? "Save package"
-              : "No package changes"}
-      </button>
+        <Field label="Audit reason">
+          <textarea
+            required
+            minLength={3}
+            maxLength={500}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Why is this commercial package configuration changing?"
+          />
+        </Field>
+
+        <div className={styles.actionRow}>
+          <span>
+            Plan V{plan.versionNumber} · current revision {plan.revision}
+          </span>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={
+              busy ||
+              reason.trim().length < 3 ||
+              (mode === "edit" && !dirty)
+            }
+          >
+            {busy
+              ? "Saving…"
+              : mode === "create"
+                ? "Create package"
+                : dirty
+                  ? "Save package changes"
+                  : "No package changes"}
+          </button>
+        </div>
+      </section>
     </form>
   );
 }
