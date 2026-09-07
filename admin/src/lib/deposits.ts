@@ -144,6 +144,7 @@ export interface DepositMutationResponse {
 }
 
 export interface DepositBulkApprovalResponse extends ApiMessagePayload {
+  message?: string;
   approved: number;
   failed: number;
   results: Array<{
@@ -203,21 +204,45 @@ export function compactDecimal(value: string): string {
   return value.replace(/0+$/, "").replace(/\.$/, "") || "0";
 }
 
+function addUnsignedIntegerStrings(left: string, right: string): string {
+  let leftIndex = left.length - 1;
+  let rightIndex = right.length - 1;
+  let carry = 0;
+  let result = "";
+
+  while (leftIndex >= 0 || rightIndex >= 0 || carry > 0) {
+    const leftDigit = leftIndex >= 0 ? Number(left[leftIndex]) : 0;
+    const rightDigit = rightIndex >= 0 ? Number(right[rightIndex]) : 0;
+    const sum = leftDigit + rightDigit + carry;
+
+    result = `${sum % 10}${result}`;
+    carry = Math.floor(sum / 10);
+    leftIndex -= 1;
+    rightIndex -= 1;
+  }
+
+  return result.replace(/^0+(?=\d)/, "") || "0";
+}
+
 export function sumDecimalStrings(values: string[]): string {
-  const scale = 100_000_000n;
-  let total = 0n;
+  const decimalPlaces = 8;
+  let total = "0";
 
   for (const value of values) {
     const match = /^(\d+)(?:\.(\d{1,8}))?$/.exec(value);
     if (!match) throw new Error(`Invalid decimal amount: ${value}`);
-    const whole = BigInt(match[1]);
-    const fraction = BigInt((match[2] ?? "").padEnd(8, "0"));
-    total += whole * scale + fraction;
+
+    const whole = match[1];
+    const fraction = (match[2] ?? "").padEnd(decimalPlaces, "0");
+    const scaled = `${whole}${fraction}`.replace(/^0+(?=\d)/, "") || "0";
+    total = addUnsignedIntegerStrings(total, scaled);
   }
 
-  const whole = total / scale;
-  const fraction = (total % scale).toString().padStart(8, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole.toString();
+  const padded = total.padStart(decimalPlaces + 1, "0");
+  const whole = padded.slice(0, -decimalPlaces).replace(/^0+(?=\d)/, "") || "0";
+  const fraction = padded.slice(-decimalPlaces).replace(/0+$/, "");
+
+  return fraction ? `${whole}.${fraction}` : whole;
 }
 
 export function normalizeTransactionId(
