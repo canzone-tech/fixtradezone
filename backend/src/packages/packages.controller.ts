@@ -51,7 +51,7 @@ export class PackagesController {
     return {
       ...catalogue,
       items: catalogue.items.filter((item) => {
-        const packageDefinitionId = packageDefinitionIdFrom(item as unknown);
+        const packageDefinitionId = packageDefinitionIdFrom(item);
         return (
           packageDefinitionId === null ||
           !activePackageDefinitionIds.has(packageDefinitionId)
