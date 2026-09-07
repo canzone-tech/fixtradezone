@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import {
   PACKAGE_AVAILABILITIES,
   PACKAGE_CAP_BASES,
@@ -14,6 +19,7 @@ import {
   PACKAGE_REWARD_RATE_MODES,
   PACKAGE_REWARD_START_MODES,
   apiMessage,
+  decimalLabel,
   enumLabel,
   readApiPayload,
   type ApiErrorPayload,
@@ -76,6 +82,10 @@ const RANGE_PRINCIPAL_TREATMENTS = [
   "NON_REFUNDABLE_PACKAGE_VALUE",
 ] as const;
 
+function cleanDecimal(value: string | null | undefined): string {
+  return value ? decimalLabel(value) : "";
+}
+
 function emptyForm(): FormState {
   return {
     packageCode: "",
@@ -113,17 +123,17 @@ function formFromItem(item: PackagePlanItem): FormState {
     slug: item.slug,
     sortOrder: String(item.sortOrder),
     availability: item.availability,
-    price: item.price,
-    minimumInvestment: item.minimumInvestment ?? "",
-    maximumInvestment: item.maximumInvestment ?? "",
+    price: cleanDecimal(item.price),
+    minimumInvestment: cleanDecimal(item.minimumInvestment),
+    maximumInvestment: cleanDecimal(item.maximumInvestment),
     durationDays: item.durationDays ? String(item.durationDays) : "",
     rewardRateMode: item.rewardRateMode,
-    fixedRewardRate: item.fixedRewardRate ?? "",
-    minimumRewardRate: item.minimumRewardRate ?? "",
-    maximumRewardRate: item.maximumRewardRate ?? "",
+    fixedRewardRate: cleanDecimal(item.fixedRewardRate),
+    minimumRewardRate: cleanDecimal(item.minimumRewardRate),
+    maximumRewardRate: cleanDecimal(item.maximumRewardRate),
     rewardRateMeaning: item.rewardRateMeaning,
     capBasis: item.capBasis,
-    capMultiplier: item.capMultiplier,
+    capMultiplier: cleanDecimal(item.capMultiplier),
     principalTreatment: item.principalTreatment,
     goalDays: String(item.goalDays),
     cycleDays: String(item.cycleDays),
@@ -196,15 +206,24 @@ function PackageItemEditorState({
   onSaved,
   onCancel,
 }: PackageItemEditorProps) {
-  const [form, setForm] = useState<FormState>(() =>
-    item ? formFromItem(item) : emptyForm(),
-  );
-  const [investmentMode, setInvestmentMode] = useState<InvestmentMode>(() =>
-    item?.rangeConfigured === false ? "LEGACY_FIXED" : "RANGE",
-  );
+  const initialForm = useMemo(() => (item ? formFromItem(item) : emptyForm()), [item]);
+  const initialInvestmentMode: InvestmentMode =
+    item?.rangeConfigured === false ? "LEGACY_FIXED" : "RANGE";
+
+  const [form, setForm] = useState<FormState>(initialForm);
+  const [investmentMode, setInvestmentMode] =
+    useState<InvestmentMode>(initialInvestmentMode);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const dirty = useMemo(
+    () =>
+      mode === "create" ||
+      investmentMode !== initialInvestmentMode ||
+      JSON.stringify(form) !== JSON.stringify(initialForm),
+    [form, initialForm, initialInvestmentMode, investmentMode, mode],
+  );
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -221,7 +240,7 @@ function PackageItemEditorState({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || reason.trim().length < 3) return;
+    if (busy || reason.trim().length < 3 || (mode === "edit" && !dirty)) return;
 
     const fixedRate = form.rewardRateMode === "FIXED";
     const common = {
@@ -278,8 +297,7 @@ function PackageItemEditorState({
           maximumInvestment: nullableDecimal(form.maximumInvestment),
           durationDays,
           currency: RANGE_PACKAGE_TECHNICAL_TERMS.currency,
-          rewardRateMeaning:
-            RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
+          rewardRateMeaning: RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
           capBasis: RANGE_PACKAGE_TECHNICAL_TERMS.capBasis,
           capMultiplier: rangeCompatibilityMultiplier(),
           goalDays: durationDays,
@@ -313,7 +331,9 @@ function PackageItemEditorState({
         };
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Package terms are invalid.");
+      setError(
+        caught instanceof Error ? caught.message : "Package terms are invalid.",
+      );
       return;
     }
 
@@ -369,7 +389,7 @@ function PackageItemEditorState({
         <div>
           <small>
             {mode === "create"
-              ? "NEW PACKAGE"
+              ? "NEW COMMERCIAL PACKAGE"
               : `EDIT ${item?.packageCode ?? "PACKAGE"}`}
           </small>
           <h3>
@@ -535,11 +555,7 @@ function PackageItemEditorState({
         ) : null}
 
         <SelectField
-          label={
-            investmentMode === "RANGE"
-              ? "Capital return"
-              : "Principal treatment"
-          }
+          label={investmentMode === "RANGE" ? "Capital return" : "Principal treatment"}
           value={form.principalTreatment}
           options={
             investmentMode === "RANGE"
@@ -554,18 +570,22 @@ function PackageItemEditorState({
             <Field label="Rate meaning (system derived)">
               <input
                 readOnly
-                value={enumLabel(
-                  RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning,
-                )}
+                value={enumLabel(RANGE_PACKAGE_TECHNICAL_TERMS.rewardRateMeaning)}
               />
             </Field>
             <Field label="Compatibility multiplier (system derived)">
               <input readOnly value={derivedCompatibilityMultiplier} />
             </Field>
+            <Field label="Compatibility price (system derived)">
+              <input
+                readOnly
+                value={form.minimumInvestment || "Derived from minimum investment"}
+              />
+            </Field>
             <Field label="Lifecycle (system derived)">
               <input
                 readOnly
-                value="Next calendar day · Daily · Complete at duration"
+                value="Next calendar day · Daily calendar · Complete at duration"
               />
             </Field>
           </>
@@ -658,20 +678,26 @@ function PackageItemEditorState({
           maxLength={500}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Why is this package configuration changing?"
+          placeholder="Why is this commercial package configuration changing?"
         />
       </Field>
 
       <button
         type="submit"
         className={styles.primaryButton}
-        disabled={busy || reason.trim().length < 3}
+        disabled={
+          busy ||
+          reason.trim().length < 3 ||
+          (mode === "edit" && !dirty)
+        }
       >
         {busy
           ? "Saving…"
           : mode === "create"
             ? "Create package"
-            : "Save package"}
+            : dirty
+              ? "Save package"
+              : "No package changes"}
       </button>
     </form>
   );

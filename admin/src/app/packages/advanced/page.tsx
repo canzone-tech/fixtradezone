@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
-import PackagesClient from "../packages-client";
+import PackagesReviewClient from "../packages-review-client";
 
 export const metadata: Metadata = {
   title: "Advanced Package Controls",
@@ -20,7 +20,7 @@ export default async function AdvancedPackagesPage() {
 
   return (
     <AdminShell>
-      <PackagesClient />
+      <PackagesReviewClient />
     </AdminShell>
   );
 }
