@@ -192,6 +192,7 @@ describe('DepositsService', () => {
     auditLog: {
       create: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
 
   const prisma = {
@@ -218,6 +219,7 @@ describe('DepositsService', () => {
     jest.clearAllMocks();
     service = new DepositsService(prisma as unknown as PrismaService);
     transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw.mockResolvedValue([]);
   });
 
   it('rejects a second open deposit before package or rail assignment', async () => {
