@@ -54,6 +54,13 @@ export class AdminCommissionPlansController {
     );
   }
 
+  @Get('packages')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermissions(PERMISSIONS.COMMISSIONS_READ)
+  listPackageOptions() {
+    return this.commissionsService.listPackageOptions();
+  }
+
   @Get(':planVersionId')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.COMMISSIONS_READ)
