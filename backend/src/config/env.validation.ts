@@ -129,6 +129,14 @@ export const envValidationSchema = Joi.object({
     .max(3_600_000)
     .default(60_000),
 
+  AWARD_REWARD_WORKER_ENABLED: boolean.default(false),
+
+  AWARD_REWARD_WORKER_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .max(3_600_000)
+    .default(60_000),
+
   SIMULATED_ACTIVITY_WORKER_ENABLED: boolean.default(false),
 
   SIMULATED_ACTIVITY_WORKER_INTERVAL_MS: Joi.number()
@@ -238,7 +246,7 @@ export const envValidationSchema = Joi.object({
         }
       } catch {
         return helpers.error('any.custom', {
-          message: 'PUBLIC_APP_URL must be a valid URL in production',
+          message: 'PUBLIC_APP_URL must be a valid URL',
         });
       }
 
