@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import LiveActivityChart, {
+  type LiveActivityPoint,
+} from "@/components/ui/live-activity-chart";
 import type { AdminUser } from "@/lib/auth";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 
@@ -42,6 +45,7 @@ interface DashboardSnapshot {
   walletRows: number | null;
   ledgerTransactions: number | null;
   recentLedger: LedgerTransaction[];
+  ledgerActivity: LedgerTransaction[];
 }
 
 const moduleStrip = [
@@ -113,6 +117,38 @@ async function readTotal<T extends { total?: number }>(
   }
 }
 
+function localDateKey(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function buildLedgerTrend(transactions: LedgerTransaction[]): LiveActivityPoint[] {
+  const formatter = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+  const counts = new Map<string, number>();
+
+  for (const transaction of transactions) {
+    const postedAt = new Date(transaction.postedAt);
+    if (Number.isNaN(postedAt.getTime())) continue;
+    const key = localDateKey(postedAt);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setHours(12, 0, 0, 0);
+    date.setDate(date.getDate() - (6 - index));
+    return {
+      label: formatter.format(date),
+      value: counts.get(localDateKey(date)) ?? 0,
+    };
+  });
+}
+
 export default function DashboardClient() {
   const router = useRouter();
   const [user, setUser] = useState<AdminUser | null>(null);
@@ -123,6 +159,7 @@ export default function DashboardClient() {
     walletRows: null,
     ledgerTransactions: null,
     recentLedger: [],
+    ledgerActivity: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -156,7 +193,7 @@ export default function DashboardClient() {
             ),
             readTotal<DepositsResponse>("/api/admin/deposits?limit=1"),
             readTotal<WalletsResponse>("/api/admin/wallets?limit=1"),
-            fetch("/api/admin/ledger?limit=5", { cache: "no-store" })
+            fetch("/api/admin/ledger?limit=100", { cache: "no-store" })
               .then(async (response) =>
                 response.ok ? await readJson<LedgerResponse>(response) : null,
               )
@@ -164,6 +201,9 @@ export default function DashboardClient() {
           ]);
 
         if (mounted) {
+          const ledgerActivity = Array.isArray(ledgerResponse?.transactions)
+            ? ledgerResponse.transactions
+            : [];
           setSnapshot({
             users,
             subscriptions,
@@ -173,9 +213,8 @@ export default function DashboardClient() {
               typeof ledgerResponse?.total === "number"
                 ? ledgerResponse.total
                 : null,
-            recentLedger: Array.isArray(ledgerResponse?.transactions)
-              ? ledgerResponse.transactions
-              : [],
+            recentLedger: ledgerActivity.slice(0, 5),
+            ledgerActivity,
           });
         }
       } finally {
@@ -198,6 +237,11 @@ export default function DashboardClient() {
       "Administrator"
     );
   }, [user]);
+
+  const ledgerTrend = useMemo(
+    () => buildLedgerTrend(snapshot.ledgerActivity),
+    [snapshot.ledgerActivity],
+  );
 
   const metrics = [
     {
@@ -328,6 +372,13 @@ export default function DashboardClient() {
                   </div>
                 </div>
               </div>
+
+              <LiveActivityChart
+                title="Ledger activity"
+                description="Last 7 days · immutable transaction count"
+                points={ledgerTrend}
+                valueLabel="transactions"
+              />
 
               <div className="ftz-chart-stats">
                 <div>
@@ -464,9 +515,7 @@ export default function DashboardClient() {
                 </span>
                 <div>
                   <strong>Financial data stays exact</strong>
-                  <small>
-                    No demo balances or fabricated transaction totals
-                  </small>
+                  <small>No demo balances or fabricated transaction totals</small>
                 </div>
               </div>
             </div>
