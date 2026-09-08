@@ -91,6 +91,13 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/award-rewards",
+        label: "Award & Reward",
+        icon: "iconoir-trophy",
+        permission: "award_rewards.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
