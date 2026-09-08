@@ -134,9 +134,7 @@ describe('AwardRewardsService policy matrix', () => {
     let candidateQuery: unknown = null;
 
     queryRaw
-      .mockImplementationOnce((_query: unknown) =>
-        Promise.resolve([{ maxOrder: 1 }]),
-      )
+      .mockImplementationOnce(() => Promise.resolve([{ maxOrder: 1 }]))
       .mockImplementationOnce((query: unknown) => {
         candidateQuery = query;
         return Promise.resolve([
