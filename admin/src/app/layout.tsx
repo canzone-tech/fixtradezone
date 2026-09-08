@@ -6,6 +6,7 @@ import "iconoir/css/iconoir.css";
 import "../styles/fixtradezone-theme.scss";
 import "../styles/fixtradezone-readability.scss";
 import "../styles/fixtradezone-responsive.scss";
+import "../styles/universal-ui.scss";
 
 export const metadata: Metadata = {
   applicationName: "FixTradeZone",
