@@ -23,6 +23,9 @@ export const PERMISSIONS = {
   COMMISSIONS_RECONCILE: 'commissions.reconcile',
   REWARDS_READ: 'rewards.read',
   REWARDS_RECONCILE: 'rewards.reconcile',
+  AWARD_REWARDS_READ: 'award_rewards.read',
+  AWARD_REWARDS_MANAGE: 'award_rewards.manage',
+  AWARD_REWARDS_RECONCILE: 'award_rewards.reconcile',
   SIMULATED_ACTIVITY_READ: 'simulated_activity.read',
   SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
   INTERNAL_TRADING_READ: 'internal_trading.read',
@@ -143,6 +146,21 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.REWARDS_RECONCILE,
     description:
       'Reconcile due package rewards through the authoritative reward engine',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_READ,
+    description:
+      'View Award & Reward policies, team-business progress and award history',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_MANAGE,
+    description:
+      'Create, edit and publish versioned package-based Award & Reward policies',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_RECONCILE,
+    description:
+      'Run idempotent sequential Team Business Award & Reward reconciliation',
   },
   {
     code: PERMISSIONS.SIMULATED_ACTIVITY_READ,
