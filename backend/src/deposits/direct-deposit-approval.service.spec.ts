@@ -72,8 +72,29 @@ describe('DirectDepositApprovalService', () => {
 
   it('lets SUPER_ADMIN directly approve a pending deposit and records the bypass path', async () => {
     transaction.deposit.findUnique.mockResolvedValue(pendingDeposit());
-    transaction.deposit.updateMany.mockResolvedValue({ count: 1 });
-    transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
+
+    let updateArgs: {
+      where: Record<string, unknown>;
+      data: Record<string, unknown>;
+    } | null = null;
+    transaction.deposit.updateMany.mockImplementation(
+      (args: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        updateArgs = args;
+        return Promise.resolve({ count: 1 });
+      },
+    );
+
+    let auditArgs: { data: Record<string, unknown> } | null = null;
+    transaction.auditLog.create.mockImplementation(
+      (args: { data: Record<string, unknown> }) => {
+        auditArgs = args;
+        return Promise.resolve({ id: 'audit-id' });
+      },
+    );
+
     depositsService.getDeposit.mockResolvedValue({
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
     });
@@ -85,32 +106,28 @@ describe('DirectDepositApprovalService', () => {
       { ipAddress: '127.0.0.1', userAgent: 'jest' },
     );
 
-    expect(transaction.deposit.updateMany).toHaveBeenCalledWith({
-      where: {
-        id: DEPOSIT_ID,
-        status: 'PENDING_REVIEW',
-        openKey: USER_ID,
-      },
-      data: expect.objectContaining({
-        status: 'APPROVED',
-        openKey: null,
-        reviewedByUserId: SUPER_ADMIN_ID,
-        reviewNote: 'Founder direct approval after TXID verification',
-      }),
+    expect(updateArgs?.where).toEqual({
+      id: DEPOSIT_ID,
+      status: 'PENDING_REVIEW',
+      openKey: USER_ID,
     });
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        actorUserId: SUPER_ADMIN_ID,
-        action: 'APPROVE',
-        entityType: 'Deposit',
-        entityId: DEPOSIT_ID,
-        metadata: expect.objectContaining({
-          approvalPath: 'SUPER_ADMIN_DIRECT',
-          adminPreReviewApplied: false,
-          readyForApprovalByUserId: null,
-          readyForApprovalAt: null,
-        }),
-      }),
+    expect(updateArgs?.data).toMatchObject({
+      status: 'APPROVED',
+      openKey: null,
+      reviewedByUserId: SUPER_ADMIN_ID,
+      reviewNote: 'Founder direct approval after TXID verification',
+    });
+    expect(auditArgs?.data).toMatchObject({
+      actorUserId: SUPER_ADMIN_ID,
+      action: 'APPROVE',
+      entityType: 'Deposit',
+      entityId: DEPOSIT_ID,
+      metadata: {
+        approvalPath: 'SUPER_ADMIN_DIRECT',
+        adminPreReviewApplied: false,
+        readyForApprovalByUserId: null,
+        readyForApprovalAt: null,
+      },
     });
     expect(result).toMatchObject({
       approvalPath: 'SUPER_ADMIN_DIRECT',
