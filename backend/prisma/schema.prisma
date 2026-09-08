@@ -10,6 +10,7 @@ datasource db {
 
 enum UserStatus {
   ACTIVE
+  RESTRICTED
   SUSPENDED
   BLOCKED
   PENDING
@@ -18,6 +19,26 @@ enum UserStatus {
 enum UserIdentifierType {
   EMAIL
   MOBILE
+}
+
+enum DuplicateAccountEnforcementMode {
+  OFF
+  MONITOR
+  RESTRICT
+  BLOCK
+}
+
+enum DuplicateAccountAllowlistType {
+  DEVICE_INSTALLATION_ID
+  IP_ADDRESS
+}
+
+enum DuplicateAccountRiskAction {
+  ALLOWED
+  MONITORED
+  RESTRICTED
+  BLOCKED
+  BYPASSED
 }
 
 enum PasswordCreationMode {
@@ -169,6 +190,7 @@ enum PackageCapReachedAction {
 enum DepositStatus {
   AWAITING_TXID
   PENDING_REVIEW
+  READY_FOR_APPROVAL
   APPROVED
   REJECTED
 }
@@ -225,10 +247,14 @@ model User {
   impersonationsAsActor   ImpersonationSession[] @relation("ImpersonationActor")
   impersonationsAsSubject ImpersonationSession[] @relation("ImpersonationSubject")
 
-  securityConfigUpdates     SystemSecurityConfig[]     @relation("SecurityConfigUpdater")
-  authConfigUpdates         SystemAuthConfig[]         @relation("AuthConfigUpdater")
-  registrationConfigUpdates SystemRegistrationConfig[] @relation("RegistrationConfigUpdater")
-  identifierClaims          UserIdentifierClaim[]
+  securityConfigUpdates         SystemSecurityConfig[]         @relation("SecurityConfigUpdater")
+  authConfigUpdates             SystemAuthConfig[]             @relation("AuthConfigUpdater")
+  registrationConfigUpdates     SystemRegistrationConfig[]     @relation("RegistrationConfigUpdater")
+  duplicateAccountConfigUpdates SystemDuplicateAccountConfig[] @relation("DuplicateAccountConfigUpdater")
+  duplicateAllowlistsCreated    DuplicateAccountAllowlist[]    @relation("DuplicateAccountAllowlistCreator")
+  deviceInstallations           UserDeviceInstallation[]
+  duplicateRiskEvents           DuplicateAccountRiskEvent[]
+  identifierClaims              UserIdentifierClaim[]
 
   referralProfile               ReferralProfile?         @relation("ReferralProfileOwner")
   sponsoredReferralProfiles     ReferralProfile[]        @relation("ReferralProfileSponsor")
@@ -250,6 +276,7 @@ model User {
   depositAccountsUpdated     DepositAccount[]     @relation("DepositAccountUpdatedBy")
   deposits                   Deposit[]            @relation("DepositOwner")
   depositsReviewed           Deposit[]            @relation("DepositReviewer")
+  depositsMarkedReady        Deposit[]            @relation("DepositReadyReviewer")
 
   @@index([status])
   @@index([createdAt])
@@ -316,7 +343,7 @@ model Role {
 }
 
 model Permission {
-  id          String   @id @default(uuid()) @db.Char(36)
+  id          String   @id @default(uuid()) @db.VarChar(36)
   code        String   @unique @db.VarChar(150)
   description String?  @db.VarChar(255)
   createdAt   DateTime @default(now()) @db.DateTime(3)
@@ -430,16 +457,88 @@ model SystemRegistrationConfig {
   usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
   usernamePrefixEnabled             Boolean              @default(false)
   usernamePrefix                    String?               @db.VarChar(20)
-  allowMultipleAccountsPerEmail     Boolean              @default(false)
-  allowMultipleAccountsPerMobile    Boolean              @default(false)
+  allowMultipleAccountsPerEmail     Boolean               @default(false)
+  allowMultipleAccountsPerMobile    Boolean               @default(false)
   updatedByUserId                   String?               @db.Char(36)
-  createdAt                         DateTime             @default(now()) @db.DateTime(3)
-  updatedAt                         DateTime             @updatedAt @db.DateTime(3)
+  createdAt                         DateTime              @default(now()) @db.DateTime(3)
+  updatedAt                         DateTime              @updatedAt @db.DateTime(3)
 
   updatedByUser User? @relation("RegistrationConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([updatedByUserId])
   @@map("system_registration_config")
+}
+
+model SystemDuplicateAccountConfig {
+  id                  Int                             @id @default(1)
+  enforcementMode     DuplicateAccountEnforcementMode @default(OFF)
+  deviceSignalEnabled Boolean                         @default(true)
+  ipSignalEnabled     Boolean                         @default(true)
+  updatedByUserId     String?                         @db.Char(36)
+  createdAt           DateTime                        @default(now()) @db.DateTime(3)
+  updatedAt           DateTime                        @updatedAt @db.DateTime(3)
+
+  updatedByUser User? @relation("DuplicateAccountConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([updatedByUserId])
+  @@map("system_duplicate_account_config")
+}
+
+model DuplicateAccountAllowlist {
+  id              String                        @id @default(uuid()) @db.Char(36)
+  type            DuplicateAccountAllowlistType
+  value           String                        @db.VarChar(191)
+  label           String?                       @db.VarChar(100)
+  isActive        Boolean                       @default(true)
+  createdByUserId String?                       @db.Char(36)
+  createdAt       DateTime                      @default(now()) @db.DateTime(3)
+  updatedAt       DateTime                      @updatedAt @db.DateTime(3)
+
+  createdByUser User? @relation("DuplicateAccountAllowlistCreator", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([type, value])
+  @@index([type, isActive])
+  @@index([createdByUserId])
+  @@map("duplicate_account_allowlist")
+}
+
+model UserDeviceInstallation {
+  id             String   @id @default(uuid()) @db.Char(36)
+  userId         String   @db.Char(36)
+  installationId String   @db.VarChar(64)
+  firstSeenIp    String?  @db.VarChar(45)
+  lastSeenIp     String?  @db.VarChar(45)
+  firstSeenAt    DateTime @default(now()) @db.DateTime(3)
+  lastSeenAt     DateTime @default(now()) @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([userId, installationId])
+  @@index([installationId])
+  @@index([lastSeenIp])
+  @@map("user_device_installations")
+}
+
+model DuplicateAccountRiskEvent {
+  id               String                          @id @default(uuid()) @db.Char(36)
+  userId           String?                         @db.Char(36)
+  attemptedEmail   String?                         @db.VarChar(191)
+  installationId   String?                         @db.VarChar(64)
+  ipAddress        String?                         @db.VarChar(45)
+  enforcementMode  DuplicateAccountEnforcementMode
+  action           DuplicateAccountRiskAction
+  bypassType       DuplicateAccountAllowlistType?
+  matchedUserIds   Json?
+  metadata         Json?
+  createdAt        DateTime                        @default(now()) @db.DateTime(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([installationId, createdAt])
+  @@index([ipAddress, createdAt])
+  @@index([action, createdAt])
+  @@map("duplicate_account_risk_events")
 }
 
 model ReferralProfile {
@@ -565,6 +664,9 @@ model PackagePlanItem {
   sortOrder           Int
   availability        PackageAvailability       @default(AVAILABLE)
   price               Decimal                   @db.Decimal(20, 8)
+  minimumInvestment   Decimal?                  @db.Decimal(20, 8)
+  maximumInvestment   Decimal?                  @db.Decimal(20, 8)
+  durationDays        Int?
   currency            String                    @db.VarChar(10)
   rewardRateMode      PackageRewardRateMode
   fixedRewardRate     Decimal?                  @db.Decimal(9, 6)
@@ -659,6 +761,10 @@ model Deposit {
   packageCode               String                   @db.VarChar(64)
   packageDisplayName        String                   @db.VarChar(100)
   amount                    Decimal                  @db.Decimal(20, 8)
+  packageMinimumInvestment  Decimal?                 @db.Decimal(20, 8)
+  packageMaximumInvestment  Decimal?                 @db.Decimal(20, 8)
+  packageDurationDays       Int?
+  packagePrincipalTreatment String?                  @db.VarChar(50)
   currency                  String                   @db.VarChar(10)
   assignedDepositAccountId  String                   @db.Char(36)
   assignedAccountLabel      String                   @db.VarChar(100)
@@ -668,6 +774,9 @@ model Deposit {
   assignedQrCodeDataUrl     String                   @db.MediumText
   txid                      String?                  @db.VarChar(191)
   submittedAt               DateTime?                @db.DateTime(3)
+  readyForApprovalByUserId  String?                  @db.Char(36)
+  readyForApprovalAt        DateTime?                @db.DateTime(3)
+  readyForApprovalNote      String?                  @db.VarChar(1000)
   reviewedByUserId          String?                  @db.Char(36)
   reviewedAt                DateTime?                @db.DateTime(3)
   reviewNote                String?                  @db.VarChar(1000)
@@ -678,7 +787,8 @@ model Deposit {
   packagePlanVersion     PackagePlanVersion @relation(fields: [packagePlanVersionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   packagePlanItem        PackagePlanItem    @relation(fields: [packagePlanItemId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   assignedDepositAccount DepositAccount     @relation(fields: [assignedDepositAccountId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  reviewedBy             User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  readyForApprovalBy      User?              @relation("DepositReadyReviewer", fields: [readyForApprovalByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  reviewedBy              User?              @relation("DepositReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([assignedNetwork, txid])
   @@index([userId, createdAt])
@@ -686,6 +796,7 @@ model Deposit {
   @@index([packagePlanVersionId])
   @@index([packagePlanItemId])
   @@index([assignedDepositAccountId])
+  @@index([readyForApprovalByUserId])
   @@index([reviewedByUserId])
   @@map("deposits")
 }

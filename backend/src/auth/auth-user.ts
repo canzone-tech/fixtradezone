@@ -1,5 +1,8 @@
 export const AUTH_SESSION_ID: unique symbol = Symbol('AUTH_SESSION_ID');
 
+export type AuthUserStatus =
+  'ACTIVE' | 'RESTRICTED' | 'SUSPENDED' | 'BLOCKED' | 'PENDING';
+
 export const AUTH_USER_SELECT = {
   id: true,
   email: true,
@@ -38,7 +41,7 @@ export interface AuthUserRecord {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED' | 'PENDING';
+  status: AuthUserStatus;
   createdAt: Date;
   lastLoginAt: Date | null;
   roles: Array<{
@@ -61,7 +64,7 @@ export interface AuthenticatedUser {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  status: AuthUserRecord['status'];
+  status: AuthUserStatus;
   createdAt: Date;
   lastLoginAt: Date | null;
   roles: string[];

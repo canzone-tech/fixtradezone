@@ -2,10 +2,10 @@
 
 ## Single Application Database
 
-- Host: 127.0.0.1
-- Port: 3306
+- Host: `127.0.0.1`
+- Port: `3306`
 - Database: `fixtradezone`
-- MySQL: 8.0.46
+- MySQL: 8.x local relational source of truth
 - Runtime user: `fixtradezone`
 
 Do not create additional application databases unless explicitly approved.
@@ -17,193 +17,318 @@ Do not create additional application databases unless explicitly approved.
 - Output: `src/generated/prisma`
 - moduleFormat: `cjs`
 - Datasource provider: MySQL
-- URL configured via `prisma.config.ts`
+- URL configured through `prisma.config.ts`
 - Runtime connectivity uses `@prisma/adapter-mariadb`
 
 ## Database Conventions
 
 - UUID IDs: `CHAR(36)`
-- UTC timestamps
+- persisted timestamps are UTC instants; financial UI display uses the shared platform-time contract
 - `createdAt` + `updatedAt` where mutable state exists
-- Financial values: SQL `DECIMAL`; never FLOAT/DOUBLE
-- Explicit lifecycle enums where integrity matters
-- Secrets remain in env/secret management, never business tables
-- Important admin/financial actions are audited
-- Historical financial/business facts are not silently rewritten or deleted
-- Reversals/adjustments are separate linked events in later accounting modules
-- Migration application is explicit; do not use `prisma migrate dev` without shadow-DB approval
+- financial values use SQL `DECIMAL`; never FLOAT/DOUBLE
+- money settlement precision: `DECIMAL(20,8)` unless a stricter domain field is documented
+- percentage/rate snapshot precision: generally `DECIMAL(9,6)`
+- explicit lifecycle enums where integrity matters
+- secrets stay in env/secret management, never business tables
+- important admin/financial actions are audited
+- immutable historical financial/business facts are never silently rewritten/deleted
+- later reversals/adjustments must be separate linked accounting events
+- migration application is explicit; `prisma migrate dev` is prohibited without shadow-DB approval
 
-## Applied Migration History
+## Migration Chain
 
-### `0001_foundation_auth_rbac`
-Foundation users/RBAC/audit schema.
-
-### `0002_auth_sessions` through `0004`
-Authentication session and security/impersonation foundation.
-
-### `0005_configurable_auth_registration`
-Configurable identifiers/auth/registration and system sequence foundation.
-
-### `0006_referral_foundation`
-Relational referral profiles, sponsor history and referral configuration.
-
-### `0007_package_plan_foundation`
-Versioned package catalogue and exact decimal economics. PKG-01 local acceptance is GREEN.
-
-### `0008_deposit_foundation`
-Applied locally on 2026-08-26 after correcting the MySQL-compatible open-key CHECK. It is immutable migration history.
-
-It introduced:
-
-- `deposit_accounts`;
-- `deposits`;
-- one-open-deposit key;
-- package/payment/account snapshots;
-- manual payment review states;
-- deposit RBAC permissions.
-
-The applied 0008 file must never be rewritten.
-
-## Pending Migration — `0009_deposit_network_generalization`
-
-Status: **SOURCE IMPLEMENTED AS DATA-DRIVEN PAYMENT-RAIL HARDENING / LOCAL CODE GATE PENDING**.
-
-Read-only local migration status has already confirmed 9 migrations with only `0009` pending. Do not deploy it until the revised code gate is GREEN.
-
-### `deposit_payment_rails`
-
-`0009` creates first-class payment-route configuration:
+Repository migration order is authoritative:
 
 ```text
-id
-asset
-networkCode
-displayName
-validationProfile
-isActive
-revision
-createdByUserId
-updatedByUserId
-createdAt
-updatedAt
+0001_foundation_auth_rbac
+0002_auth_sessions
+0003_user_impersonation
+0004_security_configuration
+0005_configurable_auth_registration
+0006_referral_foundation
+0007_package_plan_foundation
+0008_deposit_foundation
+0009_deposit_network_generalization
+0010_wallet_ledger_foundation
+0011_accounting_posting_policy
+0012_package_subscription_activation
+0013_referral_commission_foundation
+0014_rewards_caps_lifecycle_foundation
 ```
 
-Integrity:
+Applied migrations must never be rewritten. New corrections are forward-only
+migrations.
 
-- unique `(asset, networkCode)`;
-- asset/network-code shape checks;
-- positive revision;
-- actor FKs preserve auditability;
-- protocol profile is typed as `TRON`, `EVM`, or `SOLANA`.
+## Business / Accounting Foundations Through 0013
 
-A deterministic V1 rail is seeded:
+### 0007 — package plan
+
+Introduces stable package definitions, versioned DRAFT/PUBLISHED package plans and
+immutable exact-decimal package commercial terms.
+
+### 0008–0009 — deposits and payment rails
+
+Introduce versioned/data-driven receiving rails, public receiving accounts,
+immutable deposit assignment snapshots, transaction-ID validation and manual
+review state.
+
+No private key, signing key, seed phrase or custody secret is persisted.
+
+### 0010 — immutable wallet / ledger
+
+Introduces:
 
 ```text
-id                = 00000000-0000-4000-8000-000000000901
-asset             = USDT
-networkCode       = TRC20
-displayName       = USDT on TRON (TRC20)
-validationProfile = TRON
+ledger_accounts
+ledger_account_balances
+ledger_transactions
+ledger_entries
 ```
 
-This is launch configuration, not a global schema restriction.
+Ledger entries are the accounting source of truth. Balance rows are transactional
+read models.
 
-### `deposit_accounts` after 0009
-
-A receiving account references a configured rail with mandatory `paymentRailId`.
-
-Existing 0008 USDT/TRC20 rows are backfilled to the deterministic seeded rail before the FK becomes NOT NULL.
-
-The existing `asset` and `network` columns remain immutable assignment snapshots populated from the selected rail. They are not freehand Admin input.
-
-Uniqueness becomes:
+The base ledger transaction has:
 
 ```text
-(paymentRailId, walletAddress)
+sourceKey  VARCHAR(191) UNIQUE
+sourceType VARCHAR(40)
+sourceId   VARCHAR(100)
+currency   VARCHAR(10)
 ```
 
-Lookup index:
+`sourceType` is intentionally not an enum so reviewed business modules can use
+stable source families such as `PACKAGE_SUBSCRIPTION` without rewriting the WAL
+foundation.
+
+### 0012 — package subscription activation
+
+Introduces immutable `user_package_subscriptions` with the package/economic
+snapshot required by later commission and reward engines.
+
+Status values are exactly:
 
 ```text
-(paymentRailId, isActive)
+ACTIVE
+COMPLETED
+SUPERSEDED
+CANCELLED
 ```
 
-The old 0008 checks forcing every account to USDT/TRC20 are removed.
-
-No private key, seed phrase, signing key or custody secret is stored.
-
-### `deposits` after 0009
-
-The deposit fact keeps exact `DECIMAL(20,8)` amount and immutable assignment snapshots.
-
-`0009` adds:
+Reward/cap/lifecycle snapshot inputs include:
 
 ```text
-assignedValidationProfile
+settlementTimezone
+rewardRateMode
+fixedRewardRate
+minimumRewardRate
+maximumRewardRate
+rewardRateMeaning
+capBasis
+capMultiplier
+principalTreatment
+goalDays
+cycleDays
+rewardStartMode
+rewardFrequency
+cycleDayMode
+rewardDayMode
+cycleEndAction
+capReachedAction
 ```
 
-Existing TRC20 deposits are backfilled as `TRON` before this field becomes NOT NULL.
+### 0013 — referral commission foundation
 
-Transaction storage expands from `CHAR(64)` to `VARCHAR(191)` for protocol-specific identifiers.
+Introduces versioned commission policy, immutable processing runs/events and
+balanced Referral Commission ledger posting.
 
-Transaction uniqueness becomes:
+Ledger enum state after 0013 includes:
 
 ```text
-(assignedNetwork, txid)
+account buckets:
+MAIN
+PACKAGE_EARNINGS
+REFERRAL_COMMISSION
+REWARDS
+DEPOSIT_CLEARING
+PACKAGE_PRINCIPAL
+REFERRAL_COMMISSION_EXPENSE
+
+transaction kinds:
+DEPOSIT_CREDIT
+PACKAGE_ACTIVATION_FUNDING
+REFERRAL_COMMISSION_CREDIT
 ```
 
-Validation uses the immutable `assignedValidationProfile` snapshot. A later Admin rail change therefore cannot reinterpret a historical deposit.
+COMM-01 migration and runtime behavior were locally accepted before merge to
+`main`.
 
-### Network and validator ownership
+## 0014 — Rewards / Caps / Lifecycle Foundation
 
-Network names are **data**, stored in `deposit_payment_rails.networkCode`; they are not a hardcoded application list.
+Status: **SOURCE REVIEWED ON FEATURE BRANCH / LOCAL DEPLOYMENT AND RUNTIME ACCEPTANCE PENDING**.
 
-Protocol validator families remain code because address and transaction validation is security-sensitive:
+Path:
 
-- `TRON`: Base58Check public address + 64-hex transaction ID;
-- `EVM`: 20-byte `0x` address + 32-byte transaction hash;
-- `SOLANA`: Base58 structural public key/signature validation.
+`backend/prisma/migrations/0014_rewards_caps_lifecycle_foundation/migration.sql`
 
-A new network using an existing protocol profile can be configured as data. A genuinely new protocol family requires reviewed validator code before activation.
+The migration is forward-only and preserves all enum members created by WAL,
+SUB and COMM foundations.
 
-### Payment routing rule
+### Ledger extensions
 
-A package determines authoritative `amount + currency`.
+`ledger_accounts.bucket` adds:
 
-The USER chooses an ACTIVE payment rail whose `asset` matches that currency. The backend then randomly assigns an ACTIVE receiving account **within that exact rail**.
+```text
+PACKAGE_REWARD_EXPENSE
+```
 
-This prevents random cross-network assignment and wrong-chain ambiguity.
+while preserving:
 
-### One-open-deposit guard
+```text
+MAIN
+PACKAGE_EARNINGS
+REFERRAL_COMMISSION
+REWARDS
+DEPOSIT_CLEARING
+PACKAGE_PRINCIPAL
+REFERRAL_COMMISSION_EXPENSE
+```
 
-`openKey` remains nullable and unique.
+`ledger_transactions.kind` adds:
 
-Open states require non-null `openKey`; service writes `openKey = userId`. Terminal review releases it to `NULL`.
+```text
+PACKAGE_REWARD_CREDIT
+```
 
-### Deferred accounting
+while preserving:
 
-DEP-01 still does **not** create:
+```text
+DEPOSIT_CREDIT
+PACKAGE_ACTIVATION_FUNDING
+REFERRAL_COMMISSION_CREDIT
+```
 
-- wallet balance;
-- accounting ledger credit;
-- package subscription/activation;
-- referral commission;
-- reward/cap consumption;
-- withdrawal/payout;
-- blockchain custody/signing state.
+RWD-01 balanced posting contract is:
 
-Later modules must consume approved deposit facts idempotently.
+```text
+DEBIT  SYSTEM / PACKAGE_REWARD_EXPENSE / <currency>
+CREDIT USER   / PACKAGE_EARNINGS       / <currency>
+```
+
+### `reward_cap_policy_versions`
+
+Versioned DRAFT/PUBLISHED reward/cap policy with:
+
+- optimistic `revision`;
+- effective range and publication integrity checks;
+- existing-subscription rollout mode;
+- package/referral/team/award/other-income cap contribution flags;
+- clone provenance;
+- create/update/publish actor FKs.
+
+Initial seeded V1:
+
+```text
+status                               = DRAFT
+existingSubscriptionRolloutMode      = FORWARD_ONLY_FROM_POLICY_EFFECTIVE
+packageRewardCountsTowardCap         = TRUE
+referralCommissionCountsTowardCap    = FALSE
+teamCommissionCountsTowardCap        = FALSE
+awardRewardCountsTowardCap           = FALSE
+otherIncomeCountsTowardCap            = FALSE
+```
+
+A DRAFT has zero reward financial effect. SUPER_ADMIN publication is required.
+
+### `package_reward_states`
+
+One current lifecycle state per immutable subscription, keyed by
+`subscriptionId`.
+
+It snapshots:
+
+- user/policy/currency/package value;
+- cap basis/multiplier/principal treatment;
+- cap limit and consumed amount;
+- all cap contribution flags;
+- next logical reward date and due timestamp;
+- natural package day/cycle coordinates;
+- settled count;
+- ACTIVE/COMPLETED/BLOCKED status;
+- completion/blocked reason and revision.
+
+Integrity prevents negative cap consumption or consumption above cap.
+
+### `package_reward_events`
+
+Immutable daily package-reward fact with unique:
+
+```text
+sourceKey
+(subscriptionId, rewardLocalDate)
+ledgerTransactionId
+```
+
+The event retains the package, reward schedule, selected rate, calculation,
+cap-before/cap-after, rollout policy, cap contribution policy and lifecycle
+snapshot necessary to explain the ledger posting historically.
+
+Core money fields:
+
+```text
+selectedRate      DECIMAL(9,6)
+calculatedReward  DECIMAL(20,8)
+postedReward      DECIMAL(20,8)
+capLimit           DECIMAL(20,8)
+capConsumedBefore  DECIMAL(20,8)
+capConsumedAfter   DECIMAL(20,8)
+```
+
+Checks require positive reward values and prevent `postedReward` from exceeding
+the calculated amount or cap state from exceeding the cap limit.
+
+### RWD-01 permissions
+
+0014 seeds:
+
+```text
+rewards.read
+rewards.reconcile
+```
+
+No arbitrary reward/balance mutation permission is introduced.
+
+## 0014 Compatibility Audit — 2026-08-28
+
+Source review against exact 0010/0012/0013 migrations confirms:
+
+- 0014 preserves every previously valid ledger account bucket;
+- 0014 preserves every previously valid ledger transaction kind;
+- RWD subscription status assumptions exactly match the 0012 enum;
+- all required reward/cap/schedule source fields exist in immutable subscription rows;
+- RWD FK IDs use the existing `CHAR(36)` convention;
+- ledger transaction `sourceType` remains compatible with `PACKAGE_SUBSCRIPTION`;
+- V1 policy remains DRAFT after migration and therefore cannot post money by migration alone.
+
+This is source compatibility evidence only. MySQL execution/readback is still
+required before local acceptance.
 
 ## Local Migration Rule
 
 1. Run repository code gate.
-2. Run read-only `npm run db:status`.
-3. Inspect exact pending migration.
-4. Apply only with explicit `npm run db:deploy` after code gate GREEN.
-5. Rerun migration status and module SQL/audit acceptance.
-6. Never rewrite an already-applied migration.
-7. Never reset the real application database merely to bypass a failed migration.
+2. Run read-only migration status.
+3. Inspect the exact pending migration.
+4. Take/verify a local database backup.
+5. Apply only with explicit `prisma migrate deploy` / repository deploy script.
+6. Rerun migration status.
+7. Verify tables, columns, enums, checks, seed policy and permissions by SQL readback.
+8. Run module Postman/browser acceptance plus ledger/audit verification.
+9. Never rewrite an already-applied migration.
+10. Never reset the application database merely to bypass a failed migration.
 
-Current local DB: `0008` applied; `0009` pending.
+Current RWD checkpoint: migration `0014` exists on the feature branch and must be
+treated as **pending until the operator's local `migrate status/deploy/readback`
+evidence confirms otherwise**.
 
-Production migration status is unknown and production deployment remains HOLD.
+Production migration status remains unknown and production deployment remains
+HOLD.

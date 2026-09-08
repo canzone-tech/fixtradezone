@@ -37,7 +37,6 @@ jobs:
       MYSQL_DATABASE: fixtradezone
       MYSQL_USER: ci_user
       MYSQL_PASSWORD: ci_password
-      MONGODB_URI: mongodb://127.0.0.1:27017/fixtradezone
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
       REDIS_PASSWORD: ''

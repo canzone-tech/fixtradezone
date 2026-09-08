@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
 import {
@@ -19,6 +19,11 @@ const routeHeadings: Array<{
     subtitle: "Payment rails, receiving accounts and deposit review",
   },
   {
+    path: "/wallets",
+    title: "Wallets & Ledger",
+    subtitle: "Wallet buckets, immutable ledger and accounting reconciliation",
+  },
+  {
     path: "/subscriptions",
     title: "Subscriptions",
     subtitle: "Package activation queue and immutable lifecycle history",
@@ -27,6 +32,32 @@ const routeHeadings: Array<{
     path: "/commissions",
     title: "Referral Commissions",
     subtitle: "Versioned matching rules and immutable commission accounting",
+  },
+  {
+    path: "/rewards",
+    title: "Rewards, Caps & Lifecycle",
+    subtitle: "Daily package settlement, cap progress and lifecycle controls",
+  },
+  {
+    path: "/payouts",
+    title: "Payouts",
+    subtitle: "Withdrawal policy, request review and settlement operations",
+  },
+  {
+    path: "/internal-trading",
+    title: "Internal Trading",
+    subtitle:
+      "Automatic package trading, financial settlement and recovery controls",
+  },
+  {
+    path: "/trade-activity",
+    title: "Trade Activity",
+    subtitle: "System-generated daily trade activity for active package subscriptions",
+  },
+  {
+    path: "/simulated-trades",
+    title: "Trade Activity",
+    subtitle: "System-generated daily trade activity for active package subscriptions",
   },
   {
     path: "/packages",
@@ -49,6 +80,26 @@ const routeHeadings: Array<{
     subtitle: "Backend-authoritative access management",
   },
   {
+    path: "/notifications",
+    title: "Notifications",
+    subtitle: "Targeted and broadcast in-app user communication",
+  },
+  {
+    path: "/reports",
+    title: "Reports",
+    subtitle: "Read-only operational and financial reporting",
+  },
+  {
+    path: "/audit-logs",
+    title: "Audit Logs",
+    subtitle: "Immutable administration activity and security history",
+  },
+  {
+    path: "/settings/email",
+    title: "Email Delivery",
+    subtitle: "Safe transport status and controlled delivery testing",
+  },
+  {
     path: "/settings",
     title: "Settings",
     subtitle: "Platform and security configuration",
@@ -58,7 +109,6 @@ const routeHeadings: Array<{
 export default function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const searchRef = useRef<HTMLInputElement>(null);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -67,35 +117,22 @@ export default function Topbar() {
 
     async function loadSession() {
       const session = await resolveAdminSession();
-
       if (!session.user) {
         router.replace("/login");
         return;
       }
-
       if (mounted) setUser(session.user);
     }
 
     void loadSession();
 
-    const onShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
-    };
-
-    window.addEventListener("keydown", onShortcut);
-
     return () => {
       mounted = false;
-      window.removeEventListener("keydown", onShortcut);
     };
   }, [router]);
 
   const displayName = useMemo(() => {
     if (!user) return "Super Admin";
-
     return (
       [user.firstName, user.lastName].filter(Boolean).join(" ") ||
       user.username ||
@@ -123,7 +160,7 @@ export default function Topbar() {
       pathname === candidate.path || pathname.startsWith(`${candidate.path}/`),
   ) ?? {
     title: "Dashboard",
-    subtitle: "Real-time overview of your platform",
+    subtitle: "Live operational overview of your platform",
   };
 
   async function logout() {
@@ -145,7 +182,6 @@ export default function Topbar() {
         >
           <i className="iconoir-menu-scale" />
         </button>
-
         <div>
           <h1>{heading.title}</h1>
           <p>{heading.subtitle}</p>
@@ -153,44 +189,28 @@ export default function Topbar() {
       </div>
 
       <div className="ftz-topbar-actions">
-        <label className="ftz-search">
-          <i className="iconoir-search" />
-          <input
-            ref={searchRef}
-            type="search"
-            placeholder="Search users, transactions, packages..."
-            aria-label="Search admin portal"
-          />
-          <kbd>Ctrl + K</kbd>
-        </label>
-
-        <button
-          type="button"
-          className="ftz-icon-button"
-          aria-label="Favorites"
-          title="Favorites"
-        >
-          <i className="iconoir-star" />
-        </button>
-
-        <button
-          type="button"
-          className="ftz-icon-button ftz-notification"
-          aria-label="Notifications"
-          title="Notifications"
-        >
-          <i className="iconoir-bell" />
-          <span>8</span>
-        </button>
+        <span className="ftz-secure-pill">
+          <i className="iconoir-shield-check" /> Live operational data
+        </span>
 
         <div className="ftz-topbar-profile">
           <div className="ftz-avatar">{initials}</div>
-
           <div className="ftz-topbar-profile-copy">
             <strong>{displayName}</strong>
             <small>{user?.roles.join(" · ") ?? "SUPER_ADMIN"}</small>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="ftz-signout-button"
+          onClick={() => router.push("/change-password")}
+          aria-label="Change password"
+          title="Change password"
+        >
+          <i className="iconoir-key" />
+          <span>Change Password</span>
+        </button>
 
         <button
           type="button"
@@ -201,7 +221,6 @@ export default function Topbar() {
           title="Sign out"
         >
           <i className="iconoir-log-out" />
-
           <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
         </button>
       </div>

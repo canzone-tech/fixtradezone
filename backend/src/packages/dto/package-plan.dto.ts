@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import {
+  Equals,
   IsBoolean,
   IsIn,
   IsInt,
@@ -70,10 +71,11 @@ class AuditedRevisionDto {
 
 export class CreatePackagePlanDraftDto {
   @Transform(trimString)
+  @IsOptional()
   @IsString()
   @IsUUID()
   @MaxLength(36)
-  sourcePlanVersionId!: string;
+  sourcePlanVersionId?: string;
 
   @Transform(trimString)
   @IsString()
@@ -106,10 +108,10 @@ export class UpdatePackagePlanDto extends AuditedRevisionDto {
   @IsBoolean()
   upgradesEnabled?: boolean;
 
-  @Transform(trimString)
-  @IsOptional()
-  @IsString()
-  @Length(1, 64)
+  @Equals(undefined, {
+    message:
+      'settlementTimezone is controlled by SUPER_ADMIN Platform Operations.',
+  })
   settlementTimezone?: string;
 
   @Transform(trimString)
@@ -170,6 +172,24 @@ export class CreatePackagePlanItemDto extends AuditedRevisionDto {
   @IsString()
   @Matches(PRICE_PATTERN)
   price!: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  minimumInvestment?: string | null;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  maximumInvestment?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(36500)
+  durationDays?: number | null;
 
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,
@@ -279,6 +299,24 @@ export class UpdatePackagePlanItemDto extends AuditedRevisionDto {
   @IsString()
   @Matches(PRICE_PATTERN)
   price?: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  minimumInvestment?: string | null;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(PRICE_PATTERN)
+  maximumInvestment?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(36500)
+  durationDays?: number | null;
 
   @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toUpperCase() : value,

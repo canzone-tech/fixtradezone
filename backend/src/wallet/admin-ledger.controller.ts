@@ -13,9 +13,8 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
-import { CommissionsService } from '../commissions/commissions.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
-import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { DepositAccountingRecoveryService } from './deposit-accounting-recovery.service';
 import { AdminLedgerQueryDto } from './dto/wallet.dto';
 import { WalletLedgerService } from './wallet-ledger.service';
 
@@ -43,55 +42,21 @@ export class AdminLedgerController {
 @Controller('admin/deposits')
 export class AdminDepositAccountingController {
   constructor(
-    private readonly walletLedgerService: WalletLedgerService,
-    private readonly subscriptionsService: SubscriptionsService,
-    private readonly commissionsService: CommissionsService,
+    private readonly accountingRecoveryService: DepositAccountingRecoveryService,
   ) {}
 
   @Post(':depositId/post-accounting')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.LEDGER_POST)
-  async postApprovedDeposit(
+  postApprovedDeposit(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const context = getRequestContext(request);
-
-    const accounting = await this.walletLedgerService.reconcileApprovedDeposit(
+    return this.accountingRecoveryService.reconcileApprovedDeposit(
       depositId,
       actor,
-      context,
+      getRequestContext(request),
     );
-
-    const packageActivation =
-      await this.subscriptionsService.activateAutomaticallyAfterAccounting(
-        depositId,
-        actor,
-        context,
-      );
-
-    if (
-      packageActivation.activationMode !== 'AUTO' ||
-      !packageActivation.subscription
-    ) {
-      return {
-        ...accounting,
-        packageActivation,
-      };
-    }
-
-    const referralCommission =
-      await this.commissionsService.processSubscriptionSafely(
-        packageActivation.subscription.id,
-        actor,
-        context,
-      );
-
-    return {
-      ...accounting,
-      packageActivation,
-      referralCommission,
-    };
   }
 }

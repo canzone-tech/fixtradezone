@@ -1,6 +1,12 @@
+export { ChangePasswordDto } from './change-password.dto';
 export { ChangeRequiredPasswordDto } from './change-required-password.dto';
 export { LoginDto } from './login.dto';
 export { LogoutDto } from './logout.dto';
-export { RefreshTokenDto } from './refresh-token.dto';
 export { ReauthenticateDto } from './reauthenticate.dto';
+export { RefreshTokenDto } from './refresh-token.dto';
 export { RegisterDto } from './register.dto';
+export { RequestPasswordResetDto } from './request-password-reset.dto';
+export { ResendEmailVerificationDto } from './resend-email-verification.dto';
+export { ResetPasswordDto } from './reset-password.dto';
+export { UpdateOwnProfileDto } from './update-own-profile.dto';
+export { VerifyEmailDto } from './verify-email.dto';

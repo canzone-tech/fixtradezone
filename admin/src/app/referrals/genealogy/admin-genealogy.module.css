@@ -1,0 +1,198 @@
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 22px 24px;
+  border: 1px solid rgba(129, 151, 185, 0.2);
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(24, 50, 61, 0.5), rgba(11, 19, 32, 0.94));
+}
+
+.header span {
+  color: #69dfc2;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.header h2 {
+  margin: 5px 0 8px;
+  color: #f7f9fd;
+  font-size: clamp(25px, 3vw, 34px);
+}
+
+.header p {
+  max-width: 760px;
+  margin: 0;
+  color: #91a2ba;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.header button,
+.searchControls button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(105, 223, 194, 0.3);
+  border-radius: 10px;
+  background: rgba(105, 223, 194, 0.08);
+  color: #8ef0d8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.header button {
+  padding: 10px 13px;
+}
+
+.searchCard {
+  padding: 18px 20px;
+  border: 1px solid rgba(129, 151, 185, 0.18);
+  border-radius: 16px;
+  background: rgba(12, 20, 34, 0.88);
+}
+
+.searchCard form {
+  display: grid;
+  grid-template-columns: 1fr minmax(330px, 0.8fr);
+  gap: 18px;
+  align-items: end;
+}
+
+.searchCard label {
+  color: #f0f5fc;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.searchCard p {
+  margin: 5px 0 0;
+  color: #8294ae;
+  font-size: 12px;
+}
+
+.searchControls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.searchControls input {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(129, 151, 185, 0.2);
+  border-radius: 10px;
+  outline: none;
+  background: #09111e;
+  color: #eef4fc;
+  font: inherit;
+  font-size: 13px;
+}
+
+.searchControls input:focus {
+  border-color: rgba(105, 223, 194, 0.5);
+  box-shadow: 0 0 0 3px rgba(105, 223, 194, 0.07);
+}
+
+.searchControls button {
+  padding: 10px 14px;
+}
+
+.searchControls button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.results {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.results > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(129, 151, 185, 0.16);
+  border-radius: 11px;
+  background: rgba(19, 31, 50, 0.72);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.results > button:hover {
+  border-color: rgba(105, 223, 194, 0.35);
+  background: rgba(30, 48, 66, 0.78);
+}
+
+.results strong,
+.results span {
+  display: block;
+}
+
+.results strong {
+  color: #f4f7fc;
+  font-size: 13px;
+}
+
+.results > button > div:first-child > span {
+  margin-top: 4px;
+  color: #8395af;
+  font-size: 11px;
+}
+
+.resultStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.resultStats span {
+  padding: 5px 7px;
+  border: 1px solid rgba(129, 151, 185, 0.15);
+  border-radius: 999px;
+  color: #a7b4c7;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.error {
+  margin-top: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(255, 112, 112, 0.25);
+  border-radius: 9px;
+  background: rgba(255, 112, 112, 0.07);
+  color: #ffb1b1;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .header,
+  .results > button {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .searchCard form {
+    grid-template-columns: 1fr;
+  }
+
+  .resultStats {
+    justify-content: flex-start;
+  }
+}

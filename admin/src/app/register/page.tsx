@@ -3,7 +3,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
+import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
+import styles from "./register.module.css";
 
 type CreationMode = "AUTO" | "MANUAL" | "AUTO_OR_MANUAL";
 
@@ -15,6 +22,10 @@ interface RegistrationPolicy {
   usernameMode: CreationMode;
   usernamePrefixEnabled: boolean;
   usernamePrefix: string | null;
+  age18DeclarationRequired: boolean;
+  kycDeclarationRequired: boolean;
+  emailVerificationRequired: boolean;
+  declarationPolicyVersion: string;
 }
 
 interface CaptchaDisabled {
@@ -36,11 +47,11 @@ interface RegistrationResult {
     id: string;
     email: string | null;
     username: string;
-    phone: string | null;
-    firstName: string | null;
-    lastName: string | null;
     status: string;
   };
+  emailVerificationRequired: boolean;
+  verificationEmailSent: boolean;
+  verificationStatus: string;
   temporaryPassword?: string;
   mustChangePassword?: boolean;
 }
@@ -58,11 +69,28 @@ function readMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function readInviteReferralCode(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return (
+    new URLSearchParams(window.location.search)
+      .get("ref")
+      ?.trim()
+      .slice(0, 128)
+      .toUpperCase() ?? ""
+  );
+}
+
+function subscribeToInviteReferralCode() {
+  return () => undefined;
+}
+
 async function getPolicy(): Promise<RegistrationPolicy> {
   const response = await fetch("/api/auth/registration-policy", {
     cache: "no-store",
   });
-
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
@@ -77,15 +105,10 @@ async function getPolicy(): Promise<RegistrationPolicy> {
 async function getCaptcha(): Promise<CaptchaDisabled | CaptchaChallenge> {
   const response = await fetch("/api/auth/captcha", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      purpose: "REGISTRATION",
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ purpose: "REGISTRATION" }),
     cache: "no-store",
   });
-
   const payload = (await response.json().catch(() => null)) as unknown;
 
   if (!response.ok) {
@@ -96,23 +119,31 @@ async function getCaptcha(): Promise<CaptchaDisabled | CaptchaChallenge> {
 }
 
 export default function RegisterPage() {
+  const inviteReferralCode = useSyncExternalStore(
+    subscribeToInviteReferralCode,
+    readInviteReferralCode,
+    () => "",
+  );
   const [policy, setPolicy] = useState<RegistrationPolicy | null>(null);
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
-
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [referralCodeOverride, setReferralCodeOverride] = useState<string | null>(
+    null,
+  );
+  const referralCode = referralCodeOverride ?? inviteReferralCode;
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
-
+  const [age18Declared, setAge18Declared] = useState(false);
+  const [kycDeclarationAccepted, setKycDeclarationAccepted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
+  const [resendMessage, setResendMessage] = useState("");
   const [result, setResult] = useState<RegistrationResult | null>(null);
 
   async function reloadCaptcha() {
@@ -121,7 +152,6 @@ export default function RegisterPage() {
 
     try {
       const challenge = await getCaptcha();
-
       setCaptcha(challenge.enabled ? challenge : null);
     } catch (caught) {
       setCaptcha(null);
@@ -140,10 +170,7 @@ export default function RegisterPage() {
 
     void Promise.all([getPolicy(), getCaptcha()])
       .then(([nextPolicy, nextCaptcha]) => {
-        if (cancelled) {
-          return;
-        }
-
+        if (cancelled) return;
         setPolicy(nextPolicy);
         setCaptcha(nextCaptcha.enabled ? nextCaptcha : null);
       })
@@ -157,9 +184,7 @@ export default function RegisterPage() {
         }
       })
       .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -169,14 +194,21 @@ export default function RegisterPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const currentPolicy = policy;
+    if (!currentPolicy?.publicRegistrationEnabled) return;
 
-    if (!currentPolicy?.publicRegistrationEnabled) {
+    setError("");
+    setResendMessage("");
+
+    if (currentPolicy.age18DeclarationRequired && !age18Declared) {
+      setError("You must declare that you are 18 years of age or older.");
       return;
     }
 
-    setError("");
+    if (currentPolicy.kycDeclarationRequired && !kycDeclarationAccepted) {
+      setError("You must accept the identity and future KYC declaration.");
+      return;
+    }
 
     if (
       currentPolicy.passwordMode !== "AUTO" &&
@@ -197,32 +229,21 @@ export default function RegisterPage() {
       return;
     }
 
-    const body: Record<string, string> = {};
+    const body: Record<string, string | boolean> = {
+      age18Declared,
+      kycDeclarationAccepted,
+    };
 
-    if (firstName.trim()) {
-      body.firstName = firstName.trim();
+    if (referralCode.trim()) {
+      body.referralCode = referralCode.trim().toUpperCase();
     }
-
-    if (lastName.trim()) {
-      body.lastName = lastName.trim();
-    }
-
-    if (email.trim()) {
-      body.email = email.trim();
-    }
-
-    if (phone.trim()) {
-      body.phone = phone.trim();
-    }
-
+    if (email.trim()) body.email = email.trim();
     if (currentPolicy.usernameMode !== "AUTO" && username.trim()) {
       body.username = username.trim().toLowerCase();
     }
-
     if (currentPolicy.passwordMode !== "AUTO" && password) {
       body.password = password;
     }
-
     if (captcha) {
       body.captchaId = captcha.challengeId;
       body.captchaAnswer = captchaAnswer.trim();
@@ -231,14 +252,13 @@ export default function RegisterPage() {
     setSubmitting(true);
 
     try {
+      body.deviceInstallationId = await getOrCreateDeviceInstallationId();
+
       const response = await fetch("/api/auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-
       const payload = (await response
         .json()
         .catch(() => null)) as RegistrationResult | null;
@@ -257,12 +277,33 @@ export default function RegisterPage() {
           ? caught.message
           : "Unable to register account.",
       );
-
-      if (captcha) {
-        void reloadCaptcha();
-      }
+      if (captcha) void reloadCaptcha();
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function resendVerification() {
+    const targetEmail = result?.user.email;
+    if (!targetEmail) return;
+
+    setResending(true);
+    setResendMessage("");
+
+    try {
+      const response = await fetch("/api/auth/email-verification/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const payload = (await response.json().catch(() => null)) as unknown;
+      setResendMessage(
+        readMessage(payload, "If eligible, a verification email was sent."),
+      );
+    } catch {
+      setResendMessage("Unable to resend verification email right now.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -270,7 +311,6 @@ export default function RegisterPage() {
     <main className="ftz-auth-page">
       <section className="ftz-auth-visual" aria-label="FixTradeZone">
         <div className="ftz-auth-plasma" aria-hidden="true" />
-
         <div className="ftz-auth-brand">
           <Image
             src="/assets/fixtradezone/svg/fixtradezone-admin-logo.svg"
@@ -280,40 +320,28 @@ export default function RegisterPage() {
             priority
           />
         </div>
-
         <div className="ftz-auth-story">
           <span className="ftz-auth-pill">
-            <i className="iconoir-user-plus" />
-            Secure Registration
+            <i className="iconoir-user-plus" /> Secure Registration
           </span>
-
           <h1>
-            Create your
-            <span> FixTradeZone account.</span>
+            Create your<span> FixTradeZone account.</span>
           </h1>
-
           <p>
-            Registration follows the identity, credential and security policies
-            configured by the platform.
+            Register with your sponsor code when applicable, then verify your
+            email before using the account.
           </p>
         </div>
-
         <div className="ftz-auth-bull" aria-hidden="true" />
-
         <div className="ftz-auth-trust">
           <span>
-            <i className="iconoir-shield-check" />
-            Policy controlled
+            <i className="iconoir-shield-check" /> Policy controlled
           </span>
-
           <span>
-            <i className="iconoir-lock" />
-            Secure credentials
+            <i className="iconoir-mail" /> Email verified
           </span>
-
           <span>
-            <i className="iconoir-fingerprint" />
-            Audit ready
+            <i className="iconoir-fingerprint" /> Audit ready
           </span>
         </div>
       </section>
@@ -333,7 +361,6 @@ export default function RegisterPage() {
           <div className="ftz-login-head">
             <span>ACCOUNT REGISTRATION</span>
             <h2>Create account</h2>
-
             <p>
               Already registered? <Link href="/login">Sign in here</Link>.
             </p>
@@ -341,21 +368,17 @@ export default function RegisterPage() {
 
           {loading ? (
             <div className="ftz-register-state">
-              <i className="iconoir-refresh-double" />
-              Loading registration policy…
+              <i className="iconoir-refresh-double" /> Loading registration
+              policy…
             </div>
           ) : null}
 
           {!loading && policy && !policy.publicRegistrationEnabled ? (
             <div className="ftz-register-state is-warning">
               <i className="iconoir-lock" />
-
               <div>
                 <strong>Public registration is closed</strong>
-                <span>
-                  Account creation is currently available through authorized
-                  platform operators only.
-                </span>
+                <span>Account creation is currently disabled.</span>
               </div>
             </div>
           ) : null}
@@ -363,24 +386,19 @@ export default function RegisterPage() {
           {result ? (
             <div className="ftz-registration-success">
               <i className="iconoir-check-circle" />
-
               <div>
                 <strong>{result.message}</strong>
-
                 <span>
                   Username: <b>{result.user.username}</b>
                 </span>
-
                 <span>
-                  Status: <b>{result.user.status}</b>
+                  Status: <b>{result.verificationStatus}</b>
                 </span>
 
                 {result.temporaryPassword ? (
                   <div className="ftz-temporary-password">
                     <small>TEMPORARY PASSWORD — SHOWN ONCE</small>
-
                     <code>{result.temporaryPassword}</code>
-
                     <button
                       type="button"
                       onClick={() =>
@@ -389,21 +407,28 @@ export default function RegisterPage() {
                         )
                       }
                     >
-                      <i className="iconoir-copy" />
-                      Copy password
+                      <i className="iconoir-copy" /> Copy password
                     </button>
-
-                    <p>
-                      Save this password now. First login will require a
-                      password change after account activation.
-                    </p>
                   </div>
-                ) : (
-                  <p>
-                    Account created successfully. Once activated, use the
-                    credentials you selected to sign in.
-                  </p>
-                )}
+                ) : null}
+
+                {result.emailVerificationRequired ? (
+                  <div className={styles.verifyNote}>
+                    <p>
+                      Verify <b>{result.user.email}</b> before signing in. Your
+                      account remains restricted until verification succeeds.
+                    </p>
+                    <button
+                      type="button"
+                      className={styles.resendButton}
+                      onClick={() => void resendVerification()}
+                      disabled={resending}
+                    >
+                      {resending ? "Sending…" : "Resend verification email"}
+                    </button>
+                    {resendMessage ? <small>{resendMessage}</small> : null}
+                  </div>
+                ) : null}
 
                 <Link className="ftz-auth-submit" href="/login">
                   <span>Continue to sign in</span>
@@ -415,83 +440,40 @@ export default function RegisterPage() {
 
           {!result && policy?.publicRegistrationEnabled ? (
             <form className="ftz-login-form" onSubmit={submit}>
-              <div className="ftz-register-grid">
-                <div>
-                  <label htmlFor="register-first-name">First name</label>
-
-                  <div className="ftz-auth-input">
-                    <i className="iconoir-user" aria-hidden="true" />
-
-                    <input
-                      id="register-first-name"
-                      type="text"
-                      value={firstName}
-                      onChange={(event) => setFirstName(event.target.value)}
-                      maxLength={100}
-                      autoComplete="given-name"
-                      placeholder="First name"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="register-last-name">Last name</label>
-
-                  <div className="ftz-auth-input">
-                    <i className="iconoir-user" aria-hidden="true" />
-
-                    <input
-                      id="register-last-name"
-                      type="text"
-                      value={lastName}
-                      onChange={(event) => setLastName(event.target.value)}
-                      maxLength={100}
-                      autoComplete="family-name"
-                      placeholder="Last name"
-                    />
-                  </div>
-                </div>
+              <div className="ftz-auth-label-row">
+                <label htmlFor="register-referral">Referral code (optional)</label>
+                <small>Sponsor code</small>
+              </div>
+              <div className="ftz-auth-input">
+                <i className="iconoir-user-plus" />
+                <input
+                  id="register-referral"
+                  type="text"
+                  value={referralCode}
+                  onChange={(event) =>
+                    setReferralCodeOverride(event.target.value.toUpperCase())
+                  }
+                  maxLength={128}
+                  autoComplete="off"
+                  placeholder="Enter referral code"
+                />
               </div>
 
-              <label htmlFor="register-email">
-                Email {policy.emailRequired ? "*" : ""}
-              </label>
-
+              <div className="ftz-auth-label-row">
+                <label htmlFor="register-email">Email *</label>
+                <small>Verification required</small>
+              </div>
               <div className="ftz-auth-input">
                 <i className="iconoir-mail" />
-
                 <input
                   id="register-email"
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  required={policy.emailRequired}
+                  required
                   maxLength={191}
                   autoComplete="email"
                   placeholder="name@example.com"
-                />
-              </div>
-
-              <div className="ftz-auth-label-row">
-                <label htmlFor="register-mobile">
-                  Mobile {policy.mobileRequired ? "*" : ""}
-                </label>
-
-                <small>E.164 format</small>
-              </div>
-
-              <div className="ftz-auth-input">
-                <i className="iconoir-phone" />
-
-                <input
-                  id="register-mobile"
-                  type="tel"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  required={policy.mobileRequired}
-                  maxLength={16}
-                  autoComplete="tel"
-                  placeholder="+919876543210"
                 />
               </div>
 
@@ -501,17 +483,14 @@ export default function RegisterPage() {
                     <label htmlFor="register-username">
                       Username {policy.usernameMode === "MANUAL" ? "*" : ""}
                     </label>
-
                     <small>
-                      {policy.usernameMode === "AUTO_OR_MANUAL"
-                        ? "Optional"
-                        : "Required"}
+                      {policy.usernameMode === "MANUAL"
+                        ? "Required"
+                        : "Optional — leave blank for auto"}
                     </small>
                   </div>
-
                   <div className="ftz-auth-input">
                     <i className="iconoir-user" />
-
                     <input
                       id="register-username"
                       type="text"
@@ -528,12 +507,17 @@ export default function RegisterPage() {
                   </div>
                 </>
               ) : (
-                <div className="ftz-register-policy-note">
-                  <i className="iconoir-magic-wand" />
-                  Username will be generated automatically
-                  {policy.usernamePrefixEnabled && policy.usernamePrefix
-                    ? ` using prefix "${policy.usernamePrefix}".`
-                    : "."}
+                <div className={styles.policyMessage}>
+                  <i className="iconoir-magic-wand" aria-hidden="true" />
+                  <div>
+                    <strong>Username</strong>
+                    <span>
+                      Generated automatically
+                      {policy.usernamePrefixEnabled && policy.usernamePrefix
+                        ? ` using prefix “${policy.usernamePrefix}”.`
+                        : "."}
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -543,17 +527,14 @@ export default function RegisterPage() {
                     <label htmlFor="register-password">
                       Password {policy.passwordMode === "MANUAL" ? "*" : ""}
                     </label>
-
                     <small>
-                      {policy.passwordMode === "AUTO_OR_MANUAL"
-                        ? "Optional — blank generates temporary password"
-                        : "Minimum 12 characters"}
+                      {policy.passwordMode === "MANUAL"
+                        ? "Minimum 12 characters"
+                        : "Optional — leave blank for temporary password"}
                     </small>
                   </div>
-
                   <div className="ftz-auth-input">
                     <i className="iconoir-lock" />
-
                     <input
                       id="register-password"
                       type={showPassword ? "text" : "password"}
@@ -566,14 +547,11 @@ export default function RegisterPage() {
                       maxLength={128}
                       autoComplete="new-password"
                     />
-
                     <button
                       type="button"
                       className="ftz-password-toggle"
                       onClick={() => setShowPassword((current) => !current)}
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       <i
                         className={
@@ -583,15 +561,15 @@ export default function RegisterPage() {
                     </button>
                   </div>
 
-                  {(password || policy.passwordMode === "MANUAL") && (
+                  {password || policy.passwordMode === "MANUAL" ? (
                     <>
-                      <label htmlFor="register-confirm-password">
-                        Confirm password
-                      </label>
-
+                      <div className="ftz-auth-label-row">
+                        <label htmlFor="register-confirm-password">
+                          Confirm password
+                        </label>
+                      </div>
                       <div className="ftz-auth-input">
                         <i className="iconoir-key" />
-
                         <input
                           id="register-confirm-password"
                           type={showPassword ? "text" : "password"}
@@ -600,22 +578,55 @@ export default function RegisterPage() {
                             setConfirmPassword(event.target.value)
                           }
                           required={
-                            policy.passwordMode === "MANUAL" ||
-                            Boolean(password)
+                            policy.passwordMode === "MANUAL" || Boolean(password)
                           }
                           maxLength={128}
                           autoComplete="new-password"
                         />
                       </div>
                     </>
-                  )}
+                  ) : null}
                 </>
               ) : (
-                <div className="ftz-register-policy-note">
-                  <i className="iconoir-key" />A secure temporary password will
-                  be generated and shown exactly once after registration.
+                <div className={styles.policyMessage}>
+                  <i className="iconoir-key" aria-hidden="true" />
+                  <div>
+                    <strong>Password</strong>
+                    <span>
+                      A secure temporary password will be generated and shown
+                      exactly once after registration.
+                    </span>
+                  </div>
                 </div>
               )}
+
+              <div className={styles.declarations}>
+                <label className={styles.declaration}>
+                  <input
+                    type="checkbox"
+                    checked={age18Declared}
+                    onChange={(event) => setAge18Declared(event.target.checked)}
+                    required={policy.age18DeclarationRequired}
+                  />
+                  <span>I declare that I am 18 years of age or older.</span>
+                </label>
+                <label className={styles.declaration}>
+                  <input
+                    type="checkbox"
+                    checked={kycDeclarationAccepted}
+                    onChange={(event) =>
+                      setKycDeclarationAccepted(event.target.checked)
+                    }
+                    required={policy.kycDeclarationRequired}
+                  />
+                  <span>
+                    I declare that the information provided is true and belongs
+                    to me. I understand that a future verification/KYC
+                    discrepancy may result in restriction, suspension or block
+                    under platform policy.
+                  </span>
+                </label>
+              </div>
 
               {captchaLoading ? (
                 <div className="ftz-captcha-loading">
@@ -630,7 +641,6 @@ export default function RegisterPage() {
                       <strong>Security verification</strong>
                       <small>Registration CAPTCHA</small>
                     </div>
-
                     <button
                       type="button"
                       onClick={() => void reloadCaptcha()}
@@ -640,19 +650,15 @@ export default function RegisterPage() {
                       <i className="iconoir-refresh-double" />
                     </button>
                   </div>
-
                   <div className="ftz-captcha-image">
                     <img
                       src={captcha.imageDataUri}
                       alt="CAPTCHA security challenge"
                     />
                   </div>
-
                   <label htmlFor="registration-captcha">CAPTCHA answer</label>
-
                   <div className="ftz-auth-input">
                     <i className="iconoir-key" />
-
                     <input
                       id="registration-captcha"
                       type="text"
@@ -682,17 +688,10 @@ export default function RegisterPage() {
                 type="submit"
                 disabled={submitting || captchaLoading}
               >
-                <span>
-                  {submitting ? "Creating account…" : "Create account"}
-                </span>
-
+                <span>{submitting ? "Creating account…" : "Create account"}</span>
                 <i className="iconoir-arrow-right" />
               </button>
             </form>
-          ) : null}
-
-          {!result && error && !policy?.publicRegistrationEnabled ? (
-            <div className="ftz-auth-error is-visible">{error}</div>
           ) : null}
         </div>
 

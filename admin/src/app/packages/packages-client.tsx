@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { usePlatformTime } from "@/components/platform/platform-time-provider";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { AdminUser } from "@/lib/auth";
 import { resolveAdminSession } from "@/lib/admin-session-client";
 import {
@@ -60,7 +62,6 @@ interface PlanSettingsForm {
   migrationMode: string;
   renewalMode: string;
   upgradesEnabled: boolean;
-  settlementTimezone: string;
 }
 
 interface ItemForm {
@@ -142,7 +143,6 @@ function settingsFromPlan(plan: PackagePlan): PlanSettingsForm {
     migrationMode: plan.migrationMode,
     renewalMode: plan.renewalMode,
     upgradesEnabled: plan.upgradesEnabled,
-    settlementTimezone: plan.settlementTimezone,
   };
 }
 
@@ -174,15 +174,7 @@ function itemFromPlan(item: PackagePlanItem): ItemForm {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "UTC",
-  }).format(new Date(value));
+  return value ? formatPlatformDateTime(value) : "Not set";
 }
 
 function toUtcInput(value: string | null): string {
@@ -213,6 +205,7 @@ function canManagePackages(user: AdminUser): boolean {
 
 export default function PackagesClient() {
   const router = useRouter();
+  const { timeZone } = usePlatformTime();
   const [actor, setActor] = useState<AdminUser | null>(null);
   const [plans, setPlans] = useState<PackagePlanSummary[]>([]);
   const [plan, setPlan] = useState<PackagePlan | null>(null);
@@ -871,7 +864,7 @@ export default function PackagesClient() {
                 </article>
                 <article>
                   <small>EFFECTIVE FROM</small>
-                  <strong>{formatDate(plan.effectiveFrom)} UTC</strong>
+                  <strong>{formatDate(plan.effectiveFrom)}</strong>
                 </article>
                 <article>
                   <small>ITEMS</small>
@@ -885,7 +878,7 @@ export default function PackagesClient() {
                     <small>PLAN-WIDE POLICY</small>
                     <h3>Lifecycle settings</h3>
                   </div>
-                  <span>{plan.settlementTimezone}</span>
+                  <span>Platform: {timeZone}</span>
                 </div>
 
                 <form className={styles.form} onSubmit={saveSettings}>
@@ -958,23 +951,20 @@ export default function PackagesClient() {
                         setSettings({ ...settings, renewalMode: value })
                       }
                     />
-                    <Field
-                      label="Settlement timezone"
-                      help="Use an IANA timezone. Approved V1 value is UTC."
-                    >
-                      <input
-                        required
-                        maxLength={64}
-                        value={settings.settlementTimezone}
-                        disabled={plan.status !== "DRAFT" || !canManage}
-                        onChange={(event) =>
-                          setSettings({
-                            ...settings,
-                            settlementTimezone: event.target.value,
-                          })
-                        }
-                      />
-                    </Field>
+                    <div className={styles.guardrail}>
+                      <i className="iconoir-clock" />
+                      <div>
+                        <strong>Settlement timezone: {timeZone}</strong>
+                        <p>
+                          New package activations snapshot the single Platform
+                          Operations timezone. Existing subscription snapshots
+                          remain immutable. Legacy plan value{" "}
+                          {plan.settlementTimezone}
+                          is retained only for backward-compatible history and
+                          is not an Admin control.
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
                   <label className={styles.switchRow}>

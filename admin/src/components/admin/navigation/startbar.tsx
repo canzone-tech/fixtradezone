@@ -84,9 +84,18 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/rewards",
+        label: "Rewards & Caps",
+        icon: "iconoir-trophy",
+        permission: "rewards.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
         label: "Payouts",
         icon: "iconoir-coins-swap",
+        permission: "payouts.read",
+        enabled: true,
       },
       {
         href: "/referrals",
@@ -96,9 +105,25 @@ const sections: Array<{
         enabled: true,
       },
       {
-        href: "/simulated-trades",
-        label: "Simulated Trade Activity",
+        href: "/referrals/genealogy",
+        label: "Genealogy Tree",
+        icon: "iconoir-network",
+        permission: "referrals.read",
+        enabled: true,
+      },
+      {
+        href: "/internal-trading",
+        label: "Internal Trading",
         icon: "iconoir-graph-up",
+        permission: "internal_trading.read",
+        enabled: true,
+      },
+      {
+        href: "/trade-activity",
+        label: "Trade Activity",
+        icon: "iconoir-graph-up",
+        permission: "simulated_activity.read",
+        enabled: true,
       },
     ],
   },
@@ -106,9 +131,25 @@ const sections: Array<{
     label: "PLATFORM",
     items: [
       {
+        href: "/notifications",
+        label: "Notifications",
+        icon: "iconoir-bell",
+        permission: "notifications.read",
+        enabled: true,
+      },
+      {
+        href: "/reports",
+        label: "Reports",
+        icon: "iconoir-graph-up",
+        permission: "reports.read",
+        enabled: true,
+      },
+      {
         href: "/templates",
         label: "Templates / CMS",
         icon: "iconoir-page",
+        permission: "content.read",
+        enabled: true,
       },
       {
         href: "/settings",
@@ -117,13 +158,32 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/settings/email",
+        label: "Email Delivery",
+        icon: "iconoir-mail",
+        enabled: true,
+      },
+      {
         href: "/audit-logs",
         label: "Audit Logs",
         icon: "iconoir-journal-page",
+        permission: "audit_logs.read",
+        enabled: true,
       },
     ],
   },
 ];
+
+function isActiveNavItem(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (!pathname.startsWith(`${href}/`)) return false;
+
+  if (href === "/referrals" && pathname.startsWith("/referrals/genealogy")) {
+    return false;
+  }
+
+  return true;
+}
 
 export default function Startbar() {
   const pathname = usePathname();
@@ -170,30 +230,19 @@ export default function Startbar() {
           {sections.map((section) => {
             const visibleItems = user
               ? section.items.filter((item) => {
-                  if (isSuperAdmin) {
-                    return true;
-                  }
-
-                  if (!item.enabled || !item.permission) {
-                    return false;
-                  }
-
+                  if (isSuperAdmin) return true;
+                  if (!item.enabled || !item.permission) return false;
                   return user.permissions.includes(item.permission);
                 })
               : [];
 
-            if (visibleItems.length === 0) {
-              return null;
-            }
+            if (visibleItems.length === 0) return null;
 
             return (
               <div className="ftz-nav-section" key={section.label}>
                 <div className="ftz-nav-label">{section.label}</div>
-
                 {visibleItems.map((item) => {
-                  const active =
-                    pathname === item.href ||
-                    pathname.startsWith(`${item.href}/`);
+                  const active = isActiveNavItem(pathname, item.href);
 
                   if (!item.enabled) {
                     return (
@@ -229,12 +278,10 @@ export default function Startbar() {
           <div className="ftz-profile-shield">
             <i className="iconoir-shield-check" />
           </div>
-
           <div>
             <strong>{isSuperAdmin ? "SUPER ADMIN" : "ADMIN"}</strong>
             <small>{isSuperAdmin ? "All Access" : "RBAC Access"}</small>
           </div>
-
           {isSuperAdmin ? (
             <Link
               href="/settings/security"

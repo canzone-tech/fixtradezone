@@ -5,10 +5,14 @@ import {
   Injectable,
   Optional,
 } from '@nestjs/common';
-import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
-import { ReferralsService } from '../referrals/referrals.service';
+import {
+  DuplicateAccountService,
+  type RegistrationDuplicateDecision,
+} from '../duplicate-account/duplicate-account.service';
+import type { Prisma } from '../generated/prisma/client';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { ReferralsService } from '../referrals/referrals.service';
 import { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from './auth.constants';
 import {
   AUTH_USER_SELECT,
@@ -17,12 +21,14 @@ import {
 } from './auth-user';
 import type { RequestContext } from './auth.types';
 import type { RegisterDto } from './dto/register.dto';
+import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 
 const USERNAME_SEQUENCE_KEY = 'username';
 const USERNAME_SEQUENCE_START = 100001n;
 const AUTO_USERNAME_ATTEMPTS = 100;
+const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
   'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
@@ -58,10 +64,50 @@ export class RegistrationService {
     private readonly passwordService: PasswordService,
     private readonly rbacBootstrapService: RbacBootstrapService,
     @Optional() private readonly referralsService?: ReferralsService,
+    @Optional()
+    private readonly emailVerificationService?: EmailVerificationService,
+    @Optional()
+    private readonly duplicateAccountService?: DuplicateAccountService,
   ) {}
 
-  registerPublic(dto: RegisterDto, context: RequestContext = {}) {
-    return this.register(dto, null, context);
+  async registerPublic(dto: RegisterDto, context: RequestContext = {}) {
+    const duplicateDecision = this.duplicateAccountService
+      ? await this.duplicateAccountService.evaluateRegistration({
+          deviceInstallationId: dto.deviceInstallationId,
+          email: dto.email,
+          context,
+        })
+      : null;
+
+    if (duplicateDecision?.blockRegistration) {
+      await this.duplicateAccountService?.recordBlockedRegistration(
+        duplicateDecision,
+        dto.email,
+        context,
+      );
+      throw new ConflictException(
+        'Registration is blocked by the duplicate-account protection policy.',
+      );
+    }
+
+    const result = await this.register(dto, null, context, duplicateDecision);
+
+    const delivery = this.emailVerificationService
+      ? await this.emailVerificationService.sendInitial(result.user, context)
+      : { sent: false };
+
+    return {
+      ...result,
+      message: delivery.sent
+        ? 'Registration successful. Check your email to verify and activate your account.'
+        : 'Registration successful. Email verification is required; use resend if the message is not delivered.',
+      emailVerificationRequired: true,
+      verificationEmailSent: delivery.sent,
+      verificationStatus: result.user.email
+        ? 'PENDING_EMAIL_VERIFICATION'
+        : 'PENDING',
+      duplicateAccountAction: duplicateDecision?.action ?? 'ALLOWED',
+    };
   }
 
   async getPublicRegistrationPolicy() {
@@ -71,12 +117,16 @@ export class RegistrationService {
 
     return {
       publicRegistrationEnabled: config?.publicRegistrationEnabled ?? true,
-      emailRequired: config?.emailRequired ?? true,
-      mobileRequired: config?.mobileRequired ?? false,
+      emailRequired: true,
+      mobileRequired: false,
       passwordMode: config?.passwordMode ?? 'MANUAL',
       usernameMode: config?.usernameMode ?? 'AUTO_OR_MANUAL',
       usernamePrefixEnabled: config?.usernamePrefixEnabled ?? false,
       usernamePrefix: config?.usernamePrefix ?? null,
+      age18DeclarationRequired: true,
+      kycDeclarationRequired: true,
+      emailVerificationRequired: true,
+      declarationPolicyVersion: REGISTRATION_DECLARATION_POLICY_VERSION,
     };
   }
 
@@ -85,13 +135,14 @@ export class RegistrationService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
-    return this.register(dto, actor, context);
+    return this.register(dto, actor, context, null);
   }
 
   private async register(
     dto: RegisterDto,
     actor: AuthenticatedUser | null,
     context: RequestContext,
+    duplicateDecision: RegistrationDuplicateDecision | null,
   ) {
     try {
       return await this.prisma.$transaction(
@@ -121,7 +172,23 @@ export class RegistrationService {
           };
 
           const source = this.assertRegistrationAllowed(actor, policy);
-          this.assertRequiredIdentifiers(dto, policy);
+          this.assertRequiredIdentifiers(dto, policy, source);
+          this.assertPublicDeclarations(dto, source);
+
+          if (source === 'SELF_REGISTRATION' && dto.email) {
+            const existingEmailUser = await transaction.user.findFirst({
+              where: {
+                email: dto.email.trim().toLowerCase(),
+              },
+              select: { id: true },
+            });
+
+            if (existingEmailUser) {
+              throw new ConflictException(
+                'An account already exists with one of the supplied unique identifiers.',
+              );
+            }
+          }
 
           const passwordResult = this.resolvePassword(dto, policy);
           const passwordHash = await this.passwordService.hash(
@@ -140,7 +207,11 @@ export class RegistrationService {
               mustChangePassword: passwordResult.generated,
               firstName: dto.firstName,
               lastName: dto.lastName,
-              status: 'PENDING',
+              status:
+                source === 'SELF_REGISTRATION' &&
+                duplicateDecision?.restrictAccount
+                  ? 'RESTRICTED'
+                  : 'PENDING',
               roles: {
                 create: {
                   role: {
@@ -152,7 +223,11 @@ export class RegistrationService {
             select: AUTH_USER_SELECT,
           });
 
-          if (dto.email && !policy.allowMultipleAccountsPerEmail) {
+          if (
+            dto.email &&
+            (source === 'SELF_REGISTRATION' ||
+              !policy.allowMultipleAccountsPerEmail)
+          ) {
             await transaction.userIdentifierClaim.create({
               data: {
                 userId: user.id,
@@ -180,6 +255,20 @@ export class RegistrationService {
               )
             : null;
 
+          if (
+            source === 'SELF_REGISTRATION' &&
+            duplicateDecision &&
+            this.duplicateAccountService
+          ) {
+            await this.duplicateAccountService.recordRegistration(
+              transaction,
+              duplicateDecision,
+              user.id,
+              dto.email,
+              context,
+            );
+          }
+
           await transaction.auditLog.create({
             data: {
               actorUserId: actor?.id ?? user.id,
@@ -196,6 +285,17 @@ export class RegistrationService {
                 generatedUsername:
                   !dto.username || policy.usernameMode === 'AUTO',
                 generatedPassword: passwordResult.generated,
+                ...(source === 'SELF_REGISTRATION'
+                  ? {
+                      declarationPolicyVersion:
+                        REGISTRATION_DECLARATION_POLICY_VERSION,
+                      age18Declared: true,
+                      kycDeclarationAccepted: true,
+                      emailVerificationRequired: true,
+                      duplicateAccountAction:
+                        duplicateDecision?.action ?? 'ALLOWED',
+                    }
+                  : {}),
               },
               ipAddress: context.ipAddress,
               userAgent: context.userAgent,
@@ -273,15 +373,44 @@ export class RegistrationService {
   private assertRequiredIdentifiers(
     dto: RegisterDto,
     config: RegistrationConfig,
+    source: RegistrationSource,
   ): void {
-    if (config.emailRequired && !dto.email) {
+    if (source === 'SELF_REGISTRATION' && !dto.email) {
+      throw new BadRequestException(
+        'Email is required for public registration and verification.',
+      );
+    }
+
+    if (source !== 'SELF_REGISTRATION' && config.emailRequired && !dto.email) {
       throw new BadRequestException(
         'Email is required by the current registration policy.',
       );
     }
-    if (config.mobileRequired && !dto.phone) {
+
+    if (source !== 'SELF_REGISTRATION' && config.mobileRequired && !dto.phone) {
       throw new BadRequestException(
         'Mobile number is required by the current registration policy.',
+      );
+    }
+  }
+
+  private assertPublicDeclarations(
+    dto: RegisterDto,
+    source: RegistrationSource,
+  ): void {
+    if (source !== 'SELF_REGISTRATION') {
+      return;
+    }
+
+    if (dto.age18Declared !== true) {
+      throw new BadRequestException(
+        'You must declare that you are 18 years of age or older.',
+      );
+    }
+
+    if (dto.kycDeclarationAccepted !== true) {
+      throw new BadRequestException(
+        'You must accept the identity and future KYC verification declaration.',
       );
     }
   }

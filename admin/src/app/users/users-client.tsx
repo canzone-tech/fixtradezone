@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import type { AdminUser } from "@/lib/auth";
+import { formatPlatformDate } from "@/lib/platform-time";
 import styles from "./users.module.css";
 
 type UserStatus = AdminUser["status"];
@@ -738,7 +739,7 @@ export default function UsersClient() {
                           </div>
                         </td>
 
-                        <td>{new Date(user.createdAt).toLocaleDateString()}</td>
+                        <td>{formatPlatformDate(user.createdAt)}</td>
 
                         <td>
                           {protectedUser ? (

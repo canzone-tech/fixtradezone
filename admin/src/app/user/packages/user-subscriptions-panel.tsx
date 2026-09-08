@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import { enumLabel } from "@/lib/packages";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./user-subscriptions-panel.module.css";
 
 interface Subscription {
@@ -36,10 +37,7 @@ function message(payload: ResponsePayload, fallback: string) {
 }
 
 function dateLabel(value: string) {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 // Keep initial loading separate from manual refresh so React effects stay passive.

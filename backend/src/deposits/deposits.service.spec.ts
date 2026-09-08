@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
@@ -30,6 +31,26 @@ const actor: AuthenticatedUser = {
   createdAt: new Date('2026-08-26T00:00:00.000Z'),
   lastLoginAt: null,
   roles: ['USER'],
+  permissions: [],
+};
+
+const adminActor: AuthenticatedUser = {
+  ...actor,
+  id: '88888888-8888-4888-8888-888888888888',
+  email: 'admin@example.com',
+  username: 'admin',
+  firstName: 'Admin',
+  roles: ['ADMIN'],
+  permissions: ['deposits.review'],
+};
+
+const superAdminActor: AuthenticatedUser = {
+  ...actor,
+  id: '99999999-9999-4999-8999-999999999999',
+  email: 'founder@example.com',
+  username: 'founder',
+  firstName: 'Founder',
+  roles: ['SUPER_ADMIN'],
   permissions: [],
 };
 
@@ -73,8 +94,12 @@ function deposit(overrides: Record<string, unknown> = {}) {
     packagePlanVersionId: PLAN_ID,
     packagePlanItemId: ITEM_ID,
     packageCode: 'NEURAL_SCOUT',
-    packageDisplayName: 'Neural Scout',
+    packageDisplayName: 'FTZ AlphaBotc',
     amount: new Prisma.Decimal('5.00000000'),
+    packageMinimumInvestment: new Prisma.Decimal('5.00000000'),
+    packageMaximumInvestment: new Prisma.Decimal('24.00000000'),
+    packageDurationDays: 10,
+    packagePrincipalTreatment: 'RETURN_SEPARATELY',
     currency: 'USDT',
     assignedDepositAccountId: ACCOUNT_ID,
     assignedAccountLabel: 'Treasury A',
@@ -84,6 +109,9 @@ function deposit(overrides: Record<string, unknown> = {}) {
     assignedQrCodeDataUrl: QR,
     txid: null,
     submittedAt: null,
+    readyForApprovalByUserId: null,
+    readyForApprovalAt: null,
+    readyForApprovalNote: null,
     reviewedByUserId: null,
     reviewedAt: null,
     reviewNote: null,
@@ -96,6 +124,7 @@ function deposit(overrides: Record<string, unknown> = {}) {
       firstName: 'Test',
       lastName: 'User',
     },
+    readyForApprovalBy: null,
     reviewedBy: null,
     ...overrides,
   };
@@ -115,9 +144,13 @@ function packagePlan(
       items: [
         {
           id: ITEM_ID,
-          displayName: 'Neural Scout',
+          displayName: 'FTZ AlphaBotc',
           availability: 'AVAILABLE',
           price: new Prisma.Decimal('5.00000000'),
+          minimumInvestment: new Prisma.Decimal('5.00000000'),
+          maximumInvestment: new Prisma.Decimal('24.00000000'),
+          durationDays: 10,
+          principalTreatment: 'RETURN_SEPARATELY',
           currency: 'USDT',
           packageDefinition: {
             id: DEFINITION_ID,
@@ -159,6 +192,7 @@ describe('DepositsService', () => {
     auditLog: {
       create: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
 
   const prisma = {
@@ -185,6 +219,7 @@ describe('DepositsService', () => {
     jest.clearAllMocks();
     service = new DepositsService(prisma as unknown as PrismaService);
     transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw.mockResolvedValue([]);
   });
 
   it('rejects a second open deposit before package or rail assignment', async () => {
@@ -222,6 +257,49 @@ describe('DepositsService', () => {
     expect(transaction.deposit.create).not.toHaveBeenCalled();
   });
 
+  it('requires an exact investment amount for a ranged package', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        actor,
+      ),
+    ).rejects.toThrow('investmentAmount is required for this package range.');
+
+    expect(transaction.depositPaymentRail.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rejects a ranged investment below the package minimum', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '4.99999999',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Investment amount must be at least 5.00000000 USDT.');
+  });
+
+  it('rejects a ranged investment above the package maximum', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+
+    await expect(
+      service.createDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '24.00000001',
+        },
+        actor,
+      ),
+    ).rejects.toThrow('Investment amount must not exceed 24.00000000 USDT.');
+  });
+
   it('allows deposit funding for authorized manual package activation', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(
       packagePlan('MANUAL_ACTIVATION'),
@@ -233,7 +311,11 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).resolves.toMatchObject({
@@ -253,7 +335,11 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -266,13 +352,17 @@ describe('DepositsService', () => {
 
     await expect(
       service.createDeposit(
-        { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
         actor,
       ),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('uses package amount and snapshots the selected rail/account', async () => {
+  it('snapshots the exact user-selected ranged investment and rail/account', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
     transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
     transaction.depositAccount.findMany.mockResolvedValue([account]);
@@ -286,7 +376,11 @@ describe('DepositsService', () => {
     );
 
     const result = await service.createDeposit(
-      { packagePlanItemId: ITEM_ID, paymentRailId: RAIL_ID },
+      {
+        packagePlanItemId: ITEM_ID,
+        paymentRailId: RAIL_ID,
+        investmentAmount: '12.5',
+      },
       actor,
     );
 
@@ -294,13 +388,21 @@ describe('DepositsService', () => {
       userId: USER_ID,
       openKey: USER_ID,
       packagePlanItemId: ITEM_ID,
-      amount: new Prisma.Decimal('5.00000000'),
+      amount: new Prisma.Decimal('12.50000000'),
+      packageMinimumInvestment: new Prisma.Decimal('5.00000000'),
+      packageMaximumInvestment: new Prisma.Decimal('24.00000000'),
+      packageDurationDays: 10,
+      packagePrincipalTreatment: 'RETURN_SEPARATELY',
       assignedDepositAccountId: ACCOUNT_ID,
       assignedWalletAddress: ADDRESS,
       assignedNetwork: 'TRC20',
       assignedValidationProfile: 'TRON',
     });
-    expect(result.deposit.amount).toBe('5');
+    expect(result.deposit.amount).toBe('12.5');
+    expect(result.deposit.packageMinimumInvestment).toBe('5');
+    expect(result.deposit.packageMaximumInvestment).toBe('24');
+    expect(result.deposit.packageDurationDays).toBe(10);
+    expect(result.deposit.packagePrincipalTreatment).toBe('RETURN_SEPARATELY');
   });
 
   it('normalizes transaction IDs from the immutable validation profile snapshot', async () => {
@@ -348,13 +450,85 @@ describe('DepositsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('approves only pending review and releases the open-deposit key', async () => {
+  it('lets ADMIN mark only a pending deposit ready without releasing the open key', async () => {
     const pending = deposit({
       status: 'PENDING_REVIEW',
       txid: TXID,
       submittedAt: new Date('2026-08-26T01:00:00.000Z'),
     });
     transaction.deposit.findUnique.mockResolvedValue(pending);
+
+    let updateArgs: { data: Record<string, unknown> } | null = null;
+    transaction.deposit.updateMany.mockImplementation(
+      (args: { data: Record<string, unknown> }) => {
+        updateArgs = args;
+        return Promise.resolve({ count: 1 });
+      },
+    );
+    transaction.deposit.findUniqueOrThrow.mockResolvedValue(
+      deposit({
+        ...pending,
+        status: 'READY_FOR_APPROVAL',
+        readyForApprovalByUserId: adminActor.id,
+        readyForApprovalAt: new Date('2026-08-26T02:00:00.000Z'),
+        readyForApprovalNote: 'TXID checked on TRON explorer',
+        readyForApprovalBy: {
+          id: adminActor.id,
+          username: adminActor.username,
+          email: adminActor.email,
+        },
+      }),
+    );
+
+    await service.markReadyForApproval(
+      DEPOSIT_ID,
+      { note: 'TXID checked on TRON explorer' },
+      adminActor,
+    );
+
+    expect(updateArgs?.data).toMatchObject({
+      status: 'READY_FOR_APPROVAL',
+      readyForApprovalByUserId: adminActor.id,
+      readyForApprovalNote: 'TXID checked on TRON explorer',
+    });
+    expect(updateArgs?.data).not.toHaveProperty('openKey');
+  });
+
+  it('does not let SUPER_ADMIN self-create the maker review stage', async () => {
+    await expect(
+      service.markReadyForApproval(
+        DEPOSIT_ID,
+        { note: 'self review should fail' },
+        superAdminActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not let ADMIN perform final approval', async () => {
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'admin cannot approve' },
+        adminActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('lets SUPER_ADMIN approve only an ADMIN-reviewed ready deposit and releases the open key', async () => {
+    const ready = deposit({
+      status: 'READY_FOR_APPROVAL',
+      txid: TXID,
+      submittedAt: new Date('2026-08-26T01:00:00.000Z'),
+      readyForApprovalByUserId: adminActor.id,
+      readyForApprovalAt: new Date('2026-08-26T02:00:00.000Z'),
+      readyForApprovalNote: 'TXID checked on TRON explorer',
+      readyForApprovalBy: {
+        id: adminActor.id,
+        username: adminActor.username,
+        email: adminActor.email,
+      },
+    });
+    transaction.deposit.findUnique.mockResolvedValue(ready);
 
     let updateArgs: {
       where: Record<string, unknown>;
@@ -372,13 +546,12 @@ describe('DepositsService', () => {
 
     transaction.deposit.findUniqueOrThrow.mockResolvedValue(
       deposit({
+        ...ready,
         status: 'APPROVED',
         openKey: null,
-        txid: TXID,
-        submittedAt: pending.submittedAt,
-        reviewedByUserId: USER_ID,
-        reviewedAt: new Date('2026-08-26T02:00:00.000Z'),
-        reviewNote: 'TXID manually verified',
+        reviewedByUserId: superAdminActor.id,
+        reviewedAt: new Date('2026-08-26T03:00:00.000Z'),
+        reviewNote: 'Founder final approval',
       }),
     );
 
@@ -392,21 +565,40 @@ describe('DepositsService', () => {
 
     await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'TXID manually verified' },
-      actor,
+      { note: 'Founder final approval' },
+      superAdminActor,
     );
 
     expect(updateArgs?.data).toMatchObject({
       status: 'APPROVED',
       openKey: null,
-      reviewedByUserId: USER_ID,
+      reviewedByUserId: superAdminActor.id,
     });
     expect(auditArgs?.data).toMatchObject({
       action: 'APPROVE',
       metadata: {
+        readyForApprovalByUserId: adminActor.id,
         downstreamAccountingApplied: false,
         packageActivationApplied: false,
       },
     });
+  });
+
+  it('rejects a final approval attempt while the deposit is still pending ADMIN review', async () => {
+    transaction.deposit.findUnique.mockResolvedValue(
+      deposit({
+        status: 'PENDING_REVIEW',
+        txid: TXID,
+        submittedAt: new Date('2026-08-26T01:00:00.000Z'),
+      }),
+    );
+
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'too early' },
+        superAdminActor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

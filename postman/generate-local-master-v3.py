@@ -1,0 +1,468 @@
+#!/usr/bin/env python3
+"""Generate FixTradeZone local Postman MASTER v3 from the accepted v2 base.
+
+v3 preserves every still-supported v2 request and appends release-closeout auth
+recovery, CAPTCHA, password-change, email-delivery and genealogy acceptance
+contracts. Obsolete package-profile shortcuts are removed because package
+commercial terms are now managed through the generic versioned MySQL catalogue.
+It performs no network or DB I/O.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import sys
+from pathlib import Path
+from types import ModuleType
+from typing import Any
+
+HERE = Path(__file__).resolve().parent
+BASE_GENERATOR = HERE / "generate-local-master-v2.py"
+COLLECTION_NAME = "FixTradeZone-Local-API-MASTER-v3.postman_collection.json"
+ENVIRONMENT_NAME = "FixTradeZone-Local-v3.postman_environment.json"
+
+STATE_CHANGE_GUARD = """if (String(pm.environment.get('allowStateChanges')).toLowerCase() !== 'true') {\n  throw new Error('MANUAL state-changing request blocked. Set allowStateChanges=true only for the module you are intentionally accepting.');\n}"""
+
+
+def load_v2() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("ftz_postman_v2", BASE_GENERATOR)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("Unable to load MASTER v2 generator")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def request(
+    name: str,
+    method: str,
+    path: str,
+    *,
+    body: dict[str, Any] | None = None,
+    bearer_variable: str | None = None,
+    state_change: bool = False,
+    description: str | None = None,
+) -> dict[str, Any]:
+    headers: list[dict[str, str]] = []
+    if body is not None:
+        headers.append({"key": "Content-Type", "value": "application/json"})
+    if bearer_variable:
+        headers.append(
+            {"key": "Authorization", "value": f"Bearer {{{{{bearer_variable}}}}}"}
+        )
+
+    payload: dict[str, Any] = {
+        "name": name,
+        "request": {
+            "method": method,
+            "header": headers,
+            "url": f"{{{{baseUrl}}}}{path}",
+        },
+        "response": [],
+    }
+
+    if description:
+        payload["request"]["description"] = description
+    if body is not None:
+        payload["request"]["body"] = {
+            "mode": "raw",
+            "raw": json.dumps(body, indent=2),
+            "options": {"raw": {"language": "json"}},
+        }
+    if state_change:
+        payload["event"] = [
+            {
+                "listen": "prerequest",
+                "script": {
+                    "type": "text/javascript",
+                    "exec": STATE_CHANGE_GUARD.splitlines(),
+                },
+            }
+        ]
+
+    return payload
+
+
+def environment_keys(environment: dict[str, Any]) -> set[str]:
+    return {
+        str(item.get("key"))
+        for item in environment.get("values", [])
+        if item.get("key")
+    }
+
+
+def first_existing(keys: set[str], candidates: list[str]) -> str:
+    for candidate in candidates:
+        if candidate in keys:
+            return candidate
+    raise RuntimeError(
+        "MASTER v2 environment is missing expected auth token variable: "
+        + ", ".join(candidates)
+    )
+
+
+def add_env(environment: dict[str, Any], key: str, value: str = "") -> None:
+    values = environment.setdefault("values", [])
+    if any(item.get("key") == key for item in values):
+        return
+    values.append(
+        {
+            "key": key,
+            "value": value,
+            "type": "default",
+            "enabled": True,
+        }
+    )
+
+
+def request_url_text(item: dict[str, Any]) -> str:
+    request_data = item.get("request")
+    if not isinstance(request_data, dict):
+        return ""
+
+    url = request_data.get("url")
+    if isinstance(url, str):
+        return url
+    if isinstance(url, dict):
+        raw = url.get("raw")
+        return raw if isinstance(raw, str) else ""
+    return ""
+
+
+def remove_obsolete_package_profile_requests(collection: dict[str, Any]) -> None:
+    """Drop the retired canned profile endpoint inherited from MASTER v2."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "07 Packages":
+            continue
+
+        retained: list[dict[str, Any]] = []
+        for item in folder.get("item", []):
+            if not isinstance(item, dict):
+                continue
+
+            name = str(item.get("name", ""))
+            url_text = request_url_text(item)
+            if "Client Package Profile" in name or "/client-profile" in url_text:
+                continue
+            retained.append(item)
+
+        folder["item"] = retained
+
+
+def configure_package_draft_requests(
+    collection: dict[str, Any], superadmin_token: str
+) -> None:
+    """Expose first-plan bootstrap separately from published-plan cloning."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "07 Packages":
+            continue
+
+        items = [item for item in folder.get("item", []) if isinstance(item, dict)]
+        items = [
+            item
+            for item in items
+            if item.get("name") != "MANUAL - Create Initial Package Plan Draft"
+        ]
+
+        successor_index = len(items)
+        for index, item in enumerate(items):
+            if item.get("name") == "MANUAL - Create Package Plan Draft":
+                item["name"] = "MANUAL - Create Successor Package Plan Draft"
+                successor_index = index
+                break
+            if item.get("name") == "MANUAL - Create Successor Package Plan Draft":
+                successor_index = index
+                break
+
+        items.insert(
+            successor_index,
+            request(
+                "MANUAL - Create Initial Package Plan Draft",
+                "POST",
+                "/admin/package-plans/drafts",
+                body={
+                    "reason": "Initialize first database-backed package catalogue"
+                },
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description=(
+                    "Use only when GET List Package Plan Versions returns an empty list. "
+                    "Creates V1 as an empty MySQL-backed draft; no package commercial values "
+                    "are seeded from application code."
+                ),
+            ),
+        )
+        folder["item"] = items
+        return
+
+
+
+
+def configure_deposit_maker_checker_requests(
+    collection: dict[str, Any], admin_token: str, superadmin_token: str
+) -> None:
+    """Replace the inherited direct-approval request with maker-checker acceptance."""
+
+    for folder in collection.get("item", []):
+        if not isinstance(folder, dict) or folder.get("name") != "08 Deposits":
+            continue
+
+        retained: list[dict[str, Any]] = []
+        insert_at = len(folder.get("item", []))
+        for item in folder.get("item", []):
+            if not isinstance(item, dict):
+                continue
+            url_text = request_url_text(item)
+            if url_text.endswith("/admin/deposits/{{depositId}}/approve"):
+                insert_at = min(insert_at, len(retained))
+                continue
+            retained.append(item)
+
+        maker_checker = [
+            request(
+                "MANUAL REVIEW - Mark Deposit Ready for Approval",
+                "POST",
+                "/admin/deposits/{{depositId}}/ready-for-approval",
+                body={"note": "ADMIN verified the submitted payment evidence"},
+                bearer_variable=admin_token,
+                state_change=True,
+                description="ADMIN maker step. Must move only PENDING_REVIEW to READY_FOR_APPROVAL and must not post accounting.",
+            ),
+            request(
+                "MANUAL NEGATIVE - ADMIN Final Approval Must Be Forbidden",
+                "POST",
+                "/admin/deposits/{{depositId}}/approve",
+                body={"note": "ADMIN must not be able to approve"},
+                bearer_variable=admin_token,
+                state_change=True,
+                description="Expected HTTP 403. ADMIN may review/mark-ready/reject but never final-approve.",
+            ),
+            request(
+                "MANUAL FINANCIAL - SUPER_ADMIN Approve Deposit",
+                "POST",
+                "/admin/deposits/{{depositId}}/approve",
+                body={"note": "SUPER_ADMIN final approval after ADMIN review"},
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description="Final approval is SUPER_ADMIN-only and accepts only READY_FOR_APPROVAL. In AUTOMATIC operations it may post accounting, activate the package and run downstream earnings stages.",
+            ),
+            request(
+                "MANUAL FINANCIAL - SUPER_ADMIN Bulk Approve Selected",
+                "POST",
+                "/admin/deposits/bulk-approve",
+                body={
+                    "depositIds": ["{{depositId}}"],
+                    "note": "SUPER_ADMIN selected bulk final approval",
+                },
+                bearer_variable=superadmin_token,
+                state_change=True,
+                description="Selected READY_FOR_APPROVAL deposits are processed independently; one failed item must not roll back successful approvals.",
+            ),
+        ]
+
+        retained[insert_at:insert_at] = maker_checker
+        folder["item"] = retained
+        return
+
+
+def main() -> int:
+    v2 = load_v2()
+    collection = json.loads(
+        v2.materialize(v2.COLLECTION_GZIP_B64, v2.COLLECTION_SHA256)
+    )
+    environment = json.loads(
+        v2.materialize(v2.ENVIRONMENT_GZIP_B64, v2.ENVIRONMENT_SHA256)
+    )
+
+    remove_obsolete_package_profile_requests(collection)
+
+    keys = environment_keys(environment)
+    superadmin_token = first_existing(
+        keys,
+        [
+            "superAdminAccessToken",
+            "superadminAccessToken",
+            "superAdminToken",
+            "superadminToken",
+        ],
+    )
+    admin_token = first_existing(
+        keys,
+        [
+            "adminAccessToken",
+            "adminToken",
+        ],
+    )
+    configure_package_draft_requests(collection, superadmin_token)
+    configure_deposit_maker_checker_requests(
+        collection, admin_token, superadmin_token
+    )
+
+    for key in [
+        "passwordResetEmail",
+        "passwordResetToken",
+        "newTestPassword",
+        "currentTestPassword",
+        "smtpTestRecipient",
+        "genealogyUserAccessToken",
+        "genealogyRootUserId",
+        "genealogyParentUserId",
+        "genealogySearchQuery",
+    ]:
+        add_env(environment, key)
+
+    release_folder_name = "23 Release Security & Email"
+    genealogy_folder_name = "24 Referral Genealogy"
+    collection["item"] = [
+        folder
+        for folder in collection.get("item", [])
+        if folder.get("name") not in {release_folder_name, genealogy_folder_name}
+    ]
+
+    collection["item"].append(
+        {
+            "name": release_folder_name,
+            "item": [
+                request(
+                    "Health — MySQL + Redis + Email Status",
+                    "GET",
+                    "/health",
+                    description="Readiness must report MySQL and Redis up; email exposes mode/configured only.",
+                ),
+                request(
+                    "CAPTCHA Issue — LOGIN",
+                    "POST",
+                    "/auth/captcha",
+                    body={"purpose": "LOGIN"},
+                    description="Safe CAPTCHA issuance smoke test for the Redis-backed public rate-limit path. Do not hammer the endpoint during acceptance.",
+                ),
+                request(
+                    "Request Password Reset (MANUAL)",
+                    "POST",
+                    "/auth/password-reset/request",
+                    body={"email": "{{passwordResetEmail}}"},
+                    state_change=True,
+                    description="Generic response prevents account enumeration. Sends mail only for one eligible verified ACTIVE account.",
+                ),
+                request(
+                    "Complete Password Reset (MANUAL)",
+                    "POST",
+                    "/auth/password-reset/complete",
+                    body={
+                        "token": "{{passwordResetToken}}",
+                        "newPassword": "{{newTestPassword}}",
+                    },
+                    state_change=True,
+                    description="Single-use reset token. Success revokes all active sessions for the user.",
+                ),
+                request(
+                    "Change Signed-in Password (MANUAL)",
+                    "POST",
+                    "/auth/change-password",
+                    body={
+                        "currentPassword": "{{currentTestPassword}}",
+                        "newPassword": "{{newTestPassword}}",
+                    },
+                    bearer_variable=superadmin_token,
+                    state_change=True,
+                    description="Use only in the dedicated auth acceptance step; success revokes all sessions and requires login again.",
+                ),
+                request(
+                    "Email Delivery Status — Superadmin",
+                    "GET",
+                    "/admin/communication/email/status",
+                    bearer_variable=superadmin_token,
+                    description="Safe diagnostics only; SMTP password is never returned.",
+                ),
+                request(
+                    "Send SMTP/Email Test — Superadmin (MANUAL)",
+                    "POST",
+                    "/admin/communication/email/test",
+                    body={"to": "{{smtpTestRecipient}}"},
+                    bearer_variable=superadmin_token,
+                    state_change=True,
+                    description="Controlled transport test to an address you own. SMTP acceptance is followed by inbox verification of the branded template.",
+                ),
+            ],
+        }
+    )
+
+    collection["item"].append(
+        {
+            "name": genealogy_folder_name,
+            "item": [
+                request(
+                    "User Genealogy — Own Root",
+                    "GET",
+                    "/referrals/me/genealogy?page=1&limit=25",
+                    bearer_variable="genealogyUserAccessToken",
+                    description="Use an ACTIVE USER access token. Response must be limited to that users own subtree and expose no email, package amount or earnings data.",
+                ),
+                request(
+                    "Admin Genealogy — Primary Root",
+                    "GET",
+                    "/admin/referrals/genealogy?page=1&limit=25",
+                    bearer_variable=superadmin_token,
+                    description="Read-only lazy genealogy page from the configured primary referral root. Requires referrals.read.",
+                ),
+                request(
+                    "Admin Genealogy — Search Member",
+                    "GET",
+                    "/admin/referrals/genealogy/search?query={{genealogySearchQuery}}",
+                    bearer_variable=superadmin_token,
+                    description="Search enrolled referral members by username, email or name before selecting a subtree root.",
+                ),
+                request(
+                    "Admin Genealogy — Expand Selected Parent",
+                    "GET",
+                    "/admin/referrals/genealogy?rootUserId={{genealogyRootUserId}}&parentUserId={{genealogyParentUserId}}&page=1&limit=25",
+                    bearer_variable=superadmin_token,
+                    description="Parent must be the root or a descendant of rootUserId; unrelated traversal must be rejected.",
+                ),
+            ],
+        }
+    )
+
+    collection.setdefault("info", {})["name"] = "FixTradeZone Local API MASTER v3"
+    environment["name"] = "FixTradeZone Local v3"
+
+    out_dir = (
+        Path(sys.argv[1])
+        if len(sys.argv) > 1
+        else Path("/tmp/fixtradezone-postman-v3")
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    collection_bytes = (
+        json.dumps(collection, indent=2, ensure_ascii=False).encode("utf-8") + b"\n"
+    )
+    environment_bytes = (
+        json.dumps(environment, indent=2, ensure_ascii=False).encode("utf-8") + b"\n"
+    )
+
+    collection_path = out_dir / COLLECTION_NAME
+    environment_path = out_dir / ENVIRONMENT_NAME
+    collection_path.write_bytes(collection_bytes)
+    environment_path.write_bytes(environment_bytes)
+
+    request_count = sum(
+        len(folder.get("item", [])) for folder in collection.get("item", [])
+    )
+    collection_sha = hashlib.sha256(collection_bytes).hexdigest()
+    environment_sha = hashlib.sha256(environment_bytes).hexdigest()
+
+    print(f"Collection:  {collection_path}")
+    print(f"Environment: {environment_path}")
+    print(f"Folders:     {len(collection.get('item', []))}")
+    print(f"Requests:    {request_count}")
+    print(f"Collection SHA256:  {collection_sha}")
+    print(f"Environment SHA256: {environment_sha}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

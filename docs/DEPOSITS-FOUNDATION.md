@@ -158,9 +158,12 @@ Statuses:
 ```text
 AWAITING_TXID
 PENDING_REVIEW
+READY_FOR_APPROVAL
 APPROVED
 REJECTED
 ```
+
+`READY_FOR_APPROVAL` is the maker-checker handoff: an ADMIN has reviewed the submitted payment evidence, while final financial approval is still pending SUPER_ADMIN action.
 
 Creation stores immutable snapshots including:
 
@@ -211,29 +214,29 @@ Database uniqueness is scoped by `assignedNetwork + txid` so the same network tr
 
 Invalid protocol-specific transaction identifiers return HTTP 400. Duplicate identifiers return HTTP 409.
 
-## 11. Manual review
+## 11. Maker-checker manual review
 
-Only `PENDING_REVIEW` may transition to:
+Deposit approval is a two-stage operational control.
 
 ```text
-APPROVED
-REJECTED
+USER submits TXID
+→ PENDING_REVIEW
+→ ADMIN reviews payment evidence
+→ ADMIN marks READY_FOR_APPROVAL with a required note
+→ SUPER_ADMIN approves one-by-one or selected deposits in bulk
+→ APPROVED
 ```
 
-Both require a review note and actor/timestamp audit trail.
+Rules:
 
-Approval records the payment fact only. DEP-01 does **not** create:
-
-- wallet balance;
-- ledger credit;
-- package activation;
-- referral commission;
-- rewards/cap consumption;
-- withdrawal/payout;
-- blockchain custody/signing;
-- real or simulated trade accounting.
-
-Later modules must consume an approved deposit idempotently rather than rewriting DEP-01 history.
+- ADMIN may inspect, add the maker review note, mark `READY_FOR_APPROVAL`, and reject.
+- ADMIN may never approve a deposit, including by direct API call.
+- SUPER_ADMIN may final-approve only `READY_FOR_APPROVAL`; SUPER_ADMIN cannot self-create the maker review stage.
+- Rejection is terminal and may occur from `PENDING_REVIEW` or `READY_FOR_APPROVAL`.
+- `openKey` remains locked through `READY_FOR_APPROVAL` and is released only at terminal approval/rejection.
+- Bulk approval is selected-only, SUPER_ADMIN-only, and processes each deposit independently/idempotently so one failed item does not roll back other successful approvals.
+- Final approval may trigger accounting, package activation, commission and reward downstream behavior according to Platform Operations mode; the maker review step never does.
+- Maker identity/time/note and final approver identity/time/note are stored separately and audited.
 
 ## 12. RBAC
 
@@ -246,9 +249,11 @@ deposits.read
 deposits.review
 ```
 
+`deposits.review` allows an ADMIN to perform the maker review/mark-ready step and reject. Final approval is additionally hard-gated to the `SUPER_ADMIN` role and cannot be granted to ADMIN by assigning `deposits.review`.
+
 Payment-rail configuration is part of deposit-account management in DEP-01 and uses `deposits.accounts.manage`.
 
-SUPER_ADMIN retains existing platform-wide bypass. ADMIN receives no implicit financial authority.
+SUPER_ADMIN retains existing platform-wide bypass for ordinary permissions, while deposit final approval still requires the explicit SUPER_ADMIN role. ADMIN receives no final financial approval authority.
 
 ## 13. API contract
 
@@ -272,7 +277,9 @@ POST  /admin/deposit-accounts
 PATCH /admin/deposit-accounts/:accountId
 GET   /admin/deposits
 GET   /admin/deposits/:depositId
+POST  /admin/deposits/:depositId/ready-for-approval
 POST  /admin/deposits/:depositId/approve
+POST  /admin/deposits/bulk-approve
 POST  /admin/deposits/:depositId/reject
 ```
 
@@ -282,7 +289,7 @@ All deposit/payment-rail/account state responses use `Cache-Control: no-store`.
 
 `0008_deposit_foundation` is historical and already applied locally. It must never be rewritten.
 
-`0009_deposit_network_generalization` is the forward hardening migration and is still pending local deployment. It:
+`0009_deposit_network_generalization` is historical and already applied locally. It:
 
 - creates `deposit_payment_rails`;
 - seeds the deterministic V1 USDT/TRC20/TRON rail;
@@ -293,7 +300,7 @@ All deposit/payment-rail/account state responses use `Cache-Control: no-store`.
 - snapshots `assignedValidationProfile` on deposits;
 - preserves historical 0008 data.
 
-Do not deploy `0009` until the complete code gate is GREEN.
+`0031_deposit_maker_checker_approval` is the next forward migration. It adds the `READY_FOR_APPROVAL` state plus separate ADMIN maker-review identity/time/note fields and updates the deposit state constraints without rewriting historical migrations. Deploy it only with `prisma migrate deploy` after the complete local code gate is GREEN.
 
 ## 15. Frontend contract
 

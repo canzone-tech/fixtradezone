@@ -1,0 +1,86 @@
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 24px;
+  border: 1px solid rgba(129, 151, 185, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(110deg, rgba(24, 50, 61, 0.5), rgba(11, 19, 32, 0.94));
+}
+
+.header > div:first-child > span {
+  color: #69dfc2;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+}
+
+.header h2 {
+  margin: 5px 0 8px;
+  color: #f7f9fd;
+  font-size: clamp(25px, 3vw, 34px);
+}
+
+.header p {
+  max-width: 720px;
+  margin: 0;
+  color: #91a2ba;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  max-width: 360px;
+}
+
+.legend span {
+  padding: 7px 9px;
+  border: 1px solid rgba(105, 223, 194, 0.2);
+  border-radius: 999px;
+  background: rgba(105, 223, 194, 0.06);
+  color: #9fc8bd;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.errorState {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  text-align: center;
+}
+
+.errorState i {
+  color: #ffb16a;
+  font-size: 34px;
+}
+
+.errorState strong {
+  margin-top: 10px;
+  color: #f7f9fd;
+}
+
+.errorState p {
+  color: #8fa0b8;
+}
+
+@media (max-width: 820px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .legend {
+    justify-content: flex-start;
+  }
+}

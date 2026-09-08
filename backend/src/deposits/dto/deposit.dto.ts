@@ -1,5 +1,9 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -24,6 +28,7 @@ const QR_DATA_URL_PATTERN =
   /^data:image\/(?:png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
 const ASSET_PATTERN = /^[A-Z0-9]{2,10}$/;
 const NETWORK_CODE_PATTERN = /^[A-Z0-9_-]{2,40}$/;
+const INVESTMENT_AMOUNT_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,8})?$/;
 
 const normalizeUppercase = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toUpperCase() : value;
@@ -163,6 +168,12 @@ export class CreateDepositDto {
   @IsString()
   @IsUUID()
   paymentRailId!: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(INVESTMENT_AMOUNT_PATTERN)
+  investmentAmount?: string;
 }
 
 export class SubmitDepositTxidDto {
@@ -173,6 +184,20 @@ export class SubmitDepositTxidDto {
 }
 
 export class ReviewDepositDto {
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 1000)
+  note!: string;
+}
+
+export class BulkApproveDepositsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  depositIds!: string[];
+
   @Transform(trimString)
   @IsString()
   @Length(3, 1000)

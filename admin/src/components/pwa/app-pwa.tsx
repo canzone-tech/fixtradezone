@@ -174,8 +174,8 @@ export default function AppPwa() {
 
         <p style={{ margin: "0 0 22px", color: "#a7b8d4", lineHeight: 1.6 }}>
           The mobile experience runs as the secure FixTradeZone installed app.
-          Your account and business data remain network-authoritative and are not
-          stored as offline financial state.
+          Your account and business data remain network-authoritative and are
+          not stored as offline financial state.
         </p>
 
         {installPrompt ? (

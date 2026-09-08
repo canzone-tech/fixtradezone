@@ -1,8 +1,10 @@
 import { Transform } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Matches,
   MaxLength,
@@ -65,6 +67,21 @@ export class RegisterDto {
   @MinLength(1)
   @MaxLength(64)
   referralCode?: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsOptional()
+  @IsUUID('4')
+  deviceInstallationId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  age18Declared?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  kycDeclarationAccepted?: boolean;
 
   @Transform(trimString)
   @IsOptional()

@@ -1,216 +1,127 @@
 # FixTradeZone — Current State
 
-## Canonical Checkpoint — 2026-08-27
+## Canonical Checkpoint — 2026-09-08
 
 Repository state plus completed local verification are the acceptance authority.
+Source code and CI alone are never treated as financial runtime acceptance.
 
 ## Active Development Branch
 
-`feature/referral-commission-foundation`
+`feature/v1-closeout-release-gaps`
 
-## Mainline Baseline
-
-`main` contains the merged cumulative post-MLM business foundation through PR #16:
-
-- PKG-01 package-plan foundation;
-- DEP-01 deposits foundation;
-- WAL-01 immutable wallet/ledger foundation;
-- SUB-02 package subscription / activation.
-
-Applied migration history must never be rewritten. MySQL remains the relational,
-business and accounting source of truth.
-
-## COMM-01 — Referral Commission Foundation
-
-Status: **COMPLETE / LOCALLY ACCEPTED / PR HANDOFF PENDING**.
-
-Canonical contract:
-
-`docs/REFERRAL-COMMISSION-FOUNDATION.md`
-
-COMM-01 converts immutable ACTIVE package-subscription events into versioned,
-immutable and ledger-backed referral commission outcomes.
-
-### Effective executable policy
-
-The first publishable execution engine is intentionally limited to:
+Current accepted remote checkpoint before this documentation refresh:
 
 ```text
-inactive upline = LOST
-compression     = SKIP
-release mode    = IMMEDIATE
+466728e  fix(admin): keep idle lock full viewport
 ```
 
-Deferred routing/release modes remain configurable in the contract but fail
-closed at publication until their dedicated engines exist.
+## Module 08 — Deposits / Maker-Checker
 
-### Versioned commission plan
+Status: **FUNCTIONALLY COMPLETE / LOCAL ACCEPTANCE GREEN / CLOSEOUT IN PROGRESS**.
 
-Migration `0013_referral_commission_foundation` establishes:
+The deposits slice remains a backend + frontend vertical slice and preserves the
+existing maker-checker architecture.
 
-- versioned DRAFT/PUBLISHED commission plans;
-- configurable level rules;
-- immutable processing runs;
-- immutable commission events;
-- exact DECIMAL calculation snapshots;
-- deterministic source identities;
-- Referral Commission ledger posting support;
-- COMM-01 RBAC permissions.
+Accepted behavior includes:
 
-The supplied reference levels were seeded as a DRAFT only and then explicitly
-published during local acceptance:
+- USER deposit creation through the published package/payment-rail contract;
+- ADMIN review stage before final approval;
+- SUPER_ADMIN final approval authority;
+- audited rejection through the normal lifecycle;
+- accounting posting and downstream package activation on approved funding;
+- referral-commission and internal-trading lifecycle integration already present
+  in the accepted financial path;
+- bulk approve/reject acceptance reported GREEN locally;
+- USER approved/rejected deposit readback and browser acceptance reported GREEN.
+
+### Same-package ACTIVE funding protection
+
+A USER who already has an `ACTIVE` subscription for a package cannot create a
+new funding/deposit request for that same package until the subscription leaves
+`ACTIVE`.
+
+The rule is keyed by package-definition identity, not merely one plan item, so a
+different plan item for the same package cannot bypass the protection.
+
+Different packages remain eligible under the existing multiple-active-package
+policy when all other deposit rules allow them.
+
+The backend remains authoritative and returns a conflict for direct API bypass.
+The effective USER package catalogue also removes package definitions that are
+already ACTIVE for the current USER, so the normal `/user/packages` and
+`/user/deposits` UI paths do not offer duplicate same-package funding.
+
+This protection required no Prisma schema or migration change and does not
+mutate published Package V1 terms.
+
+### Frontend/session-lock closeout fix
+
+The shared inactivity lock used by ADMIN and USER surfaces is required to cover
+the complete application viewport.
+
+A global responsive rule previously constrained generic `[role="dialog"]`
+elements and could visually clamp the full-screen idle-lock backdrop. The shared
+lock stylesheet now explicitly preserves unrestricted full-viewport dimensions.
+
+Local browser acceptance for the corrected session lock and deposits UI was
+reported GREEN on 2026-09-08. Admin CI for the lock change passed lint,
+typecheck, production build and critical dependency audit.
+
+### Latest verified automated gates
+
+Backend local verification before the frontend-only lock change:
 
 ```text
-L1 20%
-L2  8%
-L3  5%
-L4  3%
-L5  2%
+Test Suites: 65 passed, 65 total
+Tests:       338 passed, 338 total
+Nest build:  GREEN
 ```
 
-Package matching is enabled per level.
+The subsequent session-lock change touched only ADMIN CSS. Its Admin CI run was
+GREEN for lint, typecheck, build and critical dependency audit, and the updated
+frontend was then accepted locally.
 
-### Financial source authority
+## Module 08 Closeout Gate
 
-Commission processing starts only from an immutable ACTIVE package subscription.
+Before opening the PR to `main`:
 
-A submitted deposit, approved deposit by itself, or accounting transaction by
-itself is not a commission event.
+1. keep `backups/` untouched and untracked;
+2. keep `postman/__pycache__/` untouched and untracked;
+3. confirm final branch/HEAD/status after this documentation commit is pulled;
+4. confirm repository CI for the documentation head is not hiding any code
+   regression (path-filtered workflows may legitimately not run for docs-only
+   changes);
+5. perform no additional Module 08 code changes unless a new acceptance failure
+   is found;
+6. open the PR to `main` only after the final local checkpoint remains clean.
 
-The canonical package-matching calculation is:
+No next module starts before this closeout/PR checkpoint is complete.
 
-```text
-eligibleBase = MIN(receiver active-package basis, source package value)
-commission   = eligibleBase × level rate / 100
-```
+## Permanent Delivery Locks
 
-AVAILABLE immediate commission posts through the immutable balanced ledger:
-
-```text
-DEBIT  SYSTEM / REFERRAL_COMMISSION_EXPENSE
-CREDIT USER   / REFERRAL_COMMISSION
-```
-
-No arbitrary balance mutation endpoint exists.
-
-### Historical behavior
-
-Sponsor routing is reconstructed at the source subscription activation time.
-Published commission-plan versions and event calculation values are preserved
-historically.
-
-If no commission plan was effective at a historical activation timestamp,
-processing records `NO_EFFECTIVE_PLAN`; later publication does not create a
-retroactive payout.
-
-Local browser reconciliation of older pre-COMM-01 subscriptions confirmed this
-behavior.
-
-## COMM-01 Local Acceptance — GREEN
-
-Completed locally on 2026-08-27:
-
-- verified pre-migration MySQL backup;
-- migration `0013_referral_commission_foundation` deployed successfully;
-- DB readback verified all four COMM-01 tables;
-- DB readback verified V1 DRAFT seed and L1–L5 reference rates;
-- DB readback verified COMM-01 permissions and ledger enums;
-- root `npm run verify:milestone` completed successfully;
-- backend `/health` returned HTTP 200;
-- frontend `/login` returned HTTP 200;
-- ADMIN `/commissions` rendered versioned plan/rules, reconciliation and immutable history;
-- USER `/user/referrals` rendered referral identity/network and ledger-backed commission history;
-- fresh USER B was correctly assigned beneath fresh sponsor USER A;
-- fresh USER A was activated on a 5 USDT package before USER B activation;
-- fresh USER B was activated on a 5 USDT package under the effective commission plan;
-- B → A L1 package matching resolved eligible base 5 USDT;
-- B → A L1 20% produced exactly 1.00000000 USDT AVAILABLE commission;
-- USER A Referral Commission wallet displayed 1.00 USDT;
-- ADMIN immutable history displayed the B → A L1 AVAILABLE event;
-- non-qualified SUPER_ADMIN uplines produced zero-value LOST events as required by the published policy;
-- admin event/ledger/reconciliation API readbacks passed;
-- USER commission history did not expose receiver/purchaser email fields;
-- deterministic/idempotent processing is covered by automated tests.
-
-The standalone Postman same-subscription retry request was not used as runtime
-acceptance evidence because its Postman subscription-id variable was unresolved.
-No false runtime idempotency claim is recorded from that request.
-
-## Current ADMIN UI
-
-Operational routes now include:
-
-- Dashboard
-- Users
-- Roles & Permissions
-- Packages
-- Deposits
-- Wallets & Ledger
-- Subscriptions
-- Referral Commissions
-- Referrals
-- Settings
-
-The Referral Commissions workspace exposes:
-
-- effective/published commission plan state;
-- editable DRAFT level/policy configuration;
-- publication safety and unsaved-change protection;
-- reconciliation queue;
-- immutable commission events.
-
-## Current USER UI
-
-Operational USER financial/referral surfaces include:
-
-- Packages
-- Deposits
-- Wallet
-- Referrals
-
-`/user/referrals` now shows only settled ledger-backed Referral Commission as
-earned money. No projected or fabricated commission is presented as a balance.
+- MySQL is the relational/business/accounting source of truth.
+- Never use `prisma migrate dev` for project delivery.
+- Never reset the database.
+- Forward migrations only with `prisma migrate deploy` when a reviewed migration
+  is actually required.
+- Run Prisma commands from `backend` with `npx --no-install prisma`.
+- `backups/` must never be touched, added or deleted by delivery automation.
+- `postman/__pycache__/` must never be touched, added or deleted.
+- Never touch/pop/drop local stashes without explicit approval.
+- Package V1 published commercial terms are immutable once published.
+- Backend is authoritative for financial/business rules; frontend mirrors those
+  rules for UX but cannot replace server enforcement.
+- Complete one module/API at a time.
+- Repo-first implementation is the current working pattern: update the feature
+  branch, verify available repository CI, then pull locally for runtime/browser/
+  Postman acceptance.
+- PR to `main` only after every required local acceptance gate is GREEN.
 
 ## Product Scope — LOCKED
 
-FixTradeZone does not execute real trades and has no AI-agent/broker/exchange
-execution milestone in v1.
+FixTradeZone does not execute real trades in v1. Any trade-like presentation is
+limited to explicitly labelled simulated activity and must not silently mutate
+real wallet/ledger balances.
 
-Future trade-like presentation is limited to clearly labelled **Simulated Trade
-Activity** / **SIMULATED RESULTS** and must not silently mutate real wallet/ledger
-balances.
-
-## Current V1 Sequence
-
-1. COMM-01 referral commission foundation — locally accepted, PR handoff pending
-2. rewards / caps / lifecycle accounting
-3. Simulated Trade Activity display only
-4. minimal v1 landing/template controls
-5. remaining USER/ADMIN operational slices
-6. notifications/reports required for launch
-7. QA/security/release hardening
-8. production deployment
-
-## Infrastructure / Data Ownership
-
-- MySQL is the relational/business/accounting source of truth.
-- MongoDB is reserved for later document/CMS/flexible configuration only if a repository feature requires it.
-- Redis is transient infrastructure and should only be used where an implemented feature requires it.
-
-## Delivery Workflow — CURRENT LOCK
-
-1. Reconcile repository + persistent docs.
-2. Lock business semantics and contract.
-3. Implement backend/database/API + matching BFF/ADMIN/USER UI as one vertical slice.
-4. Complete focused automated regression coverage.
-5. Run the combined backend + frontend code gate locally.
-6. Apply explicit reviewed migrations only when required.
-7. Run browser/UI + Postman/API verification together in one consolidated local acceptance round.
-8. Fix failures at the actual backend/frontend boundary without bypassing checks.
-9. Run SQL/audit/ledger readback where financial or persistence evidence is required.
-10. Run final milestone verification.
-11. Update persistent docs/current state and review the complete diff.
-12. Commit/push the feature branch and open PR to `main` only after every local gate is GREEN.
-
-Production deployment remains HOLD until required v1 milestones and release
-hardening are complete.
+Production deployment remains HOLD until the remaining v1 milestones and final
+release hardening are complete.

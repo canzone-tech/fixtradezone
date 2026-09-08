@@ -12,6 +12,7 @@ import {
   type DepositAccountMutationResponse,
   type DepositAccountsResponse,
   type DepositAccountingResponse,
+  type DepositBulkApprovalResponse,
   type DepositMutationResponse,
   type DepositPaymentRail,
   type DepositPaymentRailMutationResponse,
@@ -23,7 +24,9 @@ import {
   readJson,
   statusLabel,
   statusTone,
+  sumDecimalStrings,
 } from "@/lib/deposits";
+import { formatPlatformDateTime } from "@/lib/platform-time";
 
 const MAX_QR_BYTES = 256 * 1024;
 const QR_TYPES = new Set([
@@ -43,11 +46,7 @@ interface AdminDepositWorkspace {
 }
 
 function formatDate(value: string | null): string {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatPlatformDateTime(value);
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -154,6 +153,8 @@ export default function DepositsClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
+  const [selectedReadyIds, setSelectedReadyIds] = useState<string[]>([]);
+  const [bulkApprovalNote, setBulkApprovalNote] = useState("");
 
   const canReadAccounts =
     user !== null && hasPermission(user, "deposits.accounts.read");
@@ -161,6 +162,12 @@ export default function DepositsClient() {
     user !== null && hasPermission(user, "deposits.accounts.manage");
   const canReadDeposits = user !== null && hasPermission(user, "deposits.read");
   const canReview = user !== null && hasPermission(user, "deposits.review");
+  const canMarkReady =
+    user !== null &&
+    !isSuperAdmin(user) &&
+    user.roles.includes("ADMIN") &&
+    hasPermission(user, "deposits.review");
+  const canApprove = user !== null && isSuperAdmin(user);
   const canPostAccounting = user !== null && hasPermission(user, "ledger.post");
 
   const activeRails = useMemo(
@@ -172,12 +179,24 @@ export default function DepositsClient() {
       deposits.filter((deposit) => deposit.status === "PENDING_REVIEW").length,
     [deposits],
   );
+  const readyCount = useMemo(
+    () =>
+      deposits.filter((deposit) => deposit.status === "READY_FOR_APPROVAL").length,
+    [deposits],
+  );
 
   function applyWorkspace(workspace: AdminDepositWorkspace) {
     setUser(workspace.user);
     setRails(workspace.rails);
     setAccounts(workspace.accounts);
     setDeposits(workspace.deposits);
+    setSelectedReadyIds((current) =>
+      current.filter((id) =>
+        workspace.deposits.some(
+          (deposit) => deposit.id === id && deposit.status === "READY_FOR_APPROVAL",
+        ),
+      ),
+    );
   }
 
   async function reloadWorkspace() {
@@ -456,6 +475,46 @@ export default function DepositsClient() {
     }
   }
 
+  async function markReadyForApproval(deposit: Deposit) {
+    const note = (reviewNotes[deposit.id] ?? "").trim();
+    if (note.length < 3) {
+      setError("A review note of at least 3 characters is required.");
+      return;
+    }
+
+    setBusy(`ready-${deposit.id}`);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(
+        `/api/admin/deposits/${deposit.id}/ready-for-approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note }),
+        },
+      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
+      if (!response.ok || !payload) {
+        throw new Error(messageFrom(payload, "Could not mark deposit ready."));
+      }
+
+      setReviewNotes((current) => ({ ...current, [deposit.id]: "" }));
+      setNotice(payload.message);
+      await reloadWorkspace();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Could not mark deposit ready for approval.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function reviewDeposit(deposit: Deposit, action: "approve" | "reject") {
     const note = (reviewNotes[deposit.id] ?? "").trim();
     if (note.length < 3) {
@@ -483,6 +542,9 @@ export default function DepositsClient() {
       }
 
       setReviewNotes((current) => ({ ...current, [deposit.id]: "" }));
+      setSelectedReadyIds((current) =>
+        current.filter((id) => id !== deposit.id),
+      );
 
       const policyResult =
         action === "approve" && payload.packageActivationMode
@@ -508,6 +570,82 @@ export default function DepositsClient() {
     }
   }
 
+  function toggleReadySelection(depositId: string) {
+    setSelectedReadyIds((current) =>
+      current.includes(depositId)
+        ? current.filter((id) => id !== depositId)
+        : [...current, depositId],
+    );
+  }
+
+  async function bulkApproveSelected() {
+    if (!canApprove || selectedReadyIds.length === 0) return;
+
+    const note = bulkApprovalNote.trim();
+    if (note.length < 3) {
+      setError("A bulk approval note of at least 3 characters is required.");
+      return;
+    }
+
+    const selected = deposits.filter(
+      (deposit) =>
+        deposit.status === "READY_FOR_APPROVAL" &&
+        selectedReadyIds.includes(deposit.id),
+    );
+    if (selected.length !== selectedReadyIds.length) {
+      setError("One or more selected deposits changed state. Refresh and retry.");
+      return;
+    }
+
+    const totals = new Map<string, string[]>();
+    for (const deposit of selected) {
+      totals.set(deposit.currency, [
+        ...(totals.get(deposit.currency) ?? []),
+        deposit.amount,
+      ]);
+    }
+    const totalText = [...totals.entries()]
+      .map(([currency, amounts]) => `${sumDecimalStrings(amounts)} ${currency}`)
+      .join(", ");
+
+    const confirmed = window.confirm(
+      `Approve ${selected.length} ADMIN-reviewed deposit(s) totaling ${totalText}?\n\n` +
+        "Each deposit is processed independently and may post accounting, activate a package, and trigger downstream earnings automation.",
+    );
+    if (!confirmed) return;
+
+    setBusy("bulk-approve");
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch("/api/admin/deposits/bulk-approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ depositIds: selectedReadyIds, note }),
+      });
+      const payload = await readJson<DepositBulkApprovalResponse>(response);
+      if (!response.ok || !payload) {
+        throw new Error(messageFrom(payload, "Bulk approval failed."));
+      }
+
+      setBulkApprovalNote("");
+      setSelectedReadyIds([]);
+      const failures = payload.results.filter((result) => !result.ok);
+      setNotice(
+        failures.length === 0
+          ? payload.message ?? "Bulk deposit approval completed."
+          : `${payload.message ?? "Bulk deposit approval completed."} ${failures.length} item(s) require review.`,
+      );
+      await reloadWorkspace();
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Bulk approval failed.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <section className={styles.hero}>
@@ -522,7 +660,7 @@ export default function DepositsClient() {
           </p>
         </div>
         <span className={styles.badge} data-tone="warning">
-          {pendingCount} pending in current view
+          {pendingCount} pending · {readyCount} ready
         </span>
       </section>
 
@@ -972,6 +1110,7 @@ export default function DepositsClient() {
                 }
               >
                 <option value="PENDING_REVIEW">Pending review</option>
+                <option value="READY_FOR_APPROVAL">Ready for approval</option>
                 <option value="AWAITING_TXID">Awaiting transaction ID</option>
                 <option value="APPROVED">Approved</option>
                 <option value="REJECTED">Rejected</option>
@@ -987,6 +1126,39 @@ export default function DepositsClient() {
               </button>
             </div>
           </div>
+
+          {canApprove && deposits.some((deposit) => deposit.status === "READY_FOR_APPROVAL") ? (
+            <div className={styles.notice}>
+              <strong>SUPER_ADMIN final approval</strong>
+              <p>
+                Select only deposits already marked ready by an ADMIN reviewer.
+                Bulk approval processes every selected deposit independently.
+              </p>
+              <div className={styles.field}>
+                <label htmlFor="bulk-approval-note">Bulk approval note</label>
+                <input
+                  className={styles.input}
+                  id="bulk-approval-note"
+                  value={bulkApprovalNote}
+                  onChange={(event) => setBulkApprovalNote(event.target.value)}
+                  minLength={3}
+                  maxLength={1000}
+                />
+              </div>
+              <div className={styles.actions}>
+                <button
+                  className={styles.button}
+                  type="button"
+                  disabled={busy !== null || selectedReadyIds.length === 0}
+                  onClick={() => void bulkApproveSelected()}
+                >
+                  {busy === "bulk-approve"
+                    ? "Approving selected…"
+                    : `Approve selected (${selectedReadyIds.length})`}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {loading ? (
             <div className={styles.empty}>Loading deposit state…</div>
@@ -1007,12 +1179,25 @@ export default function DepositsClient() {
                         {formatDate(deposit.createdAt)}
                       </small>
                     </div>
-                    <span
-                      className={styles.badge}
-                      data-tone={statusTone(deposit.status)}
-                    >
-                      {statusLabel(deposit.status)}
-                    </span>
+                    <div className={styles.actions}>
+                      {canApprove && deposit.status === "READY_FOR_APPROVAL" ? (
+                        <label className={styles.muted}>
+                          <input
+                            type="checkbox"
+                            checked={selectedReadyIds.includes(deposit.id)}
+                            onChange={() => toggleReadySelection(deposit.id)}
+                            disabled={busy !== null}
+                          />{" "}
+                          Select
+                        </label>
+                      ) : null}
+                      <span
+                        className={styles.badge}
+                        data-tone={statusTone(deposit.status)}
+                      >
+                        {statusLabel(deposit.status)}
+                      </span>
+                    </div>
                   </div>
                   <div className={styles.kv}>
                     <div>
@@ -1036,9 +1221,17 @@ export default function DepositsClient() {
                       </strong>
                     </div>
                   </div>
+                  {deposit.readyForApprovalAt ? (
+                    <div className={styles.notice}>
+                      ADMIN review: {deposit.readyForApprovalNote} · marked ready by{" "}
+                      {deposit.readyForApprovalBy?.username ??
+                        deposit.readyForApprovalByUserId}{" "}
+                      · {formatDate(deposit.readyForApprovalAt)}
+                    </div>
+                  ) : null}
                   {deposit.reviewNote ? (
                     <div className={styles.notice}>
-                      Review: {deposit.reviewNote} ·{" "}
+                      Final review: {deposit.reviewNote} ·{" "}
                       {formatDate(deposit.reviewedAt)}
                     </div>
                   ) : null}
@@ -1087,16 +1280,73 @@ export default function DepositsClient() {
                         />
                       </div>
                       <div className={`${styles.actions} ${styles.full}`}>
+                        {canMarkReady ? (
+                          <button
+                            className={styles.button}
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void markReadyForApproval(deposit)}
+                          >
+                            {busy === `ready-${deposit.id}`
+                              ? "Marking ready…"
+                              : "Mark ready for approval"}
+                          </button>
+                        ) : (
+                          <span className={styles.muted}>
+                            Awaiting ADMIN review before final approval.
+                          </span>
+                        )}
                         <button
-                          className={styles.button}
+                          className={styles.buttonDanger}
                           type="button"
                           disabled={busy !== null}
-                          onClick={() => void reviewDeposit(deposit, "approve")}
+                          onClick={() => void reviewDeposit(deposit, "reject")}
                         >
-                          {busy === `approve-${deposit.id}`
-                            ? "Approving…"
-                            : "Approve"}
+                          {busy === `reject-${deposit.id}`
+                            ? "Rejecting…"
+                            : "Reject"}
                         </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {deposit.status === "READY_FOR_APPROVAL" && canReview ? (
+                    <div className={styles.formGrid}>
+                      <div className={`${styles.field} ${styles.full}`}>
+                        <label htmlFor={`final-review-${deposit.id}`}>
+                          {canApprove ? "Final approval / rejection note" : "Rejection note"}
+                        </label>
+                        <textarea
+                          className={styles.textarea}
+                          id={`final-review-${deposit.id}`}
+                          value={reviewNotes[deposit.id] ?? ""}
+                          onChange={(event) =>
+                            setReviewNotes((current) => ({
+                              ...current,
+                              [deposit.id]: event.target.value,
+                            }))
+                          }
+                          minLength={3}
+                          maxLength={1000}
+                        />
+                      </div>
+                      <div className={`${styles.actions} ${styles.full}`}>
+                        {canApprove ? (
+                          <button
+                            className={styles.button}
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void reviewDeposit(deposit, "approve")}
+                          >
+                            {busy === `approve-${deposit.id}`
+                              ? "Approving…"
+                              : "Approve"}
+                          </button>
+                        ) : (
+                          <span className={styles.muted}>
+                            Ready for SUPER_ADMIN final approval.
+                          </span>
+                        )}
                         <button
                           className={styles.buttonDanger}
                           type="button"

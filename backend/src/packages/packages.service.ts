@@ -146,6 +146,58 @@ export class PackagesService {
         );
       }
 
+      const latest = await transaction.packagePlanVersion.findFirst({
+        orderBy: { versionNumber: 'desc' },
+        select: { versionNumber: true },
+      });
+
+      if (!dto.sourcePlanVersionId) {
+        if (latest) {
+          throw new BadRequestException(
+            'sourcePlanVersionId is required after package-plan history exists.',
+          );
+        }
+
+        const created = await transaction.packagePlanVersion.create({
+          data: {
+            versionNumber: 1,
+            status: 'DRAFT',
+            revision: 1,
+            createdByUserId: actor.id,
+            updatedByUserId: actor.id,
+          },
+          include: PLAN_INCLUDE,
+        });
+
+        const after = toPlanSnapshot(created);
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: actor.id,
+            action: 'CREATE',
+            entityType: 'PackagePlanVersion',
+            entityId: created.id,
+            description:
+              'Administrator created the initial empty database-backed package-plan draft.',
+            metadata: {
+              source: 'ADMIN_PACKAGE_PLAN',
+              operation: 'CREATE_INITIAL_DRAFT',
+              reason: dto.reason,
+              revision: created.revision,
+              before: null,
+              after,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return {
+          message: 'Package plan V1 initial draft created.',
+          plan: after,
+        };
+      }
+
       const source = await this.findPlanOrThrow(
         transaction,
         dto.sourcePlanVersionId,
@@ -153,14 +205,9 @@ export class PackagesService {
 
       if (source.status !== 'PUBLISHED') {
         throw new BadRequestException(
-          'A new draft must be cloned from a published plan version.',
+          'A successor draft must be cloned from a published plan version.',
         );
       }
-
-      const latest = await transaction.packagePlanVersion.findFirst({
-        orderBy: { versionNumber: 'desc' },
-        select: { versionNumber: true },
-      });
 
       const created = await transaction.packagePlanVersion.create({
         data: {
@@ -185,6 +232,9 @@ export class PackagesService {
               sortOrder: item.sortOrder,
               availability: item.availability,
               price: item.price,
+              minimumInvestment: item.minimumInvestment,
+              maximumInvestment: item.maximumInvestment,
+              durationDays: item.durationDays,
               currency: item.currency,
               rewardRateMode: item.rewardRateMode,
               fixedRewardRate: item.fixedRewardRate,
@@ -217,7 +267,7 @@ export class PackagesService {
           entityType: 'PackagePlanVersion',
           entityId: created.id,
           description:
-            'Administrator cloned a published package plan into a new draft.',
+            'Administrator cloned a published package plan into a successor draft.',
           metadata: {
             source: 'ADMIN_PACKAGE_PLAN',
             operation: 'CLONE_DRAFT',
@@ -344,13 +394,11 @@ export class PackagesService {
       const plan = await this.findPlanOrThrow(transaction, planVersionId);
       this.assertEditableDraft(plan, dto.expectedRevision);
 
-      const definition = await transaction.packageDefinition.findUnique({
+      const definition = await transaction.packageDefinition.upsert({
         where: { code: dto.packageCode },
+        update: {},
+        create: { code: dto.packageCode },
       });
-
-      if (!definition) {
-        throw new NotFoundException('Package definition was not found.');
-      }
 
       if (
         plan.items.some((item) => item.packageDefinitionId === definition.id)

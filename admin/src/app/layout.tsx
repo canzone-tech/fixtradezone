@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import PlatformTimeProvider from "@/components/platform/platform-time-provider";
 import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
 import "iconoir/css/iconoir.css";
 import "../styles/fixtradezone-theme.scss";
+import "../styles/fixtradezone-readability.scss";
+import "../styles/fixtradezone-responsive.scss";
 
 export const metadata: Metadata = {
   applicationName: "FixTradeZone",
@@ -38,7 +41,7 @@ export default function RootLayout({
     >
       <body id="body">
         <AppPwa />
-        {children}
+        <PlatformTimeProvider>{children}</PlatformTimeProvider>
       </body>
     </html>
   );

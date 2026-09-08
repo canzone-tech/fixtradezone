@@ -43,7 +43,8 @@ export default function ReferralsClient() {
   const [success, setSuccess] = useState("");
 
   const [enrollmentEnabled, setEnrollmentEnabled] = useState(false);
-  const [adminSponsorChangeEnabled, setAdminSponsorChangeEnabled] = useState(false);
+  const [adminSponsorChangeEnabled, setAdminSponsorChangeEnabled] =
+    useState(false);
   const [defaultSponsorUserId, setDefaultSponsorUserId] = useState("");
 
   const [memberUserId, setMemberUserId] = useState("");
@@ -99,13 +100,14 @@ export default function ReferralsClient() {
           const configResponse = await fetch("/api/admin/referrals/config", {
             cache: "no-store",
           });
-          const configPayload = await readPayload<ReferralConfig & ErrorPayload>(
-            configResponse,
-          );
+          const configPayload = await readPayload<
+            ReferralConfig & ErrorPayload
+          >(configResponse);
 
           if (!configResponse.ok || !configPayload) {
             throw new Error(
-              configPayload?.message || "Unable to load referral configuration.",
+              configPayload?.message ||
+                "Unable to load referral configuration.",
             );
           }
 
@@ -119,9 +121,7 @@ export default function ReferralsClient() {
 
           if (nextConfig) {
             setEnrollmentEnabled(nextConfig.enrollmentEnabled);
-            setAdminSponsorChangeEnabled(
-              nextConfig.adminSponsorChangeEnabled,
-            );
+            setAdminSponsorChangeEnabled(nextConfig.adminSponsorChangeEnabled);
             setDefaultSponsorUserId(nextConfig.defaultSponsorUserId ?? "");
           }
         }
@@ -346,7 +346,9 @@ export default function ReferralsClient() {
               <div className={styles.readOnlyGrid}>
                 <div>
                   <small>PRIMARY ROOT</small>
-                  <strong>{config.primaryRootUserId ?? "Not configured"}</strong>
+                  <strong>
+                    {config.primaryRootUserId ?? "Not configured"}
+                  </strong>
                 </div>
                 <div>
                   <small>CODE MODE</small>

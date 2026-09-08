@@ -13,12 +13,12 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
-import { CommissionsService } from '../commissions/commissions.service';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import {
   AdminSubscriptionQueryDto,
   SubscriptionPageQueryDto,
 } from './dto/subscription.dto';
+import { SubscriptionActivationOrchestratorService } from './subscription-activation-orchestrator.service';
 import { SubscriptionsService } from './subscriptions.service';
 
 @Controller('admin/subscriptions')
@@ -52,34 +52,21 @@ export class AdminSubscriptionsController {
 @Controller('admin/deposits')
 export class AdminDepositSubscriptionController {
   constructor(
-    private readonly subscriptionsService: SubscriptionsService,
-    private readonly commissionsService: CommissionsService,
+    private readonly activationOrchestrator: SubscriptionActivationOrchestratorService,
   ) {}
 
   @Post(':depositId/activate-package')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SUBSCRIPTIONS_ACTIVATE)
-  async activatePackage(
+  activatePackage(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const context = getRequestContext(request);
-    const activation = await this.subscriptionsService.reconcileActivation(
+    return this.activationOrchestrator.reconcileActivation(
       depositId,
       actor,
-      context,
+      getRequestContext(request),
     );
-    const referralCommission =
-      await this.commissionsService.processSubscriptionSafely(
-        activation.subscription.id,
-        actor,
-        context,
-      );
-
-    return {
-      ...activation,
-      referralCommission,
-    };
   }
 }

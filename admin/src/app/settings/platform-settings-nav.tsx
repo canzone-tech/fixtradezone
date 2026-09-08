@@ -4,7 +4,9 @@ import styles from "./platform-configuration.module.css";
 type PlatformSettingsSection =
   | "authentication"
   | "registration"
+  | "duplicate-account"
   | "security"
+  | "operations"
   | "accounting";
 
 interface PlatformSettingsNavProps {
@@ -30,16 +32,22 @@ const sections: Array<{
     icon: "iconoir-user-plus",
   },
   {
+    key: "duplicate-account",
+    href: "/settings/duplicate-account",
+    label: "Duplicate Protection",
+    icon: "iconoir-fingerprint",
+  },
+  {
     key: "security",
     href: "/settings/security",
     label: "Security",
     icon: "iconoir-shield-check",
   },
   {
-    key: "accounting",
-    href: "/settings/accounting",
-    label: "Accounting",
-    icon: "iconoir-coins",
+    key: "operations",
+    href: "/settings/operations",
+    label: "Operations",
+    icon: "iconoir-settings",
   },
 ];
 

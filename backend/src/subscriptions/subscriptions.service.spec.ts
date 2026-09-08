@@ -10,8 +10,8 @@ const PLAN_ITEM_ID = '88888888-8888-4888-8888-888888888888';
 const DEFINITION_ID = '99999999-9999-4999-8999-999999999999';
 const ACCOUNTING_TRANSACTION_ID = '55555555-5555-4555-8555-555555555555';
 const FUNDING_TRANSACTION_ID = '66666666-6666-4666-8666-666666666666';
+const INTERNAL_TRADE_POLICY_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 
-// Keep the audit assertion explicitly typed so strict lint guards the money path.
 interface AuditCreateCall {
   data: {
     action: string;
@@ -21,6 +21,8 @@ interface AuditCreateCall {
       depositId: string;
       amount: string;
       currency: string;
+      settlementTimezone: string;
+      timezoneSource: string;
       referralCommissionApplied: boolean;
       rewardsApplied: boolean;
     };
@@ -51,8 +53,11 @@ const existingSubscription = {
   packagePlanItemId: PLAN_ITEM_ID,
   packageDefinitionId: DEFINITION_ID,
   packageCode: 'NEURAL_SCOUT',
-  packageDisplayName: 'Neural Scout',
+  packageDisplayName: 'FTZ AlphaBotc',
   price: new Prisma.Decimal('5'),
+  minimumInvestment: new Prisma.Decimal('5'),
+  maximumInvestment: new Prisma.Decimal('24'),
+  durationDays: 10,
   currency: 'USDT',
   activePackageMode: 'SINGLE_ACTIVE',
   multipleActivePackageBasis: 'HIGHEST_ACTIVE_PACKAGE',
@@ -60,6 +65,10 @@ const existingSubscription = {
   renewalMode: 'MANUAL_AFTER_TERMINAL',
   upgradesEnabled: false,
   settlementTimezone: 'UTC',
+  earningAuthority: 'LEGACY_REWARD' as const,
+  internalTradeSplitPolicyVersionId: null,
+  internalTradeUserSharePercent: null,
+  internalTradeAdminSharePercent: null,
   rewardRateMode: 'RANDOM_RANGE',
   fixedRewardRate: null,
   minimumRewardRate: new Prisma.Decimal('0.004'),
@@ -67,8 +76,8 @@ const existingSubscription = {
   rewardRateMeaning: 'USER_NET_AFTER_SPLIT',
   capBasis: 'TOTAL_RETURN',
   capMultiplier: new Prisma.Decimal('2'),
-  principalTreatment: 'INCLUDED_IN_TOTAL_RETURN',
-  goalDays: 90,
+  principalTreatment: 'RETURN_SEPARATELY',
+  goalDays: 10,
   cycleDays: 10,
   rewardStartMode: 'NEXT_CALENDAR_DAY',
   rewardFrequency: 'DAILY_CALENDAR',
@@ -78,22 +87,36 @@ const existingSubscription = {
   capReachedAction: 'COMPLETE_PACKAGE',
   status: 'ACTIVE' as const,
   activatedAt: new Date('2026-08-26T01:00:00.000Z'),
-  scheduledEndAt: new Date('2026-11-24T01:00:00.000Z'),
+  scheduledEndAt: new Date('2026-09-05T01:00:00.000Z'),
   completedAt: null,
   createdAt: new Date('2026-08-26T01:00:00.000Z'),
   updatedAt: new Date('2026-08-26T01:00:00.000Z'),
+};
+
+const createdSubscription = {
+  ...existingSubscription,
+  price: new Prisma.Decimal('12.5'),
+  settlementTimezone: 'Asia/Kolkata',
+  earningAuthority: 'INTERNAL_TRADING' as const,
+  internalTradeSplitPolicyVersionId: INTERNAL_TRADE_POLICY_ID,
+  internalTradeUserSharePercent: new Prisma.Decimal('70'),
+  internalTradeAdminSharePercent: new Prisma.Decimal('30'),
 };
 
 const approvedDeposit = {
   id: DEPOSIT_ID,
   userId: USER_ID,
   status: 'APPROVED',
-  amount: new Prisma.Decimal('5'),
+  amount: new Prisma.Decimal('12.5'),
+  packageMinimumInvestment: new Prisma.Decimal('5'),
+  packageMaximumInvestment: new Prisma.Decimal('24'),
+  packageDurationDays: 10,
+  packagePrincipalTreatment: 'RETURN_SEPARATELY',
   currency: 'USDT',
   packagePlanVersionId: PLAN_VERSION_ID,
   packagePlanItemId: PLAN_ITEM_ID,
   packageCode: 'NEURAL_SCOUT',
-  packageDisplayName: 'Neural Scout',
+  packageDisplayName: 'FTZ AlphaBotc',
   reviewedAt: new Date('2026-08-26T00:30:00.000Z'),
 };
 
@@ -102,6 +125,9 @@ const planItem = {
   planVersionId: PLAN_VERSION_ID,
   packageDefinitionId: DEFINITION_ID,
   price: new Prisma.Decimal('5'),
+  minimumInvestment: new Prisma.Decimal('5'),
+  maximumInvestment: new Prisma.Decimal('24'),
+  durationDays: 10,
   currency: 'USDT',
   rewardRateMode: 'RANDOM_RANGE',
   fixedRewardRate: null,
@@ -110,8 +136,8 @@ const planItem = {
   rewardRateMeaning: 'USER_NET_AFTER_SPLIT',
   capBasis: 'TOTAL_RETURN',
   capMultiplier: new Prisma.Decimal('2'),
-  principalTreatment: 'INCLUDED_IN_TOTAL_RETURN',
-  goalDays: 90,
+  principalTreatment: 'RETURN_SEPARATELY',
+  goalDays: 10,
   cycleDays: 10,
   rewardStartMode: 'NEXT_CALENDAR_DAY',
   rewardFrequency: 'DAILY_CALENDAR',
@@ -167,6 +193,15 @@ describe('SubscriptionsService', () => {
         id: existingSubscription.id,
         sourceDepositId: DEPOSIT_ID,
         price: '5.00000000',
+        minimumInvestment: '5.00000000',
+        maximumInvestment: '24.00000000',
+        durationDays: 10,
+        principalTreatment: 'RETURN_SEPARATELY',
+        settlementTimezone: 'UTC',
+        earningAuthority: 'LEGACY_REWARD',
+        internalTradeSplitPolicyVersionId: null,
+        internalTradeUserSharePercent: null,
+        internalTradeAdminSharePercent: null,
       },
     });
     expect(transaction.deposit.findUnique).not.toHaveBeenCalled();
@@ -208,7 +243,29 @@ describe('SubscriptionsService', () => {
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 
-  it('creates one balanced funding transaction and subscription for an eligible deposit', async () => {
+  it('fails closed before financial writes when platform timezone is unavailable', async () => {
+    transaction.$queryRaw
+      .mockResolvedValueOnce([{ id: USER_ID }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: ACCOUNTING_TRANSACTION_ID,
+          sourceKey: `DEPOSIT:${DEPOSIT_ID}:CREDIT`,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
+    transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
+
+    await expect(
+      service.activateFromApprovedDeposit(DEPOSIT_ID, actor),
+    ).rejects.toThrow('Platform operations configuration is unavailable.');
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('creates balanced funding from the exact ranged investment and snapshots duration', async () => {
     const mainAccount = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       accountKey: `USER:${USER_ID}:MAIN:USDT`,
@@ -239,6 +296,7 @@ describe('SubscriptionsService', () => {
         },
       ])
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ platformTimezone: 'Asia/Kolkata' }])
       .mockResolvedValueOnce([
         {
           id: FUNDING_TRANSACTION_ID,
@@ -249,10 +307,17 @@ describe('SubscriptionsService', () => {
       .mockResolvedValueOnce([mainAccount])
       .mockResolvedValueOnce([principalAccount])
       .mockResolvedValueOnce([
-        { side: 'DEBIT', amount: new Prisma.Decimal('5') },
-        { side: 'CREDIT', amount: new Prisma.Decimal('5') },
+        { side: 'DEBIT', amount: new Prisma.Decimal('12.5') },
+        { side: 'CREDIT', amount: new Prisma.Decimal('12.5') },
       ])
-      .mockResolvedValueOnce([existingSubscription]);
+      .mockResolvedValueOnce([
+        {
+          id: INTERNAL_TRADE_POLICY_ID,
+          userSharePercent: new Prisma.Decimal('70'),
+          adminSharePercent: new Prisma.Decimal('30'),
+        },
+      ])
+      .mockResolvedValueOnce([createdSubscription]);
     transaction.deposit.findUnique.mockResolvedValue(approvedDeposit);
     transaction.packagePlanItem.findUnique.mockResolvedValue(planItem);
     transaction.auditLog.create.mockImplementation((input: AuditCreateCall) => {
@@ -274,8 +339,17 @@ describe('SubscriptionsService', () => {
       subscription: {
         sourceDepositId: DEPOSIT_ID,
         packageCode: 'NEURAL_SCOUT',
-        price: '5.00000000',
+        price: '12.50000000',
+        minimumInvestment: '5.00000000',
+        maximumInvestment: '24.00000000',
+        durationDays: 10,
+        principalTreatment: 'RETURN_SEPARATELY',
         currency: 'USDT',
+        settlementTimezone: 'Asia/Kolkata',
+        earningAuthority: 'INTERNAL_TRADING',
+        internalTradeSplitPolicyVersionId: INTERNAL_TRADE_POLICY_ID,
+        internalTradeUserSharePercent: '70.000000',
+        internalTradeAdminSharePercent: '30.000000',
         status: 'ACTIVE',
       },
     });
@@ -290,8 +364,12 @@ describe('SubscriptionsService', () => {
     expect(auditCall.data.entityType).toBe('UserPackageSubscription');
     expect(auditCall.data.metadata.balanced).toBe(true);
     expect(auditCall.data.metadata.depositId).toBe(DEPOSIT_ID);
-    expect(auditCall.data.metadata.amount).toBe('5.00000000');
+    expect(auditCall.data.metadata.amount).toBe('12.50000000');
     expect(auditCall.data.metadata.currency).toBe('USDT');
+    expect(auditCall.data.metadata.settlementTimezone).toBe('Asia/Kolkata');
+    expect(auditCall.data.metadata.timezoneSource).toBe(
+      'SYSTEM_OPERATIONS_CONFIG',
+    );
     expect(auditCall.data.metadata.referralCommissionApplied).toBe(false);
     expect(auditCall.data.metadata.rewardsApplied).toBe(false);
   });

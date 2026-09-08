@@ -1,11 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
+import { SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { RequestContext } from '../auth/auth.types';
-import { CommissionsService } from '../commissions/commissions.service';
-import { AccountingConfigService } from '../platform-config/accounting-config.service';
+import { OperationsConfigService } from '../platform-config/operations-config.service';
+import { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
-import type { ReviewDepositDto } from './dto/deposit.dto';
+import type {
+  BulkApproveDepositsDto,
+  ReviewDepositDto,
+} from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
 
 @Injectable()
@@ -14,10 +18,10 @@ export class DepositApprovalOrchestratorService {
 
   constructor(
     private readonly depositsService: DepositsService,
-    private readonly accountingConfigService: AccountingConfigService,
+    private readonly operationsConfigService: OperationsConfigService,
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
-    private readonly commissionsService: CommissionsService,
+    private readonly postActivationService: SubscriptionPostActivationService,
   ) {}
 
   async approveDeposit(
@@ -26,8 +30,13 @@ export class DepositApprovalOrchestratorService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ) {
+    this.assertSuperAdmin(actor);
+
+    const operations = await this.operationsConfigService.getOperations();
     const postingMode =
-      await this.accountingConfigService.getDepositPostingMode();
+      operations.operationsMode === 'AUTOMATIC'
+        ? 'AUTO_ON_APPROVAL'
+        : 'MANUAL_RECONCILIATION';
 
     const approval = await this.depositsService.approveDeposit(
       depositId,
@@ -36,14 +45,17 @@ export class DepositApprovalOrchestratorService {
       context,
     );
 
-    if (postingMode === 'MANUAL_RECONCILIATION') {
+    if (operations.operationsMode === 'CONTROLLED_MANUAL') {
       return {
         ...approval,
         message:
-          'Deposit approved. Accounting and package activation are waiting for reconciliation by policy.',
+          'Deposit approved. Downstream accounting and earnings automation are paused by Controlled Manual operations mode.',
+        operationsMode: operations.operationsMode,
+        platformTimezone: operations.platformTimezone,
         accountingPostingMode: postingMode,
         accountingPosted: false,
         packageActivated: false,
+        automaticDownstreamProcessing: false,
       };
     }
 
@@ -58,10 +70,10 @@ export class DepositApprovalOrchestratorService {
         context,
       );
     } catch (error) {
-      const reason =
-        error instanceof Error
-          ? error.message
-          : 'Deposit accounting requires reconciliation.';
+      const reason = this.errorMessage(
+        error,
+        'Deposit accounting requires reconciliation.',
+      );
       this.logger.warn(
         `Deposit ${depositId} was approved but accounting is pending: ${reason}`,
       );
@@ -69,62 +81,33 @@ export class DepositApprovalOrchestratorService {
       return {
         ...approval,
         message:
-          'Deposit approved. Accounting and package activation are pending reconciliation.',
+          'Deposit approved. Accounting and all downstream automation are pending reconciliation.',
+        operationsMode: operations.operationsMode,
+        platformTimezone: operations.platformTimezone,
         accountingPostingMode: postingMode,
         accountingPosted: false,
         accountingPendingReason: reason,
         packageActivated: false,
+        automaticDownstreamProcessing: true,
       };
     }
 
+    let activation: Awaited<
+      ReturnType<SubscriptionsService['activateAutomaticallyAfterAccounting']>
+    >;
+
     try {
-      const activation =
+      activation =
         await this.subscriptionsService.activateAutomaticallyAfterAccounting(
           depositId,
           actor,
           context,
         );
-
-      if (activation.activationMode !== 'AUTO') {
-        return {
-          ...approval,
-          message: activation.message,
-          accountingPostingMode: postingMode,
-          accountingPosted: true,
-          ledgerTransaction: accounting.transaction,
-          packageActivated: false,
-          packageActivationMode: activation.activationMode,
-          packageActivationTrigger: activation.activationTrigger,
-          packageActivationRequired: activation.activationRequired,
-        };
-      }
-
-      const referralCommission =
-        await this.commissionsService.processSubscriptionSafely(
-          activation.subscription.id,
-          actor,
-          context,
-        );
-
-      return {
-        ...approval,
-        message:
-          'Deposit approved, accounted, and package activation completed.',
-        accountingPostingMode: postingMode,
-        accountingPosted: true,
-        ledgerTransaction: accounting.transaction,
-        packageActivated: true,
-        packageActivationMode: activation.activationMode,
-        packageActivationTrigger: activation.activationTrigger,
-        packageActivationRequired: activation.activationRequired,
-        subscription: activation.subscription,
-        referralCommission,
-      };
     } catch (error) {
-      const reason =
-        error instanceof Error
-          ? error.message
-          : 'Package activation requires reconciliation.';
+      const reason = this.errorMessage(
+        error,
+        'Package activation requires reconciliation.',
+      );
       this.logger.warn(
         `Deposit ${depositId} was approved/accounted but package activation is pending: ${reason}`,
       );
@@ -133,12 +116,120 @@ export class DepositApprovalOrchestratorService {
         ...approval,
         message:
           'Deposit approved and accounted. Package activation is pending reconciliation.',
+        operationsMode: operations.operationsMode,
+        platformTimezone: operations.platformTimezone,
         accountingPostingMode: postingMode,
         accountingPosted: true,
         ledgerTransaction: accounting.transaction,
         packageActivated: false,
         packageActivationPendingReason: reason,
+        automaticDownstreamProcessing: true,
       };
     }
+
+    if (activation.activationMode !== 'AUTO') {
+      return {
+        ...approval,
+        message: activation.message,
+        operationsMode: operations.operationsMode,
+        platformTimezone: operations.platformTimezone,
+        accountingPostingMode: postingMode,
+        accountingPosted: true,
+        ledgerTransaction: accounting.transaction,
+        packageActivated: false,
+        packageActivationMode: activation.activationMode,
+        packageActivationTrigger: activation.activationTrigger,
+        packageActivationRequired: activation.activationRequired,
+        automaticDownstreamProcessing: true,
+      };
+    }
+
+    const subscription = activation.subscription;
+    const downstream = await this.postActivationService.process(
+      subscription.id,
+      actor,
+      context,
+    );
+
+    return {
+      ...approval,
+      message: downstream.downstreamPending
+        ? 'Deposit approved, accounted, and package activated. One or more downstream earnings stages remain safely recoverable.'
+        : 'Deposit approved, accounted, package activated, and downstream earnings processing completed automatically.',
+      operationsMode: operations.operationsMode,
+      platformTimezone: operations.platformTimezone,
+      accountingPostingMode: postingMode,
+      accountingPosted: true,
+      ledgerTransaction: accounting.transaction,
+      packageActivated: true,
+      packageActivationMode: activation.activationMode,
+      packageActivationTrigger: activation.activationTrigger,
+      packageActivationRequired: activation.activationRequired,
+      subscription,
+      ...downstream,
+      automaticDownstreamProcessing: true,
+    };
+  }
+
+  async approveDepositsBulk(
+    dto: BulkApproveDepositsDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    this.assertSuperAdmin(actor);
+
+    const results: Array<{
+      depositId: string;
+      ok: boolean;
+      message: string;
+      status?: string;
+      accountingPosted?: boolean;
+      packageActivated?: boolean;
+    }> = [];
+
+    for (const depositId of dto.depositIds) {
+      try {
+        const result = await this.approveDeposit(
+          depositId,
+          { note: dto.note },
+          actor,
+          context,
+        );
+        results.push({
+          depositId,
+          ok: true,
+          message: result.message,
+          status: result.deposit.status,
+          accountingPosted: result.accountingPosted,
+          packageActivated: result.packageActivated,
+        });
+      } catch (error) {
+        results.push({
+          depositId,
+          ok: false,
+          message: this.errorMessage(error, 'Deposit approval failed.'),
+        });
+      }
+    }
+
+    const approved = results.filter((result) => result.ok).length;
+    const failed = results.length - approved;
+
+    return {
+      message: `Bulk deposit approval completed: ${approved} approved, ${failed} failed.`,
+      approved,
+      failed,
+      results,
+    };
+  }
+
+  private assertSuperAdmin(actor: AuthenticatedUser): void {
+    if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
+      throw new ForbiddenException('Only SUPER_ADMIN may approve deposits.');
+    }
+  }
+
+  private errorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
   }
 }

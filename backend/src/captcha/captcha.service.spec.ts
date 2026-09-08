@@ -72,6 +72,8 @@ describe('CaptchaService', () => {
         return 0;
       },
     ),
+
+    del: jest.fn((key: string): number => (store.delete(key) ? 1 : 0)),
   };
 
   const redisService = {
@@ -342,6 +344,53 @@ describe('CaptchaService', () => {
 
     await expect(
       service.verifyIfEnabled(CaptchaPurpose.LOGIN, 'invalid id', 'abc'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('still creates a challenge when Redis storage is interrupted', async () => {
+    redisClient.set.mockRejectedValueOnce(new Error('Redis unavailable'));
+
+    await expect(
+      service.createChallenge(CaptchaPurpose.REGISTRATION),
+    ).resolves.toMatchObject({
+      enabled: true,
+      purpose: CaptchaPurpose.REGISTRATION,
+      expiresIn: 180,
+    });
+
+    expect(store.size).toBe(0);
+  });
+
+  it('falls back to local one-time verification when Redis drops mid-challenge', async () => {
+    const challenge = await service.createChallenge(CaptchaPurpose.LOGIN);
+
+    if (!challenge.enabled) {
+      throw new Error('Expected CAPTCHA to be enabled.');
+    }
+
+    const stored = getStoredChallenge();
+    const answer = solveAnswer(
+      CaptchaPurpose.LOGIN,
+      challenge.challengeId,
+      stored.digest,
+    );
+
+    redisClient.eval.mockRejectedValueOnce(new Error('Redis unavailable'));
+
+    await expect(
+      service.verifyIfEnabled(
+        CaptchaPurpose.LOGIN,
+        challenge.challengeId,
+        answer,
+      ),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      service.verifyIfEnabled(
+        CaptchaPurpose.LOGIN,
+        challenge.challengeId,
+        answer,
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

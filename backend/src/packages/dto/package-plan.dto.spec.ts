@@ -3,6 +3,7 @@ import { validate } from 'class-validator';
 import {
   CreatePackagePlanItemDto,
   PublishPackagePlanDto,
+  UpdatePackagePlanDto,
 } from './package-plan.dto';
 
 function validItemPayload() {
@@ -54,6 +55,20 @@ describe('Package plan DTOs', () => {
 
     expect(properties).toEqual(
       expect.arrayContaining(['price', 'minimumRewardRate']),
+    );
+  });
+
+  it('rejects package-plan timezone changes because Platform Operations owns timezone', async () => {
+    const dto = plainToInstance(UpdatePackagePlanDto, {
+      expectedRevision: 2,
+      reason: 'Attempt a duplicate timezone override.',
+      settlementTimezone: 'UTC',
+    });
+
+    const errors = await validate(dto);
+
+    expect(errors.map((error) => error.property)).toContain(
+      'settlementTimezone',
     );
   });
 

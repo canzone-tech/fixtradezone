@@ -5,6 +5,7 @@ export const PERMISSIONS = {
   USERS_STATUS_MANAGE: 'users.status.manage',
   USERS_ROLES_MANAGE: 'users.roles.manage',
   USERS_IMPERSONATE: 'users.impersonate',
+  REFERRALS_READ: 'referrals.read',
   REFERRALS_SPONSOR_MANAGE: 'referrals.sponsor.manage',
   PACKAGES_READ: 'packages.read',
   PACKAGES_DRAFT_MANAGE: 'packages.draft.manage',
@@ -20,6 +21,22 @@ export const PERMISSIONS = {
   COMMISSIONS_READ: 'commissions.read',
   COMMISSIONS_PLAN_MANAGE: 'commissions.plan.manage',
   COMMISSIONS_RECONCILE: 'commissions.reconcile',
+  REWARDS_READ: 'rewards.read',
+  REWARDS_RECONCILE: 'rewards.reconcile',
+  SIMULATED_ACTIVITY_READ: 'simulated_activity.read',
+  SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
+  INTERNAL_TRADING_READ: 'internal_trading.read',
+  INTERNAL_TRADING_RECONCILE: 'internal_trading.reconcile',
+  PAYOUTS_READ: 'payouts.read',
+  PAYOUTS_REVIEW: 'payouts.review',
+  PAYOUTS_POLICY_MANAGE: 'payouts.policy.manage',
+  NOTIFICATIONS_READ: 'notifications.read',
+  NOTIFICATIONS_MANAGE: 'notifications.manage',
+  REPORTS_READ: 'reports.read',
+  AUDIT_LOGS_READ: 'audit_logs.read',
+  CONTENT_READ: 'content.read',
+  CONTENT_MANAGE: 'content.manage',
+  CONTENT_PUBLISH: 'content.publish',
   RBAC_READ: 'rbac.read',
   RBAC_MANAGE: 'rbac.manage',
 } as const;
@@ -27,7 +44,7 @@ export const PERMISSIONS = {
 export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.DASHBOARD_READ,
-    description: 'View administration dashboard and market data',
+    description: 'View administration dashboard and operational data',
   },
   {
     code: PERMISSIONS.USERS_READ,
@@ -48,6 +65,10 @@ export const SYSTEM_PERMISSIONS = [
   {
     code: PERMISSIONS.USERS_IMPERSONATE,
     description: 'Temporarily access an eligible user account for support',
+  },
+  {
+    code: PERMISSIONS.REFERRALS_READ,
+    description: 'View referral genealogy and network hierarchy',
   },
   {
     code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
@@ -112,6 +133,76 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.COMMISSIONS_RECONCILE,
     description:
       'Reconcile package subscriptions into referral commission events',
+  },
+  {
+    code: PERMISSIONS.REWARDS_READ,
+    description:
+      'View package reward events, cap state and package lifecycle progress',
+  },
+  {
+    code: PERMISSIONS.REWARDS_RECONCILE,
+    description:
+      'Reconcile due package rewards through the authoritative reward engine',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_READ,
+    description:
+      'View simulated trade activity policies, events and generator health',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE,
+    description:
+      'Run idempotent simulated activity reconciliation for eligible subscriptions',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_READ,
+    description: 'View internal trading policies, events and lifecycle state',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_RECONCILE,
+    description:
+      'Reconcile internal trading lifecycle for eligible package subscriptions',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_READ,
+    description: 'View payout policies, requests and payout operational state',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_REVIEW,
+    description: 'Approve, reject, submit and complete payout requests',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_POLICY_MANAGE,
+    description: 'Create, edit and publish versioned payout policies',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_READ,
+    description: 'View administration notification delivery and read state',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_MANAGE,
+    description: 'Create targeted or broadcast in-app user notifications',
+  },
+  {
+    code: PERMISSIONS.REPORTS_READ,
+    description:
+      'View read-only administration operational and financial reports',
+  },
+  {
+    code: PERMISSIONS.AUDIT_LOGS_READ,
+    description: 'View immutable administration audit logs',
+  },
+  {
+    code: PERMISSIONS.CONTENT_READ,
+    description: 'View administration content and template revisions',
+  },
+  {
+    code: PERMISSIONS.CONTENT_MANAGE,
+    description: 'Create versioned landing and email-template drafts',
+  },
+  {
+    code: PERMISSIONS.CONTENT_PUBLISH,
+    description: 'Publish approved landing and email-template revisions',
   },
   {
     code: PERMISSIONS.RBAC_READ,

@@ -44,7 +44,6 @@ export default function UserTopbar({
     .toUpperCase();
 
   const impersonated = session !== null && isImpersonationSession(session);
-
   const idleMinutes = session?.sessionPolicy.idleLockMinutes;
 
   const heading = pathname.startsWith("/user/packages")
@@ -52,26 +51,71 @@ export default function UserTopbar({
         title: "Packages",
         subtitle: "Published USDT plans and exact commercial terms",
       }
-    : pathname.startsWith("/user/referrals")
+    : pathname.startsWith("/user/deposits")
       ? {
-          title: "My Referrals",
-          subtitle: "Referral identity and direct network",
+          title: "Deposits",
+          subtitle: "Package funding requests and payment history",
         }
-      : pathname === "/user/profile"
+      : pathname.startsWith("/user/wallet")
         ? {
-            title: "My Profile",
-            subtitle: "Account identity, security and session",
+            title: "My Wallet",
+            subtitle: "Ledger-backed balances and immutable activity",
           }
-        : {
-            title: "User Dashboard",
-            subtitle: "Overview of your FixTradeZone account",
-          };
+        : pathname.startsWith("/user/commissions")
+          ? {
+              title: "Referral Commissions",
+              subtitle: "Ledger-backed balances and immutable commission history",
+            }
+          : pathname.startsWith("/user/rewards")
+            ? {
+                title: "Rewards & Caps",
+                subtitle: "Package reward lifecycle, cap progress and settlement history",
+              }
+            : pathname.startsWith("/user/payouts")
+              ? {
+                  title: "Payouts",
+                  subtitle: "Withdrawal requests, fees and settlement history",
+                }
+              : pathname.startsWith("/user/referrals")
+                ? {
+                    title: "My Referrals",
+                    subtitle: "Referral identity and direct network",
+                  }
+                : pathname.startsWith("/user/notifications")
+                  ? {
+                      title: "Notifications",
+                      subtitle: "Account, finance, security and platform updates",
+                    }
+                  : pathname.startsWith("/user/trading")
+                    ? {
+                        title: "Trading",
+                        subtitle:
+                          "Package trading progress, earnings and trade history",
+                      }
+                    : pathname.startsWith("/user/trade-activity")
+                      ? {
+                          title: "Daily Trades",
+                          subtitle:
+                            "System-generated daily trade activity for active package subscriptions",
+                        }
+                      : pathname.startsWith("/user/simulated-activity")
+                        ? {
+                            title: "Daily Trades",
+                            subtitle:
+                              "System-generated daily trade activity for active package subscriptions",
+                          }
+                        : pathname === "/user/profile"
+                          ? {
+                              title: "My Profile",
+                              subtitle: "Account identity, security and session",
+                            }
+                          : {
+                              title: "User Dashboard",
+                              subtitle: "Overview of your FixTradeZone account",
+                            };
 
   async function logout() {
-    if (loggingOut) {
-      return;
-    }
-
+    if (loggingOut) return;
     setLoggingOut(true);
 
     try {
@@ -153,21 +197,30 @@ export default function UserTopbar({
                 title="Return to Admin"
               >
                 <i className="iconoir-log-out" />
-
                 <span>{returning ? "Returning..." : "Return to Admin"}</span>
               </button>
             ) : (
-              <button
-                type="button"
-                className="ftz-signout-button"
-                disabled={loggingOut}
-                onClick={() => void logout()}
-                title="Sign out"
-              >
-                <i className="iconoir-log-out" />
-
-                <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="ftz-signout-button"
+                  onClick={() => router.push("/change-password")}
+                  title="Change password"
+                >
+                  <i className="iconoir-key" />
+                  <span>Change Password</span>
+                </button>
+                <button
+                  type="button"
+                  className="ftz-signout-button"
+                  disabled={loggingOut}
+                  onClick={() => void logout()}
+                  title="Sign out"
+                >
+                  <i className="iconoir-log-out" />
+                  <span>{loggingOut ? "Signing out..." : "Sign Out"}</span>
+                </button>
+              </>
             )}
           </>
         ) : (

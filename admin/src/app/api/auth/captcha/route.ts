@@ -1,9 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCrossSiteRequest } from "@/lib/auth";
-import { backendFetch, getApiErrorMessage, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  getApiErrorMessage,
+  readJson,
+} from "@/lib/backend";
 
 interface CaptchaRequestBody {
   purpose?: unknown;
+}
+
+const CAPTCHA_BACKEND_ATTEMPTS = 3;
+const CAPTCHA_BACKEND_TIMEOUT_MS = 2_500;
+const CAPTCHA_BACKEND_RETRY_DELAY_MS = 200;
+
+async function wait(milliseconds: number): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function fetchCaptchaChallenge(
+  purpose: "LOGIN" | "REGISTRATION",
+  headers: HeadersInit,
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= CAPTCHA_BACKEND_ATTEMPTS; attempt += 1) {
+    try {
+      return await backendFetch("/auth/captcha", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ purpose }),
+        signal: AbortSignal.timeout(CAPTCHA_BACKEND_TIMEOUT_MS),
+      });
+    } catch (caught: unknown) {
+      lastError = caught;
+
+      if (attempt < CAPTCHA_BACKEND_ATTEMPTS) {
+        await wait(CAPTCHA_BACKEND_RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("CAPTCHA backend request failed.");
 }
 
 export async function POST(request: NextRequest) {
@@ -33,16 +74,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const backendResponse = await backendFetch("/auth/captcha", {
-      method: "POST",
-      headers: {
+    const backendResponse = await fetchCaptchaChallenge(
+      body.purpose,
+      forwardedBackendHeaders(request, {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        purpose: body.purpose,
       }),
-    });
-
+    );
     const payload = await readJson(backendResponse);
 
     if (!backendResponse.ok) {

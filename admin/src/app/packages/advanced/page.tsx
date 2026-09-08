@@ -1,0 +1,26 @@
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import AdminShell from "@/components/admin/admin-shell";
+import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
+import PackagesReviewClient from "../packages-review-client";
+
+export const metadata: Metadata = {
+  title: "Advanced Package Controls",
+};
+
+export default async function AdvancedPackagesPage() {
+  const cookieStore = await cookies();
+  const hasSession =
+    cookieStore.has(ACCESS_COOKIE) || cookieStore.has(REFRESH_COOKIE);
+
+  if (!hasSession) {
+    redirect("/login");
+  }
+
+  return (
+    <AdminShell>
+      <PackagesReviewClient />
+    </AdminShell>
+  );
+}

@@ -21,6 +21,9 @@ export interface ItemTerms {
   sortOrder: number;
   availability: PlanItemWithDefinition['availability'];
   price: string;
+  minimumInvestment: string | null;
+  maximumInvestment: string | null;
+  durationDays: number | null;
   currency: string;
   rewardRateMode: PlanItemWithDefinition['rewardRateMode'];
   fixedRewardRate: string | null;

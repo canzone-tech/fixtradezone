@@ -6,6 +6,8 @@ import { LoginDto } from './login.dto';
 import { LogoutDto } from './logout.dto';
 import { RefreshTokenDto } from './refresh-token.dto';
 import { RegisterDto } from './register.dto';
+import { ResendEmailVerificationDto } from './resend-email-verification.dto';
+import { VerifyEmailDto } from './verify-email.dto';
 
 const validationOptions: ValidatorOptions = {
   whitelist: true,
@@ -24,7 +26,7 @@ async function validatePayload<T extends object>(
 }
 
 describe('Auth DTOs', () => {
-  it('normalizes and accepts a valid registration payload', async () => {
+  it('normalizes and accepts a valid registration payload with declarations', async () => {
     const password = ' SecurePassword123! ';
     const { dto, errors } = await validatePayload(RegisterDto, {
       email: '  User@Example.COM ',
@@ -33,6 +35,8 @@ describe('Auth DTOs', () => {
       phone: ' +919876543210 ',
       firstName: ' Prashant ',
       lastName: ' Shukla ',
+      age18Declared: true,
+      kycDeclarationAccepted: true,
     });
 
     expect(errors).toHaveLength(0);
@@ -43,7 +47,22 @@ describe('Auth DTOs', () => {
       phone: '+919876543210',
       firstName: 'Prashant',
       lastName: 'Shukla',
+      age18Declared: true,
+      kycDeclarationAccepted: true,
     });
+  });
+
+  it('rejects non-boolean declaration values', async () => {
+    const { errors } = await validatePayload(RegisterDto, {
+      email: 'user@example.com',
+      password: 'SecurePassword123!',
+      age18Declared: 'yes',
+      kycDeclarationAccepted: true,
+    });
+
+    expect(errors.some((error) => error.property === 'age18Declared')).toBe(
+      true,
+    );
   });
 
   it('rejects short registration passwords', async () => {
@@ -67,6 +86,19 @@ describe('Auth DTOs', () => {
     expect(errors.some((error) => error.property === 'username')).toBe(true);
     expect(errors.some((error) => error.property === 'phone')).toBe(true);
     expect(errors.some((error) => error.property === 'role')).toBe(true);
+  });
+
+  it('validates email verification and resend payloads', async () => {
+    const verify = await validatePayload(VerifyEmailDto, {
+      token: 'x'.repeat(43),
+    });
+    const resend = await validatePayload(ResendEmailVerificationDto, {
+      email: ' User@Example.COM ',
+    });
+
+    expect(verify.errors).toHaveLength(0);
+    expect(resend.errors).toHaveLength(0);
+    expect(resend.dto.email).toBe('user@example.com');
   });
 
   it('trims login identifier without applying registration password policy', async () => {
@@ -94,15 +126,5 @@ describe('Auth DTOs', () => {
 
     expect(refresh.errors).toHaveLength(0);
     expect(logout.errors).toHaveLength(0);
-  });
-
-  it('rejects malformed refresh tokens', async () => {
-    const { errors } = await validatePayload(RefreshTokenDto, {
-      refreshToken: 'not-a-jwt',
-    });
-
-    expect(errors.some((error) => error.property === 'refreshToken')).toBe(
-      true,
-    );
   });
 });

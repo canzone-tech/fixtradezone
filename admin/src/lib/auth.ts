@@ -13,7 +13,7 @@ export interface AdminUser {
   phone: string | null;
   firstName: string | null;
   lastName: string | null;
-  status: "ACTIVE" | "SUSPENDED" | "BLOCKED" | "PENDING";
+  status: "ACTIVE" | "SUSPENDED" | "BLOCKED" | "PENDING" | "RESTRICTED";
   createdAt: string;
   lastLoginAt: string | null;
   roles: string[];
@@ -57,7 +57,7 @@ export function isAdminUser(payload: unknown): payload is AdminUser {
     (candidate.firstName === null || typeof candidate.firstName === "string") &&
     (candidate.lastName === null || typeof candidate.lastName === "string") &&
     typeof candidate.status === "string" &&
-    ["ACTIVE", "SUSPENDED", "BLOCKED", "PENDING"].includes(
+    ["ACTIVE", "SUSPENDED", "BLOCKED", "PENDING", "RESTRICTED"].includes(
       candidate.status,
     ) &&
     typeof candidate.createdAt === "string" &&
@@ -66,9 +66,7 @@ export function isAdminUser(payload: unknown): payload is AdminUser {
     Array.isArray(candidate.roles) &&
     candidate.roles.every((role) => typeof role === "string") &&
     Array.isArray(candidate.permissions) &&
-    candidate.permissions.every(
-      (permission) => typeof permission === "string",
-    )
+    candidate.permissions.every((permission) => typeof permission === "string")
   );
 }
 
@@ -141,9 +139,7 @@ export function isStandardUser(user: AdminUser): boolean {
   );
 }
 
-export function getPortalRedirect(
-  user: AdminUser,
-): PortalRedirectPath | null {
+export function getPortalRedirect(user: AdminUser): PortalRedirectPath | null {
   if (isAdministrator(user)) {
     return "/dashboard";
   }

@@ -9,7 +9,11 @@ import {
   REFRESH_COOKIE,
   setAuthCookies,
 } from "@/lib/auth";
-import { backendFetch, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  readJson,
+} from "@/lib/backend";
 
 async function mirrorBackendResponse(
   backendResponse: Response,
@@ -72,12 +76,10 @@ export async function proxyAdminRequest(
   }
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
-
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
 
   const invoke = (token: string) => {
-    const headers = new Headers(init.headers);
-
+    const headers = forwardedBackendHeaders(request, init.headers);
     headers.set("Authorization", `Bearer ${token}`);
 
     return backendFetch(path, {
@@ -101,12 +103,10 @@ export async function proxyAdminRequest(
 
     const refreshResponse = await backendFetch("/auth/refresh", {
       method: "POST",
-      headers: {
+      headers: forwardedBackendHeaders(request, {
         "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        refreshToken,
       }),
+      body: JSON.stringify({ refreshToken }),
     });
 
     const refreshPayload = await readJson(refreshResponse);
@@ -120,19 +120,16 @@ export async function proxyAdminRequest(
     if (!isAdministrator(auth.user)) {
       await backendFetch("/auth/logout", {
         method: "POST",
-        headers: {
+        headers: forwardedBackendHeaders(request, {
           "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          refreshToken: auth.refreshToken,
         }),
+        body: JSON.stringify({ refreshToken: auth.refreshToken }),
       }).catch(() => undefined);
 
       return rejectSession(403);
     }
 
     const backendResponse = await invoke(auth.accessToken);
-
     const response = await mirrorBackendResponse(backendResponse);
 
     if (backendResponse.status === 401) {
@@ -141,19 +138,11 @@ export async function proxyAdminRequest(
     }
 
     setAuthCookies(response, auth);
-
     return response;
   } catch {
     return NextResponse.json(
-      {
-        message: "Admin API is temporarily unavailable.",
-      },
-      {
-        status: 503,
-        headers: {
-          "Cache-Control": "no-store",
-        },
-      },
+      { message: "Admin API is temporarily unavailable." },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

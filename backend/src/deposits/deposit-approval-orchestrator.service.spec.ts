@@ -1,6 +1,7 @@
+import { ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
-import type { CommissionsService } from '../commissions/commissions.service';
-import type { AccountingConfigService } from '../platform-config/accounting-config.service';
+import type { OperationsConfigService } from '../platform-config/operations-config.service';
+import type { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
@@ -22,12 +23,21 @@ const actor: AuthenticatedUser = {
   permissions: [],
 };
 
+const adminActor: AuthenticatedUser = {
+  ...actor,
+  id: '33333333-3333-4333-8333-333333333333',
+  email: 'reviewer@example.com',
+  username: 'reviewer',
+  roles: ['ADMIN'],
+  permissions: ['deposits.review'],
+};
+
 describe('DepositApprovalOrchestratorService', () => {
   const depositsService = {
     approveDeposit: jest.fn(),
   };
-  const accountingConfigService = {
-    getDepositPostingMode: jest.fn(),
+  const operationsConfigService = {
+    getOperations: jest.fn(),
   };
   const walletLedgerService = {
     reconcileApprovedDeposit: jest.fn(),
@@ -35,14 +45,19 @@ describe('DepositApprovalOrchestratorService', () => {
   const subscriptionsService = {
     activateAutomaticallyAfterAccounting: jest.fn(),
   };
-  const commissionsService = {
-    processSubscriptionSafely: jest.fn(),
+  const postActivationService = {
+    process: jest.fn(),
   };
 
   let service: DepositApprovalOrchestratorService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    operationsConfigService.getOperations.mockResolvedValue({
+      platformTimezone: 'Asia/Kolkata',
+      operationsMode: 'AUTOMATIC',
+      updatedAt: null,
+    });
     depositsService.approveDeposit.mockResolvedValue({
       message: 'Deposit approved.',
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
@@ -63,27 +78,49 @@ describe('DepositApprovalOrchestratorService', () => {
         subscription: { id: 'subscription-id', status: 'ACTIVE' },
       },
     );
-    commissionsService.processSubscriptionSafely.mockResolvedValue({
-      processingStatus: 'PROCESSED',
-      created: true,
-      run: { id: 'commission-run-id', outcome: 'PROCESSED' },
-      events: [],
+    postActivationService.process.mockResolvedValue({
+      referralCommission: {
+        processingStatus: 'PROCESSED',
+        created: true,
+        run: { id: 'commission-run-id', outcome: 'PROCESSED' },
+        events: [],
+      },
+      referralCommissionPendingReason: null,
+      rewardLifecycle: {
+        initialized: true,
+        noEffectivePolicy: false,
+        events: [],
+        state: { subscriptionId: 'subscription-id', status: 'ACTIVE' },
+        catchupLimitReached: false,
+        message: 'No package reward is due yet.',
+      },
+      rewardLifecyclePendingReason: null,
+      downstreamPending: false,
     });
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
-      accountingConfigService as unknown as AccountingConfigService,
+      operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
-      commissionsService as unknown as CommissionsService,
+      postActivationService as unknown as SubscriptionPostActivationService,
     );
   });
 
-  it('automatically posts accounting, activates the package, and processes commission in AUTO mode', async () => {
-    accountingConfigService.getDepositPostingMode.mockResolvedValue(
-      'AUTO_ON_APPROVAL',
-    );
+  it('blocks ADMIN final approval before reading operations policy', async () => {
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'ADMIN must not approve' },
+        adminActor,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
 
+    expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
+    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
+  });
+
+  it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {
     const result = await service.approveDeposit(
       DEPOSIT_ID,
       { note: 'verified' },
@@ -99,12 +136,14 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).toHaveBeenCalledWith(DEPOSIT_ID, actor, {});
-    expect(commissionsService.processSubscriptionSafely).toHaveBeenCalledWith(
+    expect(postActivationService.process).toHaveBeenCalledWith(
       'subscription-id',
       actor,
       {},
     );
     expect(result).toMatchObject({
+      operationsMode: 'AUTOMATIC',
+      platformTimezone: 'Asia/Kolkata',
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: true,
       packageActivated: true,
@@ -116,13 +155,21 @@ describe('DepositApprovalOrchestratorService', () => {
         processingStatus: 'PROCESSED',
         run: { id: 'commission-run-id', outcome: 'PROCESSED' },
       },
+      rewardLifecycle: {
+        initialized: true,
+        noEffectivePolicy: false,
+        state: { subscriptionId: 'subscription-id', status: 'ACTIVE' },
+      },
+      automaticDownstreamProcessing: true,
     });
   });
 
-  it('keeps approved deposits pending accounting and activation in MANUAL mode', async () => {
-    accountingConfigService.getDepositPostingMode.mockResolvedValue(
-      'MANUAL_RECONCILIATION',
-    );
+  it('keeps approved deposits waiting for recovery actions in CONTROLLED_MANUAL mode', async () => {
+    operationsConfigService.getOperations.mockResolvedValue({
+      platformTimezone: 'Asia/Kolkata',
+      operationsMode: 'CONTROLLED_MANUAL',
+      updatedAt: null,
+    });
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
@@ -135,18 +182,17 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
+      operationsMode: 'CONTROLLED_MANUAL',
       accountingPostingMode: 'MANUAL_RECONCILIATION',
       accountingPosted: false,
       packageActivated: false,
+      automaticDownstreamProcessing: false,
     });
   });
 
   it('keeps approval successful when accounting needs reconciliation', async () => {
-    accountingConfigService.getDepositPostingMode.mockResolvedValue(
-      'AUTO_ON_APPROVAL',
-    );
     walletLedgerService.reconcileApprovedDeposit.mockRejectedValue(
       new Error('ledger unavailable'),
     );
@@ -164,7 +210,7 @@ describe('DepositApprovalOrchestratorService', () => {
     expect(
       subscriptionsService.activateAutomaticallyAfterAccounting,
     ).not.toHaveBeenCalled();
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: false,
@@ -175,9 +221,6 @@ describe('DepositApprovalOrchestratorService', () => {
   });
 
   it('keeps approval/accounting successful when package activation needs reconciliation', async () => {
-    accountingConfigService.getDepositPostingMode.mockResolvedValue(
-      'AUTO_ON_APPROVAL',
-    );
     subscriptionsService.activateAutomaticallyAfterAccounting.mockRejectedValue(
       new Error('This plan allows only one active package for the USER.'),
     );
@@ -188,12 +231,72 @@ describe('DepositApprovalOrchestratorService', () => {
       actor,
     );
 
-    expect(commissionsService.processSubscriptionSafely).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       accountingPosted: true,
       packageActivated: false,
       packageActivationPendingReason:
         'This plan allows only one active package for the USER.',
+    });
+  });
+
+  it('bulk approval isolates one failed deposit instead of rolling back successful items', async () => {
+    const secondDepositId = '44444444-4444-4444-8444-444444444444';
+    depositsService.approveDeposit
+      .mockResolvedValueOnce({
+        message: 'Deposit approved.',
+        deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+      })
+      .mockRejectedValueOnce(new Error('Deposit is not ready for approval.'));
+
+    const result = await service.approveDepositsBulk(
+      {
+        depositIds: [DEPOSIT_ID, secondDepositId],
+        note: 'Founder bulk final approval',
+      },
+      actor,
+    );
+
+    expect(result).toMatchObject({
+      approved: 1,
+      failed: 1,
+      results: [
+        { depositId: DEPOSIT_ID, ok: true },
+        {
+          depositId: secondDepositId,
+          ok: false,
+          message: 'Deposit is not ready for approval.',
+        },
+      ],
+    });
+  });
+
+  it('never misreports a successful activation when a downstream stage needs reconciliation', async () => {
+    postActivationService.process.mockResolvedValue({
+      referralCommission: {
+        processingStatus: 'PENDING_RECONCILIATION',
+        message: 'Commission plan requires reconciliation.',
+      },
+      referralCommissionPendingReason:
+        'Commission plan requires reconciliation.',
+      rewardLifecycle: null,
+      rewardLifecyclePendingReason: 'Reward state temporarily unavailable',
+      downstreamPending: true,
+    });
+
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'verified' },
+      actor,
+    );
+
+    expect(result).toMatchObject({
+      accountingPosted: true,
+      packageActivated: true,
+      subscription: { id: 'subscription-id', status: 'ACTIVE' },
+      referralCommissionPendingReason:
+        'Commission plan requires reconciliation.',
+      rewardLifecyclePendingReason: 'Reward state temporarily unavailable',
     });
   });
 });
