@@ -151,7 +151,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               }`}
               onClick={close}
             >
-              <i className="iconoir-history" />
+              <i className="iconoir-clock-rotate-right" />
               <span>Subscriptions</span>
             </Link>
 
