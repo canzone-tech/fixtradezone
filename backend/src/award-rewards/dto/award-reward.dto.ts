@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsISO8601,
   IsOptional,
@@ -46,7 +47,7 @@ export class AdminAwardRewardTrackQueryDto extends AwardRewardPageQueryDto {
   userId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(AWARD_USER_TRACK_STATUSES)
   status?: AwardUserTrackStatus;
 }
 
@@ -155,10 +156,4 @@ export class ReconcileAwardRewardDto {
   @IsOptional()
   @IsUUID()
   userId?: string;
-}
-
-export function isAwardUserTrackStatus(
-  value: string,
-): value is AwardUserTrackStatus {
-  return (AWARD_USER_TRACK_STATUSES as readonly string[]).includes(value);
 }
