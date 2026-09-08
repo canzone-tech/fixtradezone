@@ -11,6 +11,7 @@ import type {
   ReviewDepositDto,
 } from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
+import { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
 @Injectable()
 export class DepositApprovalOrchestratorService {
@@ -18,6 +19,7 @@ export class DepositApprovalOrchestratorService {
 
   constructor(
     private readonly depositsService: DepositsService,
+    private readonly directDepositApprovalService: DirectDepositApprovalService,
     private readonly operationsConfigService: OperationsConfigService,
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
@@ -32,18 +34,27 @@ export class DepositApprovalOrchestratorService {
   ) {
     this.assertSuperAdmin(actor);
 
+    const current = await this.depositsService.getDeposit(depositId);
     const operations = await this.operationsConfigService.getOperations();
     const postingMode =
       operations.operationsMode === 'AUTOMATIC'
         ? 'AUTO_ON_APPROVAL'
         : 'MANUAL_RECONCILIATION';
 
-    const approval = await this.depositsService.approveDeposit(
-      depositId,
-      dto,
-      actor,
-      context,
-    );
+    const approval =
+      current.deposit.status === 'PENDING_REVIEW'
+        ? await this.directDepositApprovalService.approvePendingDeposit(
+            depositId,
+            dto,
+            actor,
+            context,
+          )
+        : await this.depositsService.approveDeposit(
+            depositId,
+            dto,
+            actor,
+            context,
+          );
 
     if (operations.operationsMode === 'CONTROLLED_MANUAL') {
       return {
