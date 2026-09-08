@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
+import CommissionExpansionClient from "./commission-expansion-client";
 import CommissionsClient from "./commissions-client";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default async function CommissionsPage() {
   return (
     <AdminShell>
       <CommissionsClient />
+      <CommissionExpansionClient />
     </AdminShell>
   );
 }
