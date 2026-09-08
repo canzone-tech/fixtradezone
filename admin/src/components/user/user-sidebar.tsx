@@ -145,6 +145,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             </Link>
 
             <Link
+              href="/user/subscriptions"
+              className={`ftz-nav-link ${
+                isActive("/user/subscriptions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-history" />
+              <span>Subscriptions</span>
+            </Link>
+
+            <Link
               href="/user/deposits"
               className={`ftz-nav-link ${
                 isActive("/user/deposits") ? "is-active" : ""
