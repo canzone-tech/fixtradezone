@@ -1,0 +1,327 @@
+/*
+ * FixTradeZone Universal UI
+ * Shared presentation authority for SUPER_ADMIN, ADMIN and USER workspaces.
+ * Page-level styles should describe unique layout only; controls, surfaces,
+ * typography and spacing belong here.
+ */
+
+:root {
+  --ftz-canvas: #020817;
+  --ftz-canvas-elevated: #040d20;
+  --ftz-surface: rgba(6, 18, 42, 0.94);
+  --ftz-surface-raised: rgba(8, 24, 54, 0.96);
+  --ftz-surface-soft: rgba(8, 28, 58, 0.72);
+  --ftz-border: rgba(67, 111, 176, 0.34);
+  --ftz-border-strong: rgba(28, 209, 216, 0.52);
+  --ftz-primary: #20e4dc;
+  --ftz-primary-2: #48a7ff;
+  --ftz-success: #24dfa4;
+  --ftz-warning: #ffb64c;
+  --ftz-danger: #ff6b7b;
+  --ftz-copy: #f4f8ff;
+  --ftz-copy-muted: #91a4c4;
+  --ftz-copy-faint: #7084a6;
+  --ftz-radius-control: 10px;
+  --ftz-radius-card: 16px;
+  --ftz-radius-hero: 18px;
+  --ftz-shadow-card: 0 18px 50px rgba(0, 0, 0, 0.16);
+  --ftz-page-gap: clamp(14px, 1.2vw, 20px);
+  --ftz-page-pad: clamp(14px, 1.5vw, 24px);
+}
+
+/* One canvas regardless of role. */
+.ftz-admin-app,
+.ftz-main,
+.ftz-page-frame {
+  background: var(--ftz-canvas);
+  color: var(--ftz-copy);
+}
+
+.ftz-page-frame {
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100vh - var(--ftz-topbar));
+  overflow-x: clip;
+}
+
+.ftz-page-frame > * {
+  width: 100%;
+  max-width: none !important;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+/* Shared page rhythm. Existing page modules can keep unique grids. */
+.ftz-page-frame > :not(.ftz-dashboard) {
+  padding-inline: var(--ftz-page-pad);
+}
+
+.ftz-page-frame > :not(.ftz-dashboard) > :first-child {
+  margin-top: var(--ftz-page-gap);
+}
+
+/* Commission Control is the visual baseline: restrained navy surfaces. */
+.ftz-page-frame :where(section, article, aside)[class*="card"],
+.ftz-page-frame :where(section, article, aside)[class*="Card"],
+.ftz-page-frame :where(section, article)[class*="panel"],
+.ftz-page-frame :where(section, article)[class*="Panel"],
+.ftz-page-frame :where(section)[class*="workspace"],
+.ftz-page-frame :where(section)[class*="Workspace"] {
+  border-color: var(--ftz-border) !important;
+  border-radius: var(--ftz-radius-card) !important;
+  box-shadow: none;
+}
+
+.ftz-page-frame :where(section, article)[class*="hero"],
+.ftz-page-frame :where(section, article)[class*="Hero"] {
+  border-color: var(--ftz-border) !important;
+  border-radius: var(--ftz-radius-hero) !important;
+}
+
+/* Universal form controls. */
+.ftz-page-frame :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 42px;
+  border: 1px solid var(--ftz-border) !important;
+  border-radius: var(--ftz-radius-control) !important;
+  outline: none;
+  color: var(--ftz-copy) !important;
+  background: rgba(3, 13, 34, 0.86) !important;
+  box-shadow: none !important;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.ftz-page-frame :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea):focus {
+  border-color: var(--ftz-border-strong) !important;
+  box-shadow: 0 0 0 3px rgba(32, 228, 220, 0.08) !important;
+  background: rgba(5, 19, 43, 0.98) !important;
+}
+
+.ftz-page-frame :where(input, textarea)::placeholder {
+  color: var(--ftz-copy-faint) !important;
+}
+
+.ftz-page-frame :where(input[type="checkbox"], input[type="radio"]) {
+  accent-color: var(--ftz-primary);
+}
+
+/* Buttons retain semantic tone but share shape and typography. */
+.ftz-page-frame button,
+.ftz-page-frame a[role="button"] {
+  border-radius: var(--ftz-radius-control) !important;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.ftz-page-frame button:not(:disabled) {
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.ftz-page-frame button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.ftz-page-frame button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+/* Tables get the same compact international finance-console treatment. */
+.ftz-page-frame table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--ftz-copy);
+}
+
+.ftz-page-frame thead th {
+  color: #8fa7cc;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ftz-page-frame tbody td {
+  border-color: rgba(66, 105, 164, 0.2) !important;
+}
+
+.ftz-page-frame tbody tr:hover {
+  background: rgba(19, 62, 95, 0.12);
+}
+
+/* Consistent headings and overlines. */
+.ftz-page-frame h1,
+.ftz-page-frame h2,
+.ftz-page-frame h3 {
+  color: var(--ftz-copy);
+  letter-spacing: -0.02em;
+}
+
+.ftz-page-frame :where(p, small, label) {
+  color: var(--ftz-copy-muted);
+}
+
+/* Universal lightweight live-data chart. */
+.ftz-live-chart {
+  position: relative;
+  display: grid;
+  min-height: 230px;
+  grid-template-rows: auto 1fr;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--ftz-border);
+  border-radius: 14px;
+  background:
+    linear-gradient(rgba(64, 108, 175, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(64, 108, 175, 0.06) 1px, transparent 1px),
+    rgba(3, 13, 33, 0.66);
+  background-size: 100% 25%, 14.285% 100%, auto;
+  overflow: hidden;
+}
+
+.ftz-live-chart-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ftz-live-chart-head small,
+.ftz-live-chart-head strong {
+  display: block;
+}
+
+.ftz-live-chart-head small {
+  color: var(--ftz-copy-faint);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ftz-live-chart-head strong {
+  margin-top: 4px;
+  font-size: 17px;
+}
+
+.ftz-live-chart-badge {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid rgba(36, 223, 164, 0.25);
+  border-radius: 999px;
+  color: var(--ftz-success);
+  background: rgba(36, 223, 164, 0.08);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.ftz-live-chart-plot {
+  position: relative;
+  min-height: 150px;
+}
+
+.ftz-live-chart-plot svg {
+  display: block;
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+
+.ftz-live-chart-area {
+  fill: url(#ftz-live-area);
+}
+
+.ftz-live-chart-line {
+  fill: none;
+  stroke: var(--ftz-primary);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px rgba(32, 228, 220, 0.28));
+}
+
+.ftz-live-chart-dot {
+  fill: #07162f;
+  stroke: var(--ftz-primary);
+  stroke-width: 2;
+}
+
+.ftz-live-chart-labels {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--ftz-copy-faint);
+  font-size: 9px;
+  text-align: center;
+}
+
+.ftz-live-chart-empty {
+  display: grid;
+  min-height: 145px;
+  place-items: center;
+  color: var(--ftz-copy-muted);
+  text-align: center;
+}
+
+/* Console mode must never look like an external SMTP send. */
+.ftz-console-warning {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 182, 76, 0.3);
+  border-radius: 10px;
+  color: #ffd48f;
+  background: rgba(255, 182, 76, 0.07);
+  font-size: 12px;
+}
+
+.ftz-status-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid rgba(36, 223, 164, 0.28);
+  border-radius: 999px;
+  color: var(--ftz-success);
+  background: rgba(36, 223, 164, 0.08);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ftz-status-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+}
+
+@media (max-width: 991px) {
+  .ftz-page-frame > :not(.ftz-dashboard) {
+    padding-inline: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ftz-page-frame > :not(.ftz-dashboard) {
+    padding-inline: 10px;
+  }
+
+  .ftz-live-chart {
+    min-height: 205px;
+    padding: 14px;
+  }
+
+  .ftz-live-chart-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
