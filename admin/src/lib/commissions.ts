@@ -13,6 +13,22 @@ export interface CommissionLevelRule {
   packageMatchingEnabled: boolean;
 }
 
+export interface CommissionPackageDepthRule {
+  id?: string;
+  packageDefinitionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  enabled: boolean;
+  maxLevelDepth: number;
+}
+
+export interface CommissionPackageOption {
+  packageDefinitionId: string;
+  packageCode: string;
+  displayName: string;
+  sortOrder: number;
+}
+
 export interface CommissionPlan {
   id: string;
   versionNumber: number;
@@ -32,7 +48,9 @@ export interface CommissionPlan {
   effectiveTo: string | null;
   publishedAt: string | null;
   clonedFromPlanVersionId: string | null;
+  maxLevels: number;
   levels: CommissionLevelRule[];
+  packageDepths: CommissionPackageDepthRule[];
 }
 
 export interface CommissionEvent {
