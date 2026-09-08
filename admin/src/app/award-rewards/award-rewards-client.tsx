@@ -190,7 +190,7 @@ export default function AwardRewardsClient() {
   const [draft, setDraft] = useState<PolicyDraft | null>(null);
   const [tracks, setTracks] = useState<AdminUserTrack[]>([]);
   const [events, setEvents] = useState<AwardEvent[]>([]);
-  const [reason, setReason] = useState("Reviewed Award & Reward policy update.");
+  const [reason, setReason] = useState("Reviewed Team Business Awards policy update.");
   const [reconcileUserId, setReconcileUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -218,7 +218,7 @@ export default function AwardRewardsClient() {
     );
     const detail = await readJson<PolicyDetail>(
       response,
-      "Unable to load Award & Reward policy.",
+      "Unable to load Team Business Awards policy.",
     );
     selectedPolicyIdRef.current = detail.id;
     setPolicy(detail);
@@ -239,7 +239,7 @@ export default function AwardRewardsClient() {
 
     const policyBody = await readJson<PolicyListResponse>(
       policyRes,
-      "Unable to load Award & Reward policies.",
+      "Unable to load Team Business Awards policies.",
     );
     const packageBody = await readJson<PackageListResponse>(
       packageRes,
@@ -247,11 +247,11 @@ export default function AwardRewardsClient() {
     );
     const trackBody = await readJson<TrackListResponse>(
       trackRes,
-      "Unable to load Award & Reward tracks.",
+      "Unable to load Team Business Awards tracks.",
     );
     const eventBody = await readJson<EventListResponse>(
       eventRes,
-      "Unable to load Award & Reward events.",
+      "Unable to load Team Business Awards events.",
     );
 
     setPolicies(policyBody.policies ?? []);
@@ -287,7 +287,7 @@ export default function AwardRewardsClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Unable to load Award & Reward workspace.",
+            : "Unable to load Team Business Awards workspace.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -302,7 +302,7 @@ export default function AwardRewardsClient() {
 
   async function selectPolicy(policyVersionId: string) {
     if (dirty) {
-      setError("Save or discard the current Award & Reward draft changes first.");
+      setError("Save or discard the current Team Business Awards draft changes first.");
       return;
     }
     setBusy("select");
@@ -410,16 +410,16 @@ export default function AwardRewardsClient() {
       });
       const created = await readJson<PolicyDetail>(
         response,
-        "Unable to create Award & Reward policy draft.",
+        "Unable to create Team Business Awards policy draft.",
       );
       selectedPolicyIdRef.current = created.id;
-      setSuccess(`Award & Reward policy V${created.versionNumber} draft created.`);
+      setSuccess(`Team Business Awards policy V${created.versionNumber} draft created.`);
       await loadWorkspace();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to create Award & Reward policy draft.",
+          : "Unable to create Team Business Awards policy draft.",
       );
     } finally {
       setBusy(null);
@@ -463,7 +463,7 @@ export default function AwardRewardsClient() {
       );
       const saved = await readJson<PolicyDetail>(
         response,
-        "Unable to save Award & Reward policy draft.",
+        "Unable to save Team Business Awards policy draft.",
       );
       setPolicy(saved);
       setDraft(policyToDraft(saved));
@@ -481,12 +481,12 @@ export default function AwardRewardsClient() {
             : item,
         ),
       );
-      setSuccess("Award & Reward matrix draft saved.");
+      setSuccess("Team Business Awards matrix draft saved.");
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to save Award & Reward policy draft.",
+          : "Unable to save Team Business Awards policy draft.",
       );
     } finally {
       setBusy(null);
@@ -496,7 +496,7 @@ export default function AwardRewardsClient() {
   async function publishPolicy() {
     if (!policy || policy.status !== "DRAFT" || !isSuperAdmin) return;
     if (dirty) {
-      setError("Save the Award & Reward matrix before publishing.");
+      setError("Save the Team Business Awards matrix before publishing.");
       return;
     }
     if (reason.trim().length < 3) {
@@ -521,16 +521,16 @@ export default function AwardRewardsClient() {
       );
       const published = await readJson<PolicyDetail>(
         response,
-        "Unable to publish Award & Reward policy.",
+        "Unable to publish Team Business Awards policy.",
       );
       selectedPolicyIdRef.current = published.id;
-      setSuccess(`Award & Reward policy V${published.versionNumber} published.`);
+      setSuccess(`Team Business Awards policy V${published.versionNumber} published.`);
       await loadWorkspace();
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to publish Award & Reward policy.",
+          : "Unable to publish Team Business Awards policy.",
       );
     } finally {
       setBusy(null);
@@ -551,7 +551,7 @@ export default function AwardRewardsClient() {
       });
       const result = await readJson<ReconcileResponse>(
         response,
-        "Unable to reconcile Award & Reward progress.",
+        "Unable to reconcile Team Business Awards progress.",
       );
       setSuccess(
         `Reconciled ${result.usersProcessed} user(s): ${result.startedTracks} track(s) started, ${result.awardsPosted} award(s) posted, ${result.closedTracks} track(s) closed.`,
@@ -561,7 +561,7 @@ export default function AwardRewardsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to reconcile Award & Reward progress.",
+          : "Unable to reconcile Team Business Awards progress.",
       );
     } finally {
       setBusy(null);
@@ -595,7 +595,7 @@ export default function AwardRewardsClient() {
       <section className={styles.hero}>
         <div>
           <p className={styles.eyebrow}>AWR-01 / TEAM BUSINESS ACHIEVEMENT</p>
-          <h1>Award & Reward</h1>
+          <h1>Team Business Awards</h1>
           <p>
             Configure a versioned package-by-level Team Business matrix. Each
             user progresses through eligible ACTIVE package tracks sequentially;
@@ -613,8 +613,8 @@ export default function AwardRewardsClient() {
               <p className={styles.eyebrow}>Policy Matrix</p>
               <h2>
                 {policy
-                  ? `Award & Reward Policy V${policy.versionNumber}`
-                  : "No Award & Reward policy yet"}
+                  ? `Team Business Awards Policy V${policy.versionNumber}`
+                  : "No Team Business Awards policy yet"}
               </h2>
               {policy ? (
                 <p className={styles.muted}>
@@ -636,7 +636,7 @@ export default function AwardRewardsClient() {
           {!policy || !draft ? (
             <div className={styles.empty}>
               {loading
-                ? "Loading Award & Reward policy…"
+                ? "Loading Team Business Awards policy…"
                 : "Create the first policy draft to configure package achievement targets."}
             </div>
           ) : (
@@ -955,7 +955,7 @@ export default function AwardRewardsClient() {
         </div>
 
         {tracks.length === 0 ? (
-          <div className={styles.empty}>No Award & Reward user tracks yet.</div>
+          <div className={styles.empty}>No Team Business Awards user tracks yet.</div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -1010,7 +1010,7 @@ export default function AwardRewardsClient() {
         </div>
 
         {events.length === 0 ? (
-          <div className={styles.empty}>No Award & Reward events posted yet.</div>
+          <div className={styles.empty}>No Team Business Awards events posted yet.</div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
