@@ -102,9 +102,7 @@ export default function UserShell({
             <div className={styles.bannerCopy}>
               <strong>{`Viewing as ${session.user.email}`}</strong>
 
-              <span>
-                {`Administrator: ${session.impersonation.actor.email}`}
-              </span>
+              <span>{`Administrator: ${session.impersonation.actor.email}`}</span>
             </div>
 
             <span
@@ -119,7 +117,7 @@ export default function UserShell({
           </div>
         ) : null}
 
-        <div className={styles.content}>{children}</div>
+        <div className={`ftz-page-frame ${styles.content}`}>{children}</div>
       </main>
     </div>
   );
