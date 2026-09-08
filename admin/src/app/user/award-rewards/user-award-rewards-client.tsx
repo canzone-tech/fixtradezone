@@ -157,7 +157,7 @@ export default function UserAwardRewardsClient() {
       });
       const awards = await checked<AwardRewardsResponse>(
         awardResponse,
-        "Could not load Team Business Award & Reward progress.",
+        "Could not load Team Business Awards progress.",
       );
 
       setSession(nextSession);
@@ -171,7 +171,7 @@ export default function UserAwardRewardsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not load Team Business Award & Reward progress.",
+          : "Could not load Team Business Awards progress.",
       );
     } finally {
       setLoading(false);
@@ -201,7 +201,7 @@ export default function UserAwardRewardsClient() {
 
         <section className={styles.hero}>
           <p className={styles.eyebrow}>AWR-01 / TEAM BUSINESS ACHIEVEMENT</p>
-          <h1>Award & Reward</h1>
+          <h1>Team Business Awards</h1>
           <p>
             Track package-by-package Team Business achievement. Every eligible
             ACTIVE package runs in policy order; the next track starts from zero
@@ -213,7 +213,7 @@ export default function UserAwardRewardsClient() {
           <div className={styles.notificationHeader}>
             <div>
               <p className={styles.eyebrow}>Sequential Processing</p>
-              <h2>My Award & Reward track</h2>
+              <h2>My Team Business Awards track</h2>
               <p>
                 Team Business is measured independently at each required
                 genealogy level. Waiting packages do not begin counting until
@@ -233,10 +233,10 @@ export default function UserAwardRewardsClient() {
           </div>
 
           {loading && !data ? (
-            <div className={styles.empty}>Loading Award & Reward progress…</div>
+            <div className={styles.empty}>Loading Team Business Awards progress…</div>
           ) : !data?.effectivePolicy ? (
             <div className={styles.empty}>
-              No enabled published Award & Reward policy is effective yet.
+              No enabled published Team Business Awards policy is effective yet.
             </div>
           ) : (
             <div className={styles.page}>
@@ -294,7 +294,7 @@ export default function UserAwardRewardsClient() {
                 </article>
               ) : (
                 <div className={styles.empty}>
-                  No Award & Reward package track is currently open.
+                  No Team Business Awards package track is currently open.
                 </div>
               )}
 
