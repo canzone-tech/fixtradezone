@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FlashMessage from "@/components/ui/flash-message";
 import { resolveAdminSession } from "@/lib/admin-session-client";
+import type { AdminUser } from "@/lib/auth";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./award-rewards.module.css";
 
@@ -122,6 +123,10 @@ interface EventListResponse {
   total: number;
 }
 
+interface UsersResponse {
+  users: AdminUser[];
+}
+
 interface ReconcileResponse {
   usersProcessed: number;
   startedTracks: number;
@@ -153,6 +158,12 @@ function compactDecimal(value: string) {
 
 function amount(value: string, currency: string) {
   return `${compactDecimal(value)} ${currency}`;
+}
+
+function userLabel(user: AdminUser) {
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const details = [name, user.email].filter(Boolean).join(" · ");
+  return `@${user.username}${details ? ` · ${details}` : ""}`;
 }
 
 function policyToDraft(policy: PolicyDetail): PolicyDraft {
@@ -190,7 +201,10 @@ export default function AwardRewardsClient() {
   const [draft, setDraft] = useState<PolicyDraft | null>(null);
   const [tracks, setTracks] = useState<AdminUserTrack[]>([]);
   const [events, setEvents] = useState<AwardEvent[]>([]);
-  const [reason, setReason] = useState("Reviewed Team Business Awards policy update.");
+  const [reconcileUsers, setReconcileUsers] = useState<AdminUser[]>([]);
+  const [reason, setReason] = useState(
+    "Reviewed Team Business Awards policy update.",
+  );
   const [reconcileUserId, setReconcileUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -268,6 +282,32 @@ export default function AwardRewardsClient() {
     await loadPolicy(preferred?.id ?? "");
   }, [loadPolicy]);
 
+  const loadReconcileUsers = useCallback(async () => {
+    const response = await fetch("/api/admin/users?page=1&limit=100", {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      setReconcileUsers([]);
+      return;
+    }
+
+    const body = await readJson<UsersResponse>(
+      response,
+      "Unable to load users for targeted reconciliation.",
+    );
+
+    setReconcileUsers(
+      (body.users ?? []).filter(
+        (user) =>
+          user.status === "ACTIVE" &&
+          user.roles.includes("USER") &&
+          !user.roles.includes("ADMIN") &&
+          !user.roles.includes("SUPER_ADMIN"),
+      ),
+    );
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -277,11 +317,19 @@ export default function AwardRewardsClient() {
         if (!mounted) return;
         const superAdmin = session.user?.roles.includes("SUPER_ADMIN") ?? false;
         const permissions = session.user?.permissions ?? [];
+        const reconcileAllowed =
+          superAdmin || permissions.includes("award_rewards.reconcile");
+        const canReadUsers = superAdmin || permissions.includes("users.read");
+
         setIsSuperAdmin(superAdmin);
-        setCanReconcile(
-          superAdmin || permissions.includes("award_rewards.reconcile"),
-        );
-        await loadWorkspace();
+        setCanReconcile(reconcileAllowed);
+
+        await Promise.all([
+          loadWorkspace(),
+          reconcileAllowed && canReadUsers
+            ? loadReconcileUsers()
+            : Promise.resolve(),
+        ]);
       } catch (caught) {
         if (!mounted) return;
         setError(
@@ -298,11 +346,13 @@ export default function AwardRewardsClient() {
     return () => {
       mounted = false;
     };
-  }, [loadWorkspace]);
+  }, [loadReconcileUsers, loadWorkspace]);
 
   async function selectPolicy(policyVersionId: string) {
     if (dirty) {
-      setError("Save or discard the current Team Business Awards draft changes first.");
+      setError(
+        "Save or discard the current Team Business Awards draft changes first.",
+      );
       return;
     }
     setBusy("select");
@@ -355,7 +405,9 @@ export default function AwardRewardsClient() {
 
   function addTrack() {
     if (!draft) return;
-    const used = new Set(draft.tracks.map((track) => track.packageDefinitionId));
+    const used = new Set(
+      draft.tracks.map((track) => track.packageDefinitionId),
+    );
     const nextPackage = packages.find(
       (candidate) => !used.has(candidate.packageDefinitionId),
     );
@@ -413,7 +465,9 @@ export default function AwardRewardsClient() {
         "Unable to create Team Business Awards policy draft.",
       );
       selectedPolicyIdRef.current = created.id;
-      setSuccess(`Team Business Awards policy V${created.versionNumber} draft created.`);
+      setSuccess(
+        `Team Business Awards policy V${created.versionNumber} draft created.`,
+      );
       await loadWorkspace();
     } catch (caught) {
       setError(
@@ -524,7 +578,9 @@ export default function AwardRewardsClient() {
         "Unable to publish Team Business Awards policy.",
       );
       selectedPolicyIdRef.current = published.id;
-      setSuccess(`Team Business Awards policy V${published.versionNumber} published.`);
+      setSuccess(
+        `Team Business Awards policy V${published.versionNumber} published.`,
+      );
       await loadWorkspace();
     } catch (caught) {
       setError(
@@ -537,10 +593,9 @@ export default function AwardRewardsClient() {
     }
   }
 
-  async function reconcile() {
+  async function reconcile(userId?: string) {
     if (!canReconcile) return;
-    const userId = reconcileUserId.trim();
-    setBusy("reconcile");
+    setBusy(userId ? "reconcile-selected" : "reconcile-all");
     setError("");
     setSuccess("");
     try {
@@ -626,7 +681,9 @@ export default function AwardRewardsClient() {
             {policy ? (
               <span
                 className={styles.badge}
-                data-tone={policy.status === "PUBLISHED" ? "success" : "warning"}
+                data-tone={
+                  policy.status === "PUBLISHED" ? "success" : "warning"
+                }
               >
                 {policy.status}
               </span>
@@ -665,7 +722,9 @@ export default function AwardRewardsClient() {
                     min={1}
                     value={draft.levelCount}
                     disabled={!editable}
-                    onChange={(event) => resizeLevels(Number(event.target.value))}
+                    onChange={(event) =>
+                      resizeLevels(Number(event.target.value))
+                    }
                   />
                 </label>
                 <label className={styles.field}>
@@ -676,7 +735,10 @@ export default function AwardRewardsClient() {
                     disabled={!editable}
                     maxLength={10}
                     onChange={(event) =>
-                      setDraft({ ...draft, asset: event.target.value.toUpperCase() })
+                      setDraft({
+                        ...draft,
+                        asset: event.target.value.toUpperCase(),
+                      })
                     }
                   />
                 </label>
@@ -778,7 +840,9 @@ export default function AwardRewardsClient() {
                               }
                             />
                             {!value ? (
-                              <span className={styles.matrixNote}>NOT_REQUIRED</span>
+                              <span className={styles.matrixNote}>
+                                NOT_REQUIRED
+                              </span>
                             ) : null}
                           </td>
                         ))}
@@ -839,10 +903,14 @@ export default function AwardRewardsClient() {
                     <button
                       className={styles.buttonSecondary}
                       type="button"
-                      disabled={busy !== null || dirty || draft.tracks.length === 0}
+                      disabled={
+                        busy !== null || dirty || draft.tracks.length === 0
+                      }
                       onClick={() => void publishPolicy()}
                     >
-                      {busy === "publish" ? "Publishing…" : "Publish version"}
+                      {busy === "publish"
+                        ? "Publishing…"
+                        : "Publish version"}
                     </button>
                   </>
                 ) : null}
@@ -887,7 +955,9 @@ export default function AwardRewardsClient() {
                 </span>
                 <span
                   className={styles.badge}
-                  data-tone={item.status === "PUBLISHED" ? "success" : "warning"}
+                  data-tone={
+                    item.status === "PUBLISHED" ? "success" : "warning"
+                  }
                 >
                   {item.status}
                 </span>
@@ -913,7 +983,9 @@ export default function AwardRewardsClient() {
                 <button
                   className={styles.buttonSecondary}
                   type="button"
-                  disabled={busy !== null || selectedSummary.status !== "PUBLISHED"}
+                  disabled={
+                    busy !== null || selectedSummary.status !== "PUBLISHED"
+                  }
                   onClick={() => void createDraft(selectedSummary.id)}
                 >
                   Clone selected
@@ -930,32 +1002,60 @@ export default function AwardRewardsClient() {
             <p className={styles.eyebrow}>Sequential Processing</p>
             <h2>User Award Tracks</h2>
             <p className={styles.muted}>
-              One open package track per user. Later eligible ACTIVE packages wait
-              until the previous award posts and closes.
+              One open package track per user. Later eligible ACTIVE packages
+              wait until the previous award posts and closes.
             </p>
           </div>
           {canReconcile ? (
             <div className={styles.actions}>
-              <input
-                className={styles.input}
-                placeholder="Optional USER UUID"
-                value={reconcileUserId}
-                onChange={(event) => setReconcileUserId(event.target.value)}
-              />
+              {reconcileUsers.length > 0 ? (
+                <select
+                  className={styles.select}
+                  value={reconcileUserId}
+                  onChange={(event) => setReconcileUserId(event.target.value)}
+                  aria-label="Select USER for Team Business Awards reconciliation"
+                >
+                  <option value="">Select USER</option>
+                  {reconcileUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {userLabel(user)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className={styles.input}
+                  placeholder="USER UUID"
+                  value={reconcileUserId}
+                  onChange={(event) => setReconcileUserId(event.target.value)}
+                />
+              )}
+              <button
+                className={styles.buttonSecondary}
+                type="button"
+                disabled={busy !== null || !reconcileUserId}
+                onClick={() => void reconcile(reconcileUserId)}
+              >
+                {busy === "reconcile-selected"
+                  ? "Reconciling…"
+                  : "Reconcile selected"}
+              </button>
               <button
                 className={styles.buttonSecondary}
                 type="button"
                 disabled={busy !== null}
                 onClick={() => void reconcile()}
               >
-                {busy === "reconcile" ? "Reconciling…" : "Reconcile"}
+                {busy === "reconcile-all" ? "Reconciling all…" : "Reconcile all"}
               </button>
             </div>
           ) : null}
         </div>
 
         {tracks.length === 0 ? (
-          <div className={styles.empty}>No Team Business Awards user tracks yet.</div>
+          <div className={styles.empty}>
+            No Team Business Awards user tracks yet.
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -975,7 +1075,9 @@ export default function AwardRewardsClient() {
                   <tr key={track.id}>
                     <td>
                       <strong>{track.username ?? track.userId}</strong>
-                      <div className={styles.meta}>{track.email ?? track.userId}</div>
+                      <div className={styles.meta}>
+                        {track.email ?? track.userId}
+                      </div>
                     </td>
                     <td>
                       <strong>{track.packageDisplayName}</strong>
@@ -1010,7 +1112,9 @@ export default function AwardRewardsClient() {
         </div>
 
         {events.length === 0 ? (
-          <div className={styles.empty}>No Team Business Awards events posted yet.</div>
+          <div className={styles.empty}>
+            No Team Business Awards events posted yet.
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -1028,7 +1132,9 @@ export default function AwardRewardsClient() {
                   <tr key={event.id}>
                     <td>
                       <strong>{event.username ?? event.userId}</strong>
-                      <div className={styles.meta}>{event.email ?? event.userId}</div>
+                      <div className={styles.meta}>
+                        {event.email ?? event.userId}
+                      </div>
                     </td>
                     <td>
                       <strong>{event.packageDisplayName}</strong>
