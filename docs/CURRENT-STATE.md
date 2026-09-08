@@ -1,316 +1,127 @@
 # FixTradeZone — Current State
 
-## Canonical Checkpoint — 2026-08-28
+## Canonical Checkpoint — 2026-09-08
 
 Repository state plus completed local verification are the acceptance authority.
 Source code and CI alone are never treated as financial runtime acceptance.
 
 ## Active Development Branch
 
-`feature/rewards-caps-lifecycle-foundation`
+`feature/v1-closeout-release-gaps`
 
-## Mainline Baseline
-
-`main` contains the cumulative locally accepted business foundation through
-COMM-01. PR #17 merged COMM-01 at:
+Current accepted remote checkpoint before this documentation refresh:
 
 ```text
-52020a6f8d8c6e7cc67e7fc4909ee53fb73f160a
+466728e  fix(admin): keep idle lock full viewport
 ```
 
-Accepted mainline slices include:
+## Module 08 — Deposits / Maker-Checker
 
-- PKG-01 package-plan foundation;
-- DEP-01 deposits/payment rails;
-- WAL-01 immutable wallet/ledger foundation;
-- SUB-02 package subscription/activation;
-- COMM-01 referral commission foundation.
+Status: **FUNCTIONALLY COMPLETE / LOCAL ACCEPTANCE GREEN / CLOSEOUT IN PROGRESS**.
 
-Applied migration history must never be rewritten. MySQL remains the relational,
-business and accounting source of truth.
+The deposits slice remains a backend + frontend vertical slice and preserves the
+existing maker-checker architecture.
 
-## COMM-01 — Referral Commission Foundation
+Accepted behavior includes:
 
-Status: **COMPLETE / LOCALLY ACCEPTED / MERGED TO MAIN**.
+- USER deposit creation through the published package/payment-rail contract;
+- ADMIN review stage before final approval;
+- SUPER_ADMIN final approval authority;
+- audited rejection through the normal lifecycle;
+- accounting posting and downstream package activation on approved funding;
+- referral-commission and internal-trading lifecycle integration already present
+  in the accepted financial path;
+- bulk approve/reject acceptance reported GREEN locally;
+- USER approved/rejected deposit readback and browser acceptance reported GREEN.
 
-Canonical contract:
+### Same-package ACTIVE funding protection
 
-`docs/REFERRAL-COMMISSION-FOUNDATION.md`
+A USER who already has an `ACTIVE` subscription for a package cannot create a
+new funding/deposit request for that same package until the subscription leaves
+`ACTIVE`.
 
-COMM-01 converts immutable ACTIVE package-subscription events into versioned,
-immutable and ledger-backed referral commission outcomes.
+The rule is keyed by package-definition identity, not merely one plan item, so a
+different plan item for the same package cannot bypass the protection.
 
-The initial executable publication boundary is intentionally limited to:
+Different packages remain eligible under the existing multiple-active-package
+policy when all other deposit rules allow them.
+
+The backend remains authoritative and returns a conflict for direct API bypass.
+The effective USER package catalogue also removes package definitions that are
+already ACTIVE for the current USER, so the normal `/user/packages` and
+`/user/deposits` UI paths do not offer duplicate same-package funding.
+
+This protection required no Prisma schema or migration change and does not
+mutate published Package V1 terms.
+
+### Frontend/session-lock closeout fix
+
+The shared inactivity lock used by ADMIN and USER surfaces is required to cover
+the complete application viewport.
+
+A global responsive rule previously constrained generic `[role="dialog"]`
+elements and could visually clamp the full-screen idle-lock backdrop. The shared
+lock stylesheet now explicitly preserves unrestricted full-viewport dimensions.
+
+Local browser acceptance for the corrected session lock and deposits UI was
+reported GREEN on 2026-09-08. Admin CI for the lock change passed lint,
+typecheck, production build and critical dependency audit.
+
+### Latest verified automated gates
+
+Backend local verification before the frontend-only lock change:
 
 ```text
-inactive upline = LOST
-compression     = SKIP
-release mode    = IMMEDIATE
+Test Suites: 65 passed, 65 total
+Tests:       338 passed, 338 total
+Nest build:  GREEN
 ```
 
-AVAILABLE immediate commission posts through the immutable balanced ledger:
+The subsequent session-lock change touched only ADMIN CSS. Its Admin CI run was
+GREEN for lint, typecheck, build and critical dependency audit, and the updated
+frontend was then accepted locally.
 
-```text
-DEBIT  SYSTEM / REFERRAL_COMMISSION_EXPENSE
-CREDIT USER   / REFERRAL_COMMISSION
-```
+## Module 08 Closeout Gate
 
-Local acceptance on 2026-08-27 verified migration 0013, published V1 reference
-levels, package matching, exact 1.00000000 USDT L1 settlement for the accepted
-QA flow, wallet readback, immutable events, RBAC and browser/API behavior.
+Before opening the PR to `main`:
 
-## RWD-01 — Rewards / Caps / Lifecycle Accounting
+1. keep `backups/` untouched and untracked;
+2. keep `postman/__pycache__/` untouched and untracked;
+3. confirm final branch/HEAD/status after this documentation commit is pulled;
+4. confirm repository CI for the documentation head is not hiding any code
+   regression (path-filtered workflows may legitimately not run for docs-only
+   changes);
+5. perform no additional Module 08 code changes unless a new acceptance failure
+   is found;
+6. open the PR to `main` only after the final local checkpoint remains clean.
 
-Status: **R48–R58 LOCKED / FEATURE IMPLEMENTED / SOURCE CI GREEN / LOCAL RUNTIME ACCEPTANCE PENDING**.
+No next module starts before this closeout/PR checkpoint is complete.
 
-Canonical contracts:
+## Permanent Delivery Locks
 
-- `docs/REWARDS-CAPS-LIFECYCLE.md`
-- `docs/REWARDS-CAPS-LIFECYCLE-LOCK.md`
-
-### Founder-approved execution boundary
-
-RWD-01 consumes only an immutable ACTIVE package subscription snapshot. Deposit
-approval alone is never a package-reward source.
-
-Initial executable package terms are:
-
-```text
-rate modes       = FIXED | RANDOM_RANGE
-rate meaning     = USER_NET_AFTER_SPLIT
-reward start     = NEXT_CALENDAR_DAY
-frequency        = DAILY_CALENDAR
-cycle day mode   = CALENDAR_DAYS
-reward day mode  = EVERY_DAY
-cap basis        = TOTAL_RETURN
-principal        = INCLUDED_IN_TOTAL_RETURN
-cycle end        = AUTO_START_NEXT_CYCLE
-cap action       = COMPLETE_PACKAGE
-```
-
-Unsupported configured modes fail closed rather than being silently interpreted.
-
-### Existing-subscription rollout
-
-Initial versioned rollout policy is:
-
-```text
-FORWARD_ONLY_FROM_POLICY_EFFECTIVE
-```
-
-For an already-ACTIVE subscription:
-
-```text
-scheduleAnchor = MAX(subscription.activatedAt, rewardPolicy.effectiveFrom)
-first payable boundary = next local calendar-day boundary after scheduleAnchor
-```
-
-No pre-policy reward backfill is generated. Natural package day/cycle/lifetime
-numbering still derives from the original activation timestamp.
-
-### Cap contribution policy
-
-Initial policy snapshot:
-
-```text
-package_reward      = COUNT
-referral_commission = DO_NOT_COUNT
-team_commission     = DO_NOT_COUNT
-award_reward        = DO_NOT_COUNT
-other_income        = DO_NOT_COUNT
-```
-
-For package value `P` and multiplier `M` under the initial principal semantics:
-
-```text
-capLimit          = P * M
-initialCapConsumed = P
-rewardHeadroom     = capLimit - P
-```
-
-Final reward settlement clips exactly to remaining cap headroom.
-
-### Financial settlement
-
-Package reward money is immutable balanced ledger money:
-
-```text
-DEBIT  SYSTEM / PACKAGE_REWARD_EXPENSE
-CREDIT USER   / PACKAGE_EARNINGS
-```
-
-Reward event, cap/lifecycle state and ledger posting commit atomically.
-
-Selected reward rates retain six-decimal precision. Calculated/posted money is
-`DECIMAL(20,8)` and uses deterministic round-down settlement.
-
-Daily source identity is deterministic:
-
-```text
-SUBSCRIPTION:<subscriptionId>:PACKAGE_REWARD:<localRewardDate>
-```
-
-### Authoritative processing path
-
-One idempotent reward-processing service is shared by:
-
-- the Redis-locked automatic worker;
-- authorized ADMIN/SUPER_ADMIN reconciliation/process-due APIs.
-
-The reconciliation path never accepts an arbitrary reward amount and is not an
-alternate calculation engine.
-
-### RWD-01 database source state
-
-Migration `0014_rewards_caps_lifecycle_foundation` is present on the feature
-branch and has **not yet been deployed in the current local acceptance round**.
-
-It adds:
-
-- `reward_cap_policy_versions`;
-- `package_reward_states`;
-- `package_reward_events`;
-- ledger bucket `PACKAGE_REWARD_EXPENSE`;
-- ledger kind `PACKAGE_REWARD_CREDIT`;
-- `rewards.read` and `rewards.reconcile`.
-
-V1 is seeded as `DRAFT`, so the migration alone has zero reward financial effect.
-Explicit SUPER_ADMIN publication is required.
-
-Migration compatibility review against applied WAL/SUB/COMM schema confirms:
-
-- all prior ledger bucket enum members are preserved;
-- all prior ledger transaction-kind enum members are preserved;
-- SUB status values match RWD service assumptions;
-- immutable subscription reward/cap/schedule snapshots contain the required RWD inputs;
-- ledger `sourceType` is a `VARCHAR(40)`, so `PACKAGE_SUBSCRIPTION` is valid.
-
-### RWD-01 automated/source gates
-
-Backend reward calculation/service money-path coverage includes deterministic
-random selection, eight-decimal round-down, forward-only scheduling, cap
-principal consumption, exact cap clipping, lifecycle completion, fail-closed
-policy behavior and idempotent settlement guards.
-
-Latest backend-changing RWD gate is GREEN: formatting/lint, unit tests, Nest
-build and dependency audit completed successfully.
-
-Latest ADMIN UI-changing head `80b6cc133b1ab857861433389b8cad8150416e7d`
-passed Admin CI run #103.
-
-### UI state
-
-ADMIN `/rewards` provides:
-
-- versioned reward/cap policy state;
-- due/blocked reconciliation;
-- immutable package reward events;
-- cap/lifecycle state;
-- worker health;
-- authorized same-service process-due recovery action.
-
-USER `/user/packages` provides:
-
-- immutable active package snapshot;
-- cap/lifecycle progress;
-- next reward/day/cycle state;
-- settled immutable package reward history.
-
-USER `/user/wallet` exposes the ledger-backed `PACKAGE_EARNINGS` bucket.
-
-Financial/admin timestamp surfaces for Rewards, Packages/Subscriptions,
-Deposits, Wallets, Commissions and Referrals use the shared platform-time
-formatter instead of browser-local timezone reinterpretation.
-
-## RWD-01 Remaining Acceptance Gate
-
-Before any PR to `main`:
-
-1. synchronize the feature branch locally and confirm clean state;
-2. take a verified local MySQL backup;
-3. run Prisma generate/validate and repository code gate;
-4. deploy migration `0014` explicitly with `migrate deploy`;
-5. verify migration/table/enum/permission readback;
-6. start MySQL, Redis, backend and admin locally;
-7. run consolidated Postman/API + browser/UI acceptance;
-8. prove forward-only no-backfill behavior;
-9. prove authoritative process-due/reconciliation behavior and RBAC negatives;
-10. prove package reward ledger debit equals credit, Package Earnings credit,
-    cap-state transition and immutable event/source-key identity;
-11. rerun the same process to prove no duplicate financial settlement;
-12. record local evidence and only then open the PR.
-
-No production-only test backdoor or HTTP `asOf` override will be added merely to
-force a due reward in QA.
-
-## Current ADMIN UI
-
-Operational routes include:
-
-- Dashboard
-- Users
-- Roles & Permissions
-- Packages
-- Deposits
-- Wallets & Ledger
-- Subscriptions
-- Referral Commissions
-- Rewards & Caps
-- Referrals
-- Settings
-
-## Current USER UI
-
-Operational USER financial/referral surfaces include:
-
-- Packages / subscriptions / reward progress
-- Deposits
-- Wallet
-- Referrals / referral commission history
-
-Only ledger-backed settled values are presented as earned wallet money.
+- MySQL is the relational/business/accounting source of truth.
+- Never use `prisma migrate dev` for project delivery.
+- Never reset the database.
+- Forward migrations only with `prisma migrate deploy` when a reviewed migration
+  is actually required.
+- Run Prisma commands from `backend` with `npx --no-install prisma`.
+- `backups/` must never be touched, added or deleted by delivery automation.
+- `postman/__pycache__/` must never be touched, added or deleted.
+- Never touch/pop/drop local stashes without explicit approval.
+- Package V1 published commercial terms are immutable once published.
+- Backend is authoritative for financial/business rules; frontend mirrors those
+  rules for UX but cannot replace server enforcement.
+- Complete one module/API at a time.
+- Repo-first implementation is the current working pattern: update the feature
+  branch, verify available repository CI, then pull locally for runtime/browser/
+  Postman acceptance.
+- PR to `main` only after every required local acceptance gate is GREEN.
 
 ## Product Scope — LOCKED
 
-FixTradeZone does not execute real trades and has no AI-agent/broker/exchange
-execution milestone in v1.
+FixTradeZone does not execute real trades in v1. Any trade-like presentation is
+limited to explicitly labelled simulated activity and must not silently mutate
+real wallet/ledger balances.
 
-Future trade-like presentation is limited to clearly labelled **Simulated Trade
-Activity** / **SIMULATED RESULTS** and must not silently mutate real wallet/ledger
-balances.
-
-## Current V1 Sequence
-
-1. RWD-01 rewards / caps / lifecycle accounting — local acceptance pending
-2. Simulated Trade Activity display only
-3. minimal v1 landing/template controls
-4. remaining USER/ADMIN operational slices
-5. notifications/reports required for launch
-6. QA/security/release hardening
-7. production deployment
-
-## Infrastructure / Data Ownership
-
-- MySQL is the relational/business/accounting source of truth.
-- MongoDB remains reserved for later document/CMS/flexible configuration only if
-  an implemented repository feature requires it.
-- Redis is transient infrastructure; RWD-01 uses it only for the distributed due
-  reward worker lock and never as financial source of truth.
-
-## Delivery Workflow — CURRENT LOCK
-
-1. Reconcile repository + persistent docs.
-2. Lock business semantics and contract.
-3. Implement backend/database/API + matching BFF/ADMIN/USER UI as one vertical slice.
-4. Complete focused automated regression coverage.
-5. Run the combined backend + frontend code gate locally.
-6. Apply explicit reviewed migrations only when required.
-7. Run browser/UI + Postman/API verification together in one consolidated local acceptance round.
-8. Fix failures at the actual backend/frontend boundary without bypassing checks.
-9. Run SQL/audit/ledger readback where financial or persistence evidence is required.
-10. Run final milestone verification.
-11. Update persistent docs/current state and review the complete diff.
-12. Open PR to `main` only after every local gate is GREEN.
-
-Production deployment remains HOLD until required v1 milestones and release
-hardening are complete.
+Production deployment remains HOLD until the remaining v1 milestones and final
+release hardening are complete.
