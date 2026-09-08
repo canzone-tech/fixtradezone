@@ -19,6 +19,8 @@
     { "key": "commissionSourcePlanId", "value": "" },
     { "key": "commissionPlanId", "value": "" },
     { "key": "commissionRevision", "value": "" },
+    { "key": "commissionAlphaPackageId", "value": "" },
+    { "key": "commissionBullPackageId", "value": "" },
     { "key": "commissionCryptoPackageId", "value": "" },
     { "key": "commissionDynamoPackageId", "value": "" },
     { "key": "commissionElitePackageId", "value": "" },
@@ -73,6 +75,8 @@
               "pm.expect(body.packages).to.be.an('array').that.is.not.empty;",
               "const normalized = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');",
               "const targets = [",
+              "  ['ALPHABOT', 'commissionAlphaPackageId'],",
+              "  ['BULLBOT', 'commissionBullPackageId'],",
               "  ['CRYPTOBOT', 'commissionCryptoPackageId'],",
               "  ['DYNAMOBOT', 'commissionDynamoPackageId'],",
               "  ['ELITEBOT', 'commissionElitePackageId'],",
@@ -85,7 +89,7 @@
               "  const match = body.packages.find((p) => normalized(`${p.packageCode}${p.displayName}`).includes(needle));",
               "  pm.collectionVariables.set(key, match ? match.packageDefinitionId : '');",
               "});",
-              "['commissionCryptoPackageId','commissionDynamoPackageId','commissionElitePackageId','commissionJupiterPackageId','commissionLegendPackageId','commissionNovaPackageId'].forEach((key) => pm.expect(pm.collectionVariables.get(key), key).to.be.a('string').and.not.empty);"
+              "['commissionAlphaPackageId','commissionBullPackageId','commissionCryptoPackageId','commissionDynamoPackageId','commissionElitePackageId','commissionJupiterPackageId','commissionLegendPackageId','commissionNovaPackageId'].forEach((key) => pm.expect(pm.collectionVariables.get(key), key).to.be.a('string').and.not.empty);"
             ]
           }
         }
@@ -133,7 +137,7 @@
           "raw": "{{commissionV2Payload}}"
         },
         "url": "{{baseUrl}}/admin/commission-plans/{{commissionPlanId}}",
-        "description": "WRITE DRAFT ONLY. Applies approved 50-level rate ranges and package cumulative depth rules. PrimeBot is included automatically only when present in the published package catalogue."
+        "description": "WRITE DRAFT ONLY. Applies approved 50-level rate ranges and package cumulative depth rules. Every currently published eligible package gets at least L1-L5; PrimeBot is included automatically only when present in the published package catalogue."
       },
       "event": [
         {
@@ -155,6 +159,8 @@
               "};",
               "const levels = Array.from({ length: 50 }, (_, index) => ({ level: index + 1, enabled: true, ratePercent: rateFor(index + 1), packageMatchingEnabled: true }));",
               "const depthConfig = [",
+              "  ['commissionAlphaPackageId', 5],",
+              "  ['commissionBullPackageId', 5],",
               "  ['commissionCryptoPackageId', 5],",
               "  ['commissionDynamoPackageId', 5],",
               "  ['commissionElitePackageId', 10],",
