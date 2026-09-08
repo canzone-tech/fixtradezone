@@ -1263,7 +1263,9 @@ export default function DepositsClient() {
                     <div className={styles.formGrid}>
                       <div className={`${styles.field} ${styles.full}`}>
                         <label htmlFor={`review-${deposit.id}`}>
-                          Review note
+                          {canApprove
+                            ? "Final approval / rejection note"
+                            : "Review note"}
                         </label>
                         <textarea
                           className={styles.textarea}
@@ -1291,9 +1293,25 @@ export default function DepositsClient() {
                               ? "Marking ready…"
                               : "Mark ready for approval"}
                           </button>
+                        ) : canApprove ? (
+                          <>
+                            <button
+                              className={styles.button}
+                              type="button"
+                              disabled={busy !== null}
+                              onClick={() => void reviewDeposit(deposit, "approve")}
+                            >
+                              {busy === `approve-${deposit.id}`
+                                ? "Approving…"
+                                : "Approve directly"}
+                            </button>
+                            <span className={styles.muted}>
+                              ADMIN pre-review is optional for SUPER_ADMIN final approval.
+                            </span>
+                          </>
                         ) : (
                           <span className={styles.muted}>
-                            Awaiting ADMIN review before final approval.
+                            Awaiting ADMIN or SUPER_ADMIN review.
                           </span>
                         )}
                         <button
