@@ -145,17 +145,6 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             </Link>
 
             <Link
-              href="/user/subscriptions"
-              className={`ftz-nav-link ${
-                isActive("/user/subscriptions") ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-clock-rotate-right" />
-              <span>Subscriptions</span>
-            </Link>
-
-            <Link
               href="/user/deposits"
               className={`ftz-nav-link ${
                 isActive("/user/deposits") ? "is-active" : ""
@@ -164,6 +153,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             >
               <i className="iconoir-wallet" />
               <span>Deposits</span>
+            </Link>
+
+            <Link
+              href="/user/subscriptions"
+              className={`ftz-nav-link ${
+                isActive("/user/subscriptions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-clock-rotate-right" />
+              <span>Subscriptions</span>
             </Link>
 
             <Link
@@ -176,41 +176,6 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <i className="iconoir-bank" />
               <span>Wallet</span>
             </Link>
-
-            <Link
-              href="/user/commissions"
-              className={`ftz-nav-link ${
-                isActive("/user/commissions") ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-coins" />
-              <span>Referral Commissions</span>
-            </Link>
-
-            <Link
-              href="/user/rewards"
-              className={`ftz-nav-link ${
-                isActive("/user/rewards") ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-trophy" />
-              <span>Rewards & Caps</span>
-            </Link>
-
-            {!impersonated ? (
-              <Link
-                href="/user/payouts"
-                className={`ftz-nav-link ${
-                  isActive("/user/payouts") ? "is-active" : ""
-                }`}
-                onClick={close}
-              >
-                <i className="iconoir-coins-swap" />
-                <span>Payouts</span>
-              </Link>
-            ) : null}
 
             <Link
               href="/user/referrals"
@@ -237,6 +202,28 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             ) : null}
 
             <Link
+              href="/user/commissions"
+              className={`ftz-nav-link ${
+                isActive("/user/commissions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-coins" />
+              <span>Referral Commissions</span>
+            </Link>
+
+            <Link
+              href="/user/rewards"
+              className={`ftz-nav-link ${
+                isActive("/user/rewards") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-trophy" />
+              <span>Rewards & Caps</span>
+            </Link>
+
+            <Link
               href="/user/trading"
               className={`ftz-nav-link ${
                 isActive("/user/trading") ? "is-active" : ""
@@ -257,6 +244,19 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <i className="iconoir-graph-up" />
               <span>Daily Trades</span>
             </Link>
+
+            {!impersonated ? (
+              <Link
+                href="/user/payouts"
+                className={`ftz-nav-link ${
+                  isActive("/user/payouts") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-coins-swap" />
+                <span>Payouts</span>
+              </Link>
+            ) : null}
           </div>
         </nav>
 
