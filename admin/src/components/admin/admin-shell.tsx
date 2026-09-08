@@ -22,7 +22,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       <Startbar />
       <Topbar />
       <AdminIdleLock />
-      <main className="ftz-main">{children}</main>
+      <main className="ftz-main">
+        <div className="ftz-page-frame">{children}</div>
+      </main>
     </div>
   );
 }
