@@ -55,9 +55,7 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
         deposit: {
           id: depositId,
           status:
-            depositId === PENDING_ID
-              ? 'PENDING_REVIEW'
-              : 'READY_FOR_APPROVAL',
+            depositId === PENDING_ID ? 'PENDING_REVIEW' : 'READY_FOR_APPROVAL',
         },
       }),
     );
