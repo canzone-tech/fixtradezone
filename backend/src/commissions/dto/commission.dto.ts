@@ -90,6 +90,22 @@ export class CommissionLevelRuleDto {
   packageMatchingEnabled!: boolean;
 }
 
+export class CommissionPackageDepthRuleDto {
+  @Transform(trimString)
+  @IsString()
+  @IsUUID()
+  packageDefinitionId!: string;
+
+  @IsBoolean()
+  enabled!: boolean;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(5)
+  @Max(100)
+  maxLevelDepth!: number;
+}
+
 class AuditedCommissionRevisionDto {
   @Type(() => Number)
   @IsInt()
@@ -165,6 +181,14 @@ export class UpdateCommissionPlanDto extends AuditedCommissionRevisionDto {
   @ValidateNested({ each: true })
   @Type(() => CommissionLevelRuleDto)
   levels?: CommissionLevelRuleDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => CommissionPackageDepthRuleDto)
+  packageDepths?: CommissionPackageDepthRuleDto[];
 }
 
 export class PublishCommissionPlanDto extends AuditedCommissionRevisionDto {
