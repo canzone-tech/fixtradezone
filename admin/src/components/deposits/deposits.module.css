@@ -120,6 +120,11 @@
   align-items: center;
 }
 
+.notice > .field + .actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
 .button,
 .buttonSecondary,
 .buttonDanger {
@@ -390,6 +395,14 @@
   .kv,
   .qrWrap {
     grid-template-columns: 1fr;
+  }
+
+  .notice > .field + .actions {
+    justify-content: flex-start;
+  }
+
+  .notice > .field + .actions .button {
+    width: 100%;
   }
 }
 
