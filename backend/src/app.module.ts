@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
+import { AwardRewardsModule } from './award-rewards/award-rewards.module';
 import { AuthModule } from './auth/auth.module';
 import { CommunicationModule } from './communication/communication.module';
 import { envValidationSchema } from './config/env.validation';
@@ -53,6 +54,7 @@ import { WalletModule } from './wallet/wallet.module';
     SubscriptionsModule,
     DepositsModule,
     RewardsModule,
+    AwardRewardsModule,
     SimulatedActivityModule,
     InternalTradingModule,
     PayoutsModule,
