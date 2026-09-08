@@ -6,6 +6,7 @@ import type { SubscriptionsService } from '../subscriptions/subscriptions.servic
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
 import type { DepositsService } from './deposits.service';
+import type { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
 const DEPOSIT_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -34,7 +35,11 @@ const adminActor: AuthenticatedUser = {
 
 describe('DepositApprovalOrchestratorService', () => {
   const depositsService = {
+    getDeposit: jest.fn(),
     approveDeposit: jest.fn(),
+  };
+  const directDepositApprovalService = {
+    approvePendingDeposit: jest.fn(),
   };
   const operationsConfigService = {
     getOperations: jest.fn(),
@@ -53,6 +58,9 @@ describe('DepositApprovalOrchestratorService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'READY_FOR_APPROVAL' },
+    });
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
       operationsMode: 'AUTOMATIC',
@@ -61,6 +69,11 @@ describe('DepositApprovalOrchestratorService', () => {
     depositsService.approveDeposit.mockResolvedValue({
       message: 'Deposit approved.',
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
+    directDepositApprovalService.approvePendingDeposit.mockResolvedValue({
+      message: 'Deposit directly approved by SUPER_ADMIN.',
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+      approvalPath: 'SUPER_ADMIN_DIRECT',
     });
     walletLedgerService.reconcileApprovedDeposit.mockResolvedValue({
       message: 'Approved deposit posted to Main / Deposit Balance.',
@@ -100,6 +113,7 @@ describe('DepositApprovalOrchestratorService', () => {
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
+      directDepositApprovalService as unknown as DirectDepositApprovalService,
       operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
@@ -107,7 +121,7 @@ describe('DepositApprovalOrchestratorService', () => {
     );
   });
 
-  it('blocks ADMIN final approval before reading operations policy', async () => {
+  it('blocks ADMIN final approval before reading deposit or operations policy', async () => {
     await expect(
       service.approveDeposit(
         DEPOSIT_ID,
@@ -116,8 +130,40 @@ describe('DepositApprovalOrchestratorService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
+    expect(depositsService.getDeposit).not.toHaveBeenCalled();
     expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
     expect(depositsService.approveDeposit).not.toHaveBeenCalled();
+    expect(
+      directDepositApprovalService.approvePendingDeposit,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('lets SUPER_ADMIN directly approve a pending deposit without ADMIN pre-review', async () => {
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'PENDING_REVIEW' },
+    });
+
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'Founder direct approval' },
+      actor,
+    );
+
+    expect(
+      directDepositApprovalService.approvePendingDeposit,
+    ).toHaveBeenCalledWith(
+      DEPOSIT_ID,
+      { note: 'Founder direct approval' },
+      actor,
+      {},
+    );
+    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      approvalPath: 'SUPER_ADMIN_DIRECT',
+      accountingPosted: true,
+      packageActivated: true,
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
   });
 
   it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {
@@ -128,6 +174,9 @@ describe('DepositApprovalOrchestratorService', () => {
     );
 
     expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
+    expect(
+      directDepositApprovalService.approvePendingDeposit,
+    ).not.toHaveBeenCalled();
     expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledWith(
       DEPOSIT_ID,
       actor,
@@ -242,6 +291,11 @@ describe('DepositApprovalOrchestratorService', () => {
 
   it('bulk approval isolates one failed deposit instead of rolling back successful items', async () => {
     const secondDepositId = '44444444-4444-4444-8444-444444444444';
+    depositsService.getDeposit.mockImplementation((depositId: string) =>
+      Promise.resolve({
+        deposit: { id: depositId, status: 'READY_FOR_APPROVAL' },
+      }),
+    );
     depositsService.approveDeposit
       .mockResolvedValueOnce({
         message: 'Deposit approved.',
