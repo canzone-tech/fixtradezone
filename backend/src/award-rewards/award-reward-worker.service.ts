@@ -33,17 +33,18 @@ export class AwardRewardWorkerService
 
   onModuleInit() {
     if (!this.infrastructureEnabled()) {
-      this.logger.log('Award & Reward worker infrastructure is disabled.');
+      this.logger.log('Team Business Awards worker infrastructure is disabled.');
       return;
     }
 
     const intervalMs = this.intervalMs();
+    void this.runOnce();
     this.timer = setInterval(() => {
       void this.runOnce();
     }, intervalMs);
     this.timer.unref();
     this.logger.log(
-      `Award & Reward worker scheduler armed at ${intervalMs}ms interval; Operations mode remains authoritative.`,
+      `Team Business Awards worker scheduler armed at ${intervalMs}ms interval; Operations mode remains authoritative.`,
     );
   }
 
@@ -98,14 +99,14 @@ export class AwardRewardWorkerService
         );
         if (summary.startedTracks > 0 || summary.awardsPosted > 0) {
           this.logger.log(
-            `Award & Reward worker processed ${summary.usersProcessed} users, started ${summary.startedTracks} tracks, posted ${summary.awardsPosted} awards.`,
+            `Team Business Awards worker processed ${summary.usersProcessed} users, started ${summary.startedTracks} tracks, posted ${summary.awardsPosted} awards.`,
           );
         }
       } catch (error) {
         this.logger.error(
           error instanceof Error
-            ? `Award & Reward worker failed: ${error.message}`
-            : 'Award & Reward worker failed with an unknown error.',
+            ? `Team Business Awards worker failed: ${error.message}`
+            : 'Team Business Awards worker failed with an unknown error.',
         );
       } finally {
         await redis.eval(
@@ -118,8 +119,8 @@ export class AwardRewardWorkerService
     } catch (error) {
       this.logger.error(
         error instanceof Error
-          ? `Award & Reward worker orchestration failed: ${error.message}`
-          : 'Award & Reward worker orchestration failed with an unknown error.',
+          ? `Team Business Awards worker orchestration failed: ${error.message}`
+          : 'Team Business Awards worker orchestration failed with an unknown error.',
       );
     } finally {
       this.running = false;
@@ -133,9 +134,9 @@ export class AwardRewardWorkerService
     );
     if (typeof configured === 'boolean') return configured;
     if (typeof configured === 'string') {
-      return ['true', '1', 'yes', 'on'].includes(configured.toLowerCase());
+      return !['false', '0', 'no', 'off'].includes(configured.toLowerCase());
     }
-    return false;
+    return true;
   }
 
   private intervalMs() {
