@@ -49,29 +49,48 @@ const draftPlan = {
   updatedAt: new Date('2026-08-27T00:00:00.000Z'),
 };
 
-const levels = [
-  {
-    id: '33333333-3333-4333-8333-333333333333',
+function levelRow(level: number, ratePercent = '1.000000') {
+  return {
+    id: `33333333-3333-4333-8333-${String(level).padStart(12, '0')}`,
     planVersionId: draftPlan.id,
-    level: 1,
+    level,
     enabled: true,
-    ratePercent: '20.000000',
+    ratePercent,
     packageMatchingEnabled: true,
     createdAt: new Date('2026-08-27T00:00:00.000Z'),
     updatedAt: new Date('2026-08-27T00:00:00.000Z'),
-  },
-];
+  };
+}
+
+const levels = [levelRow(1, '20.000000')];
+
+const packageDepth = {
+  id: '44444444-4444-4444-8444-444444444444',
+  planVersionId: draftPlan.id,
+  packageDefinitionId: '55555555-5555-4555-8555-555555555555',
+  packageCodeSnapshot: 'FTZ_ELITEBOT',
+  packageDisplayNameSnapshot: 'FTZ EliteBot',
+  enabled: true,
+  maxLevelDepth: 10,
+  createdAt: new Date('2026-08-27T00:00:00.000Z'),
+  updatedAt: new Date('2026-08-27T00:00:00.000Z'),
+};
 
 type TransactionWork = (
   transaction: Prisma.TransactionClient,
 ) => Promise<unknown>;
 
-function publicationService(planPatch: Record<string, unknown> = {}) {
+function publicationService(
+  planPatch: Record<string, unknown> = {},
+  levelRows = levels,
+  depthRows: Array<typeof packageDepth> = [],
+) {
   const transaction = {
     $queryRaw: jest
       .fn()
       .mockResolvedValueOnce([{ ...draftPlan, ...planPatch }])
-      .mockResolvedValueOnce(levels),
+      .mockResolvedValueOnce(levelRows)
+      .mockResolvedValueOnce(depthRows),
     $executeRaw: jest.fn(),
     auditLog: { create: jest.fn() },
   };
@@ -129,6 +148,54 @@ describe('CommissionsService', () => {
       ),
     ).rejects.toThrow(
       'Package matching requires active-package qualification.',
+    );
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('requires package depth rules when a commission plan expands beyond L5', async () => {
+    const expandedLevels = Array.from({ length: 6 }, (_, index) =>
+      levelRow(index + 1),
+    );
+    const { service, transaction } = publicationService(
+      {},
+      expandedLevels,
+      [],
+    );
+
+    await expect(
+      service.publishPlan(
+        draftPlan.id,
+        {
+          expectedRevision: 1,
+          reason: 'Publish expanded referral commission plan.',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Expanded referral commission plans require package depth rules.',
+    );
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('rejects a package depth that exceeds the configured maximum level', async () => {
+    const expandedLevels = Array.from({ length: 6 }, (_, index) =>
+      levelRow(index + 1),
+    );
+    const { service, transaction } = publicationService({}, expandedLevels, [
+      { ...packageDepth, maxLevelDepth: 10 },
+    ]);
+
+    await expect(
+      service.publishPlan(
+        draftPlan.id,
+        {
+          expectedRevision: 1,
+          reason: 'Publish expanded referral commission plan.',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'Package level depth must be at least L5 and cannot exceed the configured maximum level.',
     );
     expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
