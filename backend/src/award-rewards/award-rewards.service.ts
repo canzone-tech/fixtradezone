@@ -406,7 +406,11 @@ export class AwardRewardsService {
     context: RequestContext = {},
   ) {
     return this.runSerializable(async (transaction) => {
-      const current = await this.requirePolicy(transaction, policyVersionId, true);
+      const current = await this.requirePolicy(
+        transaction,
+        policyVersionId,
+        true,
+      );
       if (current.status !== 'DRAFT') {
         throw new ConflictException(
           'Published Award & Reward policy versions are immutable. Clone a new draft.',
@@ -536,7 +540,11 @@ export class AwardRewardsService {
     context: RequestContext = {},
   ) {
     return this.runSerializable(async (transaction) => {
-      const current = await this.requirePolicy(transaction, policyVersionId, true);
+      const current = await this.requirePolicy(
+        transaction,
+        policyVersionId,
+        true,
+      );
       if (current.status !== 'DRAFT') {
         throw new ConflictException(
           'Only a DRAFT Award & Reward policy can be published.',
@@ -564,7 +572,9 @@ export class AwardRewardsService {
         );
       }
       if (effectiveTo && effectiveTo <= effectiveFrom) {
-        throw new BadRequestException('effectiveTo must be after effectiveFrom.');
+        throw new BadRequestException(
+          'effectiveTo must be after effectiveFrom.',
+        );
       }
 
       const overlaps = await transaction.$queryRaw<AwardPolicyRow[]>(Prisma.sql`
@@ -645,7 +655,9 @@ export class AwardRewardsService {
   }
 
   async getMyAwards(userId: string) {
-    const currentRows = await this.prisma.$queryRaw<AwardUserTrackRow[]>(Prisma.sql`
+    const currentRows = await this.prisma.$queryRaw<
+      AwardUserTrackRow[]
+    >(Prisma.sql`
       SELECT *
       FROM award_reward_user_tracks
       WHERE userId = ${userId}
@@ -686,7 +698,9 @@ export class AwardRewardsService {
         )
       : [];
 
-    const balanceRows = await this.prisma.$queryRaw<BusinessTotalRow[]>(Prisma.sql`
+    const balanceRows = await this.prisma.$queryRaw<
+      BusinessTotalRow[]
+    >(Prisma.sql`
       SELECT COALESCE(lb.balance, 0.00000000) AS total
       FROM ledger_accounts la
       LEFT JOIN ledger_account_balances lb ON lb.accountId = la.id
@@ -789,9 +803,7 @@ export class AwardRewardsService {
     context: RequestContext = {},
     automatic = false,
   ) {
-    const userIds = userId
-      ? [userId]
-      : await this.loadReconciliationUserIds();
+    const userIds = userId ? [userId] : await this.loadReconciliationUserIds();
 
     let startedTracks = 0;
     let awardsPosted = 0;
@@ -879,7 +891,8 @@ export class AwardRewardsService {
             awardPosted: false,
             closedTrack: false,
             currentTrack: null,
-            message: 'No next eligible ACTIVE package award track is available.',
+            message:
+              'No next eligible ACTIVE package award track is available.',
           };
         }
 
@@ -1043,7 +1056,9 @@ export class AwardRewardsService {
       )
     `);
 
-    const levels = await transaction.$queryRaw<AwardPolicyLevelRow[]>(Prisma.sql`
+    const levels = await transaction.$queryRaw<
+      AwardPolicyLevelRow[]
+    >(Prisma.sql`
       SELECT *
       FROM award_reward_policy_levels
       WHERE policyTrackId = ${candidate.policyTrackId}
@@ -1114,7 +1129,11 @@ export class AwardRewardsService {
     const progress = await this.loadProgress(transaction, track.id, true);
     let parentUserIds = [track.userId];
 
-    for (let levelNumber = 1; levelNumber <= track.levelCount; levelNumber += 1) {
+    for (
+      let levelNumber = 1;
+      levelNumber <= track.levelCount;
+      levelNumber += 1
+    ) {
       const children = await transaction.referralProfile.findMany({
         where: { sponsorUserId: { in: parentUserIds } },
         select: { userId: true },
@@ -1131,7 +1150,9 @@ export class AwardRewardsService {
 
       let currentBusiness = new Prisma.Decimal(0);
       if (levelUserIds.length > 0) {
-        const totals = await transaction.$queryRaw<BusinessTotalRow[]>(Prisma.sql`
+        const totals = await transaction.$queryRaw<
+          BusinessTotalRow[]
+        >(Prisma.sql`
           SELECT COALESCE(SUM(price), 0.00000000) AS total
           FROM user_package_subscriptions
           WHERE userId IN (${Prisma.join(levelUserIds)})
@@ -1163,7 +1184,11 @@ export class AwardRewardsService {
 
       parentUserIds = levelUserIds;
       if (parentUserIds.length === 0) {
-        for (let remaining = levelNumber + 1; remaining <= track.levelCount; remaining += 1) {
+        for (
+          let remaining = levelNumber + 1;
+          remaining <= track.levelCount;
+          remaining += 1
+        ) {
           const remainingRow = progress.find(
             (row) => row.levelNumber === remaining,
           );
@@ -1197,7 +1222,9 @@ export class AwardRewardsService {
     automatic: boolean,
   ) {
     const sourceKey = awardRewardSourceKey(track.id);
-    const existingEvents = await transaction.$queryRaw<AwardEventRow[]>(Prisma.sql`
+    const existingEvents = await transaction.$queryRaw<
+      AwardEventRow[]
+    >(Prisma.sql`
       SELECT *
       FROM award_reward_events
       WHERE sourceKey = ${sourceKey}
@@ -1267,7 +1294,9 @@ export class AwardRewardsService {
       ON DUPLICATE KEY UPDATE sourceKey = VALUES(sourceKey)
     `);
 
-    const ledgerRows = await transaction.$queryRaw<LedgerTransactionRow[]>(Prisma.sql`
+    const ledgerRows = await transaction.$queryRaw<
+      LedgerTransactionRow[]
+    >(Prisma.sql`
       SELECT *
       FROM ledger_transactions
       WHERE sourceKey = ${sourceKey}
@@ -1296,7 +1325,11 @@ export class AwardRewardsService {
         normalSide: 'DEBIT',
       });
       const rewards = await this.ensureLedgerAccount(transaction, {
-        accountKey: userWalletAccountKey(track.userId, 'REWARDS', track.currency),
+        accountKey: userWalletAccountKey(
+          track.userId,
+          'REWARDS',
+          track.currency,
+        ),
         ownerType: 'USER',
         ownerUserId: track.userId,
         bucket: 'REWARDS',
@@ -1471,7 +1504,9 @@ export class AwardRewardsService {
     userId: string,
     policyVersionId: string,
   ) {
-    const maxRows = await client.$queryRaw<{ maxOrder: number | null }[]>(Prisma.sql`
+    const maxRows = await client.$queryRaw<
+      { maxOrder: number | null }[]
+    >(Prisma.sql`
       SELECT MAX(trackOrder) AS maxOrder
       FROM award_reward_user_tracks
       WHERE userId = ${userId}
@@ -1503,8 +1538,12 @@ export class AwardRewardsService {
   }
 
   private async loadReconciliationUserIds(): Promise<string[]> {
-    const effectivePolicy = await this.findEffectivePolicy(this.prisma, new Date());
-    if (!effectivePolicy || !this.booleanValue(effectivePolicy.enabled)) return [];
+    const effectivePolicy = await this.findEffectivePolicy(
+      this.prisma,
+      new Date(),
+    );
+    if (!effectivePolicy || !this.booleanValue(effectivePolicy.enabled))
+      return [];
 
     const rows = await this.prisma.$queryRaw<{ userId: string }[]>(Prisma.sql`
       SELECT DISTINCT candidate.userId
@@ -1592,7 +1631,9 @@ export class AwardRewardsService {
         }
         const awardAmount = new Prisma.Decimal(track.awardAmount);
         if (awardAmount.lte(0)) {
-          throw new BadRequestException('Award amount must be greater than zero.');
+          throw new BadRequestException(
+            'Award amount must be greater than zero.',
+          );
         }
         const levels = track.levels.map((level) => {
           const raw = level.requiredBusiness;
@@ -1656,7 +1697,9 @@ export class AwardRewardsService {
     policy: AwardPolicyRow,
   ) {
     if (!this.booleanValue(policy.enabled)) return;
-    const tracks = await transaction.$queryRaw<AwardPolicyTrackRow[]>(Prisma.sql`
+    const tracks = await transaction.$queryRaw<
+      AwardPolicyTrackRow[]
+    >(Prisma.sql`
       SELECT *
       FROM award_reward_policy_tracks
       WHERE policyVersionId = ${policy.id}
@@ -1668,7 +1711,9 @@ export class AwardRewardsService {
       );
     }
     for (const track of tracks) {
-      const levels = await transaction.$queryRaw<AwardPolicyLevelRow[]>(Prisma.sql`
+      const levels = await transaction.$queryRaw<
+        AwardPolicyLevelRow[]
+      >(Prisma.sql`
         SELECT *
         FROM award_reward_policy_levels
         WHERE policyTrackId = ${track.id}
@@ -1755,7 +1800,8 @@ export class AwardRewardsService {
       ${lock}
     `);
     const row = rows[0];
-    if (!row) throw new NotFoundException('Award & Reward policy was not found.');
+    if (!row)
+      throw new NotFoundException('Award & Reward policy was not found.');
     return row;
   }
 
@@ -2009,8 +2055,7 @@ export class AwardRewardsService {
 
     return {
       levelNumber: row.levelNumber,
-      requiredBusiness:
-        required === null ? null : this.moneyString(required),
+      requiredBusiness: required === null ? null : this.moneyString(required),
       currentBusiness: this.moneyString(current),
       required: required !== null,
       achieved: row.achievedAt !== null,
