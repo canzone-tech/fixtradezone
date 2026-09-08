@@ -6,7 +6,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import AwardRewardsClient from "./award-rewards-client";
 
 export const metadata: Metadata = {
-  title: "Award & Reward | FixTradeZone",
+  title: "Team Business Awards | FixTradeZone",
 };
 
 export default async function AwardRewardsPage() {
