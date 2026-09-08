@@ -223,6 +223,19 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Rewards & Caps</span>
             </Link>
 
+            {!impersonated ? (
+              <Link
+                href="/user/award-rewards"
+                className={`ftz-nav-link ${
+                  isActive("/user/award-rewards") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-trophy" />
+                <span>Award & Reward</span>
+              </Link>
+            ) : null}
+
             <Link
               href="/user/trading"
               className={`ftz-nav-link ${
