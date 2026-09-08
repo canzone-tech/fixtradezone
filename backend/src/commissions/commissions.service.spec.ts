@@ -156,11 +156,7 @@ describe('CommissionsService', () => {
     const expandedLevels = Array.from({ length: 6 }, (_, index) =>
       levelRow(index + 1),
     );
-    const { service, transaction } = publicationService(
-      {},
-      expandedLevels,
-      [],
-    );
+    const { service, transaction } = publicationService({}, expandedLevels, []);
 
     await expect(
       service.publishPlan(

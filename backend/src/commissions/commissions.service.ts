@@ -403,7 +403,10 @@ export class CommissionsService {
       }
 
       const currentLevels = await this.getLevels(transaction, current.id);
-      const currentDepths = await this.getPackageDepths(transaction, current.id);
+      const currentDepths = await this.getPackageDepths(
+        transaction,
+        current.id,
+      );
       const levels =
         dto.levels ??
         currentLevels.map((level) => ({
