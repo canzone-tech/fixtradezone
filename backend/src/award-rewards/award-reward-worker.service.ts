@@ -33,7 +33,9 @@ export class AwardRewardWorkerService
 
   onModuleInit() {
     if (!this.infrastructureEnabled()) {
-      this.logger.log('Team Business Awards worker infrastructure is disabled.');
+      this.logger.log(
+        'Team Business Awards worker infrastructure is disabled.',
+      );
       return;
     }
 
