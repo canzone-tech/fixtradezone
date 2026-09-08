@@ -76,8 +76,11 @@ export default function EmailDiagnosticsClient() {
         throw new Error(payload.message ?? "Test email failed.");
       }
 
+      const transport = payload.transport ?? status?.mode;
       setSuccess(
-        `${payload.message ?? "Test email accepted."}${payload.transport ? ` Transport: ${payload.transport}.` : ""}`,
+        transport === "CONSOLE"
+          ? "Test message generated successfully in CONSOLE mode. No external email was sent."
+          : `${payload.message ?? "Test email accepted by the configured transport."} Check the recipient inbox or spam folder for final delivery.`,
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Test email failed.");
@@ -115,16 +118,28 @@ export default function EmailDiagnosticsClient() {
         {loading ? (
           <div className={styles.empty}>Loading email transport status…</div>
         ) : status ? (
-          <div className={styles.grid}>
-            <div className={styles.metric}>
-              <small>Mode</small>
-              <strong>{status.mode}</strong>
+          <>
+            <div className={styles.grid}>
+              <div className={styles.metric}>
+                <small>Mode</small>
+                <strong>{status.mode}</strong>
+              </div>
+              <div className={styles.metric}>
+                <small>Configuration</small>
+                <strong>
+                  <span className="ftz-status-chip">
+                    {status.configured ? "READY" : "INCOMPLETE"}
+                  </span>
+                </strong>
+              </div>
             </div>
-            <div className={styles.metric}>
-              <small>Configuration</small>
-              <strong>{status.configured ? "READY" : "INCOMPLETE"}</strong>
-            </div>
-          </div>
+            {status.mode === "CONSOLE" ? (
+              <div className="ftz-console-warning" role="status">
+                <i className="iconoir-warning-triangle" />
+                CONSOLE MODE — delivery is captured locally; no external inbox email is sent.
+              </div>
+            ) : null}
+          </>
         ) : (
           <div className={styles.empty}>Email status is unavailable.</div>
         )}
