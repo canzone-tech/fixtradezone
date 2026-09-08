@@ -54,6 +54,8 @@ function approvedDepth(option: CommissionPackageOption) {
   const name = normalizedPackageName(
     `${option.packageCode}${option.displayName}`,
   );
+  if (name.includes("ALPHABOT")) return 5;
+  if (name.includes("BULLBOT")) return 5;
   if (name.includes("CRYPTOBOT")) return 5;
   if (name.includes("DYNAMOBOT")) return 5;
   if (name.includes("ELITEBOT")) return 10;
