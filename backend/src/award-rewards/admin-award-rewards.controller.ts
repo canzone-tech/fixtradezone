@@ -134,7 +134,7 @@ export class AdminAwardRewardsController {
     @Body() dto: ReconcileAwardRewardDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
+  ): Promise<unknown> {
     return this.awardRewardsService.reconcile(
       dto.userId,
       actor,
