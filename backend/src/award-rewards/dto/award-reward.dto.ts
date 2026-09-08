@@ -16,10 +16,14 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
-import { AWARD_USER_TRACK_STATUSES, type AwardUserTrackStatus } from '../award-rewards.constants';
+import {
+  AWARD_USER_TRACK_STATUSES,
+  type AwardUserTrackStatus,
+} from '../award-rewards.constants';
 
 const MONEY_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,8})?$/;
-const POSITIVE_MONEY_PATTERN = /^(?:0*[1-9]\d{0,11})(?:\.\d{1,8})?$|^(?:0|[1-9]\d{0,11})\.\d*[1-9]\d*$/;
+const POSITIVE_MONEY_PATTERN =
+  /^(?:0*[1-9]\d{0,11})(?:\.\d{1,8})?$|^(?:0|[1-9]\d{0,11})\.\d*[1-9]\d*$/;
 
 export class AwardRewardPageQueryDto {
   @IsOptional()
@@ -80,7 +84,8 @@ export class CreateAwardRewardPolicyDraftDto {
 export class AwardRewardLevelInputDto {
   @Transform(trimString)
   @ValidateIf(
-    (_object, value: unknown) => value !== undefined && value !== null && value !== '',
+    (_object, value: unknown) =>
+      value !== undefined && value !== null && value !== '',
   )
   @IsString()
   @Matches(MONEY_PATTERN)
@@ -152,6 +157,8 @@ export class ReconcileAwardRewardDto {
   userId?: string;
 }
 
-export function isAwardUserTrackStatus(value: string): value is AwardUserTrackStatus {
+export function isAwardUserTrackStatus(
+  value: string,
+): value is AwardUserTrackStatus {
   return (AWARD_USER_TRACK_STATUSES as readonly string[]).includes(value);
 }
