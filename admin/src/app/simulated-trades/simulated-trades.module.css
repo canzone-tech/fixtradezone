@@ -317,10 +317,12 @@
 
 .disclosure strong {
   color: #fbbf24;
+  font-size: 12px;
 }
 
 .disclosure p {
   margin: 5px 0 0;
+  font-size: 11px;
   line-height: 1.55;
 }
 
