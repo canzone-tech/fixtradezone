@@ -232,7 +232,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 onClick={close}
               >
                 <i className="iconoir-trophy" />
-                <span>Award & Reward</span>
+                <span>Team Business Awards</span>
               </Link>
             ) : null}
 
