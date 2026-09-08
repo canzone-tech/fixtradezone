@@ -131,19 +131,26 @@ describe('AwardRewardsService policy matrix', () => {
 
   it('selects only a later ACTIVE, not-yet-awarded package in track order', async () => {
     const { service, transaction, queryRaw } = serviceAndTransaction();
+    let candidateQuery: unknown = null;
+
     queryRaw
-      .mockResolvedValueOnce([{ maxOrder: 1 }])
-      .mockResolvedValueOnce([
-        {
-          sourceSubscriptionId: '44444444-4444-4444-8444-444444444444',
-          packageDefinitionId,
-          packageCode: 'ELITEBOT',
-          packageDisplayName: 'EliteBot',
-          policyTrackId: '55555555-5555-4555-8555-555555555555',
-          trackOrder: 3,
-          awardAmount: new Prisma.Decimal('500'),
-        },
-      ]);
+      .mockImplementationOnce((_query: unknown) =>
+        Promise.resolve([{ maxOrder: 1 }]),
+      )
+      .mockImplementationOnce((query: unknown) => {
+        candidateQuery = query;
+        return Promise.resolve([
+          {
+            sourceSubscriptionId: '44444444-4444-4444-8444-444444444444',
+            packageDefinitionId,
+            packageCode: 'ELITEBOT',
+            packageDisplayName: 'EliteBot',
+            policyTrackId: '55555555-5555-4555-8555-555555555555',
+            trackOrder: 3,
+            awardAmount: new Prisma.Decimal('500'),
+          },
+        ]);
+      });
 
     const result = await service.findNextCandidate(transaction, userId, {
       id: policyId,
@@ -170,7 +177,7 @@ describe('AwardRewardsService policy matrix', () => {
     });
     expect(queryRaw).toHaveBeenCalledTimes(2);
 
-    const candidateSql = sqlText(queryRaw.mock.calls[1]?.[0]);
+    const candidateSql = sqlText(candidateQuery);
     expect(candidateSql).toContain("ups.status = 'ACTIVE'");
     expect(candidateSql).toContain('arpt.trackOrder >');
     expect(candidateSql).toContain('existing.id IS NULL');
