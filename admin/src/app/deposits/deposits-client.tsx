@@ -76,6 +76,10 @@ function hasPermission(user: AdminUser, permission: string): boolean {
   return isSuperAdmin(user) || user.permissions.includes(permission);
 }
 
+function isBulkApprovableStatus(status: DepositStatus): boolean {
+  return status === "PENDING_REVIEW" || status === "READY_FOR_APPROVAL";
+}
+
 async function fetchAdminDepositWorkspace(
   filter: DepositFilter,
 ): Promise<AdminDepositWorkspace> {
@@ -153,7 +157,7 @@ export default function DepositsClient() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
-  const [selectedReadyIds, setSelectedReadyIds] = useState<string[]>([]);
+  const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
   const [bulkApprovalNote, setBulkApprovalNote] = useState("");
 
   const canReadAccounts =
@@ -190,10 +194,11 @@ export default function DepositsClient() {
     setRails(workspace.rails);
     setAccounts(workspace.accounts);
     setDeposits(workspace.deposits);
-    setSelectedReadyIds((current) =>
+    setSelectedApprovalIds((current) =>
       current.filter((id) =>
         workspace.deposits.some(
-          (deposit) => deposit.id === id && deposit.status === "READY_FOR_APPROVAL",
+          (deposit) =>
+            deposit.id === id && isBulkApprovableStatus(deposit.status),
         ),
       ),
     );
@@ -542,7 +547,7 @@ export default function DepositsClient() {
       }
 
       setReviewNotes((current) => ({ ...current, [deposit.id]: "" }));
-      setSelectedReadyIds((current) =>
+      setSelectedApprovalIds((current) =>
         current.filter((id) => id !== deposit.id),
       );
 
@@ -570,8 +575,8 @@ export default function DepositsClient() {
     }
   }
 
-  function toggleReadySelection(depositId: string) {
-    setSelectedReadyIds((current) =>
+  function toggleApprovalSelection(depositId: string) {
+    setSelectedApprovalIds((current) =>
       current.includes(depositId)
         ? current.filter((id) => id !== depositId)
         : [...current, depositId],
@@ -579,7 +584,7 @@ export default function DepositsClient() {
   }
 
   async function bulkApproveSelected() {
-    if (!canApprove || selectedReadyIds.length === 0) return;
+    if (!canApprove || selectedApprovalIds.length === 0) return;
 
     const note = bulkApprovalNote.trim();
     if (note.length < 3) {
@@ -589,10 +594,10 @@ export default function DepositsClient() {
 
     const selected = deposits.filter(
       (deposit) =>
-        deposit.status === "READY_FOR_APPROVAL" &&
-        selectedReadyIds.includes(deposit.id),
+        isBulkApprovableStatus(deposit.status) &&
+        selectedApprovalIds.includes(deposit.id),
     );
-    if (selected.length !== selectedReadyIds.length) {
+    if (selected.length !== selectedApprovalIds.length) {
       setError("One or more selected deposits changed state. Refresh and retry.");
       return;
     }
@@ -607,9 +612,14 @@ export default function DepositsClient() {
     const totalText = [...totals.entries()]
       .map(([currency, amounts]) => `${sumDecimalStrings(amounts)} ${currency}`)
       .join(", ");
+    const directCount = selected.filter(
+      (deposit) => deposit.status === "PENDING_REVIEW",
+    ).length;
+    const adminReviewedCount = selected.length - directCount;
 
     const confirmed = window.confirm(
-      `Approve ${selected.length} ADMIN-reviewed deposit(s) totaling ${totalText}?\n\n` +
+      `Approve ${selected.length} deposit(s) totaling ${totalText}?\n\n` +
+        `Selection: ${directCount} direct SUPER_ADMIN approval · ${adminReviewedCount} ADMIN-reviewed final approval.\n\n` +
         "Each deposit is processed independently and may post accounting, activate a package, and trigger downstream earnings automation.",
     );
     if (!confirmed) return;
@@ -621,7 +631,7 @@ export default function DepositsClient() {
       const response = await fetch("/api/admin/deposits/bulk-approve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ depositIds: selectedReadyIds, note }),
+        body: JSON.stringify({ depositIds: selectedApprovalIds, note }),
       });
       const payload = await readJson<DepositBulkApprovalResponse>(response);
       if (!response.ok || !payload) {
@@ -629,7 +639,7 @@ export default function DepositsClient() {
       }
 
       setBulkApprovalNote("");
-      setSelectedReadyIds([]);
+      setSelectedApprovalIds([]);
       const failures = payload.results.filter((result) => !result.ok);
       setNotice(
         failures.length === 0
@@ -1127,12 +1137,14 @@ export default function DepositsClient() {
             </div>
           </div>
 
-          {canApprove && deposits.some((deposit) => deposit.status === "READY_FOR_APPROVAL") ? (
+          {canApprove &&
+          deposits.some((deposit) => isBulkApprovableStatus(deposit.status)) ? (
             <div className={styles.notice}>
-              <strong>SUPER_ADMIN final approval</strong>
+              <strong>SUPER_ADMIN bulk approval</strong>
               <p>
-                Select only deposits already marked ready by an ADMIN reviewer.
-                Bulk approval processes every selected deposit independently.
+                Select pending deposits for direct SUPER_ADMIN approval or
+                ADMIN-reviewed deposits for final approval. Mixed selections are
+                allowed, and every deposit is processed independently.
               </p>
               <div className={styles.field}>
                 <label htmlFor="bulk-approval-note">Bulk approval note</label>
@@ -1149,12 +1161,12 @@ export default function DepositsClient() {
                 <button
                   className={styles.button}
                   type="button"
-                  disabled={busy !== null || selectedReadyIds.length === 0}
+                  disabled={busy !== null || selectedApprovalIds.length === 0}
                   onClick={() => void bulkApproveSelected()}
                 >
                   {busy === "bulk-approve"
                     ? "Approving selected…"
-                    : `Approve selected (${selectedReadyIds.length})`}
+                    : `Approve selected (${selectedApprovalIds.length})`}
                 </button>
               </div>
             </div>
@@ -1180,12 +1192,12 @@ export default function DepositsClient() {
                       </small>
                     </div>
                     <div className={styles.actions}>
-                      {canApprove && deposit.status === "READY_FOR_APPROVAL" ? (
+                      {canApprove && isBulkApprovableStatus(deposit.status) ? (
                         <label className={styles.muted}>
                           <input
                             type="checkbox"
-                            checked={selectedReadyIds.includes(deposit.id)}
-                            onChange={() => toggleReadySelection(deposit.id)}
+                            checked={selectedApprovalIds.includes(deposit.id)}
+                            onChange={() => toggleApprovalSelection(deposit.id)}
                             disabled={busy !== null}
                           />{" "}
                           Select
