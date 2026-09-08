@@ -10,6 +10,7 @@ import { AdminDepositsController } from './admin-deposits.controller';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
 import { DepositsController } from './deposits.controller';
 import { DepositsService } from './deposits.service';
+import { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
 @Module({
   imports: [
@@ -25,7 +26,11 @@ import { DepositsService } from './deposits.service';
     AdminDepositAccountsController,
     AdminDepositsController,
   ],
-  providers: [DepositsService, DepositApprovalOrchestratorService],
+  providers: [
+    DepositsService,
+    DirectDepositApprovalService,
+    DepositApprovalOrchestratorService,
+  ],
   exports: [DepositsService],
 })
 export class DepositsModule {}
