@@ -1,0 +1,294 @@
+{
+  "info": {
+    "_postman_id": "d6f60d91-77fa-4e40-b261-8dbf5ffb43f2",
+    "name": "FixTradeZone COMM-02 Referral Commission Expansion",
+    "description": "Focused local acceptance for expanded, versioned Referral Commissions. Run only after migration 0033 and frontend acceptance. Existing published V1 remains immutable. Write requests clone/update/publish a NEW version; do not run the full collection blindly against production.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{adminAccessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "commissionSourcePlanId", "value": "" },
+    { "key": "commissionPlanId", "value": "" },
+    { "key": "commissionRevision", "value": "" },
+    { "key": "commissionCryptoPackageId", "value": "" },
+    { "key": "commissionDynamoPackageId", "value": "" },
+    { "key": "commissionElitePackageId", "value": "" },
+    { "key": "commissionJupiterPackageId", "value": "" },
+    { "key": "commissionLegendPackageId", "value": "" },
+    { "key": "commissionNovaPackageId", "value": "" },
+    { "key": "commissionPrimePackageId", "value": "" },
+    { "key": "commissionV2Payload", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "01 - Read commission plans and capture current published source",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/commission-plans",
+        "description": "Read-only. Captures the currently effective/open-ended published commission plan as the clone source."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.plans).to.be.an('array').that.is.not.empty;",
+              "const source = body.plans.find((p) => p.status === 'PUBLISHED' && p.effectiveTo === null) || body.plans.find((p) => p.status === 'PUBLISHED');",
+              "pm.expect(source, 'published referral commission plan').to.exist;",
+              "pm.collectionVariables.set('commissionSourcePlanId', source.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Read published package catalogue for depth rules",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/commission-plans/packages",
+        "description": "Read-only. Resolves stable packageDefinitionId values; no package UUID is hardcoded in this collection."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.packages).to.be.an('array').that.is.not.empty;",
+              "const normalized = (value) => String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');",
+              "const targets = [",
+              "  ['CRYPTOBOT', 'commissionCryptoPackageId'],",
+              "  ['DYNAMOBOT', 'commissionDynamoPackageId'],",
+              "  ['ELITEBOT', 'commissionElitePackageId'],",
+              "  ['JUPITERBOT', 'commissionJupiterPackageId'],",
+              "  ['LEGENDBOT', 'commissionLegendPackageId'],",
+              "  ['NOVABOT', 'commissionNovaPackageId'],",
+              "  ['PRIMEBOT', 'commissionPrimePackageId']",
+              "];",
+              "targets.forEach(([needle, key]) => {",
+              "  const match = body.packages.find((p) => normalized(`${p.packageCode}${p.displayName}`).includes(needle));",
+              "  pm.collectionVariables.set(key, match ? match.packageDefinitionId : '');",
+              "});",
+              "['commissionCryptoPackageId','commissionDynamoPackageId','commissionElitePackageId','commissionJupiterPackageId','commissionLegendPackageId','commissionNovaPackageId'].forEach((key) => pm.expect(pm.collectionVariables.get(key), key).to.be.a('string').and.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - MANUAL WRITE - Clone published plan into new draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sourcePlanVersionId\": \"{{commissionSourcePlanId}}\",\n  \"reason\": \"COMM-02 local acceptance: clone published Referral Commission plan.\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/commission-plans/drafts",
+        "description": "WRITE. Creates a DRAFT only; has no financial effect. Do not run if a draft already exists."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Draft created', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+              "const body = pm.response.json();",
+              "pm.expect(body.status).to.eql('DRAFT');",
+              "pm.collectionVariables.set('commissionPlanId', body.id);",
+              "pm.collectionVariables.set('commissionRevision', String(body.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - MANUAL WRITE - Save approved 50-level expanded draft",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{{commissionV2Payload}}"
+        },
+        "url": "{{baseUrl}}/admin/commission-plans/{{commissionPlanId}}",
+        "description": "WRITE DRAFT ONLY. Applies approved 50-level rate ranges and package cumulative depth rules. PrimeBot is included automatically only when present in the published package catalogue."
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const rateFor = (level) => {",
+              "  if (level === 1) return '10';",
+              "  if (level === 2) return '4';",
+              "  if (level === 3) return '3';",
+              "  if (level === 4) return '2';",
+              "  if (level === 5) return '1';",
+              "  if (level <= 10) return '0.5';",
+              "  if (level <= 20) return '1';",
+              "  if (level <= 30) return '1.5';",
+              "  if (level <= 40) return '2';",
+              "  return '3';",
+              "};",
+              "const levels = Array.from({ length: 50 }, (_, index) => ({ level: index + 1, enabled: true, ratePercent: rateFor(index + 1), packageMatchingEnabled: true }));",
+              "const depthConfig = [",
+              "  ['commissionCryptoPackageId', 5],",
+              "  ['commissionDynamoPackageId', 5],",
+              "  ['commissionElitePackageId', 10],",
+              "  ['commissionJupiterPackageId', 20],",
+              "  ['commissionLegendPackageId', 30],",
+              "  ['commissionNovaPackageId', 40],",
+              "  ['commissionPrimePackageId', 50]",
+              "];",
+              "const packageDepths = depthConfig.flatMap(([key, maxLevelDepth]) => {",
+              "  const packageDefinitionId = pm.collectionVariables.get(key);",
+              "  return packageDefinitionId ? [{ packageDefinitionId, enabled: true, maxLevelDepth }] : [];",
+              "});",
+              "const payload = { expectedRevision: Number(pm.collectionVariables.get('commissionRevision')), reason: 'COMM-02 local acceptance: configure approved level rates and package depth.', levels, packageDepths };",
+              "pm.collectionVariables.set('commissionV2Payload', JSON.stringify(payload));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expanded draft saved', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.status).to.eql('DRAFT');",
+              "pm.expect(body.maxLevels).to.eql(50);",
+              "pm.expect(body.levels).to.have.length(50);",
+              "pm.expect(body.packageDepths).to.be.an('array').that.is.not.empty;",
+              "pm.collectionVariables.set('commissionRevision', String(body.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Readback expanded draft",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/commission-plans/{{commissionPlanId}}",
+        "description": "Read-only verification before publication."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.status).to.eql('DRAFT');",
+              "pm.expect(body.maxLevels).to.eql(50);",
+              "pm.expect(body.levels.find((l) => l.level === 1).ratePercent).to.eql('10.000000');",
+              "pm.expect(body.levels.find((l) => l.level === 6).ratePercent).to.eql('0.500000');",
+              "pm.expect(body.levels.find((l) => l.level === 41).ratePercent).to.eql('3.000000');",
+              "pm.expect(body.packageDepths).to.be.an('array').that.is.not.empty;"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - MANUAL FINAL WRITE - Publish V2 after frontend approval",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"expectedRevision\": {{commissionRevision}},\n  \"reason\": \"COMM-02 local acceptance: publish approved expanded Referral Commission policy.\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/commission-plans/{{commissionPlanId}}/publish",
+        "description": "FINAL WRITE. Run ONLY after SUPER_ADMIN frontend approval. Publication is forward-only; it closes the previous published plan at the new effectiveFrom and never rewrites old commission events."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('V2 published', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.status).to.eql('PUBLISHED');",
+              "pm.expect(body.maxLevels).to.eql(50);",
+              "pm.collectionVariables.set('commissionRevision', String(body.revision));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Read commission events after V2 source activation",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/commissions?limit=100",
+        "description": "Read-only. After creating a fresh eligible package activation through the normal deposit/subscription lifecycle, verify level, eligibleBase, ratePercent, amount, status and immutable ledger transaction ID here."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.commissions).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Recovery queue remains optional",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/admin/commissions/reconciliation?limit=100",
+        "description": "Read-only recovery check. Normal referral commission processing is automatic from package activation; manual reconciliation is fallback only."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.subscriptions).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
