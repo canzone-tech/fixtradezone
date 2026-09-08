@@ -30,7 +30,8 @@
 .footer {
   position: relative;
   z-index: 1;
-  width: min(1180px, calc(100% - 40px));
+  width: calc(100% - clamp(40px, 5vw, 96px));
+  max-width: none;
   margin-inline: auto;
 }
 
@@ -102,11 +103,15 @@
 
 .hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(360px, .72fr);
-  gap: 64px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(380px, .7fr);
+  gap: clamp(48px, 7vw, 124px);
   align-items: center;
   min-height: 680px;
   padding: 88px 0 72px;
+}
+
+.heroCopy {
+  max-width: 900px;
 }
 
 .badge,
@@ -128,9 +133,9 @@
 }
 
 .hero h1 {
-  max-width: 760px;
+  max-width: 900px;
   margin: 25px 0 22px;
-  font-size: clamp(3rem, 7vw, 5.85rem);
+  font-size: clamp(3rem, 6.4vw, 6.2rem);
   line-height: .96;
   letter-spacing: -.055em;
 }
@@ -143,7 +148,7 @@
 }
 
 .heroDescription {
-  max-width: 720px;
+  max-width: 760px;
   margin: 0;
   color: #a9b8d3;
   font-size: 1.08rem;
@@ -196,13 +201,11 @@
   gap: 6px;
 }
 
-.assurance svg {
-  color: var(--ftz-green);
-}
-
 .heroPanel {
+  justify-self: end;
+  width: min(100%, 620px);
   border: 1px solid var(--ftz-line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: linear-gradient(160deg, rgba(8, 23, 53, .95), rgba(4, 12, 30, .88));
   box-shadow: 0 30px 90px rgba(0, 0, 0, .32), inset 0 1px rgba(255, 255, 255, .03);
   overflow: hidden;
@@ -273,7 +276,7 @@
 }
 
 .sectionHeading {
-  max-width: 760px;
+  max-width: 860px;
 }
 
 .sectionHeading span {
@@ -294,7 +297,7 @@
 
 .featureGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   margin-top: 42px;
 }
@@ -303,7 +306,7 @@
   min-height: 230px;
   padding: 24px;
   border: 1px solid var(--ftz-line);
-  border-radius: 17px;
+  border-radius: 16px;
   background: linear-gradient(150deg, rgba(8, 23, 53, .78), rgba(3, 12, 29, .84));
 }
 
@@ -335,7 +338,7 @@
   align-items: center;
   padding: 58px;
   border: 1px solid var(--ftz-line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--ftz-panel);
 }
 
@@ -354,10 +357,6 @@
   background: rgba(2, 8, 23, .48);
   color: #b8c5db;
   font-size: .86rem;
-}
-
-.trustList svg {
-  color: var(--ftz-green);
 }
 
 .disclosure {
@@ -408,6 +407,11 @@
     padding-top: 68px;
   }
 
+  .heroPanel {
+    justify-self: stretch;
+    width: 100%;
+  }
+
   .featureGrid {
     grid-template-columns: 1fr;
   }
@@ -431,7 +435,7 @@
   .disclosure,
   .finalCta,
   .footer {
-    width: min(100% - 26px, 1180px);
+    width: calc(100% - 26px);
   }
 
   .navLink {
