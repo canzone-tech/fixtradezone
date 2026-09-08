@@ -29,6 +29,7 @@ import {
 import type {
   AdminCommissionQueryDto,
   CommissionLevelRuleDto,
+  CommissionPackageDepthRuleDto,
   CommissionPageQueryDto,
   CreateCommissionPlanDraftDto,
   PublishCommissionPlanDto,
@@ -80,6 +81,30 @@ interface CommissionLevelRow {
   packageMatchingEnabled: boolean | number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface CommissionPackageDepthRow {
+  id: string;
+  planVersionId: string;
+  packageDefinitionId: string;
+  packageCodeSnapshot: string;
+  packageDisplayNameSnapshot: string;
+  enabled: boolean | number;
+  maxLevelDepth: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface PackageOptionRow {
+  packageDefinitionId: string;
+  packageCode: string;
+  displayName: string;
+  sortOrder: number;
+  versionNumber: number;
+}
+
+interface MaxDepthRow {
+  maxLevelDepth: bigint | number | string | null;
 }
 
 interface SourceSubscriptionRow {
@@ -195,6 +220,11 @@ interface RouteNode {
   receiverUserId: string;
 }
 
+interface NormalizedPackageDepthRule extends CommissionPackageDepthRuleDto {
+  packageCodeSnapshot: string;
+  packageDisplayNameSnapshot: string;
+}
+
 @Injectable()
 export class CommissionsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -216,6 +246,24 @@ export class CommissionsService {
   async getPlan(planVersionId: string) {
     const row = await this.requirePlan(this.prisma, planVersionId, false);
     return this.planSnapshotWithLevels(this.prisma, row);
+  }
+
+  async listPackageOptions() {
+    const rows = await this.loadPackageOptionRows(this.prisma);
+    const seen = new Set<string>();
+    const packages = rows.flatMap((row) => {
+      if (seen.has(row.packageDefinitionId)) return [];
+      seen.add(row.packageDefinitionId);
+      return [
+        {
+          packageDefinitionId: row.packageDefinitionId,
+          packageCode: row.packageCode,
+          displayName: row.displayName,
+          sortOrder: row.sortOrder,
+        },
+      ];
+    });
+    return { packages };
   }
 
   async createDraft(
@@ -250,6 +298,7 @@ export class CommissionsService {
         );
       }
       const sourceLevels = await this.getLevels(transaction, source.id);
+      const sourceDepths = await this.getPackageDepths(transaction, source.id);
       const maxRows = await transaction.$queryRaw<
         { maxVersion: number | null }[]
       >(Prisma.sql`
@@ -295,6 +344,20 @@ export class CommissionsService {
         `);
       }
 
+      for (const depth of sourceDepths) {
+        await transaction.$executeRaw(Prisma.sql`
+          INSERT INTO referral_commission_package_depth_rules (
+            id, planVersionId, packageDefinitionId, packageCodeSnapshot,
+            packageDisplayNameSnapshot, enabled, maxLevelDepth, createdAt, updatedAt
+          ) VALUES (
+            ${randomUUID()}, ${id}, ${depth.packageDefinitionId},
+            ${depth.packageCodeSnapshot}, ${depth.packageDisplayNameSnapshot},
+            ${Boolean(depth.enabled)}, ${depth.maxLevelDepth},
+            CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+          )
+        `);
+      }
+
       await transaction.auditLog.create({
         data: {
           actorUserId: actor.id,
@@ -307,6 +370,7 @@ export class CommissionsService {
             operation: COMMISSION_AUDIT_OPERATIONS.CLONE_DRAFT,
             sourcePlanVersionId: source.id,
             versionNumber,
+            packageDepthRuleCount: sourceDepths.length,
             reason: dto.reason,
           },
           ipAddress: context.ipAddress,
@@ -339,6 +403,7 @@ export class CommissionsService {
       }
 
       const currentLevels = await this.getLevels(transaction, current.id);
+      const currentDepths = await this.getPackageDepths(transaction, current.id);
       const levels =
         dto.levels ??
         currentLevels.map((level) => ({
@@ -346,6 +411,13 @@ export class CommissionsService {
           enabled: Boolean(level.enabled),
           ratePercent: this.rateString(level.ratePercent),
           packageMatchingEnabled: Boolean(level.packageMatchingEnabled),
+        }));
+      const packageDepths =
+        dto.packageDepths ??
+        currentDepths.map((depth) => ({
+          packageDefinitionId: depth.packageDefinitionId,
+          enabled: Boolean(depth.enabled),
+          maxLevelDepth: depth.maxLevelDepth,
         }));
 
       const next = {
@@ -365,7 +437,7 @@ export class CommissionsService {
         holdPeriodHours: dto.holdPeriodHours ?? current.holdPeriodHours,
       };
 
-      this.validatePlanConfiguration(next, levels, false);
+      this.validatePlanConfiguration(next, levels, packageDepths, false);
 
       await transaction.$executeRaw(Prisma.sql`
         UPDATE referral_commission_plan_versions
@@ -407,6 +479,30 @@ export class CommissionsService {
         }
       }
 
+      if (dto.packageDepths) {
+        const normalizedDepths = await this.normalizePackageDepthRules(
+          transaction,
+          dto.packageDepths,
+        );
+        await transaction.$executeRaw(Prisma.sql`
+          DELETE FROM referral_commission_package_depth_rules
+          WHERE planVersionId = ${current.id}
+        `);
+        for (const depth of normalizedDepths) {
+          await transaction.$executeRaw(Prisma.sql`
+            INSERT INTO referral_commission_package_depth_rules (
+              id, planVersionId, packageDefinitionId, packageCodeSnapshot,
+              packageDisplayNameSnapshot, enabled, maxLevelDepth, createdAt, updatedAt
+            ) VALUES (
+              ${randomUUID()}, ${current.id}, ${depth.packageDefinitionId},
+              ${depth.packageCodeSnapshot}, ${depth.packageDisplayNameSnapshot},
+              ${depth.enabled}, ${depth.maxLevelDepth},
+              CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+            )
+          `);
+        }
+      }
+
       await transaction.auditLog.create({
         data: {
           actorUserId: actor.id,
@@ -418,6 +514,8 @@ export class CommissionsService {
             operation: COMMISSION_AUDIT_OPERATIONS.UPDATE_DRAFT,
             previousRevision: current.revision,
             newRevision: current.revision + 1,
+            maxLevels: this.maxConfiguredLevel(levels),
+            packageDepthRuleCount: packageDepths.length,
             reason: dto.reason,
           },
           ipAddress: context.ipAddress,
@@ -450,11 +548,20 @@ export class CommissionsService {
       }
 
       const levels = await this.getLevels(transaction, current.id);
+      const packageDepthRows = await this.getPackageDepths(
+        transaction,
+        current.id,
+      );
       const normalizedLevels = levels.map((level) => ({
         level: level.level,
         enabled: Boolean(level.enabled),
         ratePercent: this.rateString(level.ratePercent),
         packageMatchingEnabled: Boolean(level.packageMatchingEnabled),
+      }));
+      const normalizedDepths = packageDepthRows.map((depth) => ({
+        packageDefinitionId: depth.packageDefinitionId,
+        enabled: Boolean(depth.enabled),
+        maxLevelDepth: depth.maxLevelDepth,
       }));
       this.validatePlanConfiguration(
         {
@@ -470,6 +577,7 @@ export class CommissionsService {
           holdPeriodHours: current.holdPeriodHours,
         },
         normalizedLevels,
+        normalizedDepths,
         true,
       );
 
@@ -559,6 +667,8 @@ export class CommissionsService {
             operation: COMMISSION_AUDIT_OPERATIONS.PUBLISH_PLAN,
             reason: dto.reason,
             versionNumber: current.versionNumber,
+            maxLevels: this.maxConfiguredLevel(normalizedLevels),
+            packageDepthRuleCount: normalizedDepths.length,
             effectiveFrom: effectiveFrom.toISOString(),
             effectiveTo: effectiveTo?.toISOString() ?? null,
           },
@@ -847,6 +957,8 @@ export class CommissionsService {
           'Published commission plan has no enabled level rules.',
         );
       }
+      const packageDepths = await this.getPackageDepths(transaction, plan.id);
+      const hasPackageDepthPolicy = packageDepths.length > 0;
 
       const maxLevel = Math.max(...levels.map((level) => level.level));
       const route = await this.resolveSponsorRoute(
@@ -877,6 +989,7 @@ export class CommissionsService {
         route,
       );
       const events: CommissionEventRow[] = [];
+      const depthByReceiver = new Map<string, number>();
 
       for (const rule of levels) {
         const routeNode = route.find((node) => node.level === rule.level);
@@ -911,6 +1024,39 @@ export class CommissionsService {
           });
           events.push(lost);
           continue;
+        }
+
+        if (hasPackageDepthPolicy) {
+          let maxDepth = depthByReceiver.get(routeNode.receiverUserId);
+          if (maxDepth === undefined) {
+            maxDepth = await this.resolveReceiverMaxDepth(
+              transaction,
+              routeNode.receiverUserId,
+              source.activatedAt,
+              plan.id,
+            );
+            depthByReceiver.set(routeNode.receiverUserId, maxDepth);
+          }
+          if (rule.level > maxDepth) {
+            const lost = await this.insertEvent(transaction, {
+              runId: run.id,
+              source,
+              plan,
+              receiverUserId: routeNode.receiverUserId,
+              level: rule.level,
+              packageMatchingEnabled: matchingEnabled,
+              receiverPackageBasis: receiverBasis.toFixed(8),
+              eligibleBase: '0.00000000',
+              ratePercent: rate.toFixed(6),
+              commissionAmount: '0.00000000',
+              status: 'LOST',
+              ineligibilityReason: 'PACKAGE_LEVEL_NOT_UNLOCKED',
+              ledgerTransactionId: null,
+              availableAt: null,
+            });
+            events.push(lost);
+            continue;
+          }
         }
 
         const eligibleBase = matchingEnabled
@@ -979,6 +1125,7 @@ export class CommissionsService {
       await this.auditRun(transaction, actor, context, operation, run, events, {
         triggerType: isFirstPurchase ? 'FIRST_PURCHASE' : 'NEW_PURCHASE',
         triggerEnabled: true,
+        packageDepthPolicyApplied: hasPackageDepthPolicy,
       });
       return this.runSnapshotWithEvents(transaction, run, true);
     });
@@ -998,6 +1145,7 @@ export class CommissionsService {
       holdPeriodHours: number;
     },
     levels: CommissionLevelRuleDto[],
+    packageDepths: CommissionPackageDepthRuleDto[],
     forPublication: boolean,
   ) {
     if (levels.length === 0) {
@@ -1030,6 +1178,43 @@ export class CommissionsService {
         'At least one commission level must be enabled.',
       );
     }
+
+    const maxLevel = this.maxConfiguredLevel(levels);
+    for (let level = 1; level <= maxLevel; level += 1) {
+      if (!seen.has(level)) {
+        throw new BadRequestException(
+          'Commission levels must be contiguous from L1 through the configured maximum level.',
+        );
+      }
+    }
+
+    const seenPackages = new Set<string>();
+    let enabledDepthCount = 0;
+    for (const depth of packageDepths) {
+      if (seenPackages.has(depth.packageDefinitionId)) {
+        throw new BadRequestException(
+          'Package depth rules must contain each package only once.',
+        );
+      }
+      seenPackages.add(depth.packageDefinitionId);
+      if (depth.maxLevelDepth < 5 || depth.maxLevelDepth > maxLevel) {
+        throw new BadRequestException(
+          'Package level depth must be at least L5 and cannot exceed the configured maximum level.',
+        );
+      }
+      if (depth.enabled) enabledDepthCount += 1;
+    }
+    if (maxLevel > 5 && packageDepths.length === 0) {
+      throw new BadRequestException(
+        'Expanded referral commission plans require package depth rules.',
+      );
+    }
+    if (packageDepths.length > 0 && enabledDepthCount === 0) {
+      throw new BadRequestException(
+        'At least one package depth rule must be enabled.',
+      );
+    }
+
     if (plan.holdPeriodHours < 0) {
       throw new BadRequestException('holdPeriodHours cannot be negative.');
     }
@@ -1096,11 +1281,24 @@ export class CommissionsService {
     `);
   }
 
+  private getPackageDepths(
+    transaction: Prisma.TransactionClient | PrismaService,
+    planVersionId: string,
+  ) {
+    return transaction.$queryRaw<CommissionPackageDepthRow[]>(Prisma.sql`
+      SELECT *
+      FROM referral_commission_package_depth_rules
+      WHERE planVersionId = ${planVersionId}
+      ORDER BY maxLevelDepth ASC, packageCodeSnapshot ASC
+    `);
+  }
+
   private async planSnapshotWithLevels(
     transaction: Prisma.TransactionClient | PrismaService,
     row: CommissionPlanRow,
   ) {
     const levels = await this.getLevels(transaction, row.id);
+    const packageDepths = await this.getPackageDepths(transaction, row.id);
     return {
       id: row.id,
       versionNumber: row.versionNumber,
@@ -1125,6 +1323,7 @@ export class CommissionsService {
       publishedByUserId: row.publishedByUserId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
+      maxLevels: this.maxConfiguredLevel(levels),
       levels: levels.map((level) => ({
         id: level.id,
         level: level.level,
@@ -1132,7 +1331,67 @@ export class CommissionsService {
         ratePercent: this.rateString(level.ratePercent),
         packageMatchingEnabled: Boolean(level.packageMatchingEnabled),
       })),
+      packageDepths: packageDepths.map((depth) => ({
+        id: depth.id,
+        packageDefinitionId: depth.packageDefinitionId,
+        packageCode: depth.packageCodeSnapshot,
+        packageDisplayName: depth.packageDisplayNameSnapshot,
+        enabled: Boolean(depth.enabled),
+        maxLevelDepth: depth.maxLevelDepth,
+      })),
     };
+  }
+
+  private loadPackageOptionRows(
+    transaction: Prisma.TransactionClient | PrismaService,
+  ) {
+    return transaction.$queryRaw<PackageOptionRow[]>(Prisma.sql`
+      SELECT
+        pd.id AS packageDefinitionId,
+        pd.code AS packageCode,
+        ppi.displayName,
+        ppi.sortOrder,
+        ppv.versionNumber
+      FROM package_definitions pd
+      INNER JOIN package_plan_items ppi
+        ON ppi.packageDefinitionId = pd.id
+      INNER JOIN package_plan_versions ppv
+        ON ppv.id = ppi.planVersionId
+      WHERE ppv.status = 'PUBLISHED'
+      ORDER BY ppv.versionNumber DESC, ppi.sortOrder ASC, pd.code ASC
+    `);
+  }
+
+  private async normalizePackageDepthRules(
+    transaction: Prisma.TransactionClient | PrismaService,
+    rules: CommissionPackageDepthRuleDto[],
+  ): Promise<NormalizedPackageDepthRule[]> {
+    const options = await this.loadPackageOptionRows(transaction);
+    const optionById = new Map<string, PackageOptionRow>();
+    for (const option of options) {
+      if (!optionById.has(option.packageDefinitionId)) {
+        optionById.set(option.packageDefinitionId, option);
+      }
+    }
+    return rules.map((rule) => {
+      const option = optionById.get(rule.packageDefinitionId);
+      if (!option) {
+        throw new BadRequestException(
+          'Package depth rule references a package outside the published package catalogue.',
+        );
+      }
+      return {
+        ...rule,
+        packageCodeSnapshot: option.packageCode,
+        packageDisplayNameSnapshot: option.displayName,
+      };
+    });
+  }
+
+  private maxConfiguredLevel(levels: Array<{ level: number }>) {
+    return levels.length === 0
+      ? 0
+      : Math.max(...levels.map((level) => level.level));
   }
 
   private async resolveSponsorRoute(
@@ -1240,6 +1499,26 @@ export class CommissionsService {
       if (value.gt(highest)) highest = value;
     }
     return highest;
+  }
+
+  private async resolveReceiverMaxDepth(
+    transaction: Prisma.TransactionClient,
+    receiverUserId: string,
+    at: Date,
+    planVersionId: string,
+  ) {
+    const rows = await transaction.$queryRaw<MaxDepthRow[]>(Prisma.sql`
+      SELECT COALESCE(MAX(depth.maxLevelDepth), 0) AS maxLevelDepth
+      FROM user_package_subscriptions ups
+      INNER JOIN referral_commission_package_depth_rules depth
+        ON depth.planVersionId = ${planVersionId}
+        AND depth.packageDefinitionId = ups.packageDefinitionId
+        AND depth.enabled = TRUE
+      WHERE ups.userId = ${receiverUserId}
+        AND ups.activatedAt <= ${at}
+        AND (ups.status = 'ACTIVE' OR ups.completedAt > ${at})
+    `);
+    return Number(rows[0]?.maxLevelDepth ?? 0);
   }
 
   private async insertRun(
