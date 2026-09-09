@@ -194,8 +194,7 @@
 .termList,
 .activationNotice,
 .depositLink,
-.mobileDetailsToggle,
-.packageDetails {
+.mobileDuration {
   position: relative;
 }
 
@@ -293,12 +292,8 @@
   font-size: 8px;
 }
 
-.mobileDetailsToggle {
+.mobileDuration {
   display: none;
-}
-
-.packageDetails {
-  display: contents;
 }
 
 .termList {
@@ -536,46 +531,51 @@
   }
 
   .rateBox {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+    align-items: center;
     padding: 11px 12px;
   }
 
-  .mobileDetailsToggle {
-    display: flex;
-    width: 100%;
-    min-height: 44px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 12px;
-    padding: 0 13px;
-    border: 1px solid rgba(35, 223, 211, 0.3);
-    border-radius: 10px;
-    color: #dffffa;
-    background: rgba(6, 103, 111, 0.18);
-    font-size: 13px;
-    font-weight: 800;
+  .rateBox > small,
+  .rateBox > strong,
+  .rateBox > span {
+    grid-column: 1;
   }
 
-  .mobileDetailsToggle:hover {
-    border-color: rgba(35, 223, 211, 0.5);
-    background: rgba(8, 126, 131, 0.26);
+  .mobileDuration {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    min-width: 92px;
+    align-self: stretch;
+    align-content: center;
+    gap: 4px;
+    padding-left: 16px;
+    border-left: 1px solid rgba(22, 229, 224, 0.18);
+    text-align: right;
   }
 
-  .mobileDetailsToggle i {
-    flex: 0 0 auto;
-    font-size: 18px;
+  .mobileDuration small {
+    color: #7f9cb5;
+    letter-spacing: 0.08em;
   }
 
-  .packageDetails {
+  .mobileDuration strong {
+    color: #f5f8ff;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .termList,
+  .activationNotice {
     display: none;
   }
 
-  .packageDetailsExpanded {
-    display: block;
-  }
-
-  .packageDetails .termList {
-    margin: 12px 0;
+  .depositLink {
+    min-height: 44px;
+    margin-top: 12px;
+    font-size: 13px;
   }
 
   .emptyState,
