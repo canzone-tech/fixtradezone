@@ -29,7 +29,7 @@ export const SIMULATED_ACTIVITY_WORKER_MIN_LOCK_TTL_MS = 15 * 60_000;
 export const SIMULATED_ACTIVITY_BATCH_LIMIT = 250;
 
 export const SIMULATED_ACTIVITY_DISCLOSURE =
-  'Trade activity is system-generated according to your active package rules and does not represent external market execution.';
+  'Trade activity is simulated according to your active package rules and does not represent external market execution.';
 
 export interface SimulatedTimingWindow {
   start: string;
