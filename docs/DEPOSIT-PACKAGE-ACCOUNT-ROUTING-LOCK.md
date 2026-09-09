@@ -25,19 +25,44 @@ Its primary key is `packageDefinitionId`, enforcing at most one configured accou
 
 ## 2. Administrative configuration
 
-SUPER_ADMIN and authorized ADMIN users manage package receiving-account routes through the existing deposit-account permissions.
+SUPER_ADMIN and authorized ADMIN users manage package receiving accounts through the existing deposit-account permissions.
 
-A route may only be saved when:
+The normal creation UX is intentionally **package-first** inside the existing Deposits → Receiving Accounts form:
+
+1. choose the package;
+2. resolve the active payment rail;
+3. enter the public receiving address;
+4. upload the matching QR;
+5. provide an audit reason; and
+6. create the package account.
+
+`Operator label` is not a manual field in the package-account creation UI. The internal account label is derived from the effective published package display name.
+
+Account creation and package-route creation are one atomic backend transaction. The system must never leave a newly created package account unbound because a second route-save step failed.
+
+### Payment-rail selector rule
+
+The Receiving Accounts form adapts to the currently active rail configuration:
+
+- **exactly one active payment rail** → show that rail as read-only/static information and submit its ID internally;
+- **two or more active payment rails** → show a payment-rail dropdown;
+- **zero active payment rails** → block package-account creation safely.
+
+No payment network is hard-coded into this rule. Operations may currently run only one rail, for example USDT on BEP20, and additional rails can be enabled later without redesigning the form.
+
+A package-bound account may only be created when:
 
 - the package exists in the effective published catalogue;
-- the selected receiving account exists;
-- the receiving account is ACTIVE;
-- its payment rail is ACTIVE; and
-- the receiving account asset matches the package currency.
+- the package does not already have a configured route;
+- the selected payment rail exists and is ACTIVE;
+- the payment rail asset matches the package currency; and
+- the public receiving address is valid for the payment rail's validation profile.
 
-Removing a route is allowed as an explicit administrative action with an audit reason. A package with no configured route cannot accept a new deposit.
+The newly created package account is ACTIVE. Its active state and QR may later be maintained from Account Pool. A package that already has a route cannot receive a second package-account creation; the existing account must be maintained instead.
 
-Every route change is audit logged with the previous account, new account and supplied reason.
+The lower-level route PATCH endpoint remains available for controlled recovery/reconfiguration, but the normal UI does not expose a separate redundant package-routing form.
+
+Every account creation and route change is audit logged with the supplied reason and routing/account snapshots.
 
 ## 3. USER flow
 
@@ -122,7 +147,15 @@ Before PR to `main`:
 
 1. GitHub Backend CI and Admin CI must be green.
 2. Migration `0034_package_deposit_account_routing` must be applied locally using `prisma migrate deploy`; never `prisma migrate dev` and never reset the database.
-3. Local Postman acceptance must prove package route configuration/readback, package-specific context, direct `PENDING_REVIEW` submission and persisted routing snapshot.
+3. Local Postman acceptance must prove package-account creation, atomic route readback, package-specific context, direct `PENDING_REVIEW` submission and persisted routing snapshot.
 4. SQL readback must prove one route per package and exact route-to-deposit account matching.
-5. Browser acceptance must prove `Choose Investment` opens only the chosen package, shows the configured address/QR before submission, exposes no package/network selector, and uses one final submit action.
+5. Browser acceptance must prove:
+   - Receiving Accounts uses Package instead of Operator label;
+   - one active payment rail is displayed read-only;
+   - multiple active payment rails produce a selector;
+   - package account creation immediately binds the package;
+   - `Choose Investment` opens only the chosen package;
+   - configured address/QR are visible before submission;
+   - USER sees no package/network selector; and
+   - USER uses one final submit action.
 6. PR to `main` is allowed only after all local gates are green.
