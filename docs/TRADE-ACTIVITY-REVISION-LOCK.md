@@ -7,13 +7,19 @@ This document amends the presentation and scheduling portions of `SIMULATED-TRAD
 
 ## Client-facing terminology
 
-Client-facing ADMIN/USER navigation, page headings, labels and table columns use **Trade Activity**, **Daily Trades**, **Trade #**, **Trade time**, **WIN/LOSS** and **Result** rather than leading with the word “Simulated”.
+Client-facing ADMIN/USER navigation, page headings, labels and table columns use **Trade Activity**, **Daily Trades**, **Trade #**, **Trade time**, **WIN/LOSS** and **Result** for normal navigation and workspace content.
 
 This terminology is a presentation change only. It must never imply that FixTradeZone executed an order on an external broker/exchange when no such execution occurred.
 
-Every major Trade Activity workspace must retain an unambiguous disclosure equivalent to:
+The disclosure shown to **SUPER_ADMIN, ADMIN and USER must use the same wording**. This copy is locked:
 
-> Trade activity is system-generated according to your active package rules and does not represent external market execution.
+> **SIMULATED TRADE ACTIVITY**
+>
+> Trade activity is simulated according to your active package rules and does not represent external market execution.
+>
+> This workspace does not itself change Main Wallet, Package Earnings, Referral Commission, Rewards, package caps or accounting ledger balances, and it exposes no Buy, Sell or Close controls.
+
+Do not use **SYSTEM-GENERATED TRADE ACTIVITY** or “Trade activity is system-generated…” in client-facing disclosure copy. Internal worker/generator terminology may still use generation language where it describes implementation behavior rather than the user-facing disclosure.
 
 Internal compatibility identifiers may remain `simulated_*`, `/simulated-activity`, `simulated_activity.*`, `SIMULATED_ACTIVITY_*` and existing immutable source keys. Renaming those internal identifiers is not required for the client-facing revision.
 
@@ -92,6 +98,7 @@ Current project workflow supersedes the older Postman-first SIM-01 acceptance wo
 - ADMIN sidebar shows `Trade Activity` and opens `/trade-activity`.
 - USER sidebar shows `Daily Trades` and opens `/user/trade-activity`.
 - Legacy browser URLs redirect correctly.
+- SUPER_ADMIN, ADMIN and USER show the exact same locked **SIMULATED TRADE ACTIVITY** disclosure copy.
 - Draft policy exposes trades/day and minimum gap.
 - `5 trades + 240 minutes + 09:00-21:00` is rejected as impossible.
 - A sufficiently wide timing window with `5 + 240` saves successfully.
