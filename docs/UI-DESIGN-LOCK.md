@@ -44,6 +44,25 @@ Legacy page-level palette declarations may remain temporarily while pages are mi
 
 SUPER_ADMIN, ADMIN and USER pages must look like parts of the same FixTradeZone product. Role and permission differences may change data, controls and navigation access, but must not create a different visual theme.
 
+## Shared readability and typography
+
+Readability is a shared platform rule, not a page-specific preference. **SUPER_ADMIN, ADMIN and USER protected pages must use the same stronger typography floor.** Auth screens use the same readability layer where the same semantic elements appear.
+
+The shared readability authority is `admin/src/styles/fixtradezone-readability.scss`.
+
+Locked direction:
+
+- secondary text and technical copy: minimum `13px`, normally semibold
+- form labels: minimum `14px`, semibold
+- table headers: minimum `13px`, bold
+- table cells and protected body copy: minimum `14px`, medium weight
+- form controls: minimum `15px`
+- protected sidebar navigation: `15px`, semibold
+- shared platform-promise detail copy: `14px`, semibold
+- role-specific pages must not shrink important operational text below the shared readability floor
+
+This typography layer may increase readability without changing the Founder-locked navy/cyan palette, card geometry or financial-console hierarchy.
+
 ## Shared platform promise
 
 The protected dashboard for **SUPER_ADMIN, ADMIN and USER must render the same shared platform promise** from one reusable component. Role-specific wording is not permitted.

@@ -1,14 +1,15 @@
 /*
  * FixTradeZone project-wide readability layer.
  * Imported after the master theme so Admin, User and Auth screens share
- * the same minimum readable sizes for secondary/technical text.
+ * the same minimum readable sizes and stronger weights.
  * This file intentionally changes typography only.
  */
 
-/* Semantic secondary text should never collapse into 8–11px UI copy. */
+/* Semantic secondary text must remain comfortably readable. */
 :where(small, .small) {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5;
 }
 
 /* Covers both global classes and CSS-module generated class names. */
@@ -20,13 +21,15 @@
   [class*="hint" i],
   [class*="caption" i]
 ) {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5;
 }
 
 :where(label, [class*="label" i]) {
-  font-size: 13px !important;
-  line-height: 1.4;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.45;
 }
 
 /* Status chips and badges are operational information, not decorative text. */
@@ -36,37 +39,56 @@
   [class*="chip" i],
   [class*="pill" i]
 ) {
-  font-size: 12px !important;
-  line-height: 1.3;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.35;
 }
 
 /* Technical identifiers / account keys / transaction references. */
 :where(code, kbd, samp, [class*="mono" i]) {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5;
 }
 
 /* Tables are used across Admin and User financial/operations screens. */
 :where(table th) {
-  font-size: 12px !important;
-  line-height: 1.45;
-}
-
-:where(table td) {
   font-size: 13px !important;
+  font-weight: 700 !important;
   line-height: 1.5;
 }
 
-/* Form copy was as small as 10–11px in parts of the master theme. */
+:where(table td) {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.55;
+}
+
+/* Protected page body copy should not depend on tiny page-specific values. */
+.ftz-page-frame :where(p) {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.6;
+}
+
+/* Form copy remains readable in dense finance and settings screens. */
 :where(
   input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea
 ) {
-  font-size: 14px !important;
+  font-size: 15px !important;
+  font-weight: 500 !important;
 }
 
-/* Known dashboard/auth elements that historically used 8–11px text. */
+/* Sidebar navigation is shared by SUPER_ADMIN, ADMIN and USER workspaces. */
+:where(.ftz-nav-link) {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.4;
+}
+
+/* Known dashboard/auth elements that historically used compact 8–12px text. */
 :where(
   .ftz-nav-label,
   .ftz-notification span,
@@ -93,11 +115,30 @@
   .ftz-login-form label,
   .ftz-rbac-eyebrow
 ) {
-  font-size: 12px !important;
-  line-height: 1.45;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5;
 }
 
-/* Slightly stronger identity text beside avatars/profile controls. */
+/* Shared dashboard promise follows the same readability standard. */
+.ftz-platform-promise > div:first-child > span {
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+.ftz-platform-promise > div:first-child > strong {
+  font-size: 22px !important;
+  font-weight: 800 !important;
+}
+
+.ftz-platform-promise-points span {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.55 !important;
+}
+
+/* Stronger identity text beside avatars/profile controls. */
 :where(.ftz-sidebar-profile strong, .ftz-topbar-profile-copy strong) {
-  font-size: 13px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
 }
