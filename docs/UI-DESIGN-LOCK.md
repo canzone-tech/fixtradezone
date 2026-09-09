@@ -81,17 +81,17 @@ Implementation authority for the wording is `admin/src/components/brand/platform
 
 ## Mobile package catalogue interaction
 
-The USER package catalogue keeps the existing multi-column package-card presentation on desktop and tablet. On mobile (`650px` and below), package cards use a compact accordion interaction so users can scan the catalogue without excessive scrolling.
+The USER package catalogue keeps the existing multi-column, fully detailed package-card presentation on desktop and tablet. On mobile (`650px` and below), package cards use the Founder-approved compact purchase presentation instead of a details accordion.
 
 Founder-approved mobile behavior:
 
-- collapsed cards always show package identity, availability, investment range and USER / NET RATE
-- detailed commercial terms, activation notice and `Choose Investment` action remain hidden until the user expands that package
-- only one package may be expanded at a time
-- tapping the expanded package control closes it
-- desktop and tablet package cards remain fully expanded and visually unchanged
-- the accordion changes presentation only; package data, activation rules, purchase behavior and API contracts must not change
-- the expand/collapse control must expose accessible `aria-expanded` and `aria-controls` state
+- each package card always shows package identity, availability, investment range and USER / NET RATE
+- package duration is shown in the unused right side of the USER / NET RATE panel
+- the lower commercial-term list and activation-notice block are hidden on mobile to avoid unnecessary scrolling
+- the `View package details` / `Hide package details` accordion control is not used on mobile
+- when the package is available and activation is available, the primary mobile action is the direct `Choose Investment` button
+- desktop and tablet package cards remain fully detailed and visually unchanged
+- this compact mobile presentation changes presentation only; package data, activation rules, purchase behavior and API contracts must not change
 
 Implementation authority is `admin/src/app/user/packages/user-packages-client.tsx` with responsive geometry in `admin/src/app/user/packages/user-packages.module.css`.
 
