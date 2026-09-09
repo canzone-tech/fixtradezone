@@ -125,6 +125,12 @@
   opacity: 0.52;
 }
 
+/* Keyboard focus stays visible across every protected role and page. */
+.ftz-page-frame :where(a[href], button, input, select, textarea):focus-visible {
+  outline: 2px solid rgba(32, 228, 220, 0.72);
+  outline-offset: 2px;
+}
+
 /* Tables get the same compact international finance-console treatment. */
 .ftz-page-frame table {
   width: 100%;
