@@ -38,10 +38,29 @@ const QR_TYPES = new Set([
 
 type DepositFilter = DepositStatus | "ALL";
 
+interface PackageAccountRoute {
+  packageDefinitionId: string;
+  packagePlanItemId: string;
+  packageCode: string;
+  displayName: string;
+  currency: string;
+  sortOrder: number;
+  availability: string;
+  depositAccountId: string | null;
+  routeUpdatedAt: string | null;
+}
+
+interface PackageAccountRoutesResponse extends ApiMessagePayload {
+  planVersionId: string | null;
+  planVersionNumber: number | null;
+  packages: PackageAccountRoute[];
+}
+
 interface AdminDepositWorkspace {
   user: AdminUser;
   rails: DepositPaymentRail[];
   accounts: DepositAccount[];
+  packageRoutes: PackageAccountRoutesResponse | null;
   deposits: Deposit[];
 }
 
@@ -99,18 +118,24 @@ async function fetchAdminDepositWorkspace(
   const accountRequest = canReadAccounts
     ? fetch("/api/admin/deposit-accounts", { cache: "no-store" })
     : Promise.resolve(null);
+  const packageRouteRequest = canReadAccounts
+    ? fetch("/api/admin/deposit-package-accounts", { cache: "no-store" })
+    : Promise.resolve(null);
   const depositRequest = canReadDeposits
     ? fetch(`/api/admin/deposits${query}`, { cache: "no-store" })
     : Promise.resolve(null);
 
-  const [railResponse, accountResponse, depositResponse] = await Promise.all([
-    railRequest,
-    accountRequest,
-    depositRequest,
-  ]);
+  const [railResponse, accountResponse, packageRouteResponse, depositResponse] =
+    await Promise.all([
+      railRequest,
+      accountRequest,
+      packageRouteRequest,
+      depositRequest,
+    ]);
 
   let rails: DepositPaymentRail[] = [];
   let accounts: DepositAccount[] = [];
+  let packageRoutes: PackageAccountRoutesResponse | null = null;
   let deposits: Deposit[] = [];
 
   if (railResponse) {
@@ -133,6 +158,18 @@ async function fetchAdminDepositWorkspace(
     accounts = payload.accounts;
   }
 
+  if (packageRouteResponse) {
+    const payload = await readJson<PackageAccountRoutesResponse>(
+      packageRouteResponse,
+    );
+    if (!packageRouteResponse.ok || !payload) {
+      throw new Error(
+        messageFrom(payload, "Could not load package receiving-account routes."),
+      );
+    }
+    packageRoutes = payload;
+  }
+
   if (depositResponse) {
     const payload = await readJson<DepositsResponse & ApiMessagePayload>(
       depositResponse,
@@ -143,13 +180,15 @@ async function fetchAdminDepositWorkspace(
     deposits = payload.deposits;
   }
 
-  return { user, rails, accounts, deposits };
+  return { user, rails, accounts, packageRoutes, deposits };
 }
 
 export default function DepositsClient() {
   const [user, setUser] = useState<AdminUser | null>(null);
   const [rails, setRails] = useState<DepositPaymentRail[]>([]);
   const [accounts, setAccounts] = useState<DepositAccount[]>([]);
+  const [packageRoutes, setPackageRoutes] =
+    useState<PackageAccountRoutesResponse | null>(null);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [filter, setFilter] = useState<DepositFilter>("PENDING_REVIEW");
   const [loading, setLoading] = useState(true);
@@ -178,6 +217,13 @@ export default function DepositsClient() {
     () => rails.filter((rail) => rail.isActive),
     [rails],
   );
+  const unconfiguredPackages = useMemo(
+    () =>
+      (packageRoutes?.packages ?? []).filter(
+        (route) => route.depositAccountId === null,
+      ),
+    [packageRoutes],
+  );
   const pendingCount = useMemo(
     () =>
       deposits.filter((deposit) => deposit.status === "PENDING_REVIEW").length,
@@ -193,6 +239,7 @@ export default function DepositsClient() {
     setUser(workspace.user);
     setRails(workspace.rails);
     setAccounts(workspace.accounts);
+    setPackageRoutes(workspace.packageRoutes);
     setDeposits(workspace.deposits);
     setSelectedApprovalIds((current) =>
       current.filter((id) =>
@@ -343,21 +390,34 @@ export default function DepositsClient() {
       return;
     }
 
+    const packageDefinitionId = String(
+      formData.get("packageDefinitionId") ?? "",
+    ).trim();
+    const paymentRailId = String(formData.get("paymentRailId") ?? "").trim();
+
+    if (!packageDefinitionId) {
+      setError("Choose a package for this receiving account.");
+      return;
+    }
+    if (!paymentRailId) {
+      setError("No active payment rail is available for this account.");
+      return;
+    }
+
     setBusy("create-account");
     setError(null);
     setNotice(null);
 
     try {
       const qrCodeDataUrl = await fileToDataUrl(qrFile);
-      const response = await fetch("/api/admin/deposit-accounts", {
+      const response = await fetch("/api/admin/deposit-package-accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          label: String(formData.get("label") ?? ""),
-          paymentRailId: String(formData.get("paymentRailId") ?? ""),
+          packageDefinitionId,
+          paymentRailId,
           walletAddress: String(formData.get("walletAddress") ?? ""),
           qrCodeDataUrl,
-          isActive: formData.get("isActive") === "on",
           reason: String(formData.get("reason") ?? ""),
         }),
       });
@@ -366,7 +426,7 @@ export default function DepositsClient() {
       >(response);
       if (!response.ok || !payload) {
         throw new Error(
-          messageFrom(payload, "Could not create deposit account."),
+          messageFrom(payload, "Could not create package receiving account."),
         );
       }
 
@@ -377,7 +437,7 @@ export default function DepositsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not create deposit account.",
+          : "Could not create package receiving account.",
       );
     } finally {
       setBusy(null);
@@ -398,7 +458,6 @@ export default function DepositsClient() {
     try {
       const body: Record<string, unknown> = {
         expectedRevision: account.revision,
-        label: String(formData.get("label") ?? ""),
         isActive: formData.get("isActive") === "on",
         reason: String(formData.get("reason") ?? ""),
       };
@@ -459,7 +518,6 @@ export default function DepositsClient() {
         payload,
         "Deposit accounting completed.",
       );
-
       const activationMessage = payload.packageActivation?.message;
 
       setNotice(
@@ -467,7 +525,6 @@ export default function DepositsClient() {
           ? `${accountingMessage} ${activationMessage}`
           : accountingMessage,
       );
-
       await reloadWorkspace();
     } catch (caught) {
       setError(
@@ -660,13 +717,13 @@ export default function DepositsClient() {
     <div className={styles.page}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>DEP-01 / PAYMENT RAILS</p>
+          <p className={styles.eyebrow}>DEP-02 / PACKAGE ROUTING</p>
           <h1>Deposit Operations</h1>
           <p>
-            Configure supported asset/network rails first, attach public
-            receiving accounts to those rails, then review submitted transaction
-            IDs. Network validation is protocol-profile driven; account
-            assignment stays inside the USER-selected rail.
+            Configure supported asset/network rails, create one package-bound
+            receiving account for each package, then review submitted transaction
+            IDs. USER routing is configuration-driven; users do not choose the
+            receiving account or payment network.
           </p>
         </div>
         <span className={styles.badge} data-tone="warning">
@@ -708,7 +765,7 @@ export default function DepositsClient() {
                       className={styles.input}
                       id="rail-network"
                       name="networkCode"
-                      placeholder="TRC20, ETHEREUM, BSC..."
+                      placeholder="BEP20, TRC20, ETHEREUM..."
                       pattern="[A-Za-z0-9_-]{2,40}"
                       maxLength={40}
                       required
@@ -720,7 +777,7 @@ export default function DepositsClient() {
                       className={styles.input}
                       id="rail-name"
                       name="displayName"
-                      placeholder="USDT on TRON (TRC20)"
+                      placeholder="USDT on BNB Smart Chain (BEP20)"
                       minLength={2}
                       maxLength={100}
                       required
@@ -732,7 +789,7 @@ export default function DepositsClient() {
                       className={styles.select}
                       id="rail-profile"
                       name="validationProfile"
-                      defaultValue="TRON"
+                      defaultValue="EVM"
                     >
                       {DEPOSIT_VALIDATION_PROFILES.map((profile) => (
                         <option key={profile} value={profile}>
@@ -875,45 +932,93 @@ export default function DepositsClient() {
               <div className={styles.cardHeader}>
                 <div>
                   <p className={styles.eyebrow}>Receiving Accounts</p>
-                  <h2>Create public receiving account</h2>
+                  <h2>Create package receiving account</h2>
+                  <p className={styles.muted}>
+                    Choose the package first. The account is created ACTIVE and
+                    bound to that package in one atomic operation.
+                  </p>
                 </div>
+                {packageRoutes?.planVersionNumber ? (
+                  <span className={styles.badge}>
+                    PLAN V{packageRoutes.planVersionNumber}
+                  </span>
+                ) : null}
               </div>
 
               {canManageAccounts ? (
                 activeRails.length === 0 ? (
                   <div className={styles.notice}>
-                    Create or activate a payment rail before creating an
-                    account.
+                    Create or activate a payment rail before creating a package
+                    receiving account.
+                  </div>
+                ) : unconfiguredPackages.length === 0 ? (
+                  <div className={styles.notice}>
+                    Every package in the effective catalogue already has a
+                    receiving account. Edit the existing account below if its QR
+                    or active state needs to change.
                   </div>
                 ) : (
                   <form className={styles.formGrid} onSubmit={createAccount}>
                     <div className={styles.field}>
-                      <label htmlFor="account-label">Operator label</label>
-                      <input
-                        className={styles.input}
-                        id="account-label"
-                        name="label"
-                        minLength={2}
-                        maxLength={100}
-                        required
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label htmlFor="account-rail">Payment rail</label>
+                      <label htmlFor="account-package">Package</label>
                       <select
                         className={styles.select}
-                        id="account-rail"
-                        name="paymentRailId"
-                        defaultValue={activeRails[0]?.id}
+                        id="account-package"
+                        name="packageDefinitionId"
+                        defaultValue={
+                          unconfiguredPackages[0]?.packageDefinitionId ?? ""
+                        }
                         required
                       >
-                        {activeRails.map((rail) => (
-                          <option key={rail.id} value={rail.id}>
-                            {rail.displayName} · {rail.asset}/{rail.networkCode}
+                        {unconfiguredPackages.map((route) => (
+                          <option
+                            key={route.packageDefinitionId}
+                            value={route.packageDefinitionId}
+                          >
+                            {route.displayName} · {route.currency}
                           </option>
                         ))}
                       </select>
                     </div>
+
+                    <div className={styles.field}>
+                      <label htmlFor="account-rail">Payment rail</label>
+                      {activeRails.length === 1 ? (
+                        <>
+                          <input
+                            className={styles.input}
+                            id="account-rail"
+                            value={`${activeRails[0].displayName} · ${activeRails[0].asset}/${activeRails[0].networkCode}`}
+                            readOnly
+                            aria-readonly="true"
+                          />
+                          <input
+                            type="hidden"
+                            name="paymentRailId"
+                            value={activeRails[0].id}
+                          />
+                          <small className={styles.muted}>
+                            Only one active payment rail is configured. A selector
+                            appears automatically when multiple active rails exist.
+                          </small>
+                        </>
+                      ) : (
+                        <select
+                          className={styles.select}
+                          id="account-rail"
+                          name="paymentRailId"
+                          defaultValue={activeRails[0]?.id}
+                          required
+                        >
+                          {activeRails.map((rail) => (
+                            <option key={rail.id} value={rail.id}>
+                              {rail.displayName} · {rail.asset}/{rail.networkCode}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
                     <div className={`${styles.field} ${styles.full}`}>
                       <label htmlFor="account-address">
                         Public receiving address
@@ -930,8 +1035,8 @@ export default function DepositsClient() {
                         required
                       />
                       <small className={styles.muted}>
-                        Backend validates this address using the selected
-                        rail&apos;s protocol profile.
+                        Backend validates this address using the configured
+                        payment rail&apos;s protocol profile.
                       </small>
                     </div>
                     <div className={styles.field}>
@@ -956,13 +1061,6 @@ export default function DepositsClient() {
                         required
                       />
                     </div>
-                    <label className={`${styles.field} ${styles.full}`}>
-                      <span>Initial state</span>
-                      <span className={styles.actions}>
-                        <input name="isActive" type="checkbox" defaultChecked />{" "}
-                        Active
-                      </span>
-                    </label>
                     <div className={`${styles.actions} ${styles.full}`}>
                       <button
                         className={styles.button}
@@ -971,7 +1069,7 @@ export default function DepositsClient() {
                       >
                         {busy === "create-account"
                           ? "Creating…"
-                          : "Create account"}
+                          : "Create package account"}
                       </button>
                     </div>
                   </form>
@@ -986,7 +1084,7 @@ export default function DepositsClient() {
             <div className={styles.card}>
               <div className={styles.cardHeader}>
                 <div>
-                  <p className={styles.eyebrow}>Account Pool</p>
+                  <p className={styles.eyebrow}>Package Accounts</p>
                   <h2>{accounts.length} receiving accounts</h2>
                 </div>
               </div>
@@ -996,107 +1094,111 @@ export default function DepositsClient() {
                     No receiving accounts configured.
                   </div>
                 ) : (
-                  accounts.map((account) => (
-                    <div className={styles.row} key={account.id}>
-                      <div className={styles.rowTop}>
-                        <div className={styles.rowTitle}>
-                          <strong>{account.label}</strong>
-                          <small>
-                            {account.paymentRail.displayName} · revision{" "}
-                            {account.revision}
-                          </small>
-                        </div>
-                        <span
-                          className={styles.badge}
-                          data-tone={account.isActive ? "success" : "danger"}
-                        >
-                          {account.isActive ? "ACTIVE" : "INACTIVE"}
-                        </span>
-                      </div>
-                      <div className={styles.kv}>
-                        <div>
-                          <small>Asset / network</small>
-                          <strong>
-                            {account.asset} · {account.network}
-                          </strong>
-                        </div>
-                        <div>
-                          <small>Public address</small>
-                          <strong className={styles.mono}>
-                            {account.walletAddress}
-                          </strong>
-                        </div>
-                        <div>
-                          <small>Updated</small>
-                          <strong>{formatDate(account.updatedAt)}</strong>
-                        </div>
-                      </div>
-                      {canManageAccounts ? (
-                        <details>
-                          <summary className={styles.muted}>
-                            Edit account
-                          </summary>
-                          <form
-                            className={styles.formGrid}
-                            onSubmit={(event) => updateAccount(event, account)}
+                  accounts.map((account) => {
+                    const mappedPackages = (packageRoutes?.packages ?? []).filter(
+                      (route) => route.depositAccountId === account.id,
+                    );
+                    const mappedNames = mappedPackages
+                      .map((route) => route.displayName)
+                      .join(", ");
+
+                    return (
+                      <div className={styles.row} key={account.id}>
+                        <div className={styles.rowTop}>
+                          <div className={styles.rowTitle}>
+                            <strong>{mappedNames || account.label}</strong>
+                            <small>
+                              {account.paymentRail.displayName} · revision{" "}
+                              {account.revision}
+                            </small>
+                          </div>
+                          <span
+                            className={styles.badge}
+                            data-tone={account.isActive ? "success" : "danger"}
                           >
-                            <div className={styles.field}>
-                              <label>Label</label>
-                              <input
-                                className={styles.input}
-                                name="label"
-                                defaultValue={account.label}
-                                minLength={2}
-                                maxLength={100}
-                                required
-                              />
-                            </div>
-                            <div className={styles.field}>
-                              <label>Replace QR (optional)</label>
-                              <input
-                                className={styles.input}
-                                name="qr"
-                                type="file"
-                                accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                              />
-                            </div>
-                            <div className={styles.field}>
-                              <label>Audit reason</label>
-                              <input
-                                className={styles.input}
-                                name="reason"
-                                minLength={3}
-                                maxLength={500}
-                                required
-                              />
-                            </div>
-                            <label className={styles.field}>
-                              <span>Assignment state</span>
-                              <span className={styles.actions}>
+                            {account.isActive ? "ACTIVE" : "INACTIVE"}
+                          </span>
+                        </div>
+                        <div className={styles.kv}>
+                          <div>
+                            <small>Package</small>
+                            <strong>{mappedNames || "Legacy / unassigned"}</strong>
+                          </div>
+                          <div>
+                            <small>Asset / network</small>
+                            <strong>
+                              {account.asset} · {account.network}
+                            </strong>
+                          </div>
+                          <div>
+                            <small>Public address</small>
+                            <strong className={styles.mono}>
+                              {account.walletAddress}
+                            </strong>
+                          </div>
+                          <div>
+                            <small>Updated</small>
+                            <strong>{formatDate(account.updatedAt)}</strong>
+                          </div>
+                        </div>
+                        {canManageAccounts ? (
+                          <details>
+                            <summary className={styles.muted}>
+                              Edit account
+                            </summary>
+                            <form
+                              className={styles.formGrid}
+                              onSubmit={(event) =>
+                                updateAccount(event, account)
+                              }
+                            >
+                              <div className={styles.field}>
+                                <label>Replace QR (optional)</label>
                                 <input
-                                  name="isActive"
-                                  type="checkbox"
-                                  defaultChecked={account.isActive}
+                                  className={styles.input}
+                                  name="qr"
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
                                 />
-                                Active
-                              </span>
-                            </label>
-                            <div className={`${styles.actions} ${styles.full}`}>
-                              <button
-                                className={styles.buttonSecondary}
-                                type="submit"
-                                disabled={busy === `account-${account.id}`}
-                              >
-                                {busy === `account-${account.id}`
-                                  ? "Saving…"
-                                  : "Save changes"}
-                              </button>
-                            </div>
-                          </form>
-                        </details>
-                      ) : null}
-                    </div>
-                  ))
+                              </div>
+                              <div className={styles.field}>
+                                <label>Audit reason</label>
+                                <input
+                                  className={styles.input}
+                                  name="reason"
+                                  minLength={3}
+                                  maxLength={500}
+                                  required
+                                />
+                              </div>
+                              <label className={styles.field}>
+                                <span>Assignment state</span>
+                                <span className={styles.actions}>
+                                  <input
+                                    name="isActive"
+                                    type="checkbox"
+                                    defaultChecked={account.isActive}
+                                  />
+                                  Active
+                                </span>
+                              </label>
+                              <div className={`${styles.actions} ${styles.full}`}>
+                                <button
+                                  className={styles.buttonSecondary}
+                                  type="submit"
+                                  disabled={busy === `account-${account.id}`}
+                                >
+                                  {busy === `account-${account.id}`
+                                    ? "Saving…"
+                                    : "Save changes"}
+                                </button>
+                              </div>
+                            </form>
+                          </details>
+                        ) : null}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -1253,8 +1355,8 @@ export default function DepositsClient() {
                       <p>
                         Posting is idempotent: an already-posted deposit is not
                         double-credited. After accounting, package activation
-                        follows this deposit&apos;s immutable AUTO or MANUAL
-                        plan policy.
+                        follows this deposit&apos;s immutable AUTO or MANUAL plan
+                        policy.
                       </p>
                       <div className={styles.actions}>
                         <button
@@ -1311,14 +1413,17 @@ export default function DepositsClient() {
                               className={styles.button}
                               type="button"
                               disabled={busy !== null}
-                              onClick={() => void reviewDeposit(deposit, "approve")}
+                              onClick={() =>
+                                void reviewDeposit(deposit, "approve")
+                              }
                             >
                               {busy === `approve-${deposit.id}`
                                 ? "Approving…"
                                 : "Approve directly"}
                             </button>
                             <span className={styles.muted}>
-                              ADMIN pre-review is optional for SUPER_ADMIN final approval.
+                              ADMIN pre-review is optional for SUPER_ADMIN final
+                              approval.
                             </span>
                           </>
                         ) : (
@@ -1344,7 +1449,9 @@ export default function DepositsClient() {
                     <div className={styles.formGrid}>
                       <div className={`${styles.field} ${styles.full}`}>
                         <label htmlFor={`final-review-${deposit.id}`}>
-                          {canApprove ? "Final approval / rejection note" : "Rejection note"}
+                          {canApprove
+                            ? "Final approval / rejection note"
+                            : "Rejection note"}
                         </label>
                         <textarea
                           className={styles.textarea}
@@ -1366,7 +1473,9 @@ export default function DepositsClient() {
                             className={styles.button}
                             type="button"
                             disabled={busy !== null}
-                            onClick={() => void reviewDeposit(deposit, "approve")}
+                            onClick={() =>
+                              void reviewDeposit(deposit, "approve")
+                            }
                           >
                             {busy === `approve-${deposit.id}`
                               ? "Approving…"
