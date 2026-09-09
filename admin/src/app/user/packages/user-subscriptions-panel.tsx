@@ -56,6 +56,9 @@ export default function UserSubscriptionsPanel() {
   const [loading, setLoading] = useState(true);
   const [payload, setPayload] = useState<ResponsePayload>({});
   const [error, setError] = useState("");
+  const [expandedSubscriptionId, setExpandedSubscriptionId] = useState<
+    string | null
+  >(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -140,48 +143,86 @@ export default function UserSubscriptionsPanel() {
         </div>
       ) : null}
 
-      {active.map((item) => (
-        <article className={styles.activeCard} key={item.id}>
-          <div className={styles.identity}>
-            <span>{item.packageCode}</span>
-            <h4>{item.packageDisplayName}</h4>
-            <strong>
-              {item.price} {item.currency}
-            </strong>
-          </div>
-          <dl>
-            <div>
-              <dt>Status</dt>
-              <dd className={styles.status}>{item.status}</dd>
+      {active.map((item) => {
+        const expanded = expandedSubscriptionId === item.id;
+        const detailsId = `active-package-details-${item.id}`;
+
+        return (
+          <article className={styles.activeCard} key={item.id}>
+            <div className={styles.identity}>
+              <span>{item.packageCode}</span>
+              <h4>{item.packageDisplayName}</h4>
+              <strong>
+                {item.price} {item.currency}
+              </strong>
+              <small className={styles.mobileStatus}>{item.status}</small>
             </div>
-            <div>
-              <dt>Activated</dt>
-              <dd>{dateLabel(item.activatedAt)}</dd>
+
+            <button
+              type="button"
+              className={styles.mobileToggle}
+              aria-expanded={expanded}
+              aria-controls={detailsId}
+              onClick={() =>
+                setExpandedSubscriptionId((current) =>
+                  current === item.id ? null : item.id,
+                )
+              }
+            >
+              <span>
+                {expanded ? "Hide package details" : "View package details"}
+              </span>
+              <i
+                className={
+                  expanded
+                    ? "iconoir-nav-arrow-up"
+                    : "iconoir-nav-arrow-down"
+                }
+                aria-hidden="true"
+              />
+            </button>
+
+            <div
+              id={detailsId}
+              className={`${styles.subscriptionDetails} ${
+                expanded ? styles.subscriptionDetailsExpanded : ""
+              }`}
+            >
+              <dl>
+                <div>
+                  <dt>Status</dt>
+                  <dd className={styles.status}>{item.status}</dd>
+                </div>
+                <div>
+                  <dt>Activated</dt>
+                  <dd>{dateLabel(item.activatedAt)}</dd>
+                </div>
+                <div>
+                  <dt>Scheduled end</dt>
+                  <dd>{dateLabel(item.scheduledEndAt)}</dd>
+                </div>
+                <div>
+                  <dt>Goal / cycle</dt>
+                  <dd>
+                    {item.goalDays}d / {item.cycleDays}d
+                  </dd>
+                </div>
+                <div>
+                  <dt>Package mode</dt>
+                  <dd>{enumLabel(item.activePackageMode)}</dd>
+                </div>
+                <div>
+                  <dt>Activation</dt>
+                  <dd>{enumLabel(item.activationTrigger)}</dd>
+                </div>
+              </dl>
+              <small className={styles.source}>
+                Source deposit: {item.sourceDepositId}
+              </small>
             </div>
-            <div>
-              <dt>Scheduled end</dt>
-              <dd>{dateLabel(item.scheduledEndAt)}</dd>
-            </div>
-            <div>
-              <dt>Goal / cycle</dt>
-              <dd>
-                {item.goalDays}d / {item.cycleDays}d
-              </dd>
-            </div>
-            <div>
-              <dt>Package mode</dt>
-              <dd>{enumLabel(item.activePackageMode)}</dd>
-            </div>
-            <div>
-              <dt>Activation</dt>
-              <dd>{enumLabel(item.activationTrigger)}</dd>
-            </div>
-          </dl>
-          <small className={styles.source}>
-            Source deposit: {item.sourceDepositId}
-          </small>
-        </article>
-      ))}
+          </article>
+        );
+      })}
 
       {history.length > 0 ? (
         <div className={styles.historyNote}>
