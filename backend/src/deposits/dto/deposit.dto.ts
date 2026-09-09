@@ -158,6 +158,13 @@ export class UpdateDepositAccountDto {
   reason!: string;
 }
 
+export class EnsureDepositAddressAssignmentDto {
+  @Transform(trimString)
+  @IsString()
+  @IsUUID()
+  paymentRailId!: string;
+}
+
 export class CreateDepositDto {
   @Transform(trimString)
   @IsString()
@@ -174,6 +181,13 @@ export class CreateDepositDto {
   @IsString()
   @Matches(INVESTMENT_AMOUNT_PATTERN)
   investmentAmount?: string;
+}
+
+export class SubmitDepositRequestDto extends CreateDepositDto {
+  @Transform(normalizeTxid)
+  @IsString()
+  @Length(1, 191)
+  txid!: string;
 }
 
 export class SubmitDepositTxidDto {
