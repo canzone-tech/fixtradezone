@@ -2,9 +2,15 @@
   "info": {
     "_postman_id": "4d802b5d-8ae8-4ae9-a2c7-5ac8d7eab202",
     "name": "FixTradeZone DEP-02 Package Account Routing",
-    "description": "LOCAL ACCEPTANCE ONLY. Run after migration 0034_package_deposit_account_routing is deployed. Proves one configured receiving account per package, package-specific deposit context, and direct PENDING_REVIEW submission. Synthetic TXIDs are local QA data only. This collection rejects the created deposit at the end so it does not post accounting or activate a package.",
+    "description": "LOCAL ACCEPTANCE ONLY. Run after migration 0034_package_deposit_account_routing is deployed. Proves package-bound receiving-account creation is atomic, one configured receiving account resolves per package, USER deposit context exposes that configured route before payment submission, and a one-step deposit enters PENDING_REVIEW with immutable routing snapshots. Before running, set depositReceivingAddress and depositQrDataUrl to the REAL local-test receiving address and its matching QR data URL for the active payment rail. Optionally set depositNetworkCode (for example BEP20) and depositPackageCode. The collection deliberately chooses a package that is AVAILABLE, has no route yet, and is not already ACTIVE for the test user. The created package account/route is intentional configuration and is not deleted; only the synthetic QA deposit is rejected at the end so no accounting or package activation occurs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    { "key": "depositNetworkCode", "value": "" },
+    { "key": "depositPackageCode", "value": "" },
+    { "key": "depositReceivingAddress", "value": "" },
+    { "key": "depositQrDataUrl", "value": "" }
+  ],
   "item": [
     {
       "name": "01 Admin Login",
@@ -45,81 +51,41 @@
       }
     },
     {
-      "name": "03 User Effective Package",
+      "name": "03 User Active Package Readback",
       "event": [{
         "listen": "test",
         "script": {"exec": [
-          "pm.test('package catalogue 200', () => pm.response.to.have.status(200));",
+          "pm.test('subscriptions 200', () => pm.response.to.have.status(200));",
           "const body = pm.response.json();",
-          "const item = (body.items || []).find(i => i.availability === 'AVAILABLE');",
-          "pm.test('available package exists', () => pm.expect(item).to.exist);",
-          "if (item) {",
-          "  pm.environment.set('depositPackageItemId', item.id);",
-          "  pm.environment.set('depositPackageDefinitionId', item.packageDefinitionId);",
-          "  pm.environment.set('depositPackageCurrency', item.currency);",
-          "  pm.environment.set('depositInvestmentAmount', item.minimumInvestment || item.price);",
-          "}"
+          "const activeCodes = (body.active || []).map(item => item.packageCode);",
+          "pm.environment.set('depositActivePackageCodesJson', JSON.stringify(activeCodes));"
         ]}
       }],
       "request": {
         "method": "GET",
         "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
-        "url": "{{baseUrl}}/packages"
+        "url": "{{baseUrl}}/subscriptions/me?limit=100"
       }
     },
     {
-      "name": "04 Admin Active Receiving Account",
+      "name": "04 Select Unconfigured Package Route",
       "event": [{
         "listen": "test",
         "script": {"exec": [
-          "pm.test('account list 200', () => pm.response.to.have.status(200));",
+          "pm.test('package route list 200', () => pm.response.to.have.status(200));",
           "const body = pm.response.json();",
-          "const currency = pm.environment.get('depositPackageCurrency');",
-          "const account = (body.accounts || []).find(a => a.isActive && a.asset === currency && a.paymentRail && a.paymentRail.isActive);",
-          "pm.test('eligible active account exists', () => pm.expect(account, 'Create an active receiving account for the package currency first').to.exist);",
-          "if (account) {",
-          "  pm.environment.set('depositAccountId', account.id);",
-          "  pm.environment.set('depositAccountAddress', account.walletAddress);",
-          "  pm.environment.set('depositAccountNetwork', account.network);",
+          "const activeCodes = JSON.parse(pm.environment.get('depositActivePackageCodesJson') || '[]');",
+          "const preferredCode = (pm.variables.get('depositPackageCode') || pm.environment.get('depositPackageCode') || '').trim();",
+          "const eligible = (body.packages || []).filter(p => p.availability === 'AVAILABLE' && !p.depositAccountId && !activeCodes.includes(p.packageCode));",
+          "const item = preferredCode ? eligible.find(p => p.packageCode === preferredCode) : eligible[0];",
+          "pm.test('eligible unconfigured non-active package exists', () => pm.expect(item, preferredCode ? `Package ${preferredCode} must be AVAILABLE, unconfigured and not ACTIVE for the QA user` : 'Need one AVAILABLE package with no receiving route that is not ACTIVE for the QA user').to.exist);",
+          "if (item) {",
+          "  pm.environment.set('depositPackageItemId', item.packagePlanItemId);",
+          "  pm.environment.set('depositPackageDefinitionId', item.packageDefinitionId);",
+          "  pm.environment.set('depositPackageSelectedCode', item.packageCode);",
+          "  pm.environment.set('depositPackageDisplayName', item.displayName);",
+          "  pm.environment.set('depositPackageCurrency', item.currency);",
           "}"
-        ]}
-      }],
-      "request": {
-        "method": "GET",
-        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
-        "url": "{{baseUrl}}/admin/deposit-accounts"
-      }
-    },
-    {
-      "name": "05 Configure Package Receiving Account",
-      "event": [{
-        "listen": "test",
-        "script": {"exec": [
-          "pm.test('route save 200', () => pm.response.to.have.status(200));",
-          "const body = pm.response.json();",
-          "pm.expect(body.packageDefinitionId).to.eql(pm.environment.get('depositPackageDefinitionId'));",
-          "pm.expect(body.depositAccountId).to.eql(pm.environment.get('depositAccountId'));"
-        ]}
-      }],
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {"key": "Authorization", "value": "Bearer {{adminAccessToken}}"},
-          {"key": "Content-Type", "value": "application/json"}
-        ],
-        "body": {"mode": "raw", "raw": "{\n  \"depositAccountId\": \"{{depositAccountId}}\",\n  \"reason\": \"LOCAL QA DEP-02 package routing acceptance\"\n}"},
-        "url": "{{baseUrl}}/admin/deposit-package-accounts/{{depositPackageDefinitionId}}"
-      }
-    },
-    {
-      "name": "06 Package Route Readback",
-      "event": [{
-        "listen": "test",
-        "script": {"exec": [
-          "pm.test('route readback 200', () => pm.response.to.have.status(200));",
-          "const body = pm.response.json();",
-          "const row = (body.packages || []).find(p => p.packageDefinitionId === pm.environment.get('depositPackageDefinitionId'));",
-          "pm.test('package has exactly configured account', () => { pm.expect(row).to.exist; pm.expect(row.depositAccountId).to.eql(pm.environment.get('depositAccountId')); });"
         ]}
       }],
       "request": {
@@ -129,7 +95,94 @@
       }
     },
     {
-      "name": "07 User Package Deposit Context",
+      "name": "05 Select Active Payment Rail",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('payment rail list 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const currency = pm.environment.get('depositPackageCurrency');",
+          "const preferredNetwork = (pm.variables.get('depositNetworkCode') || pm.environment.get('depositNetworkCode') || '').trim().toUpperCase();",
+          "const eligible = (body.rails || []).filter(r => r.isActive && r.asset === currency);",
+          "const rail = preferredNetwork ? eligible.find(r => r.networkCode === preferredNetwork) : eligible[0];",
+          "pm.test('eligible active payment rail exists', () => pm.expect(rail, preferredNetwork ? `Active ${currency}/${preferredNetwork} payment rail is required` : `An active ${currency} payment rail is required`).to.exist);",
+          "if (rail) {",
+          "  pm.environment.set('depositPaymentRailId', rail.id);",
+          "  pm.environment.set('depositAccountNetwork', rail.networkCode);",
+          "  pm.environment.set('depositValidationProfile', rail.validationProfile);",
+          "}"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
+        "url": "{{baseUrl}}/admin/deposit-payment-rails"
+      }
+    },
+    {
+      "name": "06 Create Package Receiving Account Atomically",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {"exec": [
+            "const address = (pm.variables.get('depositReceivingAddress') || pm.environment.get('depositReceivingAddress') || '').trim();",
+            "const qr = (pm.variables.get('depositQrDataUrl') || pm.environment.get('depositQrDataUrl') || '').trim();",
+            "if (!address) throw new Error('Set depositReceivingAddress to the real local-test receiving address for the selected payment rail before running DEP-02.');",
+            "if (!qr.startsWith('data:image/')) throw new Error('Set depositQrDataUrl to the matching QR base64 data URL before running DEP-02.');",
+            "pm.environment.set('depositAccountAddress', address);",
+            "pm.environment.set('depositAccountQrDataUrl', qr);"
+          ]}
+        },
+        {
+          "listen": "test",
+          "script": {"exec": [
+            "pm.test('atomic package account create 201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.expect(body.packageDefinitionId).to.eql(pm.environment.get('depositPackageDefinitionId'));",
+            "pm.expect(body.depositAccountId).to.be.a('string').and.not.empty;",
+            "pm.expect(body.account.id).to.eql(body.depositAccountId);",
+            "pm.expect(body.account.label).to.eql(pm.environment.get('depositPackageDisplayName'));",
+            "pm.expect(body.account.paymentRailId).to.eql(pm.environment.get('depositPaymentRailId'));",
+            "pm.expect(body.account.walletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
+            "pm.expect(body.account.isActive).to.eql(true);",
+            "pm.environment.set('depositAccountId', body.depositAccountId);",
+            "pm.environment.set('depositAccountNetwork', body.account.network);",
+            "pm.environment.set('depositValidationProfile', body.account.paymentRail.validationProfile);"
+          ]}
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{adminAccessToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {"mode": "raw", "raw": "{\n  \"packageDefinitionId\": \"{{depositPackageDefinitionId}}\",\n  \"paymentRailId\": \"{{depositPaymentRailId}}\",\n  \"walletAddress\": \"{{depositAccountAddress}}\",\n  \"qrCodeDataUrl\": \"{{depositAccountQrDataUrl}}\",\n  \"reason\": \"LOCAL QA DEP-02 atomic package account configuration\"\n}"},
+        "url": "{{baseUrl}}/admin/deposit-package-accounts"
+      }
+    },
+    {
+      "name": "07 Package Route Readback",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('route readback 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const row = (body.packages || []).find(p => p.packageDefinitionId === pm.environment.get('depositPackageDefinitionId'));",
+          "pm.test('package has exactly the atomically created account', () => {",
+          "  pm.expect(row).to.exist;",
+          "  pm.expect(row.depositAccountId).to.eql(pm.environment.get('depositAccountId'));",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
+        "url": "{{baseUrl}}/admin/deposit-package-accounts"
+      }
+    },
+    {
+      "name": "08 User Package Deposit Context",
       "event": [{
         "listen": "test",
         "script": {"exec": [
@@ -139,7 +192,10 @@
           "pm.expect(body.receivingAccount.id).to.eql(pm.environment.get('depositAccountId'));",
           "pm.expect(body.receivingAccount.walletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
           "pm.expect(body.receivingAccount.network).to.eql(pm.environment.get('depositAccountNetwork'));",
-          "pm.test('no pre-existing open deposit', () => pm.expect(body.openDeposit).to.eql(null));"
+          "pm.expect(body.receivingAccount.validationProfile).to.eql(pm.environment.get('depositValidationProfile'));",
+          "pm.test('no pre-existing open deposit', () => pm.expect(body.openDeposit).to.eql(null));",
+          "const minimum = body.package.minimumInvestment || body.package.price;",
+          "pm.environment.set('depositInvestmentAmount', minimum);"
         ]}
       }],
       "request": {
@@ -149,15 +205,23 @@
       }
     },
     {
-      "name": "08 Submit Package Deposit One Step",
+      "name": "09 Submit Package Deposit One Step",
       "event": [
         {
           "listen": "prerequest",
           "script": {"exec": [
-            "const chars = '0123456789abcdef';",
-            "let txid = '';",
-            "for (let i = 0; i < 64; i += 1) txid += chars[Math.floor(Math.random() * chars.length)];",
-            "pm.environment.set('depositTxid', txid);"
+            "const profile = pm.environment.get('depositValidationProfile');",
+            "if (profile === 'SOLANA') {",
+            "  const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';",
+            "  let value = '';",
+            "  for (let i = 0; i < 88; i += 1) value += chars[Math.floor(Math.random() * chars.length)];",
+            "  pm.environment.set('depositTxid', value);",
+            "} else {",
+            "  const chars = '0123456789abcdef';",
+            "  let value = '';",
+            "  for (let i = 0; i < 64; i += 1) value += chars[Math.floor(Math.random() * chars.length)];",
+            "  pm.environment.set('depositTxid', value);",
+            "}"
           ]}
         },
         {
@@ -186,7 +250,7 @@
       }
     },
     {
-      "name": "09 User Deposit Snapshot Readback",
+      "name": "10 User Deposit Snapshot Readback",
       "event": [{
         "listen": "test",
         "script": {"exec": [
@@ -198,6 +262,7 @@
           "  pm.expect(d.status).to.eql('PENDING_REVIEW');",
           "  pm.expect(d.assignedDepositAccountId).to.eql(pm.environment.get('depositAccountId'));",
           "  pm.expect(d.assignedWalletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
+          "  pm.expect(d.assignedNetwork).to.eql(pm.environment.get('depositAccountNetwork'));",
           "});"
         ]}
       }],
@@ -208,7 +273,7 @@
       }
     },
     {
-      "name": "10 Admin Reject Local QA Deposit",
+      "name": "11 Admin Reject Local QA Deposit",
       "event": [{
         "listen": "test",
         "script": {"exec": [
@@ -228,14 +293,17 @@
       }
     },
     {
-      "name": "11 Final Rejected Readback",
+      "name": "12 Final Rejected Readback",
       "event": [{
         "listen": "test",
         "script": {"exec": [
           "pm.test('final history 200', () => pm.response.to.have.status(200));",
           "const body = pm.response.json();",
           "const d = (body.deposits || []).find(x => x.id === pm.environment.get('depositId'));",
-          "pm.test('local QA deposit is rejected', () => { pm.expect(d).to.exist; pm.expect(d.status).to.eql('REJECTED'); });"
+          "pm.test('local QA deposit is rejected', () => {",
+          "  pm.expect(d).to.exist;",
+          "  pm.expect(d.status).to.eql('REJECTED');",
+          "});"
         ]}
       }],
       "request": {
