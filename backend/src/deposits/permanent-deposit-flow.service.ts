@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -76,6 +76,14 @@ const DEPOSIT_INCLUDE = {
   },
 } as const;
 
+interface AddressAssignmentRow {
+  id: string;
+  userId: string;
+  paymentRailId: string;
+  depositAccountId: string;
+  assignedAt: Date;
+}
+
 interface ResolvedDepositInput {
   plan: {
     id: string;
@@ -104,10 +112,7 @@ interface ResolvedDepositInput {
     validationProfile: DepositValidationProfile;
     isActive: boolean;
   };
-  assignment: {
-    id: string;
-    assignedAt: Date;
-  };
+  assignment: AddressAssignmentRow;
   account: {
     id: string;
     label: string;
@@ -433,15 +438,17 @@ export class PermanentDepositFlowService {
     },
     context: RequestContext,
   ) {
-    const existing =
-      await transaction.userDepositAddressAssignment.findUnique({
-        where: {
-          userId_paymentRailId: {
-            userId,
-            paymentRailId: rail.id,
-          },
-        },
-      });
+    const existingRows = await transaction.$queryRaw<AddressAssignmentRow[]>(
+      Prisma.sql`
+        SELECT id, userId, paymentRailId, depositAccountId, assignedAt
+        FROM user_deposit_address_assignments
+        WHERE userId = ${userId}
+          AND paymentRailId = ${rail.id}
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
+    const existing = existingRows[0] ?? null;
 
     if (existing) {
       const account = await transaction.depositAccount.findFirst({
@@ -478,14 +485,26 @@ export class PermanentDepositFlowService {
     }
 
     const account = accounts[randomInt(accounts.length)];
-    const assignment =
-      await transaction.userDepositAddressAssignment.create({
-        data: {
-          userId,
-          paymentRailId: rail.id,
-          depositAccountId: account.id,
-        },
-      });
+    const assignment: AddressAssignmentRow = {
+      id: randomUUID(),
+      userId,
+      paymentRailId: rail.id,
+      depositAccountId: account.id,
+      assignedAt: new Date(),
+    };
+
+    await transaction.$executeRaw(
+      Prisma.sql`
+        INSERT INTO user_deposit_address_assignments (
+          id, userId, paymentRailId, depositAccountId,
+          assignedAt, createdAt, updatedAt
+        ) VALUES (
+          ${assignment.id}, ${assignment.userId}, ${assignment.paymentRailId},
+          ${assignment.depositAccountId}, ${assignment.assignedAt},
+          ${assignment.assignedAt}, ${assignment.assignedAt}
+        )
+      `,
+    );
 
     await transaction.auditLog.create({
       data: {
@@ -593,15 +612,8 @@ export class PermanentDepositFlowService {
   }
 
   private assignmentSnapshot(
-    assignment: {
-      id: string;
-      userId: string;
-      paymentRailId: string;
-      depositAccountId: string;
-      assignedAt: Date;
-    },
+    assignment: AddressAssignmentRow,
     rail: {
-      id: string;
       asset: string;
       networkCode: string;
       displayName: string;
@@ -751,8 +763,9 @@ export class PermanentDepositFlowService {
               : '';
 
           if (
-            target.includes('userId') &&
-            target.includes('paymentRailId') &&
+            (target.includes('uda_user_rail_uq') ||
+              (target.includes('userId') &&
+                target.includes('paymentRailId'))) &&
             attempt === 0
           ) {
             continue;
