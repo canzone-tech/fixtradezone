@@ -11,6 +11,7 @@ import { DepositApprovalOrchestratorService } from './deposit-approval-orchestra
 import { DepositsController } from './deposits.controller';
 import { DepositsService } from './deposits.service';
 import { DirectDepositApprovalService } from './direct-deposit-approval.service';
+import { PermanentDepositFlowService } from './permanent-deposit-flow.service';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { DirectDepositApprovalService } from './direct-deposit-approval.service'
   ],
   providers: [
     DepositsService,
+    PermanentDepositFlowService,
     DirectDepositApprovalService,
     DepositApprovalOrchestratorService,
   ],
