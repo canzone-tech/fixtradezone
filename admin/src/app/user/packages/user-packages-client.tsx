@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
-import { usePlatformTime } from "@/components/platform/platform-time-provider";
 import type { UserDirectSession } from "@/lib/user-session";
 import {
   apiMessage,
@@ -47,7 +46,6 @@ function activationPolicyCopy(trigger: string, available: boolean) {
 
 export default function UserPackagesClient() {
   const router = useRouter();
-  const { timeZone } = usePlatformTime();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [catalogue, setCatalogue] = useState<PackageCatalogue | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,25 +214,6 @@ export default function UserPackagesClient() {
           </section>
         ) : (
           <>
-            <section className={styles.planStrip}>
-              <div>
-                <small>EFFECTIVE PLAN</small>
-                <strong>V{catalogue.plan.versionNumber}</strong>
-              </div>
-              <div>
-                <small>NEW ACTIVATION TIMEZONE</small>
-                <strong>{timeZone}</strong>
-              </div>
-              <div>
-                <small>ACTIVE PACKAGE MODE</small>
-                <strong>{enumLabel(catalogue.plan.activePackageMode)}</strong>
-              </div>
-              <div>
-                <small>ACTIVATION</small>
-                <strong>{enumLabel(catalogue.plan.activationTrigger)}</strong>
-              </div>
-            </section>
-
             <section className={styles.catalogueGrid}>
               {catalogue.items.map((item, index) => (
                 <article
