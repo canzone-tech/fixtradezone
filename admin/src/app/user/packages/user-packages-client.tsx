@@ -193,7 +193,6 @@ export default function UserPackagesClient() {
         </header>
 
         <UserSubscriptionsPanel />
-        <UserRewardProgressPanel />
 
         {!catalogue.catalogueAvailable || !catalogue.plan ? (
           <section className={styles.emptyState}>
@@ -343,6 +342,8 @@ export default function UserPackagesClient() {
             </section>
           </>
         )}
+
+        <UserRewardProgressPanel />
       </div>
     </UserShell>
   );
