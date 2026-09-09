@@ -244,8 +244,8 @@ export default function UserSimulatedActivityClient() {
             <h2>Daily Trades</h2>
             <p>
               Each ACTIVE package subscription receives its own deterministic
-              daily trade schedule. Trade activity is system-generated according
-              to package rules and does not represent external market execution.
+              daily trade schedule. Trade activity is simulated according to
+              package rules and does not represent external market execution.
             </p>
           </div>
           <span className={styles.disclosurePill}>TRADE ACTIVITY</span>
@@ -435,7 +435,7 @@ export default function UserSimulatedActivityClient() {
         <section className={styles.disclosure}>
           <i className="iconoir-warning-triangle" />
           <div>
-            <strong>SYSTEM-GENERATED TRADE ACTIVITY</strong>
+            <strong>SIMULATED TRADE ACTIVITY</strong>
             <p>{activity?.disclosure ?? "Trade activity does not represent external market execution."}</p>
             <p>
               This workspace does not itself change Main Wallet, Package
