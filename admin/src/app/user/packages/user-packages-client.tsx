@@ -52,6 +52,9 @@ export default function UserPackagesClient() {
   const [catalogue, setCatalogue] = useState<PackageCatalogue | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [expandedPackageId, setExpandedPackageId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -236,113 +239,152 @@ export default function UserPackagesClient() {
             </section>
 
             <section className={styles.catalogueGrid}>
-              {catalogue.items.map((item, index) => (
-                <article
-                  className={`${styles.packageCard} ${
-                    index >= catalogue.items.length - 2
-                      ? styles.premiumCard
-                      : ""
-                  }`}
-                  key={item.id}
-                >
-                  <div className={styles.cardTop}>
-                    <span className={styles.packageIndex}>
-                      {String(item.sortOrder).padStart(2, "0")}
-                    </span>
-                    <span
-                      className={`${styles.availability} ${
-                        item.availability === "AVAILABLE"
-                          ? styles.available
-                          : styles.closed
+              {catalogue.items.map((item, index) => {
+                const expanded = expandedPackageId === item.id;
+                const detailsId = `package-details-${item.id}`;
+
+                return (
+                  <article
+                    className={`${styles.packageCard} ${
+                      index >= catalogue.items.length - 2
+                        ? styles.premiumCard
+                        : ""
+                    }`}
+                    key={item.id}
+                  >
+                    <div className={styles.cardTop}>
+                      <span className={styles.packageIndex}>
+                        {String(item.sortOrder).padStart(2, "0")}
+                      </span>
+                      <span
+                        className={`${styles.availability} ${
+                          item.availability === "AVAILABLE"
+                            ? styles.available
+                            : styles.closed
+                        }`}
+                      >
+                        {enumLabel(item.availability)}
+                      </span>
+                    </div>
+
+                    <div className={styles.packageIcon}>
+                      <i
+                        className={
+                          item.packageCode.startsWith("QUANT")
+                            ? "iconoir-graph-up"
+                            : "iconoir-brain"
+                        }
+                      />
+                    </div>
+
+                    <small className={styles.packageCode}>
+                      {item.packageCode}
+                    </small>
+                    <h3>{item.displayName}</h3>
+
+                    <div className={styles.price}>
+                      <strong>{investmentRangeLabel(item)}</strong>
+                      <span>{item.currency}</span>
+                    </div>
+
+                    <div className={styles.rateBox}>
+                      <small>USER / NET RATE</small>
+                      <strong>{rewardRateLabel(item)}</strong>
+                      <span>{enumLabel(item.rewardRateMode)}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className={styles.mobileDetailsToggle}
+                      aria-expanded={expanded}
+                      aria-controls={detailsId}
+                      onClick={() =>
+                        setExpandedPackageId((current) =>
+                          current === item.id ? null : item.id,
+                        )
+                      }
+                    >
+                      <span>
+                        {expanded ? "Hide package details" : "View package details"}
+                      </span>
+                      <i
+                        className={
+                          expanded
+                            ? "iconoir-nav-arrow-up"
+                            : "iconoir-nav-arrow-down"
+                        }
+                        aria-hidden="true"
+                      />
+                    </button>
+
+                    <div
+                      id={detailsId}
+                      className={`${styles.packageDetails} ${
+                        expanded ? styles.packageDetailsExpanded : ""
                       }`}
                     >
-                      {enumLabel(item.availability)}
-                    </span>
-                  </div>
+                      <dl className={styles.termList}>
+                        <div>
+                          <dt>Investment</dt>
+                          <dd>
+                            {investmentRangeLabel(item)} {item.currency}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Package duration</dt>
+                          <dd>{item.durationDays} calendar days</dd>
+                        </div>
+                        <div>
+                          <dt>Capital treatment</dt>
+                          <dd>{principalReturnLabel(item)}</dd>
+                        </div>
+                        <div>
+                          <dt>Cap multiplier</dt>
+                          <dd>{decimalLabel(item.capMultiplier)}×</dd>
+                        </div>
+                        <div>
+                          <dt>Rewards begin</dt>
+                          <dd>{enumLabel(item.rewardStartMode)}</dd>
+                        </div>
+                        <div>
+                          <dt>Lifecycle end</dt>
+                          <dd>{enumLabel(item.cycleEndAction)}</dd>
+                        </div>
+                      </dl>
 
-                  <div className={styles.packageIcon}>
-                    <i
-                      className={
-                        item.packageCode.startsWith("QUANT")
-                          ? "iconoir-graph-up"
-                          : "iconoir-brain"
-                      }
-                    />
-                  </div>
+                      <div className={styles.activationNotice}>
+                        <i className="iconoir-wallet" />
+                        <span>
+                          <strong>
+                            {item.availability !== "AVAILABLE"
+                              ? "Closed to new activation"
+                              : catalogue.activationAvailable
+                                ? activationPolicy?.headline
+                                : "Activation engine deferred"}
+                          </strong>
+                          <small>
+                            {item.availability !== "AVAILABLE"
+                              ? "This package cannot accept a new activation under the current plan."
+                              : catalogue.activationAvailable
+                                ? `${activationPolicy?.detail} Your exact investment is validated against this package range.`
+                                : "Funding is disabled until this plan's configured activation engine is available."}
+                          </small>
+                        </span>
+                      </div>
 
-                  <small className={styles.packageCode}>
-                    {item.packageCode}
-                  </small>
-                  <h3>{item.displayName}</h3>
-
-                  <div className={styles.price}>
-                    <strong>{investmentRangeLabel(item)}</strong>
-                    <span>{item.currency}</span>
-                  </div>
-
-                  <div className={styles.rateBox}>
-                    <small>USER / NET RATE</small>
-                    <strong>{rewardRateLabel(item)}</strong>
-                    <span>{enumLabel(item.rewardRateMode)}</span>
-                  </div>
-
-                  <dl className={styles.termList}>
-                    <div>
-                      <dt>Investment</dt>
-                      <dd>
-                        {investmentRangeLabel(item)} {item.currency}
-                      </dd>
+                      {item.availability === "AVAILABLE" &&
+                      catalogue.activationAvailable ? (
+                        <Link
+                          href="/user/deposits"
+                          className={styles.depositLink}
+                        >
+                          Choose Investment <i className="iconoir-arrow-right" />
+                        </Link>
+                      ) : null}
                     </div>
-                    <div>
-                      <dt>Package duration</dt>
-                      <dd>{item.durationDays} calendar days</dd>
-                    </div>
-                    <div>
-                      <dt>Capital treatment</dt>
-                      <dd>{principalReturnLabel(item)}</dd>
-                    </div>
-                    <div>
-                      <dt>Cap multiplier</dt>
-                      <dd>{decimalLabel(item.capMultiplier)}×</dd>
-                    </div>
-                    <div>
-                      <dt>Rewards begin</dt>
-                      <dd>{enumLabel(item.rewardStartMode)}</dd>
-                    </div>
-                    <div>
-                      <dt>Lifecycle end</dt>
-                      <dd>{enumLabel(item.cycleEndAction)}</dd>
-                    </div>
-                  </dl>
-
-                  <div className={styles.activationNotice}>
-                    <i className="iconoir-wallet" />
-                    <span>
-                      <strong>
-                        {item.availability !== "AVAILABLE"
-                          ? "Closed to new activation"
-                          : catalogue.activationAvailable
-                            ? activationPolicy?.headline
-                            : "Activation engine deferred"}
-                      </strong>
-                      <small>
-                        {item.availability !== "AVAILABLE"
-                          ? "This package cannot accept a new activation under the current plan."
-                          : catalogue.activationAvailable
-                            ? `${activationPolicy?.detail} Your exact investment is validated against this package range.`
-                            : "Funding is disabled until this plan's configured activation engine is available."}
-                      </small>
-                    </span>
-                  </div>
-
-                  {item.availability === "AVAILABLE" &&
-                  catalogue.activationAvailable ? (
-                    <Link href="/user/deposits" className={styles.depositLink}>
-                      Choose Investment <i className="iconoir-arrow-right" />
-                    </Link>
-                  ) : null}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </section>
 
             <section className={styles.disclosure}>
