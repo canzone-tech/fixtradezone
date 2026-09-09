@@ -138,6 +138,16 @@ function pendingDeposit() {
   };
 }
 
+type DepositCreateInput = {
+  data: {
+    status: string;
+    assignedDepositAccountId: string;
+    assignedWalletAddress: string;
+    assignedNetwork: string;
+    txid: string | null;
+  };
+};
+
 describe('PermanentDepositFlowService', () => {
   const transaction = {
     depositPaymentRail: {
@@ -162,8 +172,8 @@ describe('PermanentDepositFlowService', () => {
   };
 
   const prisma = {
-    $transaction: jest.fn(async (operation: (tx: typeof transaction) => unknown) =>
-      operation(transaction),
+    $transaction: jest.fn((operation: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(operation(transaction)),
     ),
   } as unknown as PrismaService;
 
@@ -209,17 +219,13 @@ describe('PermanentDepositFlowService', () => {
       actor,
     );
 
-    expect(transaction.deposit.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'PENDING_REVIEW',
-          assignedDepositAccountId: ACCOUNT_ID,
-          assignedWalletAddress: ADDRESS,
-          assignedNetwork: 'TRC20',
-          txid: TXID,
-        }),
-      }),
-    );
+    expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
+    const createInput = transaction.deposit.create.mock.calls[0][0] as DepositCreateInput;
+    expect(createInput.data.status).toBe('PENDING_REVIEW');
+    expect(createInput.data.assignedDepositAccountId).toBe(ACCOUNT_ID);
+    expect(createInput.data.assignedWalletAddress).toBe(ADDRESS);
+    expect(createInput.data.assignedNetwork).toBe('TRC20');
+    expect(createInput.data.txid).toBe(TXID);
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedWalletAddress).toBe(ADDRESS);
   });
