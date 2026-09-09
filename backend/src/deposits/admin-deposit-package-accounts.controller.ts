@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -15,7 +16,10 @@ import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { DepositPackageRoutingService } from './deposit-package-routing.service';
-import { ConfigureDepositPackageAccountDto } from './dto/deposit.dto';
+import {
+  ConfigureDepositPackageAccountDto,
+  CreatePackageDepositAccountDto,
+} from './dto/deposit.dto';
 
 @Controller('admin/deposit-package-accounts')
 export class AdminDepositPackageAccountsController {
@@ -28,6 +32,21 @@ export class AdminDepositPackageAccountsController {
   @RequirePermissions(PERMISSIONS.DEPOSIT_ACCOUNTS_READ)
   listPackageRoutes() {
     return this.depositPackageRoutingService.listPackageRoutes();
+  }
+
+  @Post()
+  @Header('Cache-Control', 'no-store')
+  @RequirePermissions(PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE)
+  createPackageAccount(
+    @Body() dto: CreatePackageDepositAccountDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.depositPackageRoutingService.createPackageAccount(
+      dto,
+      actor,
+      getRequestContext(request),
+    );
   }
 
   @Patch(':packageDefinitionId')
