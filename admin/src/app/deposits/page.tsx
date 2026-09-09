@@ -5,7 +5,6 @@ import AdminShell from "@/components/admin/admin-shell";
 import FieldHelpTarget from "@/components/ui/field-help-target";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import DepositsClient from "./deposits-client";
-import PackageAccountRoutingPanel from "./package-account-routing-panel";
 
 export const metadata: Metadata = {
   title: "Deposits | FixTradeZone",
@@ -23,7 +22,6 @@ export default async function DepositsPage() {
   return (
     <AdminShell>
       <DepositsClient />
-      <PackageAccountRoutingPanel />
       <FieldHelpTarget
         targetId="account-qr"
         label="QR image requirements"
