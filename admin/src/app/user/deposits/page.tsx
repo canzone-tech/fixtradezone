@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import UserDepositsClient from "./user-deposits-client";
+import UserDepositsSingleStepClient from "./user-deposits-single-step-client";
 
 export const metadata: Metadata = {
   title: "Deposits | FixTradeZone",
 };
 
 export default function UserDepositsPage() {
-  return <UserDepositsClient />;
+  return <UserDepositsSingleStepClient />;
 }
