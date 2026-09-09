@@ -193,7 +193,9 @@
 .rateBox,
 .termList,
 .activationNotice,
-.depositLink {
+.depositLink,
+.mobileDetailsToggle,
+.packageDetails {
   position: relative;
 }
 
@@ -289,6 +291,14 @@
 .rateBox span {
   color: #7f9cb5;
   font-size: 8px;
+}
+
+.mobileDetailsToggle {
+  display: none;
+}
+
+.packageDetails {
+  display: contents;
 }
 
 .termList {
@@ -497,6 +507,75 @@
 
   .planStrip > div:last-child {
     border-bottom: 0;
+  }
+
+  .packageCard {
+    padding: 16px;
+  }
+
+  .packageIcon {
+    display: none;
+  }
+
+  .packageCode {
+    display: block;
+    margin-top: 14px;
+  }
+
+  .packageCard h3 {
+    margin: 5px 0 10px;
+    font-size: 19px;
+  }
+
+  .price {
+    margin-bottom: 10px;
+  }
+
+  .price strong {
+    font-size: 24px;
+  }
+
+  .rateBox {
+    padding: 11px 12px;
+  }
+
+  .mobileDetailsToggle {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 0 13px;
+    border: 1px solid rgba(35, 223, 211, 0.3);
+    border-radius: 10px;
+    color: #dffffa;
+    background: rgba(6, 103, 111, 0.18);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .mobileDetailsToggle:hover {
+    border-color: rgba(35, 223, 211, 0.5);
+    background: rgba(8, 126, 131, 0.26);
+  }
+
+  .mobileDetailsToggle i {
+    flex: 0 0 auto;
+    font-size: 18px;
+  }
+
+  .packageDetails {
+    display: none;
+  }
+
+  .packageDetailsExpanded {
+    display: block;
+  }
+
+  .packageDetails .termList {
+    margin: 12px 0;
   }
 
   .emptyState,
