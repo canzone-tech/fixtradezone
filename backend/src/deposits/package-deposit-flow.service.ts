@@ -149,7 +149,10 @@ export class PackageDepositFlowService {
       LIMIT 1
     `);
 
-    const account = this.assertConfiguredAccount(routeRows[0] ?? null, item.currency);
+    const account = this.assertConfiguredAccount(
+      routeRows[0] ?? null,
+      item.currency,
+    );
 
     const openDeposit = await this.prisma.deposit.findUnique({
       where: { openKey: actor.id },
@@ -328,7 +331,9 @@ export class PackageDepositFlowService {
 
     this.assertActivationTrigger(plan.activationTrigger);
 
-    const activeSamePackage = await transaction.$queryRaw<Array<{ id: string }>>(
+    const activeSamePackage = await transaction.$queryRaw<
+      Array<{ id: string }>
+    >(
       Prisma.sql`
         SELECT ups.id
         FROM user_package_subscriptions ups
@@ -369,9 +374,15 @@ export class PackageDepositFlowService {
       FOR UPDATE
     `);
 
-    const account = this.assertConfiguredAccount(routeRows[0] ?? null, item.currency);
+    const account = this.assertConfiguredAccount(
+      routeRows[0] ?? null,
+      item.currency,
+    );
     const rangeConfigured = item.minimumInvestment !== null;
-    const investmentAmount = this.resolveInvestmentAmount(item, dto.investmentAmount);
+    const investmentAmount = this.resolveInvestmentAmount(
+      item,
+      dto.investmentAmount,
+    );
 
     return {
       plan,
@@ -434,7 +445,9 @@ export class PackageDepositFlowService {
     }
 
     if (!item.price.gt(0)) {
-      throw new BadRequestException('Investment amount must be greater than zero.');
+      throw new BadRequestException(
+        'Investment amount must be greater than zero.',
+      );
     }
 
     return item.price;
@@ -458,7 +471,7 @@ export class PackageDepositFlowService {
       );
     }
 
-    if (!Boolean(route.accountIsActive) || !Boolean(route.railIsActive)) {
+    if (!route.accountIsActive || !route.railIsActive) {
       throw new ServiceUnavailableException(
         'The receiving account configured for this package is currently unavailable.',
       );

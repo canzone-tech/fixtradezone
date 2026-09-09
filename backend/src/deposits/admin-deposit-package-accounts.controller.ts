@@ -53,7 +53,8 @@ export class AdminDepositPackageAccountsController {
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE)
   configurePackageRoute(
-    @Param('packageDefinitionId', new ParseUUIDPipe()) packageDefinitionId: string,
+    @Param('packageDefinitionId', new ParseUUIDPipe())
+    packageDefinitionId: string,
     @Body() dto: ConfigureDepositPackageAccountDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,

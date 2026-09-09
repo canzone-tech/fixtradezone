@@ -125,10 +125,11 @@ export class DepositPackageRoutingService {
   ) {
     return this.prisma.$transaction(
       async (transaction) => {
-        const packageDefinition = await transaction.packageDefinition.findUnique({
-          where: { id: dto.packageDefinitionId },
-          select: { id: true, code: true },
-        });
+        const packageDefinition =
+          await transaction.packageDefinition.findUnique({
+            where: { id: dto.packageDefinitionId },
+            select: { id: true, code: true },
+          });
 
         if (!packageDefinition) {
           throw new NotFoundException('Package definition was not found.');
@@ -314,16 +315,19 @@ export class DepositPackageRoutingService {
   ) {
     return this.prisma.$transaction(
       async (transaction) => {
-        const packageDefinition = await transaction.packageDefinition.findUnique({
-          where: { id: packageDefinitionId },
-          select: { id: true, code: true },
-        });
+        const packageDefinition =
+          await transaction.packageDefinition.findUnique({
+            where: { id: packageDefinitionId },
+            select: { id: true, code: true },
+          });
 
         if (!packageDefinition) {
           throw new NotFoundException('Package definition was not found.');
         }
 
-        const beforeRows = await transaction.$queryRaw<PackageRouteRow[]>(Prisma.sql`
+        const beforeRows = await transaction.$queryRaw<
+          PackageRouteRow[]
+        >(Prisma.sql`
           SELECT
             packageDefinitionId,
             depositAccountId,
