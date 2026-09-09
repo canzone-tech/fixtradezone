@@ -89,6 +89,15 @@
   font-size: 16px;
 }
 
+.mobileStatus,
+.mobileToggle {
+  display: none;
+}
+
+.subscriptionDetails {
+  display: contents;
+}
+
 .activeCard dl {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -201,5 +210,75 @@
 
   .header {
     flex-direction: column;
+  }
+
+  .activeCard {
+    gap: 12px;
+    padding: 15px;
+  }
+
+  .identity {
+    gap: 4px;
+  }
+
+  .identity h4 {
+    font-size: 19px;
+  }
+
+  .identity strong {
+    font-size: 17px;
+  }
+
+  .mobileStatus {
+    display: inline-flex;
+    width: max-content;
+    margin-top: 4px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    color: #70e9bf !important;
+    background: rgba(10, 91, 65, 0.28);
+    font-size: 10px !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .mobileToggle {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 13px;
+    border: 1px solid rgba(35, 223, 211, 0.3);
+    border-radius: 10px;
+    color: #dffffa;
+    background: rgba(6, 103, 111, 0.18);
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .mobileToggle:hover {
+    border-color: rgba(35, 223, 211, 0.5);
+    background: rgba(8, 126, 131, 0.26);
+  }
+
+  .mobileToggle i {
+    flex: 0 0 auto;
+    font-size: 18px;
+  }
+
+  .subscriptionDetails {
+    display: none;
+  }
+
+  .subscriptionDetailsExpanded {
+    display: grid;
+    gap: 10px;
+  }
+
+  .subscriptionDetails .source {
+    display: block;
+    padding-top: 2px;
   }
 }
