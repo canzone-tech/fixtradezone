@@ -79,6 +79,22 @@ Locked copy:
 
 Implementation authority for the wording is `admin/src/components/brand/platform-promise.tsx`. The component must inherit the protected portal surface language; it must not introduce a role-specific palette or role-specific copy.
 
+## Mobile package catalogue interaction
+
+The USER package catalogue keeps the existing multi-column package-card presentation on desktop and tablet. On mobile (`650px` and below), package cards use a compact accordion interaction so users can scan the catalogue without excessive scrolling.
+
+Founder-approved mobile behavior:
+
+- collapsed cards always show package identity, availability, investment range and USER / NET RATE
+- detailed commercial terms, activation notice and `Choose Investment` action remain hidden until the user expands that package
+- only one package may be expanded at a time
+- tapping the expanded package control closes it
+- desktop and tablet package cards remain fully expanded and visually unchanged
+- the accordion changes presentation only; package data, activation rules, purchase behavior and API contracts must not change
+- the expand/collapse control must expose accessible `aria-expanded` and `aria-controls` state
+
+Implementation authority is `admin/src/app/user/packages/user-packages-client.tsx` with responsive geometry in `admin/src/app/user/packages/user-packages.module.css`.
+
 ## Change control
 
 This design baseline is permanent. Do not alter the locked palette or pattern during normal module development, refactors or acceptance fixes.
