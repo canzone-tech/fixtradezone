@@ -2,9 +2,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import LiveActivityChart, {
+  type LiveActivityPoint,
+} from "@/components/ui/live-activity-chart";
 import UserShell from "@/components/user/user-shell";
-import { formatPlatformDateTime } from "@/lib/platform-time";
+import type { DepositsResponse } from "@/lib/deposits";
+import type { UserPayoutsResponse } from "@/lib/payouts";
+import {
+  formatPlatformDate,
+  formatPlatformDateTime,
+  platformIsoToLocalDateTimeInput,
+} from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
+import type { UserWalletResponse, WalletActivity } from "@/lib/wallet";
 import styles from "./user-dashboard.module.css";
 
 interface ErrorPayload {
@@ -21,6 +31,17 @@ interface DirectReferralsResponse {
   pagination: {
     total: number;
   };
+}
+
+interface SubscriptionSummaryResponse {
+  active?: Array<{ id: string }>;
+  history?: Array<{ id: string }>;
+}
+
+interface OptionalResponse<T> {
+  ok: boolean;
+  status: number;
+  payload: T | null;
 }
 
 const workspaceStrip = [
@@ -68,6 +89,8 @@ const workspaceStrip = [
   },
 ] as const;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 async function readPayload<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -76,8 +99,46 @@ async function readPayload<T>(response: Response): Promise<T | null> {
   }
 }
 
+async function optionalRequest<T>(url: string): Promise<OptionalResponse<T>> {
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload: response.ok ? await readPayload<T>(response) : null,
+    };
+  } catch {
+    return { ok: false, status: 0, payload: null };
+  }
+}
+
 function formatDate(value: string | null): string {
   return value ? formatPlatformDateTime(value) : "No login recorded";
+}
+
+function platformDateKey(value: string | Date): string {
+  return platformIsoToLocalDateTimeInput(value).slice(0, 10);
+}
+
+function buildWalletTrend(activity: WalletActivity[]): LiveActivityPoint[] {
+  const counts = new Map<string, number>();
+
+  for (const item of activity) {
+    const key = platformDateKey(item.postedAt);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const now = Date.now();
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now - (6 - index) * DAY_MS);
+    const key = platformDateKey(date);
+    return {
+      label: formatPlatformDate(date),
+      value: counts.get(key) ?? 0,
+    };
+  });
 }
 
 export default function UserDashboardClient() {
@@ -89,6 +150,12 @@ export default function UserDashboardClient() {
   const [directReferralTotal, setDirectReferralTotal] = useState<number | null>(
     null,
   );
+  const [activePackageTotal, setActivePackageTotal] = useState<number | null>(
+    null,
+  );
+  const [depositTotal, setDepositTotal] = useState<number | null>(null);
+  const [payoutTotal, setPayoutTotal] = useState<number | null>(null);
+  const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -97,7 +164,7 @@ export default function UserDashboardClient() {
 
     async function loadSession() {
       try {
-        // Session validation/refresh runs first. Referral data requests start only
+        // Session validation/refresh runs first. Dashboard data requests start only
         // after it completes so a rotating refresh token cannot be consumed by
         // concurrent BFF requests when an access token has expired.
         const response = await fetch("/api/user/session", {
@@ -136,40 +203,72 @@ export default function UserDashboardClient() {
           setSession(payload);
         }
 
-        try {
-          const [profileResponse, directResponse] = await Promise.all([
-            fetch("/api/user/referrals", { cache: "no-store" }),
-            fetch("/api/user/referrals/direct?page=1&limit=20", {
-              cache: "no-store",
-            }),
-          ]);
+        const [
+          profileResult,
+          directResult,
+          subscriptionsResult,
+          depositsResult,
+          payoutsResult,
+          walletResult,
+        ] = await Promise.all([
+          optionalRequest<ReferralProfile>("/api/user/referrals"),
+          optionalRequest<DirectReferralsResponse>(
+            "/api/user/referrals/direct?page=1&limit=20",
+          ),
+          optionalRequest<SubscriptionSummaryResponse>(
+            "/api/user/subscriptions?limit=100",
+          ),
+          optionalRequest<DepositsResponse>("/api/user/deposits?limit=100"),
+          optionalRequest<UserPayoutsResponse>("/api/user/payouts?limit=100"),
+          optionalRequest<UserWalletResponse>("/api/user/wallet?page=1&limit=100"),
+        ]);
 
-          if (profileResponse.status === 401 || directResponse.status === 401) {
-            router.replace("/login");
-            router.refresh();
-            return;
-          }
+        if (
+          [
+            profileResult,
+            directResult,
+            subscriptionsResult,
+            depositsResult,
+            payoutsResult,
+            walletResult,
+          ].some((result) => result.status === 401)
+        ) {
+          router.replace("/login");
+          router.refresh();
+          return;
+        }
 
-          const [profilePayload, directPayload] = await Promise.all([
-            readPayload<ReferralProfile>(profileResponse),
-            readPayload<DirectReferralsResponse>(directResponse),
-          ]);
+        if (!mounted) return;
 
-          if (mounted && profileResponse.ok && profilePayload) {
-            setReferralProfile(profilePayload);
-          }
+        if (profileResult.ok && profileResult.payload) {
+          setReferralProfile(profileResult.payload);
+        }
 
-          if (
-            mounted &&
-            directResponse.ok &&
-            directPayload &&
-            typeof directPayload.pagination?.total === "number"
-          ) {
-            setDirectReferralTotal(directPayload.pagination.total);
-          }
-        } catch {
-          // Referral widgets degrade safely without hiding the authenticated
-          // dashboard. The dedicated referral workspace exposes detailed errors.
+        if (
+          directResult.ok &&
+          typeof directResult.payload?.pagination?.total === "number"
+        ) {
+          setDirectReferralTotal(directResult.payload.pagination.total);
+        }
+
+        if (subscriptionsResult.ok && subscriptionsResult.payload) {
+          setActivePackageTotal(subscriptionsResult.payload.active?.length ?? 0);
+        }
+
+        if (depositsResult.ok && depositsResult.payload) {
+          setDepositTotal(
+            typeof depositsResult.payload.total === "number"
+              ? depositsResult.payload.total
+              : depositsResult.payload.deposits.length,
+          );
+        }
+
+        if (payoutsResult.ok && payoutsResult.payload) {
+          setPayoutTotal(payoutsResult.payload.total);
+        }
+
+        if (walletResult.ok && walletResult.payload) {
+          setWallet(walletResult.payload);
         }
       } catch (caught) {
         if (mounted) {
@@ -210,16 +309,44 @@ export default function UserDashboardClient() {
 
   const workspaceItems = useMemo(
     () =>
-      workspaceStrip.map((item) =>
-        item.label === "Referral"
-          ? {
-              ...item,
-              value: referralProfile?.assignmentStatus ?? item.value,
-              detail: referralProfile ? "Live referral API" : item.detail,
-            }
-          : item,
-      ),
-    [referralProfile],
+      workspaceStrip.map((item) => {
+        if (item.label === "Referral") {
+          return {
+            ...item,
+            value: referralProfile?.assignmentStatus ?? item.value,
+            detail: referralProfile ? "Live referral API" : item.detail,
+          };
+        }
+
+        if (item.label === "Package") {
+          return {
+            ...item,
+            value: activePackageTotal ?? "—",
+            detail: "Active subscriptions",
+          };
+        }
+
+        if (item.label === "Wallet") {
+          return {
+            ...item,
+            value: wallet?.totalActivity ?? "—",
+            detail: "Immutable activity",
+          };
+        }
+
+        return item;
+      }),
+    [activePackageTotal, referralProfile, wallet?.totalActivity],
+  );
+
+  const walletTrend = useMemo(
+    () => buildWalletTrend(wallet?.activity ?? []),
+    [wallet?.activity],
+  );
+
+  const recentWalletActivity = useMemo(
+    () => wallet?.activity.slice(0, 5) ?? [],
+    [wallet?.activity],
   );
 
   if (loading) {
@@ -282,9 +409,9 @@ export default function UserDashboardClient() {
                 <h2>Welcome back, {displayName}! 👋</h2>
 
                 <p>
-                  Manage your FixTradeZone account, packages, wallet, referrals
-                  and clearly labelled simulated activity from one secure
-                  workspace.
+                  Live account data from packages, wallet, deposits, payouts and
+                  referrals in one ledger-aware workspace. Financial values remain
+                  currency-specific and simulated activity stays clearly labelled.
                 </p>
 
                 <div className="ftz-hero-meta">
@@ -309,9 +436,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>My Package</small>
-                  <strong>LIVE</strong>
-                  <span>Open My Packages for exact lifecycle state</span>
+                  <small>Active Packages</small>
+                  <strong>{activePackageTotal ?? "—"}</strong>
+                  <span>Live subscription lifecycle</span>
                 </div>
               </article>
 
@@ -321,9 +448,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Wallet</small>
-                  <strong>LIVE</strong>
-                  <span>Exact per-currency balances are ledger-backed</span>
+                  <small>Wallet Transactions</small>
+                  <strong>{wallet?.totalActivity ?? "—"}</strong>
+                  <span>Immutable ledger-backed activity</span>
                 </div>
               </article>
 
@@ -333,9 +460,9 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Deposits</small>
-                  <strong>LIVE</strong>
-                  <span>Open Deposits for payment and review status</span>
+                  <small>Deposit Requests</small>
+                  <strong>{depositTotal ?? "—"}</strong>
+                  <span>Live deposit history</span>
                 </div>
               </article>
 
@@ -345,21 +472,21 @@ export default function UserDashboardClient() {
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Payouts</small>
-                  <strong>LIVE</strong>
-                  <span>Open Payouts for request and settlement history</span>
+                  <small>Payout Requests</small>
+                  <strong>{payoutTotal ?? "—"}</strong>
+                  <span>Live payout lifecycle</span>
                 </div>
               </article>
 
               <article className="ftz-metric-card is-cyan">
                 <div className="ftz-metric-icon">
-                  <i className="iconoir-graph-up" />
+                  <i className="iconoir-community" />
                 </div>
 
                 <div className="ftz-metric-copy">
-                  <small>Simulated Trade Activity</small>
-                  <strong>—</strong>
-                  <span>SIMULATED RESULTS only</span>
+                  <small>Direct Referrals</small>
+                  <strong>{directReferralTotal ?? "—"}</strong>
+                  <span>Live referral network</span>
                 </div>
               </article>
             </section>
@@ -373,95 +500,85 @@ export default function UserDashboardClient() {
                     <div className="ftz-legend">
                       <span>
                         <i className="dot green" />
-                        Deposits
+                        Ledger-backed
                       </span>
 
                       <span>
                         <i className="dot purple" />
-                        Payouts
+                        Platform timezone
                       </span>
 
                       <span>
                         <i className="dot blue" />
-                        Simulated Activity
+                        Live API data
                       </span>
                     </div>
                   </div>
 
-                  <span className={styles.pendingBadge}>
-                    DEDICATED LIVE WORKSPACES
-                  </span>
+                  <span className={styles.pendingBadge}>LIVE WALLET ACTIVITY</span>
                 </div>
 
-                <div className={styles.chartEmpty}>
-                  <span className={styles.emptyIcon}>
-                    <i className="iconoir-stats-up-square" />
-                  </span>
-
-                  <strong>Activity chart is ready for live data</strong>
-
-                  <p>
-                    Exact financial totals remain in the dedicated live Wallet,
-                    Deposits, Payouts, Packages, Commissions, Rewards and Referrals
-                    workspaces to avoid unsafe cross-currency aggregation on this
-                    overview.
-                  </p>
-                </div>
+                <LiveActivityChart
+                  title="Wallet activity"
+                  description="Last 7 platform days · latest 100 ledger-backed entries"
+                  points={walletTrend}
+                  valueLabel="transactions"
+                />
 
                 <div className="ftz-chart-stats">
                   <div>
                     <small>Deposits</small>
-                    <strong>LIVE</strong>
-                    <span>Dedicated deposit workspace</span>
+                    <strong>{depositTotal ?? "—"}</strong>
+                    <span>Request records</span>
                   </div>
 
                   <div>
                     <small>Payouts</small>
-                    <strong>LIVE</strong>
-                    <span className="purple">Dedicated payout workspace</span>
+                    <strong>{payoutTotal ?? "—"}</strong>
+                    <span className="purple">Request records</span>
                   </div>
 
                   <div>
-                    <small>Referral Earnings</small>
-                    <strong>LIVE</strong>
-                    <span>Commission history + ledger-backed wallet bucket</span>
+                    <small>Wallet Assets</small>
+                    <strong>{wallet?.wallets.length ?? "—"}</strong>
+                    <span>Currency-specific balances</span>
                   </div>
 
                   <div>
                     <small>Simulated Results</small>
-                    <strong>—</strong>
-                    <span className="orange">SIMULATED ONLY</span>
+                    <strong>SIMULATED ONLY</strong>
+                    <span className="orange">Never real trading</span>
                   </div>
                 </div>
               </article>
 
               <div className="ftz-stack">
                 <article className="ftz-panel ftz-deposit-panel">
-                  <h3>Deposits & Wallet</h3>
+                  <h3>Wallet Snapshot</h3>
 
-                  <div className={styles.compactEmpty}>
-                    <span>
-                      <i className="iconoir-wallet" />
-                    </span>
+                  <div className="ftz-users-package-grid">
+                    <div>
+                      <small>Tracked assets</small>
+                      <strong>{wallet?.wallets.length ?? "—"}</strong>
+                      <span>No cross-currency aggregation</span>
+                    </div>
 
                     <div>
-                      <strong>Deposits and Wallet are live</strong>
-                      <p>
-                        Use the dedicated workspaces for exact payment status,
-                        immutable ledger activity and per-currency balances.
-                      </p>
+                      <small>Ledger activity</small>
+                      <strong>{wallet?.totalActivity ?? "—"}</strong>
+                      <span>Immutable transaction history</span>
                     </div>
                   </div>
                 </article>
 
                 <article className="ftz-panel ftz-users-package">
-                  <h3>My Package</h3>
+                  <h3>My Packages</h3>
 
                   <div className="ftz-users-package-grid">
                     <div>
-                      <small>Current Package</small>
-                      <strong>LIVE</strong>
-                      <span>Open My Packages for exact active packages</span>
+                      <small>Active Packages</small>
+                      <strong>{activePackageTotal ?? "—"}</strong>
+                      <span>Live package subscriptions</span>
                     </div>
 
                     <div>
@@ -476,8 +593,8 @@ export default function UserDashboardClient() {
 
                     <div>
                       <small>Package Workspace</small>
-                      <strong>Lifecycle API live</strong>
-                      <span>No package value is fabricated on the overview</span>
+                      <strong>Immutable lifecycle records</strong>
+                      <span>Published package terms remain authoritative</span>
                     </div>
                   </div>
                 </article>
@@ -486,9 +603,11 @@ export default function UserDashboardClient() {
 
             <article className="ftz-panel ftz-transactions-panel">
               <div className="ftz-panel-heading">
-                <h3>Recent Transactions</h3>
+                <h3>Recent Wallet Activity</h3>
 
-                <span className={styles.pendingBadge}>WALLET HISTORY LIVE</span>
+                <button type="button" onClick={() => router.push("/user/wallet")}>
+                  Open My Wallet
+                </button>
               </div>
 
               <div className="ftz-table-wrap">
@@ -499,27 +618,28 @@ export default function UserDashboardClient() {
                       <th>Type</th>
                       <th>Asset</th>
                       <th>Amount</th>
-                      <th>Status</th>
+                      <th>Direction</th>
                       <th>Time</th>
                     </tr>
                   </thead>
 
                   <tbody>
-                    <tr>
-                      <td colSpan={6}>
-                        <div className={styles.tableEmpty}>
-                          <i className="iconoir-database" />
-
-                          <div>
-                            <strong>Open My Wallet for immutable history</strong>
-                            <span>
-                              Exact ledger activity stays in the ledger-backed
-                              wallet workspace.
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
+                    {recentWalletActivity.length === 0 ? (
+                      <tr>
+                        <td colSpan={6}>No readable wallet activity.</td>
+                      </tr>
+                    ) : (
+                      recentWalletActivity.map((item) => (
+                        <tr key={`${item.transactionId}-${item.bucket}`}>
+                          <td>{item.transactionId}</td>
+                          <td>{item.kind}</td>
+                          <td>{item.currency}</td>
+                          <td>{item.amount}</td>
+                          <td>{item.direction}</td>
+                          <td>{formatPlatformDateTime(item.postedAt)}</td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -584,16 +704,33 @@ export default function UserDashboardClient() {
                   <time>NOW</time>
                 </div>
 
-                <div className="ftz-activity-row">
-                  <span className="ftz-activity-icon is-blue">
-                    <i className="iconoir-clock" />
-                  </span>
+                {recentWalletActivity[0] ? (
+                  <div className="ftz-activity-row">
+                    <span className="ftz-activity-icon is-blue">
+                      <i className="iconoir-database" />
+                    </span>
 
-                  <div>
-                    <strong>Last authenticated login</strong>
-                    <small>{formatDate(user.lastLoginAt)}</small>
+                    <div>
+                      <strong>{recentWalletActivity[0].kind}</strong>
+                      <small>
+                        {recentWalletActivity[0].amount} {recentWalletActivity[0].currency}
+                        {" · "}
+                        {formatPlatformDateTime(recentWalletActivity[0].postedAt)}
+                      </small>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="ftz-activity-row">
+                    <span className="ftz-activity-icon is-blue">
+                      <i className="iconoir-clock" />
+                    </span>
+
+                    <div>
+                      <strong>Last authenticated login</strong>
+                      <small>{formatDate(user.lastLoginAt)}</small>
+                    </div>
+                  </div>
+                )}
               </div>
             </article>
 
@@ -606,10 +743,9 @@ export default function UserDashboardClient() {
                 <strong>Data integrity first</strong>
 
                 <p>
-                  Exact financial values remain in dedicated ledger-backed
-                  workspaces and are never aggregated across currencies here.
-                  Simulated activity will always be explicitly labelled as
-                  simulated.
+                  Exact financial values remain currency-specific and are never
+                  aggregated across currencies here. Simulated activity will always
+                  be explicitly labelled as simulated.
                 </p>
               </div>
             </article>
