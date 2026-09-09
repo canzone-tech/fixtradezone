@@ -248,7 +248,7 @@ export default function UserSimulatedActivityClient() {
               package rules and does not represent external market execution.
             </p>
           </div>
-          <span className={styles.disclosurePill}>TRADE ACTIVITY</span>
+          <span className={styles.disclosurePill}>SIMULATED</span>
         </section>
 
         {error ? (
@@ -436,7 +436,10 @@ export default function UserSimulatedActivityClient() {
           <i className="iconoir-warning-triangle" />
           <div>
             <strong>SIMULATED TRADE ACTIVITY</strong>
-            <p>{activity?.disclosure ?? "Trade activity does not represent external market execution."}</p>
+            <p>
+              {activity?.disclosure ??
+                "Trade activity is simulated according to your active package rules and does not represent external market execution."}
+            </p>
             <p>
               This workspace does not itself change Main Wallet, Package
               Earnings, Referral Commission, Rewards, package caps or accounting
