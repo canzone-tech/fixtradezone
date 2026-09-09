@@ -167,7 +167,26 @@ describe('PackageDepositFlowService', () => {
     transaction.$queryRaw
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([route]);
-    transaction.deposit.create.mockResolvedValue(pendingDeposit());
+    transaction.deposit.create.mockImplementation(async (args: unknown) => {
+      const data = (
+        args as {
+          data: {
+            status: string;
+            assignedDepositAccountId: string;
+            assignedWalletAddress: string;
+            assignedNetwork: string;
+            txid: string | null;
+          };
+        }
+      ).data;
+
+      expect(data.status).toBe('PENDING_REVIEW');
+      expect(data.assignedDepositAccountId).toBe(ACCOUNT_ID);
+      expect(data.assignedWalletAddress).toBe(ADDRESS);
+      expect(data.assignedNetwork).toBe('TRC20');
+      expect(data.txid).toBe(TXID);
+      return pendingDeposit();
+    });
     transaction.auditLog.create.mockResolvedValue({});
 
     const result = await service.submitDeposit(
@@ -179,17 +198,7 @@ describe('PackageDepositFlowService', () => {
       actor,
     );
 
-    expect(transaction.deposit.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'PENDING_REVIEW',
-          assignedDepositAccountId: ACCOUNT_ID,
-          assignedWalletAddress: ADDRESS,
-          assignedNetwork: 'TRC20',
-          txid: TXID,
-        }),
-      }),
-    );
+    expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
   });
