@@ -575,7 +575,7 @@ export default function SimulatedTradesClient() {
             wallet or ledger mutation path.
           </p>
         </div>
-        <span className={styles.disclosurePill}>SYSTEM-GENERATED</span>
+        <span className={styles.disclosurePill}>SIMULATED</span>
       </section>
 
       {error ? (
@@ -1034,7 +1034,7 @@ export default function SimulatedTradesClient() {
       <section className={styles.disclosure}>
         <i className="iconoir-warning-triangle" />
         <div>
-          <strong>SYSTEM-GENERATED TRADE ACTIVITY</strong>
+          <strong>SIMULATED TRADE ACTIVITY</strong>
           <p>
             {presentedPolicy?.disclosure ??
               "Trade activity does not represent external market execution."}
