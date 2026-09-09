@@ -129,6 +129,34 @@ export class CreateDepositAccountDto {
   reason!: string;
 }
 
+export class CreatePackageDepositAccountDto {
+  @Transform(trimString)
+  @IsUUID()
+  packageDefinitionId!: string;
+
+  @Transform(trimString)
+  @IsUUID()
+  paymentRailId!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @Length(20, 100)
+  walletAddress!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(360_000)
+  @Matches(QR_DATA_URL_PATTERN, {
+    message: 'qrCodeDataUrl must be a supported base64 image data URL.',
+  })
+  qrCodeDataUrl!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
 export class UpdateDepositAccountDto {
   @IsInt()
   @Min(1)
