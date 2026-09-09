@@ -6,7 +6,11 @@ import LiveActivityChart, {
   type LiveActivityPoint,
 } from "@/components/ui/live-activity-chart";
 import type { AdminUser } from "@/lib/auth";
-import { formatPlatformDateTime } from "@/lib/platform-time";
+import {
+  formatPlatformDate,
+  formatPlatformDateTime,
+  platformIsoToLocalDateTimeInput,
+} from "@/lib/platform-time";
 
 interface UsersResponse {
   total?: number;
@@ -117,34 +121,29 @@ async function readTotal<T extends { total?: number }>(
   }
 }
 
-function localDateKey(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function platformDateKey(value: string | Date): string {
+  return platformIsoToLocalDateTimeInput(value).slice(0, 10);
 }
 
 function buildLedgerTrend(transactions: LedgerTransaction[]): LiveActivityPoint[] {
-  const formatter = new Intl.DateTimeFormat(undefined, {
-    day: "numeric",
-    month: "short",
-  });
   const counts = new Map<string, number>();
 
   for (const transaction of transactions) {
-    const postedAt = new Date(transaction.postedAt);
-    if (Number.isNaN(postedAt.getTime())) continue;
-    const key = localDateKey(postedAt);
+    const key = platformDateKey(transaction.postedAt);
+    if (!key) continue;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
+  const now = Date.now();
+
   return Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setHours(12, 0, 0, 0);
-    date.setDate(date.getDate() - (6 - index));
+    const date = new Date(now - (6 - index) * DAY_MS);
+    const key = platformDateKey(date);
     return {
-      label: formatter.format(date),
-      value: counts.get(localDateKey(date)) ?? 0,
+      label: formatPlatformDate(date),
+      value: counts.get(key) ?? 0,
     };
   });
 }
