@@ -110,7 +110,7 @@
     [class*="MetricGrid"],
     [class*="metrics"],
     [class*="Metrics"]
-  ) > article {
+  ) > :where(article, div) {
   border: 1px solid var(--ftz-border) !important;
   border-radius: 14px !important;
   background: var(--ftz-surface-gradient) !important;
