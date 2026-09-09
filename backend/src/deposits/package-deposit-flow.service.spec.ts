@@ -167,7 +167,7 @@ describe('PackageDepositFlowService', () => {
     transaction.$queryRaw
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([route]);
-    transaction.deposit.create.mockImplementation(async (args: unknown) => {
+    transaction.deposit.create.mockImplementation((args: unknown) => {
       const data = (
         args as {
           data: {
@@ -185,7 +185,7 @@ describe('PackageDepositFlowService', () => {
       expect(data.assignedWalletAddress).toBe(ADDRESS);
       expect(data.assignedNetwork).toBe('TRC20');
       expect(data.txid).toBe(TXID);
-      return pendingDeposit();
+      return Promise.resolve(pendingDeposit());
     });
     transaction.auditLog.create.mockResolvedValue({});
 
