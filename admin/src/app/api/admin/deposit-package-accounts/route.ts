@@ -6,3 +6,11 @@ export function GET(request: NextRequest) {
     method: "GET",
   });
 }
+
+export async function POST(request: NextRequest) {
+  return proxyAdminRequest(request, "/admin/deposit-package-accounts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: await request.text(),
+  });
+}
