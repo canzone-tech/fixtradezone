@@ -95,6 +95,35 @@ Founder-approved mobile behavior:
 
 Implementation authority is `admin/src/app/user/packages/user-packages-client.tsx` with responsive geometry in `admin/src/app/user/packages/user-packages.module.css`.
 
+## USER package plan metadata visibility
+
+The published-plan metadata block is an internal/development concern and is intentionally **not rendered in the USER package catalogue** for now.
+
+The USER interface must not show the standalone summary values for:
+
+- EFFECTIVE PLAN / version number
+- NEW ACTIVATION TIMEZONE
+- ACTIVE PACKAGE MODE
+- ACTIVATION trigger
+
+The underlying package-plan data and API contracts remain unchanged so the metadata can be surfaced again later if Founder-approved development or diagnostics require it. This is a presentation-only visibility rule.
+
+## Mobile My Active Packages interaction
+
+The `My Active Packages` section keeps full subscription details visible on desktop and tablet. On mobile (`640px` and below), each active package uses a compact accordion to reduce vertical scrolling.
+
+Founder-approved mobile behavior:
+
+- collapsed state always shows package code, display name, principal amount/currency and current status
+- a `View package details` control expands the selected active package
+- expanded details include status, activated time, scheduled end, goal/cycle, package mode, activation trigger and source deposit reference
+- tapping `Hide package details` collapses the selected package
+- only one active package may be expanded at a time
+- desktop and tablet remain fully detailed without requiring expansion
+- this interaction changes presentation only; subscription history, accounting, activation state and API behavior must not change
+
+Implementation authority is `admin/src/app/user/packages/user-subscriptions-panel.tsx` with responsive geometry in `admin/src/app/user/packages/user-subscriptions-panel.module.css`.
+
 ## Change control
 
 This design baseline is permanent. Do not alter the locked palette or pattern during normal module development, refactors or acceptance fixes.
