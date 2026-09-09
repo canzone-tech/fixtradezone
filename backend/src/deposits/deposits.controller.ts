@@ -14,20 +14,18 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
 import {
-  CreateDepositDto,
   DepositPaymentRailQueryDto,
-  EnsureDepositAddressAssignmentDto,
-  SubmitDepositRequestDto,
   SubmitDepositTxidDto,
+  SubmitPackageDepositDto,
 } from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
-import { PermanentDepositFlowService } from './permanent-deposit-flow.service';
+import { PackageDepositFlowService } from './package-deposit-flow.service';
 
 @Controller('deposits')
 export class DepositsController {
   constructor(
     private readonly depositsService: DepositsService,
-    private readonly permanentDepositFlowService: PermanentDepositFlowService,
+    private readonly packageDepositFlowService: PackageDepositFlowService,
   ) {}
 
   @Get('payment-rails')
@@ -36,48 +34,32 @@ export class DepositsController {
     return this.depositsService.listAvailableDepositPaymentRails(query);
   }
 
+  @Get('context/:packagePlanItemId')
+  @Header('Cache-Control', 'no-store')
+  getPackageDepositContext(
+    @Param('packagePlanItemId', new ParseUUIDPipe()) packagePlanItemId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.packageDepositFlowService.getPackageDepositContext(
+      packagePlanItemId,
+      actor,
+    );
+  }
+
   @Get('me')
   @Header('Cache-Control', 'no-store')
   getMyDeposits(@CurrentUser() actor: AuthenticatedUser) {
     return this.depositsService.getMyDeposits(actor);
   }
 
-  @Post('address-assignment')
-  @Header('Cache-Control', 'no-store')
-  ensureAddressAssignment(
-    @Body() dto: EnsureDepositAddressAssignmentDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
-    return this.permanentDepositFlowService.ensureAddressAssignment(
-      dto.paymentRailId,
-      actor,
-      getRequestContext(request),
-    );
-  }
-
   @Post('submit')
   @Header('Cache-Control', 'no-store')
-  submitDeposit(
-    @Body() dto: SubmitDepositRequestDto,
+  submitPackageDeposit(
+    @Body() dto: SubmitPackageDepositDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.permanentDepositFlowService.submitDeposit(
-      dto,
-      actor,
-      getRequestContext(request),
-    );
-  }
-
-  @Post()
-  @Header('Cache-Control', 'no-store')
-  createDeposit(
-    @Body() dto: CreateDepositDto,
-    @CurrentUser() actor: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
-    return this.permanentDepositFlowService.createDeposit(
+    return this.packageDepositFlowService.submitDeposit(
       dto,
       actor,
       getRequestContext(request),

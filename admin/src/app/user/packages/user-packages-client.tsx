@@ -317,7 +317,10 @@ export default function UserPackagesClient() {
 
                 {item.availability === "AVAILABLE" &&
                 catalogue.activationAvailable ? (
-                  <Link href="/user/deposits" className={styles.depositLink}>
+                  <Link
+                    href={`/user/deposits/${encodeURIComponent(item.id)}`}
+                    className={styles.depositLink}
+                  >
                     Choose Investment <i className="iconoir-arrow-right" />
                   </Link>
                 ) : null}

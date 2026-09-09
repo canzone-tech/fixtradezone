@@ -1,10 +1,5 @@
-import type { Metadata } from "next";
-import UserDepositsSingleStepClient from "./user-deposits-single-step-client";
-
-export const metadata: Metadata = {
-  title: "Deposits | FixTradeZone",
-};
+import { redirect } from "next/navigation";
 
 export default function UserDepositsPage() {
-  return <UserDepositsSingleStepClient />;
+  redirect("/user/packages");
 }

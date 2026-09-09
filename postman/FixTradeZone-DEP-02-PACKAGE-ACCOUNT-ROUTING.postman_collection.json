@@ -1,0 +1,248 @@
+{
+  "info": {
+    "_postman_id": "4d802b5d-8ae8-4ae9-a2c7-5ac8d7eab202",
+    "name": "FixTradeZone DEP-02 Package Account Routing",
+    "description": "LOCAL ACCEPTANCE ONLY. Run after migration 0034_package_deposit_account_routing is deployed. Proves one configured receiving account per package, package-specific deposit context, and direct PENDING_REVIEW submission. Synthetic TXIDs are local QA data only. This collection rejects the created deposit at the end so it does not post accounting or activate a package.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Admin Login",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('admin login 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+          "pm.expect(body.user.roles).to.include.oneOf(['ADMIN', 'SUPER_ADMIN']);",
+          "pm.environment.set('adminAccessToken', body.accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"identifier\": \"{{adminIdentifier}}\",\n  \"password\": \"{{adminPassword}}\"\n}"},
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "02 User Login",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('user login 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+          "pm.expect(body.user.roles).to.include('USER');",
+          "pm.environment.set('userAccessToken', body.accessToken);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {"mode": "raw", "raw": "{\n  \"identifier\": \"{{userIdentifier}}\",\n  \"password\": \"{{userPassword}}\"\n}"},
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "03 User Effective Package",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('package catalogue 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const item = (body.items || []).find(i => i.availability === 'AVAILABLE');",
+          "pm.test('available package exists', () => pm.expect(item).to.exist);",
+          "if (item) {",
+          "  pm.environment.set('depositPackageItemId', item.id);",
+          "  pm.environment.set('depositPackageDefinitionId', item.packageDefinitionId);",
+          "  pm.environment.set('depositPackageCurrency', item.currency);",
+          "  pm.environment.set('depositInvestmentAmount', item.minimumInvestment || item.price);",
+          "}"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
+        "url": "{{baseUrl}}/packages"
+      }
+    },
+    {
+      "name": "04 Admin Active Receiving Account",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('account list 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const currency = pm.environment.get('depositPackageCurrency');",
+          "const account = (body.accounts || []).find(a => a.isActive && a.asset === currency && a.paymentRail && a.paymentRail.isActive);",
+          "pm.test('eligible active account exists', () => pm.expect(account, 'Create an active receiving account for the package currency first').to.exist);",
+          "if (account) {",
+          "  pm.environment.set('depositAccountId', account.id);",
+          "  pm.environment.set('depositAccountAddress', account.walletAddress);",
+          "  pm.environment.set('depositAccountNetwork', account.network);",
+          "}"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
+        "url": "{{baseUrl}}/admin/deposit-accounts"
+      }
+    },
+    {
+      "name": "05 Configure Package Receiving Account",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('route save 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.packageDefinitionId).to.eql(pm.environment.get('depositPackageDefinitionId'));",
+          "pm.expect(body.depositAccountId).to.eql(pm.environment.get('depositAccountId'));"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{adminAccessToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {"mode": "raw", "raw": "{\n  \"depositAccountId\": \"{{depositAccountId}}\",\n  \"reason\": \"LOCAL QA DEP-02 package routing acceptance\"\n}"},
+        "url": "{{baseUrl}}/admin/deposit-package-accounts/{{depositPackageDefinitionId}}"
+      }
+    },
+    {
+      "name": "06 Package Route Readback",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('route readback 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const row = (body.packages || []).find(p => p.packageDefinitionId === pm.environment.get('depositPackageDefinitionId'));",
+          "pm.test('package has exactly configured account', () => { pm.expect(row).to.exist; pm.expect(row.depositAccountId).to.eql(pm.environment.get('depositAccountId')); });"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminAccessToken}}"}],
+        "url": "{{baseUrl}}/admin/deposit-package-accounts"
+      }
+    },
+    {
+      "name": "07 User Package Deposit Context",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('package deposit context 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "pm.expect(body.package.id).to.eql(pm.environment.get('depositPackageItemId'));",
+          "pm.expect(body.receivingAccount.id).to.eql(pm.environment.get('depositAccountId'));",
+          "pm.expect(body.receivingAccount.walletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
+          "pm.expect(body.receivingAccount.network).to.eql(pm.environment.get('depositAccountNetwork'));",
+          "pm.test('no pre-existing open deposit', () => pm.expect(body.openDeposit).to.eql(null));"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
+        "url": "{{baseUrl}}/deposits/context/{{depositPackageItemId}}"
+      }
+    },
+    {
+      "name": "08 Submit Package Deposit One Step",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {"exec": [
+            "const chars = '0123456789abcdef';",
+            "let txid = '';",
+            "for (let i = 0; i < 64; i += 1) txid += chars[Math.floor(Math.random() * chars.length)];",
+            "pm.environment.set('depositTxid', txid);"
+          ]}
+        },
+        {
+          "listen": "test",
+          "script": {"exec": [
+            "pm.test('single-step submit 201', () => pm.response.to.have.status(201));",
+            "const d = pm.response.json().deposit;",
+            "pm.expect(d.status).to.eql('PENDING_REVIEW');",
+            "pm.expect(d.packagePlanItemId).to.eql(pm.environment.get('depositPackageItemId'));",
+            "pm.expect(d.assignedDepositAccountId).to.eql(pm.environment.get('depositAccountId'));",
+            "pm.expect(d.assignedWalletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
+            "pm.expect(d.assignedNetwork).to.eql(pm.environment.get('depositAccountNetwork'));",
+            "pm.expect(d.txid).to.eql(pm.environment.get('depositTxid').toLowerCase());",
+            "pm.environment.set('depositId', d.id);"
+          ]}
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{userAccessToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {"mode": "raw", "raw": "{\n  \"packagePlanItemId\": \"{{depositPackageItemId}}\",\n  \"investmentAmount\": \"{{depositInvestmentAmount}}\",\n  \"txid\": \"{{depositTxid}}\"\n}"},
+        "url": "{{baseUrl}}/deposits/submit"
+      }
+    },
+    {
+      "name": "09 User Deposit Snapshot Readback",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('history 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const d = (body.deposits || []).find(x => x.id === pm.environment.get('depositId'));",
+          "pm.test('routing snapshot persisted', () => {",
+          "  pm.expect(d).to.exist;",
+          "  pm.expect(d.status).to.eql('PENDING_REVIEW');",
+          "  pm.expect(d.assignedDepositAccountId).to.eql(pm.environment.get('depositAccountId'));",
+          "  pm.expect(d.assignedWalletAddress).to.eql(pm.environment.get('depositAccountAddress'));",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
+        "url": "{{baseUrl}}/deposits/me"
+      }
+    },
+    {
+      "name": "10 Admin Reject Local QA Deposit",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('reject 201', () => pm.response.to.have.status(201));",
+          "const d = pm.response.json().deposit;",
+          "pm.expect(d.status).to.eql('REJECTED');"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{adminAccessToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {"mode": "raw", "raw": "{\n  \"note\": \"LOCAL QA DEP-02 cleanup rejection - no accounting expected\"\n}"},
+        "url": "{{baseUrl}}/admin/deposits/{{depositId}}/reject"
+      }
+    },
+    {
+      "name": "11 Final Rejected Readback",
+      "event": [{
+        "listen": "test",
+        "script": {"exec": [
+          "pm.test('final history 200', () => pm.response.to.have.status(200));",
+          "const body = pm.response.json();",
+          "const d = (body.deposits || []).find(x => x.id === pm.environment.get('depositId'));",
+          "pm.test('local QA deposit is rejected', () => { pm.expect(d).to.exist; pm.expect(d.status).to.eql('REJECTED'); });"
+        ]}
+      }],
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{userAccessToken}}"}],
+        "url": "{{baseUrl}}/deposits/me"
+      }
+    }
+  ]
+}

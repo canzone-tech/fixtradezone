@@ -15,6 +15,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
 import {
@@ -158,11 +159,15 @@ export class UpdateDepositAccountDto {
   reason!: string;
 }
 
-export class EnsureDepositAddressAssignmentDto {
+export class ConfigureDepositPackageAccountDto {
+  @ValidateIf((_, value: unknown) => value !== null)
+  @IsUUID()
+  depositAccountId!: string | null;
+
   @Transform(trimString)
   @IsString()
-  @IsUUID()
-  paymentRailId!: string;
+  @Length(3, 500)
+  reason!: string;
 }
 
 export class CreateDepositDto {
@@ -183,7 +188,18 @@ export class CreateDepositDto {
   investmentAmount?: string;
 }
 
-export class SubmitDepositRequestDto extends CreateDepositDto {
+export class SubmitPackageDepositDto {
+  @Transform(trimString)
+  @IsString()
+  @IsUUID()
+  packagePlanItemId!: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(INVESTMENT_AMOUNT_PATTERN)
+  investmentAmount?: string;
+
   @Transform(normalizeTxid)
   @IsString()
   @Length(1, 191)
