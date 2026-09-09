@@ -86,7 +86,9 @@ async function checkedUserJson<T extends ApiMessagePayload>(
 }
 
 async function fetchWorkspace(): Promise<UserDepositWorkspace> {
-  const sessionResponse = await fetch("/api/user/session", { cache: "no-store" });
+  const sessionResponse = await fetch("/api/user/session", {
+    cache: "no-store",
+  });
   const session = await checkedUserJson<UserDirectSession & ApiMessagePayload>(
     sessionResponse,
     "USER session is unavailable.",
@@ -95,11 +97,12 @@ async function fetchWorkspace(): Promise<UserDepositWorkspace> {
     throw new Error("USER session is incomplete.");
   }
 
-  const packageResponse = await fetch("/api/user/packages", { cache: "no-store" });
-  const packagePayload = await checkedUserJson<PackageCatalogue & ApiMessagePayload>(
-    packageResponse,
-    "Could not load available packages.",
-  );
+  const packageResponse = await fetch("/api/user/packages", {
+    cache: "no-store",
+  });
+  const packagePayload = await checkedUserJson<
+    PackageCatalogue & ApiMessagePayload
+  >(packageResponse, "Could not load available packages.");
 
   const railResponse = await fetch("/api/user/deposit-payment-rails", {
     cache: "no-store",
@@ -108,17 +111,20 @@ async function fetchWorkspace(): Promise<UserDepositWorkspace> {
     DepositPaymentRailsResponse & ApiMessagePayload
   >(railResponse, "Could not load available payment networks.");
 
-  const depositResponse = await fetch("/api/user/deposits", { cache: "no-store" });
-  const depositPayload = await checkedUserJson<DepositsResponse & ApiMessagePayload>(
-    depositResponse,
-    "Could not load deposit history.",
-  );
+  const depositResponse = await fetch("/api/user/deposits", {
+    cache: "no-store",
+  });
+  const depositPayload = await checkedUserJson<
+    DepositsResponse & ApiMessagePayload
+  >(depositResponse, "Could not load deposit history.");
 
   return {
     session,
     packages:
       packagePayload.catalogueAvailable && packagePayload.activationAvailable
-        ? packagePayload.items.filter((item) => item.availability === "AVAILABLE")
+        ? packagePayload.items.filter(
+            (item) => item.availability === "AVAILABLE",
+          )
         : [],
     rails: railPayload.rails,
     deposits: depositPayload.deposits,
@@ -183,24 +189,27 @@ export default function UserDepositsSingleStepClient() {
     [eligibleRails, selectedRailId],
   );
 
+  function applyWorkspace(workspace: UserDepositWorkspace) {
+    setSession(workspace.session);
+    setPackages(workspace.packages);
+    setRails(workspace.rails);
+    setDeposits(workspace.deposits);
+
+    const nextPackage =
+      workspace.packages.find((item) => item.id === selectedPackageId) ??
+      workspace.packages[0] ??
+      null;
+    setSelectedPackageId(nextPackage?.id ?? "");
+    if (nextPackage && !investmentAmount) {
+      setInvestmentAmount(nextPackage.minimumInvestment ?? nextPackage.price);
+    }
+  }
+
   async function loadWorkspace() {
     setLoading(true);
     setError(null);
     try {
-      const workspace = await fetchWorkspace();
-      setSession(workspace.session);
-      setPackages(workspace.packages);
-      setRails(workspace.rails);
-      setDeposits(workspace.deposits);
-
-      const nextPackage =
-        workspace.packages.find((item) => item.id === selectedPackageId) ??
-        workspace.packages[0] ??
-        null;
-      setSelectedPackageId(nextPackage?.id ?? "");
-      if (nextPackage && !investmentAmount) {
-        setInvestmentAmount(nextPackage.minimumInvestment ?? nextPackage.price);
-      }
+      applyWorkspace(await fetchWorkspace());
     } catch (caught) {
       const redirectTo = redirectFor(caught);
       if (redirectTo) {
@@ -219,25 +228,72 @@ export default function UserDepositsSingleStepClient() {
   }
 
   useEffect(() => {
-    void loadWorkspace();
-    // Initial load only. Subsequent reloads are explicit after mutations.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+
+    async function loadInitialWorkspace() {
+      try {
+        const workspace = await fetchWorkspace();
+        if (!active) return;
+
+        const firstPackage = workspace.packages[0] ?? null;
+        setSession(workspace.session);
+        setPackages(workspace.packages);
+        setRails(workspace.rails);
+        setDeposits(workspace.deposits);
+        setSelectedPackageId(firstPackage?.id ?? "");
+        setInvestmentAmount(
+          firstPackage?.minimumInvestment ?? firstPackage?.price ?? "",
+        );
+      } catch (caught) {
+        const redirectTo = redirectFor(caught);
+        if (redirectTo) {
+          router.replace(redirectTo);
+          router.refresh();
+          return;
+        }
+        if (active) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Could not load deposit workspace.",
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadInitialWorkspace();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   useEffect(() => {
     if (eligibleRails.some((rail) => rail.id === selectedRailId)) return;
-    setSelectedRailId(eligibleRails[0]?.id ?? "");
+    const nextRailId = eligibleRails[0]?.id ?? "";
+    queueMicrotask(() => setSelectedRailId(nextRailId));
   }, [eligibleRails, selectedRailId]);
 
   useEffect(() => {
+    let active = true;
+
     if (!selectedRailId || openDeposit) {
-      setPermanentAddress(null);
-      return;
+      queueMicrotask(() => {
+        if (!active) return;
+        setPermanentAddress(null);
+        setAddressLoading(false);
+      });
+      return () => {
+        active = false;
+      };
     }
 
-    let active = true;
-    setAddressLoading(true);
-    setPermanentAddress(null);
+    queueMicrotask(() => {
+      if (!active) return;
+      setAddressLoading(true);
+      setPermanentAddress(null);
+    });
 
     async function ensureAddress() {
       try {
@@ -275,7 +331,9 @@ export default function UserDepositsSingleStepClient() {
   function choosePackage(packageId: string) {
     const nextPackage = packages.find((item) => item.id === packageId) ?? null;
     setSelectedPackageId(packageId);
-    setInvestmentAmount(nextPackage?.minimumInvestment ?? nextPackage?.price ?? "");
+    setInvestmentAmount(
+      nextPackage?.minimumInvestment ?? nextPackage?.price ?? "",
+    );
     setTxid("");
     setError(null);
     setNotice(null);
@@ -329,9 +387,9 @@ export default function UserDepositsSingleStepClient() {
           txid: normalizedTxid,
         }),
       });
-      const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
-        response,
-      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
       if (!response.ok || !payload) {
         throw new Error(messageFrom(payload, "Could not submit deposit."));
       }
@@ -367,9 +425,9 @@ export default function UserDepositsSingleStepClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txid: normalized }),
       });
-      const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
-        response,
-      );
+      const payload = await readJson<
+        DepositMutationResponse & ApiMessagePayload
+      >(response);
       if (!response.ok || !payload) {
         throw new Error(
           messageFrom(payload, "Could not submit transaction ID."),
@@ -403,7 +461,10 @@ export default function UserDepositsSingleStepClient() {
             </p>
           </div>
           {openDeposit ? (
-            <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
+            <span
+              className={styles.badge}
+              data-tone={statusTone(openDeposit.status)}
+            >
               {statusLabel(openDeposit.status)}
             </span>
           ) : null}
@@ -423,7 +484,10 @@ export default function UserDepositsSingleStepClient() {
                 <p className={styles.eyebrow}>Deposit in progress</p>
                 <h2>{openDeposit.packageDisplayName}</h2>
               </div>
-              <span className={styles.badge} data-tone={statusTone(openDeposit.status)}>
+              <span
+                className={styles.badge}
+                data-tone={statusTone(openDeposit.status)}
+              >
                 {statusLabel(openDeposit.status)}
               </span>
             </div>
@@ -458,7 +522,9 @@ export default function UserDepositsSingleStepClient() {
                   <button
                     className={styles.buttonSecondary}
                     type="button"
-                    onClick={() => void copyAddress(openDeposit.assignedWalletAddress)}
+                    onClick={() =>
+                      void copyAddress(openDeposit.assignedWalletAddress)
+                    }
                   >
                     Copy address
                   </button>
@@ -502,9 +568,10 @@ export default function UserDepositsSingleStepClient() {
               </div>
             ) : (
               <div className={styles.notice}>
-                Transaction ID <span className={styles.mono}>{openDeposit.txid}</span>{" "}
-                was submitted {formatPlatformDateTime(openDeposit.submittedAt)}. Do not
-                send another payment for this request.
+                Transaction ID{" "}
+                <span className={styles.mono}>{openDeposit.txid}</span> was
+                submitted {formatPlatformDateTime(openDeposit.submittedAt)}. Do
+                not send another payment for this request.
               </div>
             )}
           </section>
@@ -518,7 +585,9 @@ export default function UserDepositsSingleStepClient() {
             </div>
 
             {packages.length === 0 ? (
-              <div className={styles.empty}>No package is currently available.</div>
+              <div className={styles.empty}>
+                No package is currently available.
+              </div>
             ) : (
               <div className={styles.formGrid}>
                 <div className={styles.field}>
@@ -531,7 +600,8 @@ export default function UserDepositsSingleStepClient() {
                   >
                     {packages.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.displayName} — {investmentRangeLabel(item)} {item.currency}
+                        {item.displayName} — {investmentRangeLabel(item)}{" "}
+                        {item.currency}
                       </option>
                     ))}
                   </select>
@@ -574,7 +644,9 @@ export default function UserDepositsSingleStepClient() {
 
                 <div className={`${styles.full} ${styles.card}`}>
                   {addressLoading ? (
-                    <div className={styles.empty}>Loading permanent receiving address…</div>
+                    <div className={styles.empty}>
+                      Loading permanent receiving address…
+                    </div>
                   ) : permanentAddress ? (
                     <div className={styles.qrWrap}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -604,7 +676,9 @@ export default function UserDepositsSingleStepClient() {
                           <button
                             className={styles.buttonSecondary}
                             type="button"
-                            onClick={() => void copyAddress(permanentAddress.walletAddress)}
+                            onClick={() =>
+                              void copyAddress(permanentAddress.walletAddress)
+                            }
                           >
                             Copy address
                           </button>
@@ -613,21 +687,31 @@ export default function UserDepositsSingleStepClient() {
                     </div>
                   ) : (
                     <div className={styles.empty}>
-                      No permanent receiving address is available for this network.
+                      No permanent receiving address is available for this
+                      network.
                     </div>
                   )}
                 </div>
 
                 <div className={`${styles.notice} ${styles.full}`}>
-                  Send exactly <strong>{investmentAmount || "—"} {selectedPackage?.currency ?? ""}</strong>{" "}
-                  on <strong>{selectedRail?.networkCode ?? "the selected network"}</strong>{" "}
-                  to the permanent address above. The backend validates the package range
-                  again before accepting the transaction ID.
+                  Send exactly{" "}
+                  <strong>
+                    {investmentAmount || "—"} {selectedPackage?.currency ?? ""}
+                  </strong>{" "}
+                  on{" "}
+                  <strong>
+                    {selectedRail?.networkCode ?? "the selected network"}
+                  </strong>{" "}
+                  to the permanent address above. The backend validates the
+                  package range again before accepting the transaction ID.
                 </div>
 
                 <div className={`${styles.field} ${styles.full}`}>
                   <label htmlFor="deposit-txid">
-                    Transaction ID · {permanentAddress?.networkCode ?? selectedRail?.networkCode ?? "network"}
+                    Transaction ID ·{" "}
+                    {permanentAddress?.networkCode ??
+                      selectedRail?.networkCode ??
+                      "network"}
                   </label>
                   <input
                     className={styles.input}
@@ -663,7 +747,9 @@ export default function UserDepositsSingleStepClient() {
                     }
                     onClick={() => void submitNewDeposit()}
                   >
-                    {busy === "submit" ? "Submitting…" : "Submit Deposit for Review"}
+                    {busy === "submit"
+                      ? "Submitting…"
+                      : "Submit Deposit for Review"}
                   </button>
                 </div>
               </div>
@@ -706,7 +792,9 @@ export default function UserDepositsSingleStepClient() {
                   {deposits.map((deposit) => (
                     <tr key={deposit.id}>
                       <td>{deposit.packageDisplayName}</td>
-                      <td>{compactDecimal(deposit.amount)} {deposit.currency}</td>
+                      <td>
+                        {compactDecimal(deposit.amount)} {deposit.currency}
+                      </td>
                       <td>
                         {deposit.packageDurationDays
                           ? `${deposit.packageDurationDays} days`
@@ -714,7 +802,10 @@ export default function UserDepositsSingleStepClient() {
                       </td>
                       <td>{deposit.assignedNetwork}</td>
                       <td>
-                        <span className={styles.badge} data-tone={statusTone(deposit.status)}>
+                        <span
+                          className={styles.badge}
+                          data-tone={statusTone(deposit.status)}
+                        >
                           {statusLabel(deposit.status)}
                         </span>
                       </td>
