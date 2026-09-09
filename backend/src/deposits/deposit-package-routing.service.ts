@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
@@ -8,8 +9,45 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
-import type { ConfigureDepositPackageAccountDto } from './dto/deposit.dto';
+import { isValidDepositAddress } from './deposit.validation';
+import type {
+  ConfigureDepositPackageAccountDto,
+  CreatePackageDepositAccountDto,
+} from './dto/deposit.dto';
 import { DEPOSIT_AUDIT_OPERATIONS } from './deposits.constants';
+
+const PAYMENT_RAIL_SELECT = {
+  id: true,
+  asset: true,
+  networkCode: true,
+  displayName: true,
+  validationProfile: true,
+  isActive: true,
+  revision: true,
+  createdByUserId: true,
+  updatedByUserId: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+const DEPOSIT_ACCOUNT_SELECT = {
+  id: true,
+  label: true,
+  paymentRailId: true,
+  asset: true,
+  network: true,
+  walletAddress: true,
+  qrCodeDataUrl: true,
+  isActive: true,
+  revision: true,
+  createdByUserId: true,
+  updatedByUserId: true,
+  createdAt: true,
+  updatedAt: true,
+  paymentRail: {
+    select: PAYMENT_RAIL_SELECT,
+  },
+} as const;
 
 interface PackageRouteRow {
   packageDefinitionId: string;
@@ -78,6 +116,194 @@ export class DepositPackageRoutingService {
         };
       }),
     };
+  }
+
+  async createPackageAccount(
+    dto: CreatePackageDepositAccountDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const packageDefinition = await transaction.packageDefinition.findUnique({
+          where: { id: dto.packageDefinitionId },
+          select: { id: true, code: true },
+        });
+
+        if (!packageDefinition) {
+          throw new NotFoundException('Package definition was not found.');
+        }
+
+        const existingRoutes = await transaction.$queryRaw<PackageRouteRow[]>(
+          Prisma.sql`
+            SELECT
+              packageDefinitionId,
+              depositAccountId,
+              updatedByUserId,
+              createdAt,
+              updatedAt
+            FROM deposit_package_account_routes
+            WHERE packageDefinitionId = ${dto.packageDefinitionId}
+            LIMIT 1
+            FOR UPDATE
+          `,
+        );
+
+        if (existingRoutes.length > 0) {
+          throw new ConflictException(
+            'This package already has a receiving account. Edit the existing account instead of creating another package account.',
+          );
+        }
+
+        const now = new Date();
+        const plans = await transaction.packagePlanVersion.findMany({
+          where: {
+            status: 'PUBLISHED',
+            effectiveFrom: { lte: now },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+            items: {
+              some: { packageDefinitionId: dto.packageDefinitionId },
+            },
+          },
+          include: {
+            items: {
+              where: { packageDefinitionId: dto.packageDefinitionId },
+              select: { id: true, currency: true, displayName: true },
+            },
+          },
+          orderBy: [{ effectiveFrom: 'desc' }, { versionNumber: 'desc' }],
+          take: 2,
+        });
+
+        if (plans.length > 1) {
+          throw new ServiceUnavailableException(
+            'Package catalogue has overlapping effective plan versions.',
+          );
+        }
+
+        const item = plans[0]?.items[0];
+        if (!item) {
+          throw new BadRequestException(
+            'Package is not present in the effective published catalogue.',
+          );
+        }
+
+        const rail = await transaction.depositPaymentRail.findUnique({
+          where: { id: dto.paymentRailId },
+          select: PAYMENT_RAIL_SELECT,
+        });
+
+        if (!rail) {
+          throw new NotFoundException('Deposit payment rail was not found.');
+        }
+
+        if (!rail.isActive) {
+          throw new BadRequestException(
+            'A package receiving account can only be created on an active payment rail.',
+          );
+        }
+
+        if (rail.asset !== item.currency) {
+          throw new BadRequestException(
+            `Package ${item.displayName} requires ${item.currency}; the selected rail receives ${rail.asset}.`,
+          );
+        }
+
+        if (!isValidDepositAddress(rail.validationProfile, dto.walletAddress)) {
+          throw new BadRequestException(
+            `Receiving address is invalid for ${rail.networkCode}.`,
+          );
+        }
+
+        const account = await transaction.depositAccount.create({
+          data: {
+            label: item.displayName,
+            paymentRailId: rail.id,
+            asset: rail.asset,
+            network: rail.networkCode,
+            walletAddress: dto.walletAddress,
+            qrCodeDataUrl: dto.qrCodeDataUrl,
+            isActive: true,
+            createdByUserId: actor.id,
+            updatedByUserId: actor.id,
+          },
+          select: DEPOSIT_ACCOUNT_SELECT,
+        });
+
+        await transaction.$executeRaw(Prisma.sql`
+          INSERT INTO deposit_package_account_routes (
+            packageDefinitionId,
+            depositAccountId,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          ) VALUES (
+            ${dto.packageDefinitionId},
+            ${account.id},
+            ${actor.id},
+            CURRENT_TIMESTAMP(3),
+            CURRENT_TIMESTAMP(3)
+          )
+        `);
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: actor.id,
+            action: 'CREATE',
+            entityType: 'DepositAccount',
+            entityId: account.id,
+            description: `Administrator created the package receiving account for ${packageDefinition.code}.`,
+            metadata: {
+              source: 'ADMIN_DEPOSIT_PACKAGE_ACCOUNT',
+              operation: DEPOSIT_AUDIT_OPERATIONS.CREATE_ACCOUNT,
+              reason: dto.reason,
+              packageDefinitionId: dto.packageDefinitionId,
+              packagePlanItemId: item.id,
+              packageCode: packageDefinition.code,
+              accountLabel: account.label,
+              walletAddress: account.walletAddress,
+              asset: account.asset,
+              network: account.network,
+              paymentRailId: account.paymentRailId,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: actor.id,
+            action: 'UPDATE',
+            entityType: 'PackageDefinition',
+            entityId: dto.packageDefinitionId,
+            description: `Administrator configured deposit account ${account.label} for package ${packageDefinition.code}.`,
+            metadata: {
+              source: 'ADMIN_DEPOSIT_PACKAGE_ROUTE',
+              operation: DEPOSIT_AUDIT_OPERATIONS.CONFIGURE_PACKAGE_ACCOUNT,
+              reason: dto.reason,
+              beforeDepositAccountId: null,
+              afterDepositAccountId: account.id,
+              accountLabel: account.label,
+              walletAddress: account.walletAddress,
+              asset: account.asset,
+              network: account.network,
+              paymentRailId: account.paymentRailId,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return {
+          message: `${item.displayName} receiving account created and assigned.`,
+          packageDefinitionId: dto.packageDefinitionId,
+          depositAccountId: account.id,
+          account,
+        };
+      },
+      { isolationLevel: 'Serializable' },
+    );
   }
 
   async configurePackageRoute(
