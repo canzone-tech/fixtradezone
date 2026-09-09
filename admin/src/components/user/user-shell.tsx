@@ -1,6 +1,8 @@
 "use client";
 
 import { type ReactNode, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import PlatformPromise from "@/components/brand/platform-promise";
 import IdleLock from "@/components/security/idle-lock";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
@@ -24,6 +26,8 @@ export default function UserShell({
   returning = false,
   onReturnToAdmin,
 }: UserShellProps) {
+  const pathname = usePathname();
+
   useEffect(() => {
     const closeOnDesktop = () => {
       if (window.innerWidth >= 992) {
@@ -74,6 +78,7 @@ export default function UserShell({
       ? `impersonation:${session.impersonation.actor.id}`
       : `user:${session.user.id}`
     : null;
+  const showPlatformPromise = pathname === "/user/dashboard";
 
   return (
     <div className="ftz-admin-app">
@@ -117,7 +122,10 @@ export default function UserShell({
           </div>
         ) : null}
 
-        <div className={`ftz-page-frame ${styles.content}`}>{children}</div>
+        <div className={`ftz-page-frame ${styles.content}`}>
+          {showPlatformPromise ? <PlatformPromise /> : null}
+          {children}
+        </div>
       </main>
     </div>
   );

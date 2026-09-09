@@ -44,6 +44,22 @@ Legacy page-level palette declarations may remain temporarily while pages are mi
 
 SUPER_ADMIN, ADMIN and USER pages must look like parts of the same FixTradeZone product. Role and permission differences may change data, controls and navigation access, but must not create a different visual theme.
 
+## Shared platform promise
+
+The protected dashboard for **SUPER_ADMIN, ADMIN and USER must render the same shared platform promise** from one reusable component. Role-specific wording is not permitted.
+
+Locked copy:
+
+> **Built for what’s next.**
+>
+> AI-powered insights and intelligent automation.
+>
+> Enterprise-grade security by design.
+>
+> Smarter support, powered by AI.
+
+Implementation authority for the wording is `admin/src/components/brand/platform-promise.tsx`. The component must inherit the protected portal surface language; it must not introduce a role-specific palette or role-specific copy.
+
 ## Change control
 
 This design baseline is permanent. Do not alter the locked palette or pattern during normal module development, refactors or acceptance fixes.
