@@ -16,13 +16,19 @@ import { getRequestContext } from '../auth/request-context';
 import {
   CreateDepositDto,
   DepositPaymentRailQueryDto,
+  EnsureDepositAddressAssignmentDto,
+  SubmitDepositRequestDto,
   SubmitDepositTxidDto,
 } from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
+import { PermanentDepositFlowService } from './permanent-deposit-flow.service';
 
 @Controller('deposits')
 export class DepositsController {
-  constructor(private readonly depositsService: DepositsService) {}
+  constructor(
+    private readonly depositsService: DepositsService,
+    private readonly permanentDepositFlowService: PermanentDepositFlowService,
+  ) {}
 
   @Get('payment-rails')
   @Header('Cache-Control', 'no-store')
@@ -36,6 +42,34 @@ export class DepositsController {
     return this.depositsService.getMyDeposits(actor);
   }
 
+  @Post('address-assignment')
+  @Header('Cache-Control', 'no-store')
+  ensureAddressAssignment(
+    @Body() dto: EnsureDepositAddressAssignmentDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.permanentDepositFlowService.ensureAddressAssignment(
+      dto.paymentRailId,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Post('submit')
+  @Header('Cache-Control', 'no-store')
+  submitDeposit(
+    @Body() dto: SubmitDepositRequestDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.permanentDepositFlowService.submitDeposit(
+      dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
   @Post()
   @Header('Cache-Control', 'no-store')
   createDeposit(
@@ -43,7 +77,7 @@ export class DepositsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.depositsService.createDeposit(
+    return this.permanentDepositFlowService.createDeposit(
       dto,
       actor,
       getRequestContext(request),
