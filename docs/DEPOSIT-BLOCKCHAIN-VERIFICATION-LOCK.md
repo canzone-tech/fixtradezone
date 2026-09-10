@@ -1,28 +1,16 @@
 # FixTradeZone Deposit Blockchain Verification Lock
 
-Status: **FOUNDER APPROVED — LOCKED**
+Status: **FOUNDER APPROVED — LOCKED / LOCAL ACCEPTANCE IN PROGRESS**
 
-This document is the source of truth for DEP-03 blockchain verification. It extends `DEPOSIT-PACKAGE-ACCOUNT-ROUTING-LOCK.md` without changing one-package-to-configured-account routing, immutable deposit snapshots, or the existing accounting/package lifecycle after a valid manual approval.
+This document is the source of truth for DEP-03 blockchain verification and deposit approval policy. It extends `DEPOSIT-PACKAGE-ACCOUNT-ROUTING-LOCK.md` without changing one-package-to-configured-account routing, immutable deposit snapshots, or the existing accounting/package activation/downstream lifecycle after a deposit is approved.
 
-## 1. Phase 1 scope
-
-Phase 1 is **automatic blockchain verification + manual verified-only approval** for configured EVM deposit payment rails on **BNB Smart Chain mainnet (chain ID 56)**.
-
-Blockchain verification is configured per payment rail. Token contract address, token decimals and required confirmations are operational configuration and must not be hard-coded into package or USER flows.
-
-Blockchain verification does not itself approve a deposit, credit a wallet, post a ledger transaction, activate a package, or trigger commissions/rewards.
-
-`AUTO_AFTER_BLOCKCHAIN_VERIFIED` is outside Phase 1 and remains OFF until separately approved and implemented.
-
-## 2. Verification authority
+## 1. Blockchain verification authority
 
 A syntactically valid transaction ID is not proof of payment.
 
-For an enabled BSC/EVM rail, the backend verifies on-chain evidence through JSON-RPC and fails closed when evidence is incomplete or unavailable.
+For an enabled BSC/EVM payment rail, the backend verifies on-chain evidence through JSON-RPC. A successful verification requires all of the following:
 
-A successful verification requires all of the following:
-
-1. the configured RPC reports the configured BSC mainnet chain ID;
+1. the configured RPC reports BNB Smart Chain mainnet chain ID `56`;
 2. the transaction receipt exists and is mined;
 3. the receipt status indicates successful execution;
 4. only standard ERC20/BEP20 `Transfer` logs emitted by the configured token contract are considered;
@@ -30,13 +18,15 @@ A successful verification requires all of the following:
 6. the sum of matching transfers equals the deposit's immutable submitted amount using configured token decimals and integer base-unit arithmetic; and
 7. the receipt has reached the configured confirmation threshold.
 
-For BEP20/ERC20 token transfers, the top-level transaction `to` field is **not** treated as the payment receiver because it commonly points to the token contract. Receiver and amount authority comes from matching `Transfer` event logs.
+For BEP20/ERC20 token transfers, the top-level transaction `to` field is not treated as the payment receiver because it commonly points to the token contract. Receiver and amount authority comes from matching `Transfer` event logs.
 
 The sender address is not required to match a FixTradeZone USER identity because a valid payment may originate from an exchange, custody provider, or another external wallet.
 
-## 3. Configuration and provider rules
+## 2. Blockchain configuration
 
-An enabled Phase-1 rail requires:
+Blockchain verification is configured per deposit payment rail. Token contract address, token decimals and required confirmations are operational configuration and must not be hard-coded into package or USER flows.
+
+An enabled BSC rail requires:
 
 - validation profile `EVM`;
 - chain ID `56`;
@@ -46,103 +36,159 @@ An enabled Phase-1 rail requires:
 
 Configuration is fail-safe. If the RPC or token contract cannot be probed, enabling/changing verification fails and the previous configuration remains authoritative.
 
-Local development may use the bounded public BSC JSON-RPC fallback. Runtime infrastructure may override it with:
+Local development may use the bounded public BSC JSON-RPC fallback. Runtime infrastructure may override it with `DEPOSIT_BSC_RPC_URL` and `DEPOSIT_BSC_RPC_TIMEOUT_MS`. Production should use dedicated/redundant provider infrastructure. Provider credentials or secret URLs must never be stored in deposit records, audit payloads, or source code.
 
-- `DEPOSIT_BSC_RPC_URL`;
-- `DEPOSIT_BSC_RPC_TIMEOUT_MS`.
-
-Production should use dedicated/redundant provider infrastructure. Provider credentials or secret URLs remain environment configuration and must never be stored in deposit records, audit payloads, or source code.
-
-## 4. Persisted verification states
+## 3. Persisted verification states
 
 - `VERIFIED` — all configured chain/token/receiver/amount/confirmation checks passed.
 - `PENDING` — transaction is not visible/mined yet or confirmations remain below the configured threshold.
 - `FAILED` — deterministic on-chain evidence contradicts the submitted deposit, for example a reverted transaction, missing matching transfer, or amount mismatch.
 - `UNAVAILABLE` — RPC/provider infrastructure cannot currently establish the result safely or returned malformed/inconsistent data.
 
-Only `VERIFIED` satisfies the Phase-1 approval gate for a rail configured as `VERIFY_ONLY`.
+A `VERIFIED` result is monotonic: repeated verification requests return the stored verified evidence rather than downgrading it because of a later transient RPC outage.
 
-A `VERIFIED` result is monotonic in Phase 1: repeated verification requests return the stored verified evidence rather than downgrading it because of a later transient RPC outage.
+Verification evidence itself never directly credits a wallet, posts a ledger transaction, activates a package, or triggers commissions/rewards. Financial effects enter only through the existing deposit approval orchestrator.
 
-## 5. New-deposit submission behavior
+## 4. Founder-approved deposit approval modes
 
-New one-step USER package deposits continue to pass the locked server-side package/routing/amount/TxID-format checks and are created as `PENDING_REVIEW` with immutable package/account/address/network snapshots.
+SUPER_ADMIN controls one mutually exclusive approval policy per active payment rail:
 
-After the deposit transaction commits, the backend automatically attempts blockchain verification when the assigned payment rail is configured as `VERIFY_ONLY`.
+### `MANUAL`
 
-The submitted deposit must not be lost when verification is pending or temporarily unavailable. It remains in manual review while the approval gate stays closed until verification reaches `VERIFIED`.
+`MANUAL` is the safe default. A missing approval-policy row is interpreted as `MANUAL`.
 
-If blockchain verification is OFF for a payment rail, the existing manual approval lifecycle remains unchanged for that rail.
+- SUPER_ADMIN owns the final approve/reject decision.
+- Blockchain verification still runs and its evidence remains visible when verification is configured for the rail.
+- `PENDING`, `FAILED` or `UNAVAILABLE` blockchain evidence does not technically hard-block the SUPER_ADMIN manual approve endpoint in this mode.
+- The UI must make contradictory or incomplete blockchain evidence prominent so the human decision is informed.
+- Reject remains available.
+- Bulk approval is a manual SUPER_ADMIN path and therefore follows the same `MANUAL` policy check per deposit.
 
-## 6. Founder-approved approval gate
+This mode is the required operational fallback while automatic approval has not yet completed positive real-chain acceptance.
 
-For every new deposit on a `VERIFY_ONLY` rail:
+### `AUTO_AFTER_BLOCKCHAIN_VERIFIED`
 
-```text
-VERIFIED    -> manual SUPER_ADMIN approval allowed
-PENDING     -> approval BLOCKED; retry verification
-FAILED      -> approval BLOCKED; reject or investigate
-UNAVAILABLE -> approval BLOCKED; retry when verification is available
-NOT CHECKED -> approval BLOCKED; verification is required
-```
+This mode may be enabled only when the payment rail has a complete BSC `VERIFY_ONLY` blockchain configuration.
 
-The **backend guard is authoritative**. Frontend button state or rendering must never be the only protection.
+- Manual SUPER_ADMIN approval is disabled while this mode is active.
+- `VERIFIED` is mandatory before automatic approval.
+- `PENDING`, `UNAVAILABLE`, `FAILED`, or missing evidence cannot enter automatic approval.
+- `PENDING` and `UNAVAILABLE` may be retried automatically.
+- Deterministic `FAILED` evidence is not repeatedly auto-approved or silently overridden; it requires review/rejection/investigation.
+- Once verification is `VERIFIED`, the system invokes the existing approval orchestrator and therefore preserves the current accounting, package activation, commission, reward, and recovery/idempotency behavior.
+- Reject remains available before approval.
 
-The guard executes before approval, accounting, package activation, commission/reward processing, or any other downstream financial action. Therefore a required non-VERIFIED deposit cannot reach financial effects through direct SUPER_ADMIN approval or bulk approval.
+The backend policy guard is authoritative. Frontend rendering is never the only protection.
 
-Bulk approval processes each deposit independently through the same approval orchestrator and therefore the same blockchain gate.
+## 5. Approval mode administration
 
-Reject remains available for invalid or suspicious pending deposits and does not require a successful blockchain verification.
+Approval mode is stored separately from blockchain-verification configuration in `deposit_payment_rail_approval_configs`.
 
-## 7. Historical approved deposits
+Each mode change records:
 
-Deposits already `APPROVED` before the verified-only gate is introduced are **not retroactively blocked or changed**.
+- payment rail;
+- selected approval mode;
+- revision;
+- SUPER_ADMIN actor;
+- audit reason; and
+- created/updated timestamps.
 
-DEP-03 must not reverse their status, ledger posting, wallet effect, package activation, commissions, rewards, or other previously completed lifecycle state.
+Only an authenticated active SUPER_ADMIN may make the policy decision. Existing RBAC permission checks remain in place, but the service also enforces the SUPER_ADMIN role so a delegated permission cannot silently enable financial automation.
 
-Historical approved deposits may have blockchain evidence recorded later for audit/investigation, but a later non-VERIFIED result does not rewrite their completed financial history.
+Changing the mode does not rewrite already `APPROVED` or `REJECTED` deposits or any completed ledger/package/downstream history.
+
+## 6. New-deposit behavior
+
+New one-step USER package deposits continue to pass the locked server-side package/routing/amount/TxID-format checks and are created with immutable package/account/address/network snapshots.
+
+After the deposit transaction commits, the backend attempts blockchain verification when the assigned payment rail is configured as `VERIFY_ONLY`.
+
+The deposit is never discarded because verification is pending or temporarily unavailable.
+
+- Under `MANUAL`, verification evidence is returned/displayed but SUPER_ADMIN remains the final decision maker.
+- Under `AUTO_AFTER_BLOCKCHAIN_VERIFIED`, the deposit waits until verification is `VERIFIED`; only then may automatic approval run.
+
+If blockchain verification is OFF for a payment rail, `AUTO_AFTER_BLOCKCHAIN_VERIFIED` cannot be enabled for that rail.
+
+## 7. Automatic retry worker
+
+A bounded deposit blockchain worker provides eventual processing for AUTO mode.
+
+- It is armed at a 60-second interval outside the test environment.
+- It selects only open deposits on rails explicitly configured `AUTO_AFTER_BLOCKCHAIN_VERIFIED` with blockchain verification enabled.
+- It retries unresolved `PENDING`/`UNAVAILABLE` evidence on a bounded cadence.
+- It does not repeatedly process deterministic `FAILED` evidence.
+- It uses a Redis distributed lock so multiple backend instances do not intentionally run the same batch concurrently.
+- It processes a bounded batch and fails safely per deposit.
+- If Redis, RPC, configured audit actor, or another required dependency is unavailable, automatic approval pauses rather than bypassing the gate.
+
+The SUPER_ADMIN who enabled AUTO is retained as the configured audit actor. Automatic processing additionally identifies itself through the worker request context and explicit auto-approval note. The configured actor must still exist, be ACTIVE, and retain SUPER_ADMIN; otherwise automation fails closed.
 
 ## 8. Replay, evidence and idempotency
 
 The existing Deposit database invariant `@@unique([assignedNetwork, txid])` prevents the same normalized transaction ID from being submitted twice on the same network.
 
-Verification evidence is stored per deposit. Repeated non-final verification attempts update the same evidence record and attempt count; they do not create financial effects.
+Verification evidence is stored per deposit. Repeated non-final verification attempts update the same evidence record and attempt count; they do not create duplicate financial effects.
 
 Each evidence snapshot records chain, token contract, token decimals, required/observed confirmations, block number, on-chain amount, receiving address, TxID, status, checked time, verified time and failure details where applicable.
 
 The deposit's immutable package/account/address/network/QR snapshots remain the verification target even if package routing changes later.
 
+Existing approval/accounting/package services retain their own concurrency and idempotency controls; AUTO mode must reuse them rather than creating a parallel financial posting path.
+
 ## 9. Admin UI
 
-The Admin Deposits workspace must surface open-deposit blockchain state using clear labels equivalent to:
+The SUPER_ADMIN Deposits workspace exposes a dedicated **Deposit approval mode** panel for each active payment rail.
+
+The selector contains exactly:
+
+- `MANUAL`;
+- `AUTO AFTER BLOCKCHAIN VERIFIED`.
+
+Changing the mode requires an audit reason. Enabling AUTO requires explicit confirmation in the browser and is disabled when the backend reports that the rail is not eligible.
+
+The Blockchain Verification panel continues to surface open-deposit states such as:
 
 - `BLOCKCHAIN VERIFIED`;
 - `PENDING CONFIRMATIONS`;
 - `VERIFICATION FAILED`;
 - `RPC UNAVAILABLE`;
-- `NOT CHECKED` when no evidence exists yet.
+- `NOT CHECKED`.
 
-Authorized reviewers have a **Verify blockchain / Retry blockchain verification** action. The UI must visibly state when approval remains blocked until `VERIFIED`.
+It also displays the effective approval mode for each deposit and keeps Verify/Retry available to authorized reviewers. MANUAL copy must not falsely state that approval is technically blocked until `VERIFIED`; AUTO copy must clearly state that automatic approval waits for `VERIFIED`.
 
-The existing FixTradeZone universal theme, readability rules, Package Accounts collapse behavior, Deposit Queue behavior and package routing UX remain unchanged.
+The existing FixTradeZone universal theme, readability rules, Package Accounts collapse behavior, package routing UX, and reject workflow remain unchanged.
 
-## 10. Acceptance gates before PR to main
+## 10. Historical deposits
 
-1. GitHub Backend CI and Admin CI must be green.
-2. Any forward migration required by the branch must be applied locally with `prisma migrate deploy`; never use `prisma migrate dev` and never reset the database.
-3. Browser acceptance comes first for this UI integration and must prove the blockchain verification status panel/badges, Verify/Retry action, and visible verified-only approval policy without regressing the existing Deposit Queue.
-4. A focused local API/Postman gate may then prove a required non-VERIFIED deposit is rejected by the approval endpoint before financial processing and that the normal manual SUPER_ADMIN lifecycle is available after `VERIFIED`.
-5. SQL/readback proof must confirm persisted verification evidence and no unintended duplicate accounting/financial effects.
-6. Historical already-approved deposits must remain unchanged.
-7. PR to `main` is allowed only after all applicable local gates are green.
+Deposits already `APPROVED` before DEP-03 or before a later policy change are not retroactively blocked or rewritten.
 
-## 11. Completed Phase-1 API proof checkpoint
+DEP-03 must not reverse their status, ledger posting, wallet effect, package activation, commissions, rewards, or other completed lifecycle state.
 
-Local API acceptance before the approval integration proved:
+Historical blockchain evidence may be recorded later for audit/investigation, but it cannot rewrite completed financial history.
 
-- migration `0035_deposit_blockchain_verification` deployed forward-only;
-- payment-rail blockchain configuration persisted and read back correctly;
+## 11. Completed negative-security acceptance
+
+Local DEP-03 acceptance already proved:
+
+- blockchain configuration persisted and read back correctly;
 - chain ID and token decimals were probed through BSC RPC;
 - a syntactically valid but fake QA TxID remained `PENDING` with `TX_NOT_FOUND_OR_PENDING` and never became `VERIFIED`;
-- verification evidence persisted and read back correctly; and
-- the historical already-approved QA deposit remained `APPROVED` with its existing financial lifecycle untouched.
+- verification evidence persisted and read back correctly;
+- the Admin Blockchain Verification panel showed the negative result;
+- under the earlier verified-only intermediate guard, a fake transaction could not reach approval; and
+- the negative QA deposit was cleanly rejected afterward.
+
+That intermediate verified-only manual guard is superseded by the Founder-approved explicit `MANUAL` versus `AUTO_AFTER_BLOCKCHAIN_VERIFIED` policy described in this document.
+
+## 12. Acceptance gates before PR to main
+
+1. GitHub Backend CI and Admin CI must be green.
+2. Migration `0037_deposit_approval_mode` and any other pending forward migration must be applied locally using `prisma migrate deploy`; never use `prisma migrate dev` and never reset the database.
+3. Browser acceptance comes first and must prove the SUPER_ADMIN approval-mode panel loads with `MANUAL` as the safe default and persists/readbacks an explicit MANUAL selection with audit reason.
+4. Browser acceptance must prove blockchain evidence remains visible under MANUAL and that the normal SUPER_ADMIN manual approval path remains available.
+5. AUTO must not be treated as locally accepted until a genuine BSC mainnet transfer proves exact configured token, exact snapshotted receiving address, exact submitted amount, required confirmations, `VERIFIED`, and automatic approval through the existing financial lifecycle.
+6. Until that positive real-chain proof exists, local operational mode should remain `MANUAL`.
+7. Focused Postman/API or SQL/readback proof may be used after browser acceptance where it adds evidence without repeating completed tests.
+8. Historical already-approved/rejected deposits must remain unchanged.
+9. PR to `main` is allowed only after all applicable local gates are green.
