@@ -32,7 +32,7 @@ CREATE TABLE `deposit_blockchain_verifications` (
   `tokenContractAddress` VARCHAR(100) NULL,
   `tokenDecimals` TINYINT UNSIGNED NULL,
   `requiredConfirmations` SMALLINT UNSIGNED NULL,
-  `observedConfirmations` SMALLINT UNSIGNED NULL,
+  `observedConfirmations` INT UNSIGNED NULL,
   `blockNumber` BIGINT UNSIGNED NULL,
   `onChainAmount` VARCHAR(100) NULL,
   `receivingAddress` VARCHAR(100) NULL,
