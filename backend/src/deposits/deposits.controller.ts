@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { DepositSubmissionOrchestratorService } from './deposit-submission-orchestrator.service';
 import {
   DepositPaymentRailQueryDto,
   SubmitDepositTxidDto,
@@ -26,6 +27,7 @@ export class DepositsController {
   constructor(
     private readonly depositsService: DepositsService,
     private readonly packageDepositFlowService: PackageDepositFlowService,
+    private readonly depositSubmissionOrchestrator: DepositSubmissionOrchestratorService,
   ) {}
 
   @Get('payment-rails')
@@ -59,7 +61,7 @@ export class DepositsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.packageDepositFlowService.submitDeposit(
+    return this.depositSubmissionOrchestrator.submitPackageDeposit(
       dto,
       actor,
       getRequestContext(request),
