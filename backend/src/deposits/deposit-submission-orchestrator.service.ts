@@ -18,7 +18,7 @@ export class DepositSubmissionOrchestratorService {
     dto: SubmitPackageDepositDto,
     actor: AuthenticatedUser,
     context: RequestContext = {},
-  ) {
+  ): Promise<unknown> {
     const submission = await this.packageDepositFlowService.submitDeposit(
       dto,
       actor,
