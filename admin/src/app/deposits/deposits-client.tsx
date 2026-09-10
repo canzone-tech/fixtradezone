@@ -198,6 +198,7 @@ export default function DepositsClient() {
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [selectedApprovalIds, setSelectedApprovalIds] = useState<string[]>([]);
   const [bulkApprovalNote, setBulkApprovalNote] = useState("");
+  const [packageAccountsOpen, setPackageAccountsOpen] = useState(false);
 
   const canReadAccounts =
     user !== null && hasPermission(user, "deposits.accounts.read");
@@ -1087,120 +1088,131 @@ export default function DepositsClient() {
                   <p className={styles.eyebrow}>Package Accounts</p>
                   <h2>{accounts.length} receiving accounts</h2>
                 </div>
+                <button
+                  className={styles.buttonSecondary}
+                  type="button"
+                  aria-expanded={packageAccountsOpen}
+                  aria-controls="package-accounts-list"
+                  onClick={() => setPackageAccountsOpen((current) => !current)}
+                >
+                  {packageAccountsOpen ? "Close accounts" : "Open accounts"}
+                </button>
               </div>
-              <div className={styles.list}>
-                {accounts.length === 0 ? (
-                  <div className={styles.empty}>
-                    No receiving accounts configured.
-                  </div>
-                ) : (
-                  accounts.map((account) => {
-                    const mappedPackages = (packageRoutes?.packages ?? []).filter(
-                      (route) => route.depositAccountId === account.id,
-                    );
-                    const mappedNames = mappedPackages
-                      .map((route) => route.displayName)
-                      .join(", ");
+              {packageAccountsOpen ? (
+                <div className={styles.list} id="package-accounts-list">
+                  {accounts.length === 0 ? (
+                    <div className={styles.empty}>
+                      No receiving accounts configured.
+                    </div>
+                  ) : (
+                    accounts.map((account) => {
+                      const mappedPackages = (packageRoutes?.packages ?? []).filter(
+                        (route) => route.depositAccountId === account.id,
+                      );
+                      const mappedNames = mappedPackages
+                        .map((route) => route.displayName)
+                        .join(", ");
 
-                    return (
-                      <div className={styles.row} key={account.id}>
-                        <div className={styles.rowTop}>
-                          <div className={styles.rowTitle}>
-                            <strong>{mappedNames || account.label}</strong>
-                            <small>
-                              {account.paymentRail.displayName} · revision{" "}
-                              {account.revision}
-                            </small>
-                          </div>
-                          <span
-                            className={styles.badge}
-                            data-tone={account.isActive ? "success" : "danger"}
-                          >
-                            {account.isActive ? "ACTIVE" : "INACTIVE"}
-                          </span>
-                        </div>
-                        <div className={styles.kv}>
-                          <div>
-                            <small>Package</small>
-                            <strong>{mappedNames || "Legacy / unassigned"}</strong>
-                          </div>
-                          <div>
-                            <small>Asset / network</small>
-                            <strong>
-                              {account.asset} · {account.network}
-                            </strong>
-                          </div>
-                          <div>
-                            <small>Public address</small>
-                            <strong className={styles.mono}>
-                              {account.walletAddress}
-                            </strong>
-                          </div>
-                          <div>
-                            <small>Updated</small>
-                            <strong>{formatDate(account.updatedAt)}</strong>
-                          </div>
-                        </div>
-                        {canManageAccounts ? (
-                          <details>
-                            <summary className={styles.muted}>
-                              Edit account
-                            </summary>
-                            <form
-                              className={styles.formGrid}
-                              onSubmit={(event) =>
-                                updateAccount(event, account)
-                              }
+                      return (
+                        <div className={styles.row} key={account.id}>
+                          <div className={styles.rowTop}>
+                            <div className={styles.rowTitle}>
+                              <strong>{mappedNames || account.label}</strong>
+                              <small>
+                                {account.paymentRail.displayName} · revision{" "}
+                                {account.revision}
+                              </small>
+                            </div>
+                            <span
+                              className={styles.badge}
+                              data-tone={account.isActive ? "success" : "danger"}
                             >
-                              <div className={styles.field}>
-                                <label>Replace QR (optional)</label>
-                                <input
-                                  className={styles.input}
-                                  name="qr"
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                                />
-                              </div>
-                              <div className={styles.field}>
-                                <label>Audit reason</label>
-                                <input
-                                  className={styles.input}
-                                  name="reason"
-                                  minLength={3}
-                                  maxLength={500}
-                                  required
-                                />
-                              </div>
-                              <label className={styles.field}>
-                                <span>Assignment state</span>
-                                <span className={styles.actions}>
+                              {account.isActive ? "ACTIVE" : "INACTIVE"}
+                            </span>
+                          </div>
+                          <div className={styles.kv}>
+                            <div>
+                              <small>Package</small>
+                              <strong>{mappedNames || "Legacy / unassigned"}</strong>
+                            </div>
+                            <div>
+                              <small>Asset / network</small>
+                              <strong>
+                                {account.asset} · {account.network}
+                              </strong>
+                            </div>
+                            <div>
+                              <small>Public address</small>
+                              <strong className={styles.mono}>
+                                {account.walletAddress}
+                              </strong>
+                            </div>
+                            <div>
+                              <small>Updated</small>
+                              <strong>{formatDate(account.updatedAt)}</strong>
+                            </div>
+                          </div>
+                          {canManageAccounts ? (
+                            <details>
+                              <summary className={styles.muted}>
+                                Edit account
+                              </summary>
+                              <form
+                                className={styles.formGrid}
+                                onSubmit={(event) =>
+                                  updateAccount(event, account)
+                                }
+                              >
+                                <div className={styles.field}>
+                                  <label>Replace QR (optional)</label>
                                   <input
-                                    name="isActive"
-                                    type="checkbox"
-                                    defaultChecked={account.isActive}
+                                    className={styles.input}
+                                    name="qr"
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
                                   />
-                                  Active
-                                </span>
-                              </label>
-                              <div className={`${styles.actions} ${styles.full}`}>
-                                <button
-                                  className={styles.buttonSecondary}
-                                  type="submit"
-                                  disabled={busy === `account-${account.id}`}
-                                >
-                                  {busy === `account-${account.id}`
-                                    ? "Saving…"
-                                    : "Save changes"}
-                                </button>
-                              </div>
-                            </form>
-                          </details>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+                                </div>
+                                <div className={styles.field}>
+                                  <label>Audit reason</label>
+                                  <input
+                                    className={styles.input}
+                                    name="reason"
+                                    minLength={3}
+                                    maxLength={500}
+                                    required
+                                  />
+                                </div>
+                                <label className={styles.field}>
+                                  <span>Assignment state</span>
+                                  <span className={styles.actions}>
+                                    <input
+                                      name="isActive"
+                                      type="checkbox"
+                                      defaultChecked={account.isActive}
+                                    />
+                                    Active
+                                  </span>
+                                </label>
+                                <div className={`${styles.actions} ${styles.full}`}>
+                                  <button
+                                    className={styles.buttonSecondary}
+                                    type="submit"
+                                    disabled={busy === `account-${account.id}`}
+                                  >
+                                    {busy === `account-${account.id}`
+                                      ? "Saving…"
+                                      : "Save changes"}
+                                  </button>
+                                </div>
+                              </form>
+                            </details>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              ) : null}
             </div>
           </section>
         </>
