@@ -60,7 +60,7 @@ export class DepositsController {
     @Body() dto: SubmitPackageDepositDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
+  ): Promise<unknown> {
     return this.depositSubmissionOrchestrator.submitPackageDeposit(
       dto,
       actor,
