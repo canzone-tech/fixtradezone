@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
-import type { SubmitPackageDepositDto } from './dto/deposit.dto';
+import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
+import type { SubmitPackageDepositDto } from './dto/deposit.dto';
 import { PackageDepositFlowService } from './package-deposit-flow.service';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class DepositSubmissionOrchestratorService {
   constructor(
     private readonly packageDepositFlowService: PackageDepositFlowService,
     private readonly blockchainVerification: DepositBlockchainVerificationService,
+    private readonly blockchainProcessing: DepositBlockchainProcessingService,
   ) {}
 
   async submitPackageDeposit(
@@ -43,7 +45,7 @@ export class DepositSubmissionOrchestratorService {
     }
 
     try {
-      const verification = await this.blockchainVerification.verifyDeposit(
+      const verification = await this.blockchainProcessing.verifyAndApplyPolicy(
         submission.deposit.id,
         actor,
         context,
@@ -54,7 +56,7 @@ export class DepositSubmissionOrchestratorService {
         blockchainVerification: {
           required: true,
           attempted: true,
-          ...verification,
+          ...(verification as Record<string, unknown>),
         },
       };
     } catch (error) {
@@ -69,7 +71,7 @@ export class DepositSubmissionOrchestratorService {
           required: true,
           attempted: true,
           message:
-            'Deposit was submitted, but automatic blockchain verification could not complete. Approval remains blocked until verification is retried successfully.',
+            'Deposit was submitted, but automatic blockchain verification could not complete. Approval behavior remains controlled by the configured MANUAL or AUTO_AFTER_BLOCKCHAIN_VERIFIED policy.',
           verification: null,
         },
       };
