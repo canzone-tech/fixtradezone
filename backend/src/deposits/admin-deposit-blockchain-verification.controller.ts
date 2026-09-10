@@ -26,7 +26,7 @@ export class AdminDepositBlockchainVerificationController {
   @RequirePermissions(PERMISSIONS.DEPOSITS_READ)
   getBlockchainVerification(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
-  ) {
+  ): Promise<unknown> {
     return this.blockchainVerification.getDepositVerification(depositId);
   }
 
@@ -37,7 +37,7 @@ export class AdminDepositBlockchainVerificationController {
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
+  ): Promise<unknown> {
     return this.blockchainVerification.verifyDeposit(
       depositId,
       actor,
