@@ -55,18 +55,15 @@ describe('DepositApprovalModeService', () => {
   });
 
   it('defaults a rail with no approval policy row to MANUAL', async () => {
-    prisma.$queryRaw
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          verificationMode: 'VERIFY_ONLY',
-          chainId: 56,
-          tokenContractAddress:
-            '0x55d398326f99059ff775485246999027b3197955',
-          tokenDecimals: 18,
-          requiredConfirmations: 3,
-        },
-      ]);
+    prisma.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        verificationMode: 'VERIFY_ONLY',
+        chainId: 56,
+        tokenContractAddress: '0x55d398326f99059ff775485246999027b3197955',
+        tokenDecimals: 18,
+        requiredConfirmations: 3,
+      },
+    ]);
 
     await expect(service.getRailApprovalMode(RAIL_ID)).resolves.toMatchObject({
       approvalPolicy: {
