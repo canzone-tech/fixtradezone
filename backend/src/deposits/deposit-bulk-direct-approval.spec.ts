@@ -34,7 +34,8 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
     approvePendingDeposit: jest.fn(),
   };
   const blockchainApprovalGuard = {
-    assertApprovalAllowed: jest.fn(),
+    assertManualApprovalAllowed: jest.fn(),
+    assertAutomaticApprovalAllowed: jest.fn(),
   };
   const operationsConfigService = {
     getOperations: jest.fn(),
@@ -77,10 +78,10 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
           approvalPath: 'SUPER_ADMIN_DIRECT',
         }),
     );
-    blockchainApprovalGuard.assertApprovalAllowed.mockResolvedValue({
-      required: true,
+    blockchainApprovalGuard.assertManualApprovalAllowed.mockResolvedValue({
+      approvalMode: 'MANUAL',
       allowed: true,
-      verificationStatus: 'VERIFIED',
+      verificationStatus: 'PENDING',
     });
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
@@ -99,19 +100,22 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
     );
   });
 
-  it('routes verified pending and ADMIN-reviewed deposits independently in one SUPER_ADMIN bulk request', async () => {
+  it('routes pending and ADMIN-reviewed deposits independently through the MANUAL SUPER_ADMIN bulk path', async () => {
     const note = 'Founder mixed bulk approval';
     const result = await service.approveDepositsBulk(
       { depositIds: [PENDING_ID, READY_ID], note },
       actor,
     );
 
-    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
-      PENDING_ID,
-    );
-    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
-      READY_ID,
-    );
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).toHaveBeenCalledWith(PENDING_ID);
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).toHaveBeenCalledWith(READY_ID);
+    expect(
+      blockchainApprovalGuard.assertAutomaticApprovalAllowed,
+    ).not.toHaveBeenCalled();
     expect(
       directDepositApprovalService.approvePendingDeposit,
     ).toHaveBeenCalledWith(PENDING_ID, { note }, actor, {});
