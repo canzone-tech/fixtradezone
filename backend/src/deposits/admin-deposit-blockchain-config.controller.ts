@@ -26,7 +26,9 @@ export class AdminDepositBlockchainConfigController {
   @Get(':railId/blockchain-config')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.DEPOSIT_ACCOUNTS_READ)
-  getBlockchainConfig(@Param('railId', new ParseUUIDPipe()) railId: string) {
+  getBlockchainConfig(
+    @Param('railId', new ParseUUIDPipe()) railId: string,
+  ): Promise<unknown> {
     return this.blockchainVerification.getRailConfig(railId);
   }
 
@@ -38,7 +40,7 @@ export class AdminDepositBlockchainConfigController {
     @Body() dto: ConfigureDepositBlockchainVerificationDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
+  ): Promise<unknown> {
     return this.blockchainVerification.configureRail(
       railId,
       dto,
