@@ -1,6 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
-import type { NextFunction, Request, Response } from 'express';
+import { json, urlencoded, type NextFunction, type Request, type Response } from 'express';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
@@ -41,8 +41,8 @@ async function bootstrap() {
   // QR images are capped at 256 KiB in the admin UI and 360,000 characters
   // after base64 encoding in the DTO. Keep the transport limit bounded but
   // large enough for a valid QR payload to reach validation.
-  app.useBodyParser('json', { limit: '512kb' });
-  app.useBodyParser('urlencoded', { limit: '512kb', extended: true });
+  app.use(json({ limit: '512kb' }));
+  app.use(urlencoded({ limit: '512kb', extended: true }));
 
   expressApp.disable('x-powered-by');
 
