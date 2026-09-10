@@ -303,17 +303,18 @@
 
 .qrWrap {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 20px;
   align-items: center;
 }
 
 .qr {
-  width: 150px;
-  height: 150px;
+  width: 190px;
+  height: 190px;
+  box-sizing: border-box;
   object-fit: contain;
-  border-radius: 14px;
-  padding: 8px;
+  border-radius: 16px;
+  padding: 10px;
   background: #fff;
 }
 
@@ -396,6 +397,22 @@
   .kv,
   .qrWrap {
     grid-template-columns: 1fr;
+  }
+
+  .qrWrap {
+    justify-items: stretch;
+  }
+
+  .qr {
+    width: min(210px, 70vw);
+    height: auto;
+    aspect-ratio: 1;
+    justify-self: center;
+    padding: 10px;
+  }
+
+  .qrWrap > .list {
+    width: 100%;
   }
 
   .notice > .field + .actions {
