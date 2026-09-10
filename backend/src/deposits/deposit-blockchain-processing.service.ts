@@ -64,6 +64,7 @@ export class DepositBlockchainProcessingService {
     if (policy.approvalMode !== 'AUTO_AFTER_BLOCKCHAIN_VERIFIED') {
       return {
         ...verificationResult,
+        message: this.manualModeMessage(verificationResult.verification.status),
         approvalPolicy: {
           approvalMode: 'MANUAL' as const,
           automaticApprovalEnabled: false,
@@ -139,6 +140,22 @@ export class DepositBlockchainProcessingService {
           message,
         },
       };
+    }
+  }
+
+  private manualModeMessage(
+    status: VerificationActionResult['verification']['status'],
+  ): string {
+    switch (status) {
+      case 'VERIFIED':
+        return 'Blockchain transaction is VERIFIED. MANUAL mode is active, so SUPER_ADMIN still owns the final approve or reject decision.';
+      case 'FAILED':
+        return 'Blockchain verification FAILED. MANUAL mode remains active; SUPER_ADMIN must review the contradictory on-chain evidence before any final decision.';
+      case 'UNAVAILABLE':
+        return 'Blockchain verification is temporarily UNAVAILABLE. MANUAL mode remains active and the evidence can be retried before the SUPER_ADMIN decision.';
+      case 'PENDING':
+      default:
+        return 'Blockchain verification is PENDING. MANUAL mode remains active and SUPER_ADMIN owns the final approve or reject decision after review.';
     }
   }
 
