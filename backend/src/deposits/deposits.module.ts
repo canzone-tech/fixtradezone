@@ -11,8 +11,10 @@ import { AdminDepositPackageAccountsController } from './admin-deposit-package-a
 import { AdminDepositPaymentRailsController } from './admin-deposit-payment-rails.controller';
 import { AdminDepositsController } from './admin-deposits.controller';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
+import { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import { DepositPackageRoutingService } from './deposit-package-routing.service';
+import { DepositSubmissionOrchestratorService } from './deposit-submission-orchestrator.service';
 import { DepositsController } from './deposits.controller';
 import { DepositsService } from './deposits.service';
 import { DirectDepositApprovalService } from './direct-deposit-approval.service';
@@ -40,6 +42,8 @@ import { PackageDepositFlowService } from './package-deposit-flow.service';
     PackageDepositFlowService,
     DepositPackageRoutingService,
     DepositBlockchainVerificationService,
+    DepositBlockchainApprovalGuardService,
+    DepositSubmissionOrchestratorService,
     DirectDepositApprovalService,
     DepositApprovalOrchestratorService,
   ],
