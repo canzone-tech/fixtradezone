@@ -1,10 +1,11 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { OperationsConfigService } from '../platform-config/operations-config.service';
 import type { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
+import type { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import type { DepositsService } from './deposits.service';
 import type { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
@@ -41,6 +42,9 @@ describe('DepositApprovalOrchestratorService', () => {
   const directDepositApprovalService = {
     approvePendingDeposit: jest.fn(),
   };
+  const blockchainApprovalGuard = {
+    assertApprovalAllowed: jest.fn(),
+  };
   const operationsConfigService = {
     getOperations: jest.fn(),
   };
@@ -60,6 +64,11 @@ describe('DepositApprovalOrchestratorService', () => {
     jest.clearAllMocks();
     depositsService.getDeposit.mockResolvedValue({
       deposit: { id: DEPOSIT_ID, status: 'READY_FOR_APPROVAL' },
+    });
+    blockchainApprovalGuard.assertApprovalAllowed.mockResolvedValue({
+      required: true,
+      allowed: true,
+      verificationStatus: 'VERIFIED',
     });
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
@@ -114,6 +123,7 @@ describe('DepositApprovalOrchestratorService', () => {
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
       directDepositApprovalService as unknown as DirectDepositApprovalService,
+      blockchainApprovalGuard as unknown as DepositBlockchainApprovalGuardService,
       operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
@@ -121,7 +131,7 @@ describe('DepositApprovalOrchestratorService', () => {
     );
   });
 
-  it('blocks ADMIN final approval before reading deposit or operations policy', async () => {
+  it('blocks ADMIN final approval before reading deposit or blockchain policy', async () => {
     await expect(
       service.approveDeposit(
         DEPOSIT_ID,
@@ -131,6 +141,7 @@ describe('DepositApprovalOrchestratorService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(depositsService.getDeposit).not.toHaveBeenCalled();
+    expect(blockchainApprovalGuard.assertApprovalAllowed).not.toHaveBeenCalled();
     expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
     expect(depositsService.approveDeposit).not.toHaveBeenCalled();
     expect(
@@ -138,7 +149,35 @@ describe('DepositApprovalOrchestratorService', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('lets SUPER_ADMIN directly approve a pending deposit without ADMIN pre-review', async () => {
+  it('blocks SUPER_ADMIN approval before any financial action when blockchain verification is not VERIFIED', async () => {
+    blockchainApprovalGuard.assertApprovalAllowed.mockRejectedValue(
+      new ConflictException('Blockchain verification is pending.'),
+    );
+
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'Do not bypass blockchain gate' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
+      DEPOSIT_ID,
+    );
+    expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
+    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
+    expect(
+      directDepositApprovalService.approvePendingDeposit,
+    ).not.toHaveBeenCalled();
+    expect(walletLedgerService.reconcileApprovedDeposit).not.toHaveBeenCalled();
+    expect(
+      subscriptionsService.activateAutomaticallyAfterAccounting,
+    ).not.toHaveBeenCalled();
+    expect(postActivationService.process).not.toHaveBeenCalled();
+  });
+
+  it('lets SUPER_ADMIN directly approve a pending deposit after blockchain verification passes', async () => {
     depositsService.getDeposit.mockResolvedValue({
       deposit: { id: DEPOSIT_ID, status: 'PENDING_REVIEW' },
     });
@@ -149,6 +188,9 @@ describe('DepositApprovalOrchestratorService', () => {
       actor,
     );
 
+    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
+      DEPOSIT_ID,
+    );
     expect(
       directDepositApprovalService.approvePendingDeposit,
     ).toHaveBeenCalledWith(
@@ -164,6 +206,20 @@ describe('DepositApprovalOrchestratorService', () => {
       packageActivated: true,
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
     });
+  });
+
+  it('does not retroactively apply the blockchain guard to an already approved deposit', async () => {
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
+
+    await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'Recovery call' },
+      actor,
+    );
+
+    expect(blockchainApprovalGuard.assertApprovalAllowed).not.toHaveBeenCalled();
   });
 
   it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {
