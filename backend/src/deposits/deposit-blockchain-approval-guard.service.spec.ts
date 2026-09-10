@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
-import { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import type { PrismaService } from '../database/prisma.service';
+import { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 
 const DEPOSIT_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -18,31 +18,55 @@ describe('DepositBlockchainApprovalGuardService', () => {
     );
   });
 
-  it('allows approval when blockchain verification is not required', async () => {
+  it('allows SUPER_ADMIN manual approval when MANUAL is configured even if verification is pending', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         depositId: DEPOSIT_ID,
         depositStatus: 'PENDING_REVIEW',
-        verificationMode: 'OFF',
-        verificationStatus: null,
-        failureCode: null,
+        approvalMode: 'MANUAL',
+        verificationMode: 'VERIFY_ONLY',
+        verificationStatus: 'PENDING',
+        failureCode: 'TX_NOT_FOUND_OR_PENDING',
         failureReason: null,
       },
     ]);
 
     await expect(
-      service.assertApprovalAllowed(DEPOSIT_ID),
+      service.assertManualApprovalAllowed(DEPOSIT_ID),
     ).resolves.toMatchObject({
-      required: false,
+      approvalMode: 'MANUAL',
+      allowed: true,
+      verificationStatus: 'PENDING',
+    });
+  });
+
+  it('treats missing approval config as safe MANUAL default', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        depositId: DEPOSIT_ID,
+        depositStatus: 'PENDING_REVIEW',
+        approvalMode: null,
+        verificationMode: 'VERIFY_ONLY',
+        verificationStatus: 'FAILED',
+        failureCode: 'AMOUNT_MISMATCH',
+        failureReason: null,
+      },
+    ]);
+
+    await expect(
+      service.assertManualApprovalAllowed(DEPOSIT_ID),
+    ).resolves.toMatchObject({
+      approvalMode: 'MANUAL',
       allowed: true,
     });
   });
 
-  it('allows approval only after required blockchain verification is VERIFIED', async () => {
+  it('blocks manual approval when AUTO_AFTER_BLOCKCHAIN_VERIFIED is configured', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         depositId: DEPOSIT_ID,
-        depositStatus: 'READY_FOR_APPROVAL',
+        depositStatus: 'PENDING_REVIEW',
+        approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
         verificationMode: 'VERIFY_ONLY',
         verificationStatus: 'VERIFIED',
         failureCode: null,
@@ -51,21 +75,40 @@ describe('DepositBlockchainApprovalGuardService', () => {
     ]);
 
     await expect(
-      service.assertApprovalAllowed(DEPOSIT_ID),
+      service.assertManualApprovalAllowed(DEPOSIT_ID),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('allows automatic approval only after blockchain verification is VERIFIED', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        depositId: DEPOSIT_ID,
+        depositStatus: 'PENDING_REVIEW',
+        approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
+        verificationMode: 'VERIFY_ONLY',
+        verificationStatus: 'VERIFIED',
+        failureCode: null,
+        failureReason: null,
+      },
+    ]);
+
+    await expect(
+      service.assertAutomaticApprovalAllowed(DEPOSIT_ID),
     ).resolves.toMatchObject({
-      required: true,
+      approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
       allowed: true,
       verificationStatus: 'VERIFIED',
     });
   });
 
   it.each(['PENDING', 'FAILED', 'UNAVAILABLE', null])(
-    'blocks approval when required verification status is %s',
+    'blocks automatic approval when verification status is %s',
     async (verificationStatus) => {
       prisma.$queryRaw.mockResolvedValue([
         {
           depositId: DEPOSIT_ID,
           depositStatus: 'PENDING_REVIEW',
+          approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
           verificationMode: 'VERIFY_ONLY',
           verificationStatus,
           failureCode:
@@ -75,7 +118,7 @@ describe('DepositBlockchainApprovalGuardService', () => {
       ]);
 
       await expect(
-        service.assertApprovalAllowed(DEPOSIT_ID),
+        service.assertAutomaticApprovalAllowed(DEPOSIT_ID),
       ).rejects.toBeInstanceOf(ConflictException);
     },
   );
@@ -85,6 +128,7 @@ describe('DepositBlockchainApprovalGuardService', () => {
       {
         depositId: DEPOSIT_ID,
         depositStatus: 'APPROVED',
+        approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
         verificationMode: 'VERIFY_ONLY',
         verificationStatus: 'PENDING',
         failureCode: 'TX_NOT_FOUND_OR_PENDING',
@@ -93,9 +137,8 @@ describe('DepositBlockchainApprovalGuardService', () => {
     ]);
 
     await expect(
-      service.assertApprovalAllowed(DEPOSIT_ID),
+      service.assertAutomaticApprovalAllowed(DEPOSIT_ID),
     ).resolves.toMatchObject({
-      required: true,
       allowed: true,
       historicalApproved: true,
     });
