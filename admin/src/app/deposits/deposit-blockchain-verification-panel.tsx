@@ -19,6 +19,8 @@ type BlockchainVerificationStatus =
   | "FAILED"
   | "UNAVAILABLE";
 
+type DepositApprovalMode = "MANUAL" | "AUTO_AFTER_BLOCKCHAIN_VERIFIED";
+
 interface BlockchainVerificationRecord {
   depositId: string;
   status: BlockchainVerificationStatus;
@@ -39,17 +41,33 @@ interface BlockchainVerificationRecord {
   verifiedAt: string | null;
 }
 
+interface ApprovalPolicy {
+  approvalMode: DepositApprovalMode;
+  verificationMode: "OFF" | "VERIFY_ONLY";
+  verificationStatus: BlockchainVerificationStatus | null;
+}
+
 interface BlockchainVerificationResponse extends ApiMessagePayload {
   depositId: string;
   required: boolean;
   paymentRailId: string;
   network: string;
   verification: BlockchainVerificationRecord | null;
+  approvalPolicy: ApprovalPolicy;
 }
 
 interface BlockchainVerificationActionResponse extends ApiMessagePayload {
   alreadyVerified: boolean;
   verification: BlockchainVerificationRecord;
+  approvalPolicy?: {
+    approvalMode: DepositApprovalMode;
+    automaticApprovalEnabled: boolean;
+  };
+  autoApproval?: {
+    attempted: boolean;
+    approved: boolean;
+    message?: string;
+  };
 }
 
 interface QueueItem {
@@ -100,6 +118,13 @@ function verificationTone(item: QueueItem): string {
     default:
       return "info";
   }
+}
+
+function approvalModeLabel(item: QueueItem): string {
+  return item.verification?.approvalPolicy.approvalMode ===
+    "AUTO_AFTER_BLOCKCHAIN_VERIFIED"
+    ? "BSC AUTO"
+    : "MANUAL";
 }
 
 export default function DepositBlockchainVerificationPanel() {
@@ -256,12 +281,12 @@ export default function DepositBlockchainVerificationPanel() {
     <section className={styles.card}>
       <div className={styles.cardHeader}>
         <div>
-          <p className={styles.eyebrow}>DEP-03 / SECURITY GATE</p>
+          <p className={styles.eyebrow}>DEP-03 / SECURITY EVIDENCE</p>
           <h2>Blockchain verification</h2>
           <p className={styles.muted}>
-            Required rails must reach BLOCKCHAIN VERIFIED before SUPER_ADMIN
-            approval. Reject remains available for invalid deposits; historical
-            approvals are not changed retroactively.
+            Blockchain evidence is always shown for configured rails. MANUAL keeps
+            the final decision with SUPER_ADMIN; BSC AUTO waits for VERIFIED and
+            then uses the existing approval/accounting lifecycle automatically.
           </p>
         </div>
         <button
@@ -287,6 +312,8 @@ export default function DepositBlockchainVerificationPanel() {
         <div className={styles.list}>
           {items.map((item) => {
             const verification = item.verification?.verification ?? null;
+            const approvalMode =
+              item.verification?.approvalPolicy.approvalMode ?? "MANUAL";
             const verified = verification?.status === "VERIFIED";
             const actionLabel = verification
               ? verified
@@ -304,7 +331,7 @@ export default function DepositBlockchainVerificationPanel() {
                     </strong>
                     <small>
                       {item.deposit.user?.username ?? item.deposit.userId} ·{" "}
-                      {statusLabel(item.deposit.status)}
+                      {statusLabel(item.deposit.status)} · {approvalModeLabel(item)}
                     </small>
                   </div>
                   <span
@@ -316,6 +343,10 @@ export default function DepositBlockchainVerificationPanel() {
                 </div>
 
                 <div className={styles.kv}>
+                  <div>
+                    <small>Approval mode</small>
+                    <strong>{approvalModeLabel(item)}</strong>
+                  </div>
                   <div>
                     <small>Network</small>
                     <strong>{item.deposit.assignedNetwork}</strong>
@@ -364,12 +395,13 @@ export default function DepositBlockchainVerificationPanel() {
                     >
                       {busyId === item.deposit.id ? "Verifying…" : actionLabel}
                     </button>
-                    {!verified ? (
-                      <span className={styles.muted}>
-                        Approval is blocked by the backend until this state is
-                        VERIFIED.
-                      </span>
-                    ) : null}
+                    <span className={styles.muted}>
+                      {approvalMode === "AUTO_AFTER_BLOCKCHAIN_VERIFIED"
+                        ? verified
+                          ? "BSC AUTO may now process approval through the existing lifecycle."
+                          : "Automatic approval waits until this state is VERIFIED."
+                        : "MANUAL mode is active; SUPER_ADMIN owns the final approve/reject decision after reviewing this evidence."}
+                    </span>
                   </div>
                 ) : null}
               </div>
