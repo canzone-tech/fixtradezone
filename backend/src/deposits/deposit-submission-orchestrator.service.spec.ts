@@ -1,4 +1,5 @@
 import type { AuthenticatedUser } from '../auth/auth-user';
+import type { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import type { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import { DepositSubmissionOrchestratorService } from './deposit-submission-orchestrator.service';
 import type { PackageDepositFlowService } from './package-deposit-flow.service';
@@ -24,7 +25,9 @@ describe('DepositSubmissionOrchestratorService', () => {
   };
   const blockchainVerification = {
     getDepositVerification: jest.fn(),
-    verifyDeposit: jest.fn(),
+  };
+  const blockchainProcessing = {
+    verifyAndApplyPolicy: jest.fn(),
   };
 
   let service: DepositSubmissionOrchestratorService;
@@ -40,30 +43,32 @@ describe('DepositSubmissionOrchestratorService', () => {
       required: true,
       verification: null,
     });
-    blockchainVerification.verifyDeposit.mockResolvedValue({
+    blockchainProcessing.verifyAndApplyPolicy.mockResolvedValue({
       message: 'Blockchain transaction is not ready for verification yet.',
       alreadyVerified: false,
       verification: { status: 'PENDING' },
+      approvalPolicy: { approvalMode: 'MANUAL' },
     });
 
     service = new DepositSubmissionOrchestratorService(
       packageDepositFlowService as unknown as PackageDepositFlowService,
       blockchainVerification as unknown as DepositBlockchainVerificationService,
+      blockchainProcessing as unknown as DepositBlockchainProcessingService,
     );
   });
 
-  it('attempts blockchain verification after the deposit transaction commits', async () => {
-    const result = await service.submitPackageDeposit(
+  it('attempts blockchain verification and applies approval policy after the deposit commits', async () => {
+    const result = (await service.submitPackageDeposit(
       {
         packagePlanItemId: '33333333-3333-4333-8333-333333333333',
         amount: '20',
         txid: 'a'.repeat(64),
       },
       actor,
-    );
+    )) as Record<string, any>;
 
     expect(packageDepositFlowService.submitDeposit).toHaveBeenCalledTimes(1);
-    expect(blockchainVerification.verifyDeposit).toHaveBeenCalledWith(
+    expect(blockchainProcessing.verifyAndApplyPolicy).toHaveBeenCalledWith(
       DEPOSIT_ID,
       actor,
       {},
@@ -72,26 +77,27 @@ describe('DepositSubmissionOrchestratorService', () => {
       required: true,
       attempted: true,
       verification: { status: 'PENDING' },
+      approvalPolicy: { approvalMode: 'MANUAL' },
     });
   });
 
-  it('does not call the verifier when the payment rail has verification off', async () => {
+  it('does not call the processor when the payment rail has blockchain verification off', async () => {
     blockchainVerification.getDepositVerification.mockResolvedValue({
       depositId: DEPOSIT_ID,
       required: false,
       verification: null,
     });
 
-    const result = await service.submitPackageDeposit(
+    const result = (await service.submitPackageDeposit(
       {
         packagePlanItemId: '33333333-3333-4333-8333-333333333333',
         amount: '20',
         txid: 'a'.repeat(64),
       },
       actor,
-    );
+    )) as Record<string, any>;
 
-    expect(blockchainVerification.verifyDeposit).not.toHaveBeenCalled();
+    expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
     expect(result.blockchainVerification).toMatchObject({
       required: false,
       attempted: false,
@@ -99,18 +105,18 @@ describe('DepositSubmissionOrchestratorService', () => {
   });
 
   it('keeps a submitted deposit pending review when automatic verification cannot complete', async () => {
-    blockchainVerification.verifyDeposit.mockRejectedValue(
+    blockchainProcessing.verifyAndApplyPolicy.mockRejectedValue(
       new Error('RPC configuration incomplete'),
     );
 
-    const result = await service.submitPackageDeposit(
+    const result = (await service.submitPackageDeposit(
       {
         packagePlanItemId: '33333333-3333-4333-8333-333333333333',
         amount: '20',
         txid: 'a'.repeat(64),
       },
       actor,
-    );
+    )) as Record<string, any>;
 
     expect(result.deposit).toMatchObject({
       id: DEPOSIT_ID,
