@@ -55,6 +55,17 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+  DEPOSIT_BSC_RPC_URL: Joi.string()
+    .uri({ scheme: ['https'] })
+    .allow('')
+    .default(''),
+
+  DEPOSIT_BSC_RPC_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .max(30_000)
+    .default(8_000),
+
   PUBLIC_APP_URL: Joi.string().uri().default('https://localhost:3001'),
 
   COMMUNICATION_EMAIL_MODE: Joi.string()
