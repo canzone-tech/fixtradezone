@@ -13,21 +13,33 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
 import { PERMISSIONS } from '../rbac/rbac.constants';
+import { DepositApprovalModeService } from './deposit-approval-mode.service';
+import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 
 @Controller('admin/deposits')
 export class AdminDepositBlockchainVerificationController {
   constructor(
     private readonly blockchainVerification: DepositBlockchainVerificationService,
+    private readonly approvalMode: DepositApprovalModeService,
+    private readonly blockchainProcessing: DepositBlockchainProcessingService,
   ) {}
 
   @Get(':depositId/blockchain-verification')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.DEPOSITS_READ)
-  getBlockchainVerification(
+  async getBlockchainVerification(
     @Param('depositId', new ParseUUIDPipe()) depositId: string,
   ): Promise<unknown> {
-    return this.blockchainVerification.getDepositVerification(depositId);
+    const [verification, approvalPolicy] = await Promise.all([
+      this.blockchainVerification.getDepositVerification(depositId),
+      this.approvalMode.getDepositApprovalPolicy(depositId),
+    ]);
+
+    return {
+      ...verification,
+      approvalPolicy,
+    };
   }
 
   @Post(':depositId/verify-blockchain')
@@ -38,7 +50,7 @@ export class AdminDepositBlockchainVerificationController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ): Promise<unknown> {
-    return this.blockchainVerification.verifyDeposit(
+    return this.blockchainProcessing.verifyAndApplyPolicy(
       depositId,
       actor,
       getRequestContext(request),
