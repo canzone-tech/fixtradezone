@@ -141,7 +141,9 @@ describe('DepositApprovalOrchestratorService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(depositsService.getDeposit).not.toHaveBeenCalled();
-    expect(blockchainApprovalGuard.assertApprovalAllowed).not.toHaveBeenCalled();
+    expect(
+      blockchainApprovalGuard.assertApprovalAllowed,
+    ).not.toHaveBeenCalled();
     expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
     expect(depositsService.approveDeposit).not.toHaveBeenCalled();
     expect(
@@ -213,13 +215,11 @@ describe('DepositApprovalOrchestratorService', () => {
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
     });
 
-    await service.approveDeposit(
-      DEPOSIT_ID,
-      { note: 'Recovery call' },
-      actor,
-    );
+    await service.approveDeposit(DEPOSIT_ID, { note: 'Recovery call' }, actor);
 
-    expect(blockchainApprovalGuard.assertApprovalAllowed).not.toHaveBeenCalled();
+    expect(
+      blockchainApprovalGuard.assertApprovalAllowed,
+    ).not.toHaveBeenCalled();
   });
 
   it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {

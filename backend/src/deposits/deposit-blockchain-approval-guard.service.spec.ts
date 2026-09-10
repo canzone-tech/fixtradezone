@@ -30,7 +30,9 @@ describe('DepositBlockchainApprovalGuardService', () => {
       },
     ]);
 
-    await expect(service.assertApprovalAllowed(DEPOSIT_ID)).resolves.toMatchObject({
+    await expect(
+      service.assertApprovalAllowed(DEPOSIT_ID),
+    ).resolves.toMatchObject({
       required: false,
       allowed: true,
     });
@@ -48,7 +50,9 @@ describe('DepositBlockchainApprovalGuardService', () => {
       },
     ]);
 
-    await expect(service.assertApprovalAllowed(DEPOSIT_ID)).resolves.toMatchObject({
+    await expect(
+      service.assertApprovalAllowed(DEPOSIT_ID),
+    ).resolves.toMatchObject({
       required: true,
       allowed: true,
       verificationStatus: 'VERIFIED',
@@ -88,7 +92,9 @@ describe('DepositBlockchainApprovalGuardService', () => {
       },
     ]);
 
-    await expect(service.assertApprovalAllowed(DEPOSIT_ID)).resolves.toMatchObject({
+    await expect(
+      service.assertApprovalAllowed(DEPOSIT_ID),
+    ).resolves.toMatchObject({
       required: true,
       allowed: true,
       historicalApproved: true,

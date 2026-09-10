@@ -7,7 +7,9 @@ import { PackageDepositFlowService } from './package-deposit-flow.service';
 
 @Injectable()
 export class DepositSubmissionOrchestratorService {
-  private readonly logger = new Logger(DepositSubmissionOrchestratorService.name);
+  private readonly logger = new Logger(
+    DepositSubmissionOrchestratorService.name,
+  );
 
   constructor(
     private readonly packageDepositFlowService: PackageDepositFlowService,
