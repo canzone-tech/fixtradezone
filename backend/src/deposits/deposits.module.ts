@@ -5,10 +5,13 @@ import { RewardsModule } from '../rewards/rewards.module';
 import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AdminDepositAccountsController } from './admin-deposit-accounts.controller';
+import { AdminDepositBlockchainConfigController } from './admin-deposit-blockchain-config.controller';
+import { AdminDepositBlockchainVerificationController } from './admin-deposit-blockchain-verification.controller';
 import { AdminDepositPackageAccountsController } from './admin-deposit-package-accounts.controller';
 import { AdminDepositPaymentRailsController } from './admin-deposit-payment-rails.controller';
 import { AdminDepositsController } from './admin-deposits.controller';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
+import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import { DepositPackageRoutingService } from './deposit-package-routing.service';
 import { DepositsController } from './deposits.controller';
 import { DepositsService } from './deposits.service';
@@ -26,17 +29,20 @@ import { PackageDepositFlowService } from './package-deposit-flow.service';
   controllers: [
     DepositsController,
     AdminDepositPaymentRailsController,
+    AdminDepositBlockchainConfigController,
     AdminDepositAccountsController,
     AdminDepositPackageAccountsController,
     AdminDepositsController,
+    AdminDepositBlockchainVerificationController,
   ],
   providers: [
     DepositsService,
     PackageDepositFlowService,
     DepositPackageRoutingService,
+    DepositBlockchainVerificationService,
     DirectDepositApprovalService,
     DepositApprovalOrchestratorService,
   ],
-  exports: [DepositsService],
+  exports: [DepositsService, DepositBlockchainVerificationService],
 })
 export class DepositsModule {}
