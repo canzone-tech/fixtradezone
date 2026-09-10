@@ -4,6 +4,7 @@ import type { SubscriptionPostActivationService } from '../subscriptions/subscri
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
+import type { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import type { DepositsService } from './deposits.service';
 import type { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
@@ -31,6 +32,9 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
   };
   const directDepositApprovalService = {
     approvePendingDeposit: jest.fn(),
+  };
+  const blockchainApprovalGuard = {
+    assertApprovalAllowed: jest.fn(),
   };
   const operationsConfigService = {
     getOperations: jest.fn(),
@@ -73,6 +77,11 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
           approvalPath: 'SUPER_ADMIN_DIRECT',
         }),
     );
+    blockchainApprovalGuard.assertApprovalAllowed.mockResolvedValue({
+      required: true,
+      allowed: true,
+      verificationStatus: 'VERIFIED',
+    });
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
       operationsMode: 'CONTROLLED_MANUAL',
@@ -82,6 +91,7 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
       directDepositApprovalService as unknown as DirectDepositApprovalService,
+      blockchainApprovalGuard as unknown as DepositBlockchainApprovalGuardService,
       operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
@@ -89,13 +99,19 @@ describe('DepositApprovalOrchestratorService mixed bulk approval', () => {
     );
   });
 
-  it('routes pending and ADMIN-reviewed deposits independently in one SUPER_ADMIN bulk request', async () => {
+  it('routes verified pending and ADMIN-reviewed deposits independently in one SUPER_ADMIN bulk request', async () => {
     const note = 'Founder mixed bulk approval';
     const result = await service.approveDepositsBulk(
       { depositIds: [PENDING_ID, READY_ID], note },
       actor,
     );
 
+    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
+      PENDING_ID,
+    );
+    expect(blockchainApprovalGuard.assertApprovalAllowed).toHaveBeenCalledWith(
+      READY_ID,
+    );
     expect(
       directDepositApprovalService.approvePendingDeposit,
     ).toHaveBeenCalledWith(PENDING_ID, { note }, actor, {});
