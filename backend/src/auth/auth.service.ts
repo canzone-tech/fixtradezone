@@ -61,20 +61,12 @@ export class AuthService {
         ? 'EMAIL'
         : 'USERNAME';
 
-    if (multipleAccountsEnabled && identifierType !== 'USERNAME') {
-      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
-    }
-
     const methodEnabled =
       identifierType === 'USERNAME'
         ? (authConfig?.loginWithUsername ?? true)
         : identifierType === 'EMAIL'
           ? (authConfig?.loginWithEmail ?? true)
           : (authConfig?.loginWithMobile ?? true);
-
-    if (!methodEnabled) {
-      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
-    }
 
     const normalizedIdentifier =
       identifierType === 'EMAIL' || identifierType === 'USERNAME'
@@ -135,7 +127,11 @@ export class AuthService {
       );
     }
 
-    if (user.status !== 'ACTIVE') {
+    if (multipleAccountsEnabled && identifierType !== 'USERNAME') {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    if (!methodEnabled || user.status !== 'ACTIVE') {
       throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
     }
 
