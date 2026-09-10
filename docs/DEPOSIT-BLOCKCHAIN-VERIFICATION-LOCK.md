@@ -1,93 +1,148 @@
-# Deposit Blockchain Verification Lock
+# FixTradeZone Deposit Blockchain Verification Lock
 
-Status: DEP-03 phase 1 implementation / local acceptance pending.
+Status: **FOUNDER APPROVED — LOCKED**
 
-## Purpose
+This document is the source of truth for DEP-03 blockchain verification. It extends `DEPOSIT-PACKAGE-ACCOUNT-ROUTING-LOCK.md` without changing one-package-to-configured-account routing, immutable deposit snapshots, or the existing accounting/package lifecycle after a valid manual approval.
 
-FixTradeZone must not treat a syntactically valid transaction ID as proof that a real blockchain payment occurred. Blockchain verification is a security layer that validates submitted deposit evidence against the configured package receiving account before an operator relies on it.
+## 1. Phase 1 scope
 
-## Phase 1 scope
+Phase 1 is **automatic blockchain verification + manual verified-only approval** for configured EVM deposit payment rails on **BNB Smart Chain mainnet (chain ID 56)**.
 
-Phase 1 is `VERIFY_ONLY`.
+Blockchain verification is configured per payment rail. Token contract address, token decimals and required confirmations are operational configuration and must not be hard-coded into package or USER flows.
 
-- BNB Smart Chain mainnet only.
-- EVM/BEP20 payment rails only.
-- Blockchain verification does not approve a deposit.
-- Blockchain verification does not credit any wallet or ledger.
-- Blockchain verification does not activate a package.
-- Blockchain verification does not trigger commissions, rewards, simulated activity, internal trading, or other downstream earnings.
-- Existing SUPER_ADMIN manual approval remains the financial authorization gate during phase 1.
-- Automatic approval is explicitly out of scope until the verification layer passes local API acceptance and later acceptance gates.
+Blockchain verification does not itself approve a deposit, credit a wallet, post a ledger transaction, activate a package, or trigger commissions/rewards.
 
-## Configuration rule
+`AUTO_AFTER_BLOCKCHAIN_VERIFIED` is outside Phase 1 and remains OFF until separately approved and implemented.
 
-Blockchain verification is configured per deposit payment rail. The configuration stores:
+## 2. Verification authority
 
-- verification mode (`OFF` or `VERIFY_ONLY`)
-- chain ID
-- token contract address
-- token decimals
-- required confirmations
-- revision and audit actor
+A syntactically valid transaction ID is not proof of payment.
 
-The token contract is configuration, never a source-code constant. FixTradeZone must not guess a BEP20 USDT contract address.
+For an enabled BSC/EVM rail, the backend verifies on-chain evidence through JSON-RPC and fails closed when evidence is incomplete or unavailable.
 
-For phase 1, enabled verification requires:
+A successful verification requires all of the following:
 
-- EVM validation profile
-- BNB Smart Chain mainnet chain ID `56`
-- a valid EVM token contract address
-- token decimals confirmed through the configured RPC
-- at least one required confirmation
+1. the configured RPC reports the configured BSC mainnet chain ID;
+2. the transaction receipt exists and is mined;
+3. the receipt status indicates successful execution;
+4. only standard ERC20/BEP20 `Transfer` logs emitted by the configured token contract are considered;
+5. the transfer receiver in the event log equals the deposit's immutable receiving-address snapshot;
+6. the sum of matching transfers equals the deposit's immutable submitted amount using configured token decimals and integer base-unit arithmetic; and
+7. the receipt has reached the configured confirmation threshold.
 
-Configuration is fail-safe: if the RPC or token contract cannot be probed, enabling verification fails and the previous configuration remains unchanged.
+For BEP20/ERC20 token transfers, the top-level transaction `to` field is **not** treated as the payment receiver because it commonly points to the token contract. Receiver and amount authority comes from matching `Transfer` event logs.
 
-## RPC rule
+The sender address is not required to match a FixTradeZone USER identity because a valid payment may originate from an exchange, custody provider, or another external wallet.
 
-Local development may use the default public BNB Smart Chain JSON-RPC endpoint without an API key. Runtime configuration may override it with `DEPOSIT_BSC_RPC_URL`; the URL is treated as infrastructure configuration and must not be stored in deposit records or audit payloads. `DEPOSIT_BSC_RPC_TIMEOUT_MS` bounds network waits.
+## 3. Configuration and provider rules
 
-Production may use a dedicated provider endpoint, but provider credentials or secret URLs must remain environment configuration and must never be committed.
+An enabled Phase-1 rail requires:
 
-## Verification evidence
+- validation profile `EVM`;
+- chain ID `56`;
+- a valid configured EVM token contract address;
+- token decimals confirmed through RPC; and
+- a positive required-confirmation count.
 
-For a deposit with verification enabled, the verifier checks the snapshotted deposit evidence, not the current package route. Historical route changes therefore cannot rewrite the verification target.
+Configuration is fail-safe. If the RPC or token contract cannot be probed, enabling/changing verification fails and the previous configuration remains authoritative.
 
-A successful phase-1 verification requires all of the following:
+Local development may use the bounded public BSC JSON-RPC fallback. Runtime infrastructure may override it with:
 
-1. RPC chain ID matches the configured chain ID.
-2. The transaction receipt exists and is mined.
-3. The transaction receipt status is successful.
-4. A standard ERC20/BEP20 `Transfer` event emitted by the configured token contract sends funds to the deposit's snapshotted receiving address.
-5. The sum of matching transfer events to that receiving address equals the deposit's exact submitted amount using integer base-unit arithmetic.
-6. The receipt has at least the configured confirmation count.
-7. Existing deposit uniqueness prevents the same `(assignedNetwork, txid)` from being submitted twice.
+- `DEPOSIT_BSC_RPC_URL`;
+- `DEPOSIT_BSC_RPC_TIMEOUT_MS`.
 
-The sender address is not used as an identity gate because users may fund from an exchange, custody provider, or another wallet.
+Production should use dedicated/redundant provider infrastructure. Provider credentials or secret URLs remain environment configuration and must never be stored in deposit records, audit payloads, or source code.
 
-## Result states
+## 4. Persisted verification states
 
-- `VERIFIED`: all checks passed and the required confirmation threshold was met.
-- `PENDING`: transaction is not mined/visible yet or confirmations are still below the configured threshold.
-- `FAILED`: deterministic on-chain evidence contradicts the deposit, for example reverted transaction, missing matching transfer, or amount mismatch.
-- `UNAVAILABLE`: verification infrastructure is unavailable or returned inconsistent/malformed data.
+- `VERIFIED` — all configured chain/token/receiver/amount/confirmation checks passed.
+- `PENDING` — transaction is not visible/mined yet or confirmations remain below the configured threshold.
+- `FAILED` — deterministic on-chain evidence contradicts the submitted deposit, for example a reverted transaction, missing matching transfer, or amount mismatch.
+- `UNAVAILABLE` — RPC/provider infrastructure cannot currently establish the result safely or returned malformed/inconsistent data.
 
-A `VERIFIED` result is monotonic in phase 1: repeated manual verification requests return the stored verified evidence rather than downgrading it because of a later transient RPC outage.
+Only `VERIFIED` satisfies the Phase-1 approval gate for a rail configured as `VERIFY_ONLY`.
 
-## Audit and immutability
+A `VERIFIED` result is monotonic in Phase 1: repeated verification requests return the stored verified evidence rather than downgrading it because of a later transient RPC outage.
 
-Each verification attempt records a bounded evidence snapshot including chain, token contract, token decimals, required/observed confirmations, block number, on-chain amount, receiving address, TxID, status, and failure reason where applicable. RPC endpoint URLs and provider secrets are never recorded.
+## 5. New-deposit submission behavior
 
-The deposit's package/account/address/network/QR snapshots remain immutable and continue to be the basis for verification.
+New one-step USER package deposits continue to pass the locked server-side package/routing/amount/TxID-format checks and are created as `PENDING_REVIEW` with immutable package/account/address/network snapshots.
 
-## API acceptance gate
+After the deposit transaction commits, the backend automatically attempts blockchain verification when the assigned payment rail is configured as `VERIFY_ONLY`.
 
-Before any automatic submission hook or approval guard is added, local acceptance must prove:
+The submitted deposit must not be lost when verification is pending or temporarily unavailable. It remains in manual review while the approval gate stays closed until verification reaches `VERIFIED`.
 
-- migration `0035_deposit_blockchain_verification` deploys forward-only with `prisma migrate deploy`;
-- rail blockchain config readback works;
-- enabling config proves chain/token decimals through BSC RPC;
-- a known fake/local QA TxID cannot become `VERIFIED`;
-- verification evidence is persisted and readable;
-- no deposit status, wallet, ledger, subscription, commission, reward, or trading state is changed by verification.
+If blockchain verification is OFF for a payment rail, the existing manual approval lifecycle remains unchanged for that rail.
 
-After this gate is green, the next implementation step may automatically request verification after submission and require `VERIFIED` before manual approval when that rail is in `VERIFY_ONLY` mode. Automatic approval remains a separate future decision.
+## 6. Founder-approved approval gate
+
+For every new deposit on a `VERIFY_ONLY` rail:
+
+```text
+VERIFIED    -> manual SUPER_ADMIN approval allowed
+PENDING     -> approval BLOCKED; retry verification
+FAILED      -> approval BLOCKED; reject or investigate
+UNAVAILABLE -> approval BLOCKED; retry when verification is available
+NOT CHECKED -> approval BLOCKED; verification is required
+```
+
+The **backend guard is authoritative**. Frontend button state or rendering must never be the only protection.
+
+The guard executes before approval, accounting, package activation, commission/reward processing, or any other downstream financial action. Therefore a required non-VERIFIED deposit cannot reach financial effects through direct SUPER_ADMIN approval or bulk approval.
+
+Bulk approval processes each deposit independently through the same approval orchestrator and therefore the same blockchain gate.
+
+Reject remains available for invalid or suspicious pending deposits and does not require a successful blockchain verification.
+
+## 7. Historical approved deposits
+
+Deposits already `APPROVED` before the verified-only gate is introduced are **not retroactively blocked or changed**.
+
+DEP-03 must not reverse their status, ledger posting, wallet effect, package activation, commissions, rewards, or other previously completed lifecycle state.
+
+Historical approved deposits may have blockchain evidence recorded later for audit/investigation, but a later non-VERIFIED result does not rewrite their completed financial history.
+
+## 8. Replay, evidence and idempotency
+
+The existing Deposit database invariant `@@unique([assignedNetwork, txid])` prevents the same normalized transaction ID from being submitted twice on the same network.
+
+Verification evidence is stored per deposit. Repeated non-final verification attempts update the same evidence record and attempt count; they do not create financial effects.
+
+Each evidence snapshot records chain, token contract, token decimals, required/observed confirmations, block number, on-chain amount, receiving address, TxID, status, checked time, verified time and failure details where applicable.
+
+The deposit's immutable package/account/address/network/QR snapshots remain the verification target even if package routing changes later.
+
+## 9. Admin UI
+
+The Admin Deposits workspace must surface open-deposit blockchain state using clear labels equivalent to:
+
+- `BLOCKCHAIN VERIFIED`;
+- `PENDING CONFIRMATIONS`;
+- `VERIFICATION FAILED`;
+- `RPC UNAVAILABLE`;
+- `NOT CHECKED` when no evidence exists yet.
+
+Authorized reviewers have a **Verify blockchain / Retry blockchain verification** action. The UI must visibly state when approval remains blocked until `VERIFIED`.
+
+The existing FixTradeZone universal theme, readability rules, Package Accounts collapse behavior, Deposit Queue behavior and package routing UX remain unchanged.
+
+## 10. Acceptance gates before PR to main
+
+1. GitHub Backend CI and Admin CI must be green.
+2. Any forward migration required by the branch must be applied locally with `prisma migrate deploy`; never use `prisma migrate dev` and never reset the database.
+3. Browser acceptance comes first for this UI integration and must prove the blockchain verification status panel/badges, Verify/Retry action, and visible verified-only approval policy without regressing the existing Deposit Queue.
+4. A focused local API/Postman gate may then prove a required non-VERIFIED deposit is rejected by the approval endpoint before financial processing and that the normal manual SUPER_ADMIN lifecycle is available after `VERIFIED`.
+5. SQL/readback proof must confirm persisted verification evidence and no unintended duplicate accounting/financial effects.
+6. Historical already-approved deposits must remain unchanged.
+7. PR to `main` is allowed only after all applicable local gates are green.
+
+## 11. Completed Phase-1 API proof checkpoint
+
+Local API acceptance before the approval integration proved:
+
+- migration `0035_deposit_blockchain_verification` deployed forward-only;
+- payment-rail blockchain configuration persisted and read back correctly;
+- chain ID and token decimals were probed through BSC RPC;
+- a syntactically valid but fake QA TxID remained `PENDING` with `TX_NOT_FOUND_OR_PENDING` and never became `VERIFIED`;
+- verification evidence persisted and read back correctly; and
+- the historical already-approved QA deposit remained `APPROVED` with its existing financial lifecycle untouched.
