@@ -6,6 +6,7 @@ import { OperationsConfigService } from '../platform-config/operations-config.se
 import { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { WalletLedgerService } from '../wallet/wallet-ledger.service';
+import { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import type {
   BulkApproveDepositsDto,
   ReviewDepositDto,
@@ -20,6 +21,7 @@ export class DepositApprovalOrchestratorService {
   constructor(
     private readonly depositsService: DepositsService,
     private readonly directDepositApprovalService: DirectDepositApprovalService,
+    private readonly blockchainApprovalGuard: DepositBlockchainApprovalGuardService,
     private readonly operationsConfigService: OperationsConfigService,
     private readonly walletLedgerService: WalletLedgerService,
     private readonly subscriptionsService: SubscriptionsService,
@@ -35,6 +37,10 @@ export class DepositApprovalOrchestratorService {
     this.assertSuperAdmin(actor);
 
     const current = await this.depositsService.getDeposit(depositId);
+    if (current.deposit.status !== 'APPROVED') {
+      await this.blockchainApprovalGuard.assertApprovalAllowed(depositId);
+    }
+
     const operations = await this.operationsConfigService.getOperations();
     const postingMode =
       operations.operationsMode === 'AUTOMATIC'
