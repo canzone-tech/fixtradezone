@@ -1,6 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
-import { json, urlencoded, type NextFunction, type Request, type Response } from 'express';
+import {
+  json,
+  urlencoded,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
