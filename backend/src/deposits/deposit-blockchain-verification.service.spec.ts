@@ -36,12 +36,20 @@ describe('deposit blockchain verification helpers', () => {
       [
         {
           address: token,
-          topics: [TRANSFER_TOPIC, addressTopic(sender), addressTopic(receiver)],
+          topics: [
+            TRANSFER_TOPIC,
+            addressTopic(sender),
+            addressTopic(receiver),
+          ],
           data: '0x0f4240',
         },
         {
           address: token,
-          topics: [TRANSFER_TOPIC, addressTopic(sender), addressTopic(receiver)],
+          topics: [
+            TRANSFER_TOPIC,
+            addressTopic(sender),
+            addressTopic(receiver),
+          ],
           data: '0x1e8480',
         },
         {
@@ -55,7 +63,11 @@ describe('deposit blockchain verification helpers', () => {
         },
         {
           address: '0x5555555555555555555555555555555555555555',
-          topics: [TRANSFER_TOPIC, addressTopic(sender), addressTopic(receiver)],
+          topics: [
+            TRANSFER_TOPIC,
+            addressTopic(sender),
+            addressTopic(receiver),
+          ],
           data: '0x5f5e100',
         },
       ],

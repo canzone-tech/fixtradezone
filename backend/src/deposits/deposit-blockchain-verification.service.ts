@@ -20,10 +20,7 @@ const ERC20_TRANSFER_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
 export type DepositBlockchainVerificationStatus =
-  | 'PENDING'
-  | 'VERIFIED'
-  | 'FAILED'
-  | 'UNAVAILABLE';
+  'PENDING' | 'VERIFIED' | 'FAILED' | 'UNAVAILABLE';
 
 type VerificationMode = 'OFF' | 'VERIFY_ONLY';
 
@@ -188,7 +185,9 @@ function normalizeEvmAddress(value: string): string {
 
 function parseHexQuantity(value: string): bigint {
   if (!/^0x[0-9a-fA-F]+$/.test(value)) {
-    throw new RpcUnavailableError('Blockchain RPC returned an invalid quantity.');
+    throw new RpcUnavailableError(
+      'Blockchain RPC returned an invalid quantity.',
+    );
   }
   return BigInt(value);
 }
@@ -336,7 +335,9 @@ export class DepositBlockchainVerificationService {
             updatedAt = CURRENT_TIMESTAMP(3)
         `);
 
-        const afterRows = await transaction.$queryRaw<RailBlockchainConfigRow[]>(
+        const afterRows = await transaction.$queryRaw<
+          RailBlockchainConfigRow[]
+        >(
           Prisma.sql`
             SELECT
               paymentRailId,
@@ -509,9 +510,10 @@ export class DepositBlockchainVerificationService {
       const txHash = candidate.txid.startsWith('0x')
         ? candidate.txid
         : `0x${candidate.txid}`;
-      const receiptValue = await this.rpc<unknown>('eth_getTransactionReceipt', [
-        txHash,
-      ]);
+      const receiptValue = await this.rpc<unknown>(
+        'eth_getTransactionReceipt',
+        [txHash],
+      );
       if (receiptValue === null) {
         return {
           status: 'PENDING',
@@ -787,7 +789,9 @@ export class DepositBlockchainVerificationService {
   private async loadRailConfig(
     paymentRailId: string,
   ): Promise<RailBlockchainConfigRow | null> {
-    const rows = await this.prisma.$queryRaw<RailBlockchainConfigRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      RailBlockchainConfigRow[]
+    >(Prisma.sql`
       SELECT
         paymentRailId,
         verificationMode,
@@ -842,7 +846,9 @@ export class DepositBlockchainVerificationService {
   private async loadVerification(
     depositId: string,
   ): Promise<DepositVerificationRow | null> {
-    const rows = await this.prisma.$queryRaw<DepositVerificationRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      DepositVerificationRow[]
+    >(Prisma.sql`
       SELECT
         depositId,
         status,
@@ -951,7 +957,9 @@ export class DepositBlockchainVerificationService {
     return {
       status: 'FAILED',
       observedConfirmations: null,
-      blockNumber: blockNumber ? parseHexQuantity(blockNumber).toString() : null,
+      blockNumber: blockNumber
+        ? parseHexQuantity(blockNumber).toString()
+        : null,
       onChainAmount,
       failureCode,
       failureReason,
