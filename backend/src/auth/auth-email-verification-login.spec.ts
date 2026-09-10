@@ -62,6 +62,7 @@ describe('AuthService pending email verification login', () => {
     prisma.systemAuthConfig.findUnique.mockResolvedValue(null);
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     prisma.user.findUnique.mockResolvedValue(pendingUser);
+    prisma.user.findMany.mockResolvedValue([pendingUser]);
 
     service = new AuthService(
       prisma as unknown as PrismaService,
@@ -71,12 +72,46 @@ describe('AuthService pending email verification login', () => {
     );
   });
 
-  it('returns a clear verification-pending message after the correct password is proven', async () => {
+  it('returns a clear verification-pending message for the signup email after the correct password is proven', async () => {
     passwordService.verifyForAuthentication.mockResolvedValue(true);
 
     await expect(
       service.login({
-        identifier: pendingUser.username,
+        identifier: pendingUser.email,
+        password: 'CorrectPassword123!',
+      }),
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          'Email verification pending. Please verify your email before signing in.',
+      },
+    });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { email: pendingUser.email },
+        take: 2,
+      }),
+    );
+    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('does not let multiple-account or disabled-email-login policy mask the pending-verification message after credential proof', async () => {
+    prisma.systemRegistrationConfig.findUnique.mockResolvedValue({
+      allowMultipleAccountsPerEmail: true,
+      allowMultipleAccountsPerMobile: false,
+    });
+    prisma.systemAuthConfig.findUnique.mockResolvedValue({
+      loginWithUsername: true,
+      loginWithEmail: false,
+      loginWithMobile: true,
+    });
+    passwordService.verifyForAuthentication.mockResolvedValue(true);
+
+    await expect(
+      service.login({
+        identifier: pendingUser.email,
         password: 'CorrectPassword123!',
       }),
     ).rejects.toMatchObject({
@@ -95,7 +130,7 @@ describe('AuthService pending email verification login', () => {
 
     await expect(
       service.login({
-        identifier: pendingUser.username,
+        identifier: pendingUser.email,
         password: 'WrongPassword123!',
       }),
     ).rejects.toMatchObject({
