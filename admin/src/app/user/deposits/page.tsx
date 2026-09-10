@@ -1,5 +1,14 @@
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function UserDepositsPage() {
-  redirect("/user/packages");
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/user/packages");
+  }, [router]);
+
+  return null;
 }
