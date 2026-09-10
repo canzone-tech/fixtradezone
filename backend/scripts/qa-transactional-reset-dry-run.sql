@@ -9,12 +9,12 @@
 --   destructive cleanup script is authored.
 -- - Configuration/master data is reported as a baseline and must be preserved.
 --
--- Run only against the local FixTradeZone MySQL database after migrations are
--- current. Review the COMPLETE output before authorizing any cleanup.
+-- Run only against the local FixTradeZone MySQL/MariaDB database after
+-- migrations are current. Review the COMPLETE output before authorizing cleanup.
 
 USE `fixtradezone`;
 
-SET SESSION group_concat_max_len = 1000000;
+SET SESSION group_concat_max_len = 16777216;
 
 SELECT
   'FIXTRADEZONE QA TRANSACTIONAL RESET — DRY RUN ONLY' AS gate,
@@ -68,6 +68,15 @@ GROUP BY
   u.`id`, u.`username`, u.`email`, u.`phone`, u.`status`, u.`createdAt`
 ORDER BY u.`createdAt`, u.`username`;
 
+-- MariaDB cannot reopen the same TEMPORARY table across UNION branches inside
+-- one prepared statement. Snapshot candidate UUIDs into a session scalar once,
+-- then use FIND_IN_SET in the dynamic reports below. UUIDs cannot contain comma.
+SELECT GROUP_CONCAT(q.`id` ORDER BY q.`id` SEPARATOR ',')
+INTO @qa_candidate_ids
+FROM `qa_reset_candidates` q;
+
+SET @qa_candidate_ids = COALESCE(@qa_candidate_ids, '');
+
 -- ---------------------------------------------------------------------------
 -- 2. Every real FK that points directly at users(id), with candidate row count.
 --
@@ -81,8 +90,8 @@ SELECT GROUP_CONCAT(
     'SELECT ''', REPLACE(k.`TABLE_NAME`, '''', ''''''), '.',
     REPLACE(k.`COLUMN_NAME`, '''', ''''''),
     ''' AS reference_path, COUNT(*) AS candidate_row_count FROM `',
-    REPLACE(k.`TABLE_NAME`, '`', '``'), '` t INNER JOIN `qa_reset_candidates` q ON t.`',
-    REPLACE(k.`COLUMN_NAME`, '`', '``'), '` = q.`id`'
+    REPLACE(k.`TABLE_NAME`, '`', '``'), '` t WHERE FIND_IN_SET(t.`',
+    REPLACE(k.`COLUMN_NAME`, '`', '``'), '`, @qa_candidate_ids) > 0'
   )
   ORDER BY k.`TABLE_NAME`, k.`COLUMN_NAME`
   SEPARATOR ' UNION ALL '
@@ -114,8 +123,8 @@ SELECT GROUP_CONCAT(
     'SELECT ''', REPLACE(c.`TABLE_NAME`, '''', ''''''), '.',
     REPLACE(c.`COLUMN_NAME`, '''', ''''''),
     ''' AS user_like_path, COUNT(*) AS candidate_row_count FROM `',
-    REPLACE(c.`TABLE_NAME`, '`', '``'), '` t INNER JOIN `qa_reset_candidates` q ON t.`',
-    REPLACE(c.`COLUMN_NAME`, '`', '``'), '` = q.`id`'
+    REPLACE(c.`TABLE_NAME`, '`', '``'), '` t WHERE FIND_IN_SET(t.`',
+    REPLACE(c.`COLUMN_NAME`, '`', '``'), '`, @qa_candidate_ids) > 0'
   )
   ORDER BY c.`TABLE_NAME`, c.`COLUMN_NAME`
   SEPARATOR ' UNION ALL '
