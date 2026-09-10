@@ -61,7 +61,8 @@ export class DepositApprovalModeService {
         isActive: true,
       },
     });
-    if (!rail) throw new NotFoundException('Deposit payment rail was not found.');
+    if (!rail)
+      throw new NotFoundException('Deposit payment rail was not found.');
 
     const [approval, blockchain] = await Promise.all([
       this.loadApprovalConfig(paymentRailId),
@@ -108,7 +109,8 @@ export class DepositApprovalModeService {
         validationProfile: true,
       },
     });
-    if (!rail) throw new NotFoundException('Deposit payment rail was not found.');
+    if (!rail)
+      throw new NotFoundException('Deposit payment rail was not found.');
 
     if (dto.approvalMode === 'AUTO_AFTER_BLOCKCHAIN_VERIFIED') {
       const blockchain = await this.loadBlockchainConfig(paymentRailId);
@@ -152,7 +154,9 @@ export class DepositApprovalModeService {
             updatedAt = CURRENT_TIMESTAMP(3)
         `);
 
-        const rows = await transaction.$queryRaw<ApprovalConfigRow[]>(Prisma.sql`
+        const rows = await transaction.$queryRaw<
+          ApprovalConfigRow[]
+        >(Prisma.sql`
           SELECT
             paymentRailId,
             approvalMode,

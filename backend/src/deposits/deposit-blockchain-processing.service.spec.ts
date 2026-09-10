@@ -60,10 +60,7 @@ describe('DepositBlockchainProcessingService', () => {
   });
 
   it('records verification but does not auto approve in MANUAL mode', async () => {
-    const result = (await service.verifyAndApplyPolicy(
-      DEPOSIT_ID,
-      actor,
-    )) as {
+    const result = (await service.verifyAndApplyPolicy(DEPOSIT_ID, actor)) as {
       approvalPolicy: { approvalMode: string };
       autoApproval: { attempted: boolean; approved: boolean };
     };
@@ -89,10 +86,9 @@ describe('DepositBlockchainProcessingService', () => {
       verification: { status: 'PENDING' },
     });
 
-    const result = (await service.verifyAndApplyPolicy(
-      DEPOSIT_ID,
-      actor,
-    )) as { autoApproval: { attempted: boolean; approved: boolean } };
+    const result = (await service.verifyAndApplyPolicy(DEPOSIT_ID, actor)) as {
+      autoApproval: { attempted: boolean; approved: boolean };
+    };
 
     expect(approvalOrchestrator.approveDeposit).not.toHaveBeenCalled();
     expect(result.autoApproval).toMatchObject({
@@ -109,10 +105,9 @@ describe('DepositBlockchainProcessingService', () => {
       verificationStatus: 'VERIFIED',
     });
 
-    const result = (await service.verifyAndApplyPolicy(
-      DEPOSIT_ID,
-      actor,
-    )) as { autoApproval: { attempted: boolean; approved: boolean } };
+    const result = (await service.verifyAndApplyPolicy(DEPOSIT_ID, actor)) as {
+      autoApproval: { attempted: boolean; approved: boolean };
+    };
 
     expect(approvalMode.resolveAutomaticApprovalActor).toHaveBeenCalledWith(
       DEPOSIT_ID,

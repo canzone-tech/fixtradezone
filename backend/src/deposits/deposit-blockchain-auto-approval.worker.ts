@@ -18,7 +18,9 @@ const WORKER_LOCK_KEY = 'fixtradezone:deposits:blockchain-auto-approval';
 export class DepositBlockchainAutoApprovalWorker
   implements OnModuleInit, OnApplicationShutdown
 {
-  private readonly logger = new Logger(DepositBlockchainAutoApprovalWorker.name);
+  private readonly logger = new Logger(
+    DepositBlockchainAutoApprovalWorker.name,
+  );
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 

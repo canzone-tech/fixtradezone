@@ -46,7 +46,9 @@ export class DepositApprovalOrchestratorService {
           depositId,
         );
       } else {
-        await this.blockchainApprovalGuard.assertManualApprovalAllowed(depositId);
+        await this.blockchainApprovalGuard.assertManualApprovalAllowed(
+          depositId,
+        );
       }
     }
 

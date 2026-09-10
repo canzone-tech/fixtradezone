@@ -38,7 +38,8 @@ export class DepositBlockchainProcessingService {
   }
 
   async processAutomaticCandidate(depositId: string): Promise<unknown> {
-    const actor = await this.approvalMode.resolveAutomaticApprovalActor(depositId);
+    const actor =
+      await this.approvalMode.resolveAutomaticApprovalActor(depositId);
     const context: RequestContext = {
       userAgent: 'FixTradeZone deposit blockchain auto-approval worker',
     };
@@ -142,6 +143,8 @@ export class DepositBlockchainProcessingService {
   }
 
   private errorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : 'Automatic approval failed.';
+    return error instanceof Error
+      ? error.message
+      : 'Automatic approval failed.';
   }
 }
