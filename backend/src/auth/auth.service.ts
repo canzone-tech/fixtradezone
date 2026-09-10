@@ -85,6 +85,7 @@ export class AuthService {
       ...AUTH_USER_SELECT,
       passwordHash: true,
       mustChangePassword: true,
+      emailVerifiedAt: true,
     } as const;
 
     const identifierMatches =
@@ -120,7 +121,21 @@ export class AuthService {
       dto.password,
     );
 
-    if (!user || !passwordMatches || user.status !== 'ACTIVE') {
+    if (!user || !passwordMatches) {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    if (
+      user.status === 'PENDING' &&
+      user.email !== null &&
+      user.emailVerifiedAt === null
+    ) {
+      throw new UnauthorizedException(
+        'Email verification pending. Please verify your email before signing in.',
+      );
+    }
+
+    if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
     }
 
