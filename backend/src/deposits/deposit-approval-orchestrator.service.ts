@@ -14,6 +14,8 @@ import type {
 import { DepositsService } from './deposits.service';
 import { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
+type DepositApprovalSource = 'MANUAL' | 'AUTO_BLOCKCHAIN';
+
 @Injectable()
 export class DepositApprovalOrchestratorService {
   private readonly logger = new Logger(DepositApprovalOrchestratorService.name);
@@ -33,12 +35,19 @@ export class DepositApprovalOrchestratorService {
     dto: ReviewDepositDto,
     actor: AuthenticatedUser,
     context: RequestContext = {},
+    approvalSource: DepositApprovalSource = 'MANUAL',
   ) {
     this.assertSuperAdmin(actor);
 
     const current = await this.depositsService.getDeposit(depositId);
     if (current.deposit.status !== 'APPROVED') {
-      await this.blockchainApprovalGuard.assertApprovalAllowed(depositId);
+      if (approvalSource === 'AUTO_BLOCKCHAIN') {
+        await this.blockchainApprovalGuard.assertAutomaticApprovalAllowed(
+          depositId,
+        );
+      } else {
+        await this.blockchainApprovalGuard.assertManualApprovalAllowed(depositId);
+      }
     }
 
     const operations = await this.operationsConfigService.getOperations();
@@ -65,6 +74,7 @@ export class DepositApprovalOrchestratorService {
     if (operations.operationsMode === 'CONTROLLED_MANUAL') {
       return {
         ...approval,
+        approvalSource,
         message:
           'Deposit approved. Downstream accounting and earnings automation are paused by Controlled Manual operations mode.',
         operationsMode: operations.operationsMode,
@@ -97,6 +107,7 @@ export class DepositApprovalOrchestratorService {
 
       return {
         ...approval,
+        approvalSource,
         message:
           'Deposit approved. Accounting and all downstream automation are pending reconciliation.',
         operationsMode: operations.operationsMode,
@@ -131,6 +142,7 @@ export class DepositApprovalOrchestratorService {
 
       return {
         ...approval,
+        approvalSource,
         message:
           'Deposit approved and accounted. Package activation is pending reconciliation.',
         operationsMode: operations.operationsMode,
@@ -147,6 +159,7 @@ export class DepositApprovalOrchestratorService {
     if (activation.activationMode !== 'AUTO') {
       return {
         ...approval,
+        approvalSource,
         message: activation.message,
         operationsMode: operations.operationsMode,
         platformTimezone: operations.platformTimezone,
@@ -170,6 +183,7 @@ export class DepositApprovalOrchestratorService {
 
     return {
       ...approval,
+      approvalSource,
       message: downstream.downstreamPending
         ? 'Deposit approved, accounted, and package activated. One or more downstream earnings stages remain safely recoverable.'
         : 'Deposit approved, accounted, package activated, and downstream earnings processing completed automatically.',
