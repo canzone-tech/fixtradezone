@@ -32,11 +32,17 @@ function applySecurityHeaders(
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
   const expressApp = app.getHttpAdapter().getInstance() as {
     disable(name: string): void;
     set(name: string, value: string | boolean): void;
   };
+
+  // QR images are capped at 256 KiB in the admin UI and 360,000 characters
+  // after base64 encoding in the DTO. Keep the transport limit bounded but
+  // large enough for a valid QR payload to reach validation.
+  app.useBodyParser('json', { limit: '512kb' });
+  app.useBodyParser('urlencoded', { limit: '512kb', extended: true });
 
   expressApp.disable('x-powered-by');
 
