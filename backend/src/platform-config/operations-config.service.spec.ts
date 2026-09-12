@@ -45,21 +45,21 @@ describe('OperationsConfigService', () => {
     service = new OperationsConfigService(prisma as unknown as PrismaService);
   });
 
-  it('defaults to Asia/Kolkata and AUTOMATIC when the singleton row is absent', async () => {
+  it('defaults to UTC and AUTOMATIC when the singleton row is absent', async () => {
     prisma.$queryRaw.mockResolvedValue([]);
 
     await expect(service.getOperations()).resolves.toEqual({
-      platformTimezone: 'Asia/Kolkata',
+      platformTimezone: 'UTC',
       operationsMode: 'AUTOMATIC',
       updatedAt: null,
     });
   });
 
-  it('rejects invalid IANA timezone values', async () => {
+  it('rejects any non-UTC platform timezone', async () => {
     await expect(
       service.updateOperations(
         {
-          platformTimezone: 'Not/A_Real_Timezone',
+          platformTimezone: 'Asia/Kolkata' as 'UTC',
           operationsMode: 'AUTOMATIC',
         },
         actor(['SUPER_ADMIN']),
@@ -73,7 +73,7 @@ describe('OperationsConfigService', () => {
     await expect(
       service.updateOperations(
         {
-          platformTimezone: 'Asia/Kolkata',
+          platformTimezone: 'UTC',
           operationsMode: 'CONTROLLED_MANUAL',
         },
         actor(['ADMIN']),
@@ -83,7 +83,7 @@ describe('OperationsConfigService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('atomically updates operations and synchronizes legacy accounting mode', async () => {
+  it('atomically updates operations in UTC and synchronizes legacy accounting mode', async () => {
     const previousUpdatedAt = new Date('2026-08-28T01:00:00.000Z');
     const currentUpdatedAt = new Date('2026-08-28T01:05:00.000Z');
 
@@ -97,7 +97,7 @@ describe('OperationsConfigService', () => {
       ])
       .mockResolvedValueOnce([
         {
-          platformTimezone: 'America/New_York',
+          platformTimezone: 'UTC',
           operationsMode: 'CONTROLLED_MANUAL',
           updatedAt: currentUpdatedAt,
         },
@@ -107,7 +107,7 @@ describe('OperationsConfigService', () => {
     await expect(
       service.updateOperations(
         {
-          platformTimezone: 'America/New_York',
+          platformTimezone: 'UTC',
           operationsMode: 'CONTROLLED_MANUAL',
         },
         actor(['SUPER_ADMIN']),
@@ -115,7 +115,7 @@ describe('OperationsConfigService', () => {
       ),
     ).resolves.toEqual({
       message: 'Operations configuration updated.',
-      platformTimezone: 'America/New_York',
+      platformTimezone: 'UTC',
       operationsMode: 'CONTROLLED_MANUAL',
       updatedAt: currentUpdatedAt,
     });
@@ -128,7 +128,7 @@ describe('OperationsConfigService', () => {
         entityType: 'SystemOperationsConfig',
         entityId: '1',
         description:
-          'SUPER_ADMIN updated platform timezone and operations automation mode.',
+          'SUPER_ADMIN updated operations automation mode under the UTC platform-time standard.',
         metadata: {
           source: 'ADMIN_OPERATIONS_CONFIG',
           previous: {
@@ -136,7 +136,7 @@ describe('OperationsConfigService', () => {
             operationsMode: 'AUTOMATIC',
           },
           current: {
-            platformTimezone: 'America/New_York',
+            platformTimezone: 'UTC',
             operationsMode: 'CONTROLLED_MANUAL',
           },
           synchronizedDepositPostingMode: 'MANUAL_RECONCILIATION',
