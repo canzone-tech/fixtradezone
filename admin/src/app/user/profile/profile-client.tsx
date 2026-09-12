@@ -16,6 +16,64 @@ interface ProfileUpdatePayload extends ErrorPayload {
   user?: UserDirectSession["user"];
 }
 
+interface CountryDialOption {
+  code: string;
+  label: string;
+}
+
+const COUNTRY_DIAL_OPTIONS: CountryDialOption[] = [
+  { code: "+91", label: "India (+91)" },
+  { code: "+1", label: "United States / Canada (+1)" },
+  { code: "+44", label: "United Kingdom (+44)" },
+  { code: "+971", label: "United Arab Emirates (+971)" },
+  { code: "+966", label: "Saudi Arabia (+966)" },
+  { code: "+974", label: "Qatar (+974)" },
+  { code: "+965", label: "Kuwait (+965)" },
+  { code: "+973", label: "Bahrain (+973)" },
+  { code: "+968", label: "Oman (+968)" },
+  { code: "+92", label: "Pakistan (+92)" },
+  { code: "+880", label: "Bangladesh (+880)" },
+  { code: "+977", label: "Nepal (+977)" },
+  { code: "+94", label: "Sri Lanka (+94)" },
+  { code: "+65", label: "Singapore (+65)" },
+  { code: "+60", label: "Malaysia (+60)" },
+  { code: "+62", label: "Indonesia (+62)" },
+  { code: "+63", label: "Philippines (+63)" },
+  { code: "+66", label: "Thailand (+66)" },
+  { code: "+84", label: "Vietnam (+84)" },
+  { code: "+86", label: "China (+86)" },
+  { code: "+852", label: "Hong Kong (+852)" },
+  { code: "+81", label: "Japan (+81)" },
+  { code: "+82", label: "South Korea (+82)" },
+  { code: "+61", label: "Australia (+61)" },
+  { code: "+64", label: "New Zealand (+64)" },
+  { code: "+49", label: "Germany (+49)" },
+  { code: "+33", label: "France (+33)" },
+  { code: "+39", label: "Italy (+39)" },
+  { code: "+34", label: "Spain (+34)" },
+  { code: "+31", label: "Netherlands (+31)" },
+  { code: "+41", label: "Switzerland (+41)" },
+  { code: "+46", label: "Sweden (+46)" },
+  { code: "+47", label: "Norway (+47)" },
+  { code: "+45", label: "Denmark (+45)" },
+  { code: "+353", label: "Ireland (+353)" },
+  { code: "+48", label: "Poland (+48)" },
+  { code: "+351", label: "Portugal (+351)" },
+  { code: "+30", label: "Greece (+30)" },
+  { code: "+90", label: "Turkey (+90)" },
+  { code: "+7", label: "Russia / Kazakhstan (+7)" },
+  { code: "+380", label: "Ukraine (+380)" },
+  { code: "+27", label: "South Africa (+27)" },
+  { code: "+234", label: "Nigeria (+234)" },
+  { code: "+254", label: "Kenya (+254)" },
+  { code: "+233", label: "Ghana (+233)" },
+  { code: "+20", label: "Egypt (+20)" },
+  { code: "+212", label: "Morocco (+212)" },
+  { code: "+55", label: "Brazil (+55)" },
+  { code: "+54", label: "Argentina (+54)" },
+  { code: "+52", label: "Mexico (+52)" },
+];
+
 async function readPayload<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -28,13 +86,43 @@ function formatDate(value: string | null): string {
   return value ? formatPlatformDateTime(value) : "No login recorded";
 }
 
+function splitPhone(value: string | null | undefined) {
+  const normalized = (value ?? "").trim().replace(/[\s()-]/g, "");
+
+  if (!normalized) {
+    return { countryCode: "+91", mobileNumber: "" };
+  }
+
+  const match = [...COUNTRY_DIAL_OPTIONS]
+    .sort((left, right) => right.code.length - left.code.length)
+    .find((option) => normalized.startsWith(option.code));
+
+  if (!match) {
+    return {
+      countryCode: "",
+      mobileNumber: normalized.replace(/^\+/, "").replace(/\D/g, ""),
+    };
+  }
+
+  return {
+    countryCode: match.code,
+    mobileNumber: normalized.slice(match.code.length).replace(/\D/g, ""),
+  };
+}
+
+function combinedPhone(countryCode: string, mobileNumber: string) {
+  const digits = mobileNumber.replace(/\D/g, "");
+  return digits ? `${countryCode}${digits}` : "";
+}
+
 export default function UserProfileClient() {
   const router = useRouter();
 
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [countryCode, setCountryCode] = useState("+91");
+  const [mobileNumber, setMobileNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -74,10 +162,13 @@ export default function UserProfileClient() {
         }
 
         if (mounted) {
+          const parsedPhone = splitPhone(payload.user.phone);
+
           setSession(payload);
           setFirstName(payload.user.firstName ?? "");
           setLastName(payload.user.lastName ?? "");
-          setPhone(payload.user.phone ?? "");
+          setCountryCode(parsedPhone.countryCode);
+          setMobileNumber(parsedPhone.mobileNumber);
         }
       } catch (caught) {
         if (mounted) {
@@ -120,6 +211,22 @@ export default function UserProfileClient() {
     event.preventDefault();
     if (!session) return;
 
+    const normalizedMobile = mobileNumber.replace(/\D/g, "");
+
+    if (normalizedMobile && !countryCode) {
+      setSaveError("Select a country code for the mobile number.");
+      setSaveMessage("");
+      return;
+    }
+
+    const phone = combinedPhone(countryCode, normalizedMobile);
+
+    if (phone && phone.replace(/\D/g, "").length > 15) {
+      setSaveError("Mobile number must fit the E.164 limit of 15 digits.");
+      setSaveMessage("");
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
     setSaveMessage("");
@@ -146,6 +253,8 @@ export default function UserProfileClient() {
         throw new Error(payload?.message || "Unable to update your profile.");
       }
 
+      const parsedPhone = splitPhone(payload.user.phone);
+
       setSession((current) =>
         current
           ? {
@@ -156,7 +265,8 @@ export default function UserProfileClient() {
       );
       setFirstName(payload.user.firstName ?? "");
       setLastName(payload.user.lastName ?? "");
-      setPhone(payload.user.phone ?? "");
+      setCountryCode(parsedPhone.countryCode);
+      setMobileNumber(parsedPhone.mobileNumber);
       setSaveMessage(payload.message ?? "Profile updated successfully.");
     } catch (caught) {
       setSaveError(
@@ -301,22 +411,56 @@ export default function UserProfileClient() {
                 </label>
               </div>
 
-              <label>
-                <span>Mobile</span>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
-                  maxLength={16}
-                  autoComplete="tel"
-                  placeholder="Optional · E.164, e.g. +919876543210"
-                  disabled={saving}
-                />
-              </label>
+              <div className={styles.formGrid}>
+                <label>
+                  <span>Country code</span>
+                  <select
+                    value={countryCode}
+                    onChange={(event) => setCountryCode(event.target.value)}
+                    autoComplete="tel-country-code"
+                    disabled={saving}
+                    style={{
+                      width: "100%",
+                      height: 42,
+                      padding: "0 12px",
+                      border: "1px solid rgba(83, 119, 176, 0.28)",
+                      borderRadius: 9,
+                      outline: 0,
+                      color: "#eaf2ff",
+                      background: "rgba(2, 11, 27, 0.96)",
+                      fontSize: 10,
+                    }}
+                  >
+                    <option value="">Select country code</option>
+                    {COUNTRY_DIAL_OPTIONS.map((option) => (
+                      <option key={`${option.code}-${option.label}`} value={option.code}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  <span>Mobile number</span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={mobileNumber}
+                    onChange={(event) =>
+                      setMobileNumber(event.target.value.replace(/\D/g, ""))
+                    }
+                    maxLength={15}
+                    autoComplete="tel-national"
+                    placeholder="Optional · number only"
+                    disabled={saving}
+                  />
+                </label>
+              </div>
 
               <p className={styles.formHint}>
-                These fields are optional. Leave a field blank and save to clear
-                it. Email and username remain account identifiers and are not
+                Mobile is saved in E.164 format by combining the selected country
+                code with the number. Leave the mobile number blank and save to
+                clear it. Email and username remain account identifiers and are not
                 changed here.
               </p>
 
