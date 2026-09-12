@@ -33,14 +33,14 @@ function activationPolicyCopy(trigger: string, available: boolean) {
     return {
       headline: "AUTHORIZED MANUAL ACTIVATION",
       detail:
-        "After payment approval and accounting, an authorized administrator completes package activation.",
+        "After payment approval and accounting, an authorized administrator completes package activation from Total Wallet.",
     };
   }
 
   return {
     headline: "AUTO ACTIVATION ON APPROVAL",
     detail:
-      "Approved and accounted payment activates the purchased package exactly once.",
+      "Approved and accounted payment activates the purchased package exactly once from Total Wallet.",
   };
 }
 
@@ -175,7 +175,9 @@ export default function UserPackagesClient() {
             <p>
               Each package publishes an investment range and duration. Your
               exact selected amount is snapshotted as that package&apos;s principal
-              and each active package operates independently.
+              and each active package operates independently. Package purchase
+              spends Total Wallet only; Main / Deposit, Package Earnings,
+              Referral Commission and Rewards are not debited by the purchase.
             </p>
           </div>
 
@@ -309,7 +311,7 @@ export default function UserPackagesClient() {
                       {item.availability !== "AVAILABLE"
                         ? "This package cannot accept a new activation under the current plan."
                         : catalogue.activationAvailable
-                          ? `${activationPolicy?.detail} Your exact investment is validated against this package range.`
+                          ? `${activationPolicy?.detail} Your exact investment is validated against this package range. Total Wallet is the only package funding source.`
                           : "Funding is disabled until this plan's configured activation engine is available."}
                     </small>
                   </span>
@@ -341,7 +343,9 @@ export default function UserPackagesClient() {
                 come directly from one effective published plan version. Money
                 remains exact decimal data. Each activation snapshots its actual
                 selected principal and source package terms so later plan changes
-                never rewrite history.
+                never rewrite history. Total Wallet is the authoritative
+                spendable source for package purchase; component wallet balances
+                remain accounting categories and are unchanged by the purchase.
               </p>
             </div>
           </section>
