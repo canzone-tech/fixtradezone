@@ -30,6 +30,7 @@ type DecimalValue = Prisma.Decimal | number | string;
 type WalletAuditOperation =
   (typeof WALLET_AUDIT_OPERATIONS)[keyof typeof WALLET_AUDIT_OPERATIONS];
 type LedgerAccountBucket = UserWalletBucket | 'DEPOSIT_CLEARING';
+type WalletActivityBucket = UserWalletBucket | 'TOTAL_WALLET';
 
 interface LedgerAccountRow {
   id: string;
@@ -104,7 +105,7 @@ interface WalletActivityRow {
   postedAt: Date;
   side: LedgerSide;
   amount: DecimalValue;
-  bucket: UserWalletBucket;
+  bucket: WalletActivityBucket;
 }
 
 interface AdminWalletRow {
@@ -179,37 +180,85 @@ export class WalletLedgerService {
       WalletActivityRow[]
     >(Prisma.sql`
       SELECT
-        lt.id AS transactionId,
-        lt.kind,
-        lt.sourceType,
-        lt.sourceId,
-        lt.description,
-        lt.currency,
-        lt.postedAt,
-        le.side,
-        le.amount,
-        la.bucket
-      FROM ledger_entries le
-      INNER JOIN ledger_transactions lt ON lt.id = le.transactionId
-      INNER JOIN ledger_accounts la ON la.id = le.accountId
-      WHERE la.ownerType = 'USER'
-        AND la.ownerUserId = ${userId}
-        AND la.bucket IN (
-          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
-        )
-      ORDER BY lt.postedAt DESC, le.createdAt DESC
+        activity_rows.transactionId,
+        activity_rows.kind,
+        activity_rows.sourceType,
+        activity_rows.sourceId,
+        activity_rows.description,
+        activity_rows.currency,
+        activity_rows.postedAt,
+        activity_rows.side,
+        activity_rows.amount,
+        activity_rows.bucket
+      FROM (
+        SELECT
+          lt.id AS transactionId,
+          lt.kind,
+          lt.sourceType,
+          lt.sourceId,
+          lt.description,
+          lt.currency,
+          lt.postedAt,
+          le.side,
+          le.amount,
+          la.bucket,
+          le.createdAt AS sortAt
+        FROM ledger_entries le
+        INNER JOIN ledger_transactions lt ON lt.id = le.transactionId
+        INNER JOIN ledger_accounts la ON la.id = le.accountId
+        WHERE la.ownerType = 'USER'
+          AND la.ownerUserId = ${userId}
+          AND la.bucket IN (
+            'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+          )
+
+        UNION ALL
+
+        SELECT
+          COALESCE(lt.id, twe.id) AS transactionId,
+          COALESCE(lt.kind, 'TOTAL_WALLET_EVENT') AS kind,
+          COALESCE(lt.sourceType, 'TOTAL_WALLET') AS sourceType,
+          COALESCE(lt.sourceId, twe.eventKey) AS sourceId,
+          COALESCE(
+            lt.description,
+            CONCAT(
+              'Total Wallet ',
+              REPLACE(LOWER(twe.reason), '_', ' '),
+              '.'
+            )
+          ) AS description,
+          twe.currency,
+          COALESCE(lt.postedAt, twe.createdAt) AS postedAt,
+          twe.direction AS side,
+          twe.amount,
+          'TOTAL_WALLET' AS bucket,
+          twe.createdAt AS sortAt
+        FROM user_total_wallet_events twe
+        LEFT JOIN ledger_transactions lt ON lt.id = twe.ledgerTransactionId
+        WHERE twe.userId = ${userId}
+      ) activity_rows
+      ORDER BY activity_rows.postedAt DESC, activity_rows.sortAt DESC
       LIMIT ${query.limit} OFFSET ${skip}
     `);
 
     const countRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
-      FROM ledger_entries le
-      INNER JOIN ledger_accounts la ON la.id = le.accountId
-      WHERE la.ownerType = 'USER'
-        AND la.ownerUserId = ${userId}
-        AND la.bucket IN (
-          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
-        )
+      FROM (
+        SELECT le.id AS activityId
+        FROM ledger_entries le
+        INNER JOIN ledger_accounts la ON la.id = le.accountId
+        WHERE la.ownerType = 'USER'
+          AND la.ownerUserId = ${userId}
+          AND la.bucket IN (
+            'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+          )
+
+        UNION ALL
+
+        SELECT twe.id AS activityId
+        FROM user_total_wallet_events twe
+        WHERE twe.userId = ${userId}
+      ) activity_rows
     `);
 
     return {
