@@ -37,6 +37,7 @@ export class AdminSubscriptionQueryDto extends SubscriptionPageQueryDto {
 }
 
 export class PurchasePackageFromTotalWalletDto {
+  // Retried requests must reuse the same key so package funding stays idempotent.
   @IsUUID()
   requestKey!: string;
 
