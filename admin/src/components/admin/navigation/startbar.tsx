@@ -99,7 +99,7 @@ const sections: Array<{
       },
       {
         href: "/payouts",
-        label: "Payouts",
+        label: "Withdrawal",
         icon: "iconoir-coins-swap",
         permission: "payouts.read",
         enabled: true,
