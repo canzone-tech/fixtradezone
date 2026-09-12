@@ -42,6 +42,7 @@ interface TradeEvent {
   localTradeDate: string;
   tradeDayNumber: number;
   slotNumber: number;
+  scheduledAt: string;
   assetSymbol: string;
   outcome: "WIN" | "LOSS";
   eventType: "NORMAL" | "TARGET_RECONCILIATION";
@@ -85,6 +86,14 @@ function money(value: string, currency: string) {
   return `${Number(value).toLocaleString(undefined, {
     maximumFractionDigits: 8,
   })} ${currency}`;
+}
+
+function utcTime(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "—";
+
+  return parsed.toISOString().slice(11, 19);
 }
 
 function percentage(progress: string, target: string) {
@@ -491,6 +500,7 @@ export default function UserTradingClient() {
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Time (UTC)</th>
                   <th>Day / Slot</th>
                   <th>Asset</th>
                   <th>Result</th>
@@ -505,6 +515,7 @@ export default function UserTradingClient() {
                 {events.map((event) => (
                   <tr key={event.id}>
                     <td>{event.localTradeDate}</td>
+                    <td>{utcTime(event.scheduledAt)}</td>
                     <td>
                       D{event.tradeDayNumber} / {event.slotNumber}
                     </td>
@@ -531,7 +542,7 @@ export default function UserTradingClient() {
 
                 {!events.length ? (
                   <tr>
-                    <td colSpan={8} className={styles.empty}>
+                    <td colSpan={9} className={styles.empty}>
                       No trade history for this package yet.
                     </td>
                   </tr>

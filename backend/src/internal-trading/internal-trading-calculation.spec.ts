@@ -134,6 +134,94 @@ describe('ITD-02B internal trading calculation', () => {
     });
   });
 
+  it('matches the observed day progression and credits the daily target on the first qualifying WIN only', () => {
+    const firstLoss = calculateNormalTradeTransition(
+      {
+        grossTarget: '0.16962714',
+        grossProgressBefore: '0',
+        grossHighWaterBefore: '0',
+        userSharePercent: '70',
+        adminSharePercent: '30',
+        userCreditedBefore: '0',
+        adminRecognizedBefore: '0',
+      },
+      '-0.24290700',
+    );
+
+    const secondLoss = calculateNormalTradeTransition(
+      {
+        grossTarget: '0.16962714',
+        grossProgressBefore: firstLoss.grossProgressAfter,
+        grossHighWaterBefore: firstLoss.grossHighWaterAfter,
+        userSharePercent: '70',
+        adminSharePercent: '30',
+        userCreditedBefore: firstLoss.userCreditedAfter,
+        adminRecognizedBefore: firstLoss.adminRecognizedAfter,
+      },
+      '-0.15494100',
+    );
+
+    const firstWin = calculateNormalTradeTransition(
+      {
+        grossTarget: '0.16962714',
+        grossProgressBefore: secondLoss.grossProgressAfter,
+        grossHighWaterBefore: secondLoss.grossHighWaterAfter,
+        userSharePercent: '70',
+        adminSharePercent: '30',
+        userCreditedBefore: secondLoss.userCreditedAfter,
+        adminRecognizedBefore: secondLoss.adminRecognizedAfter,
+      },
+      '0.22852280',
+    );
+
+    const secondWin = calculateNormalTradeTransition(
+      {
+        grossTarget: '0.16962714',
+        grossProgressBefore: firstWin.grossProgressAfter,
+        grossHighWaterBefore: firstWin.grossHighWaterAfter,
+        userSharePercent: '70',
+        adminSharePercent: '30',
+        userCreditedBefore: firstWin.userCreditedAfter,
+        adminRecognizedBefore: firstWin.adminRecognizedAfter,
+      },
+      '0.19873940',
+    );
+
+    const targetClose = calculateTargetReconciliationTransition({
+      grossTarget: '0.16962714',
+      grossProgressBefore: secondWin.grossProgressAfter,
+      grossHighWaterBefore: secondWin.grossHighWaterAfter,
+      userSharePercent: '70',
+      adminSharePercent: '30',
+      userCreditedBefore: secondWin.userCreditedAfter,
+      adminRecognizedBefore: secondWin.adminRecognizedAfter,
+    });
+
+    expect([
+      firstLoss.grossProgressAfter,
+      secondLoss.grossProgressAfter,
+      firstWin.grossProgressAfter,
+      secondWin.grossProgressAfter,
+      targetClose.grossProgressAfter,
+    ]).toEqual([
+      '-0.24290700',
+      '-0.39784800',
+      '-0.16932520',
+      '0.02941420',
+      '0.16962714',
+    ]);
+
+    expect(firstWin).toMatchObject({
+      grossSettlementAmount: '0.16962714',
+      userSettlementAmount: '0.11873900',
+      adminSettlementAmount: '0.05088814',
+    });
+
+    expect(secondWin.userSettlementAmount).toBe('0.00000000');
+    expect(targetClose.grossResultAmount).toBe('0.14021294');
+    expect(targetClose.userSettlementAmount).toBe('0.00000000');
+  });
+
   it('allows LOSS gross progress below zero without reversing previous settlements', () => {
     const result = calculateNormalTradeTransition(
       {
@@ -170,7 +258,6 @@ describe('ITD-02B internal trading calculation', () => {
     );
 
     expect(result.grossProgressAfter).toBe('99.99999999');
-
     expect(result.reachedGrossTarget).toBe(false);
   });
 
