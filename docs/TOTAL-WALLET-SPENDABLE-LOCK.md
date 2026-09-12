@@ -1,28 +1,29 @@
-# TOTAL-WALLET-01 — Payout Spendable Balance Lock
+# TOTAL-WALLET-01 — Payout / Reinvestment Spendable Balance Lock
 
 Status: **IMPLEMENTED / LOCAL ACCEPTANCE IN PROGRESS**.
 
 ## Final business lock
 
-Total Wallet is the authoritative spendable balance for **USER payouts only**.
+The existing package catalogue purchase flow remains unchanged:
 
 ```text
-Payout           → Total Wallet ONLY
-Package Purchase → original Deposit / TXID flow
+Packages page
+→ choose package
+→ Deposit / TXID flow
+→ authorized approval/accounting
+→ package activation
 ```
 
-Package purchase is not a direct Total Wallet purchase path. The existing package flow remains:
+The Payouts workspace has two explicit Total Wallet actions:
 
 ```text
-Published package plan/item
-→ USER creates the package-specific deposit
-→ USER submits the public network TXID
-→ authorized deposit review approves the payment
-→ approved-deposit accounting credits USER Main / Deposit
-→ SUB-02 package activation consumes the approved package principal
+Payout       → Total Wallet → external payout request
+Reinvestment → Total Wallet → amount-eligible package activation
 ```
 
-## Payout accounting
+There is **no `Purchase from Total Wallet` action on the Packages page**. Reinvestment is exposed only from the Payouts workspace.
+
+## Payout action
 
 For a new payout request, the only USER spend source is `TOTAL_WALLET`.
 
@@ -35,71 +36,93 @@ The four component balances retain their accounting/classification meaning:
 
 A payout reserve/release must not rewrite those four component balances.
 
-Current Total Wallet value is derived from the four USER component balances plus immutable Total-Wallet-only adjustment events.
-
-Example:
-
-```text
-Before payout:
-Main / Deposit        10
-Package Earnings       4
-Referral Commission    3
-Rewards                2
-Total Wallet           19
-
-Reserve payout 12:
-Main / Deposit        10   unchanged
-Package Earnings       4   unchanged
-Referral Commission    3   unchanged
-Rewards                2   unchanged
-Total Wallet            7
-```
-
 A rejected/cancelled payout restores the corresponding Total Wallet reserve exactly once. A completed payout does not restore it.
 
-## Package purchase remains deposit-backed
+## Reinvestment action
 
-TOTAL-WALLET-01 does not replace the established package payment/activation chain.
+Reinvestment is not an external payout and does not create a blockchain transfer, destination address, or payout fee.
 
-Approved-deposit accounting first posts:
-
-```text
-DEBIT   SYSTEM:DEPOSIT_CLEARING:<currency>
-CREDIT  USER:<userId>:MAIN:<currency>
-```
-
-Package activation then posts the exact approved package principal:
+USER flow:
 
 ```text
-DEBIT   USER:<userId>:MAIN:<currency>
-CREDIT  SYSTEM:PACKAGE_PRINCIPAL:<currency>
+Payouts
+→ Action = Reinvestment
+→ enter exact amount
+→ UI shows only AVAILABLE published packages whose investment range contains that amount
+→ USER selects one eligible package
+→ backend revalidates package, amount, active-package rules and Total Wallet availability
+→ Total Wallet is debited atomically
+→ balanced package-principal ledger funding is posted
+→ package subscription is activated idempotently
 ```
 
-The package subscription retains its immutable `sourceDepositId` and `sourceDepositAccountingTransactionId` lineage. There is no USER-facing direct package-purchase endpoint funded from Total Wallet.
+For a range package, eligibility is:
 
-## Migration correction boundary
+```text
+minimumInvestment <= entered amount <= maximumInvestment
+```
 
-Migration `0039_total_wallet_spendable_balance` introduced the payout Total Wallet projection and payout policy support. Migration `0040_total_wallet_package_purchase` was applied during pre-acceptance work but represented an incorrect package-purchase interpretation.
+If `maximumInvestment` is open-ended, only the minimum boundary applies. For an exact-price package, the amount must equal the configured package price.
 
-Applied migrations are never rewritten or deleted. `0041_restore_deposit_package_purchase` is the forward-only correction that restores the original deposit-backed package schema and removes the pre-acceptance direct-wallet package-purchase fields.
+Reinvestment uses the **full entered amount** as package principal. The four component balances are not rewritten by the reinvestment debit.
 
-If any direct Total-Wallet package row exists, `0041` fails closed on the restored NOT NULL deposit lineage instead of deleting or rewriting financial history.
+## Existing package purchase remains deposit-backed
+
+The Packages page continues to use the established payment/activation chain:
+
+```text
+Published package plan/item
+→ USER creates the package-specific deposit
+→ USER submits the public network TXID
+→ authorized deposit review approves the payment
+→ approved-deposit accounting credits USER Main / Deposit
+→ SUB-02 package activation consumes the approved package principal
+```
+
+That route must not be redirected to Total Wallet and must not expose the Payouts reinvestment control.
+
+## Reinvestment lineage
+
+A reinvestment has no external deposit, so its package subscription uses:
+
+```text
+fundingSource = TOTAL_WALLET
+purchaseRequestKey = immutable idempotency key
+sourceDepositId = NULL
+sourceDepositAccountingTransactionId = NULL
+```
+
+Deposit-funded subscriptions continue writing their normal immutable deposit lineage.
+
+The Total Wallet debit and package-principal ledger transaction use deterministic/idempotent source keys and commit atomically with the subscription creation.
+
+## Migration boundary
+
+Migration `0039_total_wallet_spendable_balance` introduced authoritative Total Wallet accounting and payout support.
+
+Migration `0040_total_wallet_package_purchase` was already applied during pre-acceptance work. Its nullable subscription lineage and `fundingSource` / `purchaseRequestKey` columns are retained because the explicit Payouts → Reinvestment action requires them.
+
+Migration `0041_restore_deposit_package_purchase` is now a compatibility correction after the earlier local failed attempt. It does **not** remove the 0040 columns. It restores `referral_commission_runs.sourceDepositId` to nullable so a reinvestment can preserve a no-deposit lineage safely.
+
+The original Packages → Deposit / TXID UI remains unchanged despite those database capabilities.
 
 ## Acceptance requirements
 
 Before merge, local evidence must prove:
 
-1. payout policy exposes only `Total Wallet` as the new payout source;
-2. a payout reserve decreases Total Wallet by the exact reserved amount;
-3. `MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` remain unchanged by payout reserve/release;
-4. payout overdraw is rejected atomically;
-5. rejected payout restores the reserve exactly once;
-6. package selection still routes to the original Deposit/TXID flow;
-7. package activation still requires approved-deposit accounting and immutable deposit lineage;
-8. package activation still consumes USER Main / Deposit into SYSTEM Package Principal;
-9. no direct `Purchase from Total Wallet` package UI/API remains;
-10. financial ledger/event writes remain balanced, immutable and idempotent.
+1. Packages still routes `Choose Investment` to the original Deposit/TXID flow;
+2. Packages has no direct `Purchase from Total Wallet` action;
+3. Payouts exposes `Action = Payout | Reinvestment`;
+4. Payout uses Total Wallet only and preserves all four component balances;
+5. Reinvestment package choices are filtered by the exact entered amount;
+6. backend rejects a selected package when the amount is outside its published range;
+7. reinvestment rejects insufficient Total Wallet atomically;
+8. successful reinvestment decreases Total Wallet by the exact package principal;
+9. successful reinvestment creates no payout request, payout fee, destination address, or external TXID;
+10. reinvestment funding ledger entries are balanced and immutable;
+11. retry with the same request key is idempotent and never double-debits Total Wallet;
+12. payout rejection restores only its own reserve and does not affect reinvestment history.
 
 ## History rule
 
-Legacy payout source snapshots and all existing package/deposit/ledger history remain immutable. This correction changes only the forward behavior after the correction boundary.
+Existing package/deposit/payout/ledger history remains immutable. This change adds the explicit Payouts reinvestment action without altering the established Packages → Deposit / TXID user flow.
