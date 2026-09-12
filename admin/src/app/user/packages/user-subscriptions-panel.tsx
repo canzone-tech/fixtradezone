@@ -8,7 +8,8 @@ import styles from "./user-subscriptions-panel.module.css";
 
 interface Subscription {
   id: string;
-  sourceDepositId: string;
+  sourceDepositId: string | null;
+  fundingLedgerTransactionId: string;
   packageCode: string;
   packageDisplayName: string;
   price: string;
@@ -217,7 +218,9 @@ export default function UserSubscriptionsPanel() {
                 </div>
               </dl>
               <small className={styles.source}>
-                Source deposit: {item.sourceDepositId}
+                {item.sourceDepositId
+                  ? `Source deposit: ${item.sourceDepositId}`
+                  : `Source reinvestment: ${item.fundingLedgerTransactionId}`}
               </small>
             </div>
           </article>
