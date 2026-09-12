@@ -110,7 +110,7 @@ function decimalUnits(value: string): bigint | null {
 
   const [whole, fraction = ""] = normalized.split(".");
   return (
-    BigInt(whole) * 100000000n +
+    BigInt(whole) * BigInt(100000000) +
     BigInt((fraction + "00000000").slice(0, 8))
   );
 }
@@ -120,7 +120,11 @@ function amountFitsPackage(item: PackagePlanItem, amount: string): boolean {
 
   const amountUnits = decimalUnits(amount);
   const minimumUnits = decimalUnits(item.minimumInvestment);
-  if (amountUnits === null || minimumUnits === null || amountUnits <= 0n) {
+  if (
+    amountUnits === null ||
+    minimumUnits === null ||
+    amountUnits <= BigInt(0)
+  ) {
     return false;
   }
 
@@ -252,7 +256,7 @@ export default function UserPayoutsClient() {
     return (
       amountUnits !== null &&
       availableUnits !== null &&
-      amountUnits > 0n &&
+      amountUnits > BigInt(0) &&
       amountUnits <= availableUnits
     );
   }, [activeWallet?.totalWallet, amount]);
