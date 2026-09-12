@@ -33,14 +33,14 @@ function activationPolicyCopy(trigger: string, available: boolean) {
     return {
       headline: "AUTHORIZED MANUAL ACTIVATION",
       detail:
-        "After payment approval and accounting, an authorized administrator completes package activation from Total Wallet.",
+        "Package funding is backed by Total Wallet and follows the published manual activation policy.",
     };
   }
 
   return {
-    headline: "AUTO ACTIVATION ON APPROVAL",
+    headline: "TOTAL WALLET PURCHASE",
     detail:
-      "Approved and accounted payment activates the purchased package exactly once from Total Wallet.",
+      "A valid purchase is funded directly from Total Wallet and activates the package exactly once.",
   };
 }
 
@@ -320,10 +320,10 @@ export default function UserPackagesClient() {
                 {item.availability === "AVAILABLE" &&
                 catalogue.activationAvailable ? (
                   <Link
-                    href={`/user/deposits/${encodeURIComponent(item.id)}`}
+                    href={`/user/packages/purchase/${encodeURIComponent(item.id)}`}
                     className={styles.depositLink}
                   >
-                    Choose Investment <i className="iconoir-arrow-right" />
+                    Purchase from Total Wallet <i className="iconoir-arrow-right" />
                   </Link>
                 ) : null}
               </article>
