@@ -141,7 +141,9 @@ export class WalletLedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyWallet(userId: string, query: WalletPageQueryDto) {
-    const bucketRows = await this.prisma.$queryRaw<WalletBucketRow[]>(Prisma.sql`
+    const bucketRows = await this.prisma.$queryRaw<
+      WalletBucketRow[]
+    >(Prisma.sql`
       SELECT
         la.bucket,
         la.currency,
@@ -173,7 +175,9 @@ export class WalletLedgerService {
     );
 
     const skip = (query.page - 1) * query.limit;
-    const activity = await this.prisma.$queryRaw<WalletActivityRow[]>(Prisma.sql`
+    const activity = await this.prisma.$queryRaw<
+      WalletActivityRow[]
+    >(Prisma.sql`
       SELECT
         lt.id AS transactionId,
         lt.kind,
@@ -516,7 +520,9 @@ export class WalletLedgerService {
       );
     }
 
-    const existingEntryCount = await transaction.$queryRaw<CountRow[]>(Prisma.sql`
+    const existingEntryCount = await transaction.$queryRaw<
+      CountRow[]
+    >(Prisma.sql`
       SELECT COUNT(*) AS total
       FROM ledger_entries
       WHERE transactionId = ${ledgerTransaction.id}
