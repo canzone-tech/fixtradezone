@@ -120,6 +120,13 @@
   line-height: 1.5;
 }
 
+/* Auth errors are actionable security guidance and must not render at legacy 9px. */
+.ftz-auth-error {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.5 !important;
+}
+
 /* Shared dashboard promise follows the same readability standard. */
 .ftz-platform-promise > div:first-child > span {
   font-size: 12px !important;
