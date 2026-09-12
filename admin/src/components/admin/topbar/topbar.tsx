@@ -40,7 +40,7 @@ const routeHeadings: Array<{
   },
   {
     path: "/payouts",
-    title: "Payouts",
+    title: "Withdrawal",
     subtitle: "Withdrawal policy, request review and settlement operations",
   },
   {
