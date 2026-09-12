@@ -7,6 +7,7 @@ type DecimalValue = Prisma.Decimal | number | string;
 
 interface TotalWalletBalanceRow {
   balance: DecimalValue;
+  eventDelta?: DecimalValue;
 }
 
 interface TotalWalletEventRow {
@@ -41,19 +42,58 @@ export async function insertTotalWalletEvent(
   }
 
   if (input.requireAvailable) {
+    // Lock the USER row and all currently materialized component balance rows in
+    // one read. Every Total-Wallet-only spend uses this helper, so the USER row
+    // serializes concurrent payout/package spends. Locking component balances
+    // also prevents a concurrent source-ledger update from changing the
+    // spendable basis between validation and event insertion.
+    //
+    // Total Wallet is intentionally not a fifth USER ledger bucket. Its current
+    // spendable value is:
+    //   MAIN + PACKAGE_EARNINGS + REFERRAL_COMMISSION + REWARDS
+    //   + immutable Total-Wallet-only CREDIT/DEBIT event delta.
     const balances = await transaction.$queryRaw<TotalWalletBalanceRow[]>(
       Prisma.sql`
-        SELECT balance
-        FROM user_total_wallet_balances
-        WHERE userId = ${input.userId}
-          AND currency = ${input.currency}
-        LIMIT 1
+        SELECT
+          COALESCE(lb.balance, 0.00000000) AS balance,
+          COALESCE((
+            SELECT SUM(
+              CASE
+                WHEN event_rows.direction = 'CREDIT' THEN event_rows.amount
+                ELSE -event_rows.amount
+              END
+            )
+            FROM user_total_wallet_events event_rows
+            WHERE event_rows.userId = u.id
+              AND event_rows.currency = ${input.currency}
+          ), 0.00000000) AS eventDelta
+        FROM users u
+        LEFT JOIN ledger_accounts la
+          ON la.ownerType = 'USER'
+         AND la.ownerUserId = u.id
+         AND la.currency = ${input.currency}
+         AND la.bucket IN (
+           'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+         )
+        LEFT JOIN ledger_account_balances lb
+          ON lb.accountId = la.id
+        WHERE u.id = ${input.userId}
         FOR UPDATE
       `,
     );
-    const available = balances[0]
-      ? new Prisma.Decimal(balances[0].balance)
-      : new Prisma.Decimal(0);
+
+    if (balances.length === 0) {
+      throw new ServiceUnavailableException(
+        'Total Wallet USER accounting identity is unavailable.',
+      );
+    }
+
+    const sourceBalance = balances.reduce(
+      (total, row) => total.plus(new Prisma.Decimal(row.balance)),
+      new Prisma.Decimal(0),
+    );
+    const eventDelta = new Prisma.Decimal(balances[0]?.eventDelta ?? 0);
+    const available = sourceBalance.plus(eventDelta);
 
     if (available.lt(amount)) {
       throw new ConflictException(
