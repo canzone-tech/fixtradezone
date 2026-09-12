@@ -10,6 +10,7 @@ import { SubscriptionActivationOrchestratorService } from './subscription-activa
 import { SubscriptionPostActivationService } from './subscription-post-activation.service';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
+import { TotalWalletPackagePurchaseService } from './total-wallet-package-purchase.service';
 
 @Module({
   imports: [CommissionsModule, RewardsModule, InternalTradingModule],
@@ -22,6 +23,7 @@ import { SubscriptionsService } from './subscriptions.service';
     SubscriptionsService,
     SubscriptionPostActivationService,
     SubscriptionActivationOrchestratorService,
+    TotalWalletPackagePurchaseService,
   ],
   exports: [SubscriptionsService, SubscriptionPostActivationService],
 })
