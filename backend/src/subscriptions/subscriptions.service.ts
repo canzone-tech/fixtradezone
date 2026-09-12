@@ -10,11 +10,13 @@ import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import type { PackageActivationTrigger } from '../packages/packages.constants';
+import { insertTotalWalletEvent } from '../wallet/total-wallet-accounting';
 import {
   depositCreditSourceKey,
   packageActivationSourceKey,
+  packageActivationTotalWalletEventKey,
   packagePrincipalAccountKey,
-  userWalletAccountKey,
+  totalWalletControlAccountKey,
 } from '../wallet/wallet.constants';
 import type {
   AdminSubscriptionQueryDto,
@@ -81,7 +83,8 @@ interface LedgerAccountRow {
     | 'REFERRAL_COMMISSION'
     | 'REWARDS'
     | 'DEPOSIT_CLEARING'
-    | 'PACKAGE_PRINCIPAL';
+    | 'PACKAGE_PRINCIPAL'
+    | 'PAYOUT_TOTAL_WALLET_CONTROL';
   currency: string;
   normalSide: 'DEBIT' | 'CREDIT';
 }
@@ -490,6 +493,9 @@ export class SubscriptionsService {
       const currency = deposit.currency.toUpperCase();
       const amount = deposit.amount.toFixed(8);
       const fundingSourceKey = packageActivationSourceKey(deposit.id);
+      const totalWalletEventKey = packageActivationTotalWalletEventKey(
+        deposit.id,
+      );
       const proposedFundingId = randomUUID();
 
       await transaction.$executeRaw(Prisma.sql`
@@ -529,6 +535,9 @@ export class SubscriptionsService {
             currency,
             settlementTimezone: platformTimezone,
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
+            fundingSource: 'TOTAL_WALLET',
+            totalWalletEventKey,
+            componentBalancesChanged: false,
             referralCommissionApplied: false,
             rewardsApplied: false,
           })},
@@ -565,27 +574,33 @@ export class SubscriptionsService {
         );
       }
 
-      const mainAccount = await this.requireAccount(
-        transaction,
-        userWalletAccountKey(deposit.userId, 'MAIN', currency),
-        'USER',
-        deposit.userId,
-        'MAIN',
-        currency,
-        'CREDIT',
-      );
+      const totalWalletControlAccount =
+        await this.ensureSystemTotalWalletControlAccount(transaction, currency);
       const principalAccount = await this.ensureSystemPrincipalAccount(
         transaction,
         currency,
       );
 
+      await insertTotalWalletEvent(transaction, {
+        eventKey: totalWalletEventKey,
+        userId: deposit.userId,
+        currency,
+        direction: 'DEBIT',
+        amount,
+        reason: 'PACKAGE_PURCHASE',
+        ledgerTransactionId: fundingTransaction.id,
+        requireAvailable: true,
+        insufficientMessage:
+          'Total Wallet balance is insufficient for package activation.',
+      });
+
       await this.insertLedgerEntry(
         transaction,
         fundingTransaction.id,
-        mainAccount.id,
+        totalWalletControlAccount.id,
         'DEBIT',
         amount,
-        `Package ${deposit.packageDisplayName} principal funded from Main / Deposit.`,
+        `Package ${deposit.packageDisplayName} principal funded from authoritative Total Wallet.`,
       );
       await this.insertLedgerEntry(
         transaction,
@@ -600,8 +615,20 @@ export class SubscriptionsService {
         transaction,
         fundingTransaction.id,
       );
-      await this.applyBalance(transaction, mainAccount, 'DEBIT', amount);
-      await this.applyBalance(transaction, principalAccount, 'CREDIT', amount);
+      await this.applyBalance(
+        transaction,
+        totalWalletControlAccount,
+        'DEBIT',
+        amount,
+        'Package Total Wallet control accounting failed.',
+      );
+      await this.applyBalance(
+        transaction,
+        principalAccount,
+        'CREDIT',
+        amount,
+        'Package principal accounting failed.',
+      );
 
       const activatedAt = new Date();
 
@@ -754,7 +781,7 @@ export class SubscriptionsService {
           entityType: 'UserPackageSubscription',
           entityId: subscriptionId,
           description:
-            'Approved and accounted deposit activated a USER package.',
+            'Approved and accounted deposit activated a USER package from Total Wallet.',
           metadata: {
             source: 'PACKAGE_SUBSCRIPTION',
             operation,
@@ -784,7 +811,10 @@ export class SubscriptionsService {
               : null,
             sourceDepositAccountingTransactionId: accountingTransaction.id,
             fundingLedgerTransactionId: fundingTransaction.id,
-            debitAccount: mainAccount.accountKey,
+            fundingSource: 'TOTAL_WALLET',
+            totalWalletEventKey,
+            componentBalancesChanged: false,
+            debitAccount: totalWalletControlAccount.accountKey,
             creditAccount: principalAccount.accountKey,
             balanced: true,
             referralCommissionApplied: false,
@@ -804,7 +834,7 @@ export class SubscriptionsService {
 
       return {
         created: true,
-        message: 'Package activated and principal moved from Main / Deposit.',
+        message: 'Package activated and principal funded from Total Wallet.',
         subscription: this.snapshot(created),
       };
     });
@@ -939,7 +969,7 @@ export class SubscriptionsService {
     const account = rows[0];
     if (!account) {
       throw new ConflictException(
-        'Required Main / Deposit accounting account does not exist.',
+        'Required ledger accounting account does not exist.',
       );
     }
     if (
@@ -953,6 +983,36 @@ export class SubscriptionsService {
         'Ledger account semantics are inconsistent.',
       );
     }
+    return account;
+  }
+
+  private async ensureSystemTotalWalletControlAccount(
+    transaction: Prisma.TransactionClient,
+    currency: string,
+  ) {
+    const accountKey = totalWalletControlAccountKey(currency);
+    await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO ledger_accounts (
+        id, accountKey, ownerType, ownerUserId, bucket, currency, normalSide, createdAt
+      ) VALUES (
+        ${randomUUID()}, ${accountKey}, 'SYSTEM', NULL, 'PAYOUT_TOTAL_WALLET_CONTROL', ${currency}, 'DEBIT', CURRENT_TIMESTAMP(3)
+      )
+      ON DUPLICATE KEY UPDATE accountKey = VALUES(accountKey)
+    `);
+    const account = await this.requireAccount(
+      transaction,
+      accountKey,
+      'SYSTEM',
+      null,
+      'PAYOUT_TOTAL_WALLET_CONTROL',
+      currency,
+      'DEBIT',
+    );
+    await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO ledger_account_balances (accountId, balance, revision, updatedAt)
+      VALUES (${account.id}, 0.00000000, 0, CURRENT_TIMESTAMP(3))
+      ON DUPLICATE KEY UPDATE accountId = VALUES(accountId)
+    `);
     return account;
   }
 
@@ -1042,6 +1102,7 @@ export class SubscriptionsService {
     account: LedgerAccountRow,
     side: 'DEBIT' | 'CREDIT',
     amount: string,
+    failureMessage: string,
   ) {
     const direction = side === account.normalSide ? 1 : -1;
     const updated = await transaction.$executeRaw(Prisma.sql`
@@ -1054,9 +1115,7 @@ export class SubscriptionsService {
         AND balance + (${direction} * CAST(${amount} AS DECIMAL(20,8))) >= 0
     `);
     if (updated !== 1) {
-      throw new ConflictException(
-        'Main / Deposit balance is insufficient for package activation.',
-      );
+      throw new ConflictException(failureMessage);
     }
   }
 
