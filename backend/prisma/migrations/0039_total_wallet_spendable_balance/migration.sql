@@ -1,15 +1,19 @@
 -- TOTAL-WALLET-01 — authoritative spendable Total Wallet.
--- Forward-only. Existing source-bucket and payout history remain immutable.
+-- Forward-only. Existing source-bucket, package and payout history remain immutable.
 --
 -- Locked business rules:
 -- - Total Wallet is the authoritative spendable balance.
 -- - MAIN / PACKAGE_EARNINGS / REFERRAL_COMMISSION / REWARDS remain source
---   accounting balances and are NOT reduced by a Total Wallet payout.
--- - Every future source-bucket ledger CREDIT/DEBIT is mirrored into immutable
---   Total Wallet events, so package funding from MAIN also reduces Total Wallet.
+--   accounting balances and are NOT reduced by a Total Wallet payout or a new
+--   package purchase/activation.
+-- - Future component ledger economic credits/debits are mirrored into immutable
+--   Total Wallet events where they represent incoming/outgoing value.
 -- - New payouts reserve from TOTAL_WALLET only.
--- - Legacy payout source buckets remain supported for historical lifecycle
---   completion/rejection.
+-- - New package activations spend TOTAL_WALLET only; component balances stay
+--   unchanged and package-principal ledger accounting uses the system Total
+--   Wallet control account.
+-- - Legacy payout source buckets and historical package funding remain preserved
+--   for historical lifecycle completion/readback only.
 
 CREATE TABLE `user_total_wallet_balances` (
   `userId` CHAR(36) NOT NULL,
@@ -88,10 +92,11 @@ SELECT
 FROM `user_total_wallet_balances` tw
 WHERE tw.balance > 0;
 
--- Every future component ledger entry mirrors its economic effect into the
--- Total Wallet event stream. The component bucket itself remains independently
--- visible/auditable. A duplicate event is an accounting conflict and therefore
--- fails closed instead of being ignored.
+-- Future component ledger entries mirror their economic effect into the Total
+-- Wallet event stream. Package purchase/activation does NOT debit a USER
+-- component ledger account under the new lock; it posts its own explicit Total
+-- Wallet debit event in application accounting. A duplicate event is an
+-- accounting conflict and therefore fails closed instead of being ignored.
 CREATE TRIGGER `total_wallet_from_component_entry`
 AFTER INSERT ON `ledger_entries`
 FOR EACH ROW
