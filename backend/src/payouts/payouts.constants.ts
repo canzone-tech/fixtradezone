@@ -47,8 +47,11 @@ export const PAYOUT_LEDGER_KINDS = {
   SETTLEMENT: 'PAYOUT_SETTLEMENT',
 } as const;
 
+// The existing internal bucket name is retained for migration compatibility.
+// It is now the shared balanced-ledger control for authoritative Total Wallet
+// spends (payouts and package purchases); it is never a USER component bucket.
 export const PAYOUT_SYSTEM_BUCKETS = {
-  TOTAL_WALLET_CONTROL: 'TOTAL_WALLET_CONTROL',
+  TOTAL_WALLET_CONTROL: 'PAYOUT_TOTAL_WALLET_CONTROL',
   RESERVE: 'PAYOUT_RESERVE',
   SETTLEMENT: 'PAYOUT_SETTLEMENT',
   FEE_REVENUE: 'PAYOUT_FEE_REVENUE',
@@ -85,6 +88,10 @@ export function payoutTotalWalletEventKey(
   operation: 'RESERVE' | 'RELEASE',
 ): string {
   return `PAYOUT:${payoutId}:TOTAL_WALLET:${operation}`;
+}
+
+export function payoutTotalWalletControlAccountKey(currency: string): string {
+  return `SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:${currency}`;
 }
 
 export function payoutReserveAccountKey(currency: string): string {
