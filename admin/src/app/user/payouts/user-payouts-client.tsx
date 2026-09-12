@@ -82,6 +82,8 @@ function payoutBucketBalance(
   if (!wallet) return "0";
 
   switch (bucket) {
+    case "TOTAL_WALLET":
+      return wallet.totalWallet;
     case "MAIN":
       return wallet.buckets.main;
     case "PACKAGE_EARNINGS":
@@ -138,7 +140,8 @@ export default function UserPayoutsClient() {
   const [policy, setPolicy] = useState<CurrentPayoutPolicyResponse | null>(null);
   const [payouts, setPayouts] = useState<UserPayoutsResponse | null>(null);
   const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
-  const [sourceBucket, setSourceBucket] = useState<PayoutBucket>("MAIN");
+  const [sourceBucket, setSourceBucket] =
+    useState<PayoutBucket>("TOTAL_WALLET");
   const [amount, setAmount] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [loading, setLoading] = useState(true);
@@ -255,7 +258,7 @@ export default function UserPayoutsClient() {
         throw new Error("Payout requests are currently disabled.");
       }
       if (!sourceBucketEnabled) {
-        throw new Error("Selected wallet bucket is not enabled for payouts.");
+        throw new Error("Total Wallet is not enabled for payouts.");
       }
       if (!amount.trim() || !destinationAddress.trim()) {
         throw new Error("Amount and destination address are required.");
@@ -280,7 +283,7 @@ export default function UserPayoutsClient() {
       setDestinationAddress("");
       setSuccess(
         payload.created
-          ? `Payout ${payload.payout.id} created and funds reserved.`
+          ? `Payout ${payload.payout.id} created and Total Wallet funds reserved.`
           : `Payout ${payload.payout.id} was already created.`,
       );
 
@@ -325,8 +328,8 @@ export default function UserPayoutsClient() {
           <p className={styles.eyebrow}>PAYOUT-01 / WITHDRAWAL & PAYOUTS</p>
           <h1>Payouts</h1>
           <p>
-            Request a payout from an enabled accounting bucket to the published
-            network. Creating a request atomically reserves the requested wallet
+            Request a payout from your Total Wallet to the published network.
+            Creating a request atomically reserves the requested Total Wallet
             amount until an administrator rejects it or completes settlement.
           </p>
         </section>
@@ -450,7 +453,7 @@ export default function UserPayoutsClient() {
 
           <form onSubmit={submitPayout} className={styles.formGrid}>
             <div className={styles.field}>
-              <label htmlFor="payout-source-bucket">Source wallet bucket</label>
+              <label htmlFor="payout-source-bucket">Payout source</label>
               <select
                 id="payout-source-bucket"
                 className={styles.select}
@@ -461,7 +464,7 @@ export default function UserPayoutsClient() {
                 disabled={busy || !requestsEnabled}
               >
                 {enabledBuckets.length === 0 ? (
-                  <option value="MAIN">No bucket enabled</option>
+                  <option value="TOTAL_WALLET">Total Wallet not enabled</option>
                 ) : (
                   enabledBuckets.map((bucket) => (
                     <option value={bucket} key={bucket}>
@@ -471,7 +474,7 @@ export default function UserPayoutsClient() {
                 )}
               </select>
               <span className={styles.help}>
-                Available in selected bucket: {compactDecimal(selectedBucketBalance)}{" "}
+                Available for payout: {compactDecimal(selectedBucketBalance)}{" "}
                 {activeWallet?.currency ?? activePolicy?.asset ?? "USDT"}
               </span>
             </div>
