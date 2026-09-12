@@ -13,12 +13,14 @@ The existing component balances remain independent source/accounting balances:
 - `REFERRAL_COMMISSION`
 - `REWARDS`
 
-A payout changes **Total Wallet only**. It must not debit or rewrite any of the four component balances.
+Neither payout nor package purchase/activation debits or rewrites any of those four component balances.
+
+The only spendable source for both operations is `Total Wallet`.
 
 Example:
 
 ```text
-Before payout
+Before spend
 Main / Deposit       10
 Package Earnings      4
 Referral Commission   3
@@ -35,34 +37,56 @@ Rewards               2
 Total Wallet           7
 ```
 
+If a package purchase of 5 follows:
+
+```text
+After package purchase
+Main / Deposit       10
+Package Earnings      4
+Referral Commission   3
+Rewards               2
+Total Wallet           2
+```
+
 ## Package funding invariant
 
-Package purchase/activation remains eligible from `MAIN` / Main / Deposit only.
+Package purchase/activation is funded from `TOTAL_WALLET` only.
 
-Because Total Wallet is the authoritative spendable balance, a successful MAIN-funded package debit must also reduce Total Wallet by the same amount. This prevents the same economic value from being spent once by payout and again by package activation.
+`MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` are never selected, checked, debited, consumed, or rewritten as package-purchase funding sources.
 
-If either MAIN eligibility/balance or authoritative Total Wallet spendable balance is insufficient, package funding must fail closed.
+A successful package activation:
+
+1. verifies authoritative Total Wallet has at least the required package amount;
+2. posts one immutable Total Wallet `DEBIT` event for that amount;
+3. records a balanced package-principal ledger transaction through the system Total Wallet control account;
+4. leaves all four component balances unchanged.
+
+If authoritative Total Wallet is insufficient, package funding fails closed and no subscription or financial write may partially commit.
 
 ## Posting model
 
-Future USER component-ledger entries mirror their economic effect into an immutable Total Wallet event stream:
+Future USER component-ledger entries mirror their economic effect into the immutable Total Wallet event stream when those component events represent incoming/outgoing economic value:
 
 - component `CREDIT` -> Total Wallet `CREDIT`
 - component `DEBIT` -> Total Wallet `DEBIT`
 
-This synchronization changes Total Wallet but does not alter the other component balances beyond the original component ledger posting itself.
+That synchronization never makes a component bucket independently spendable.
 
-Payout accounting does not post against component USER ledger accounts. It reserves directly from authoritative Total Wallet and records a balanced system control/reserve transaction.
+Payout accounting and package-purchase accounting do not post debits against component USER ledger accounts. They debit authoritative Total Wallet directly and use balanced system control accounting for the related financial transaction.
 
 A rejected payout restores Total Wallet only. A completed payout leaves the earlier Total Wallet reserve consumed.
+
+Package purchase has no component-bucket debit to restore because component balances were never spent.
 
 ## Historical safety
 
 - Existing component ledger entries are immutable.
+- Existing package activations retain their historical ledger/accounting records.
 - Existing payout requests retain their historical source-bucket snapshot.
-- Existing migrations are immutable; implementation is forward-only.
+- Existing migrations remain immutable once applied; implementation is forward-only.
 - Migration opening balance is initialized from the currently available sum of the four component balances once, at migration time.
 - Legacy payout requests may finish/reject under their historical accounting path.
+- New package activations after TOTAL-WALLET-01 use Total Wallet only.
 
 ## Payout policy
 
@@ -79,6 +103,8 @@ Local acceptance must prove all of the following:
 3. Component balances are unchanged by payout reserve, rejection, and completion.
 4. Rejection restores exactly the reserved Total Wallet amount.
 5. Payout cannot reserve more than Total Wallet.
-6. Package activation remains MAIN-only and also decreases Total Wallet.
-7. Double-spend between payout reserve and package funding is rejected atomically.
-8. Ledger transactions remain balanced and Total Wallet events are immutable/idempotent.
+6. Package purchase/activation decreases Total Wallet only.
+7. `MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` remain unchanged by package purchase.
+8. Package activation fails atomically when Total Wallet is insufficient.
+9. Double-spend between payout reserve and package funding is rejected atomically.
+10. Ledger transactions remain balanced and Total Wallet events are immutable/idempotent.
