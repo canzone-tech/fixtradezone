@@ -8,8 +8,6 @@ SUB-02 converts an eligible approved/accounted package payment into an immutable
 
 This milestone consumes PKG-01, DEP-01 and WAL-01. It does not implement referral commissions, reward accrual/caps, renewals/upgrades, withdrawals or simulated-trade accounting.
 
-TOTAL-WALLET-01 now supersedes the historical package-funding source rule for **new** activations: package principal is funded from authoritative `Total Wallet` only. Historical package activations remain immutable.
-
 ## Source-of-truth chain
 
 ```text
@@ -69,60 +67,42 @@ Therefore:
 
 No activation path may bypass WAL-01 accounting.
 
-## Package principal accounting — TOTAL-WALLET-01 superseding rule
+## Package principal accounting
 
-Approved-deposit accounting still credits USER Main / Deposit as the source-accounting classification and, under TOTAL-WALLET-01, the economic credit also becomes available in authoritative Total Wallet:
+Approved-deposit accounting first credits USER Main / Deposit:
 
 ```text
 DEBIT   SYSTEM:DEPOSIT_CLEARING:<currency>
 CREDIT  USER:<userId>:MAIN:<currency>
-
-Total Wallet event: CREDIT <deposit amount>
 ```
 
-For **new** package activation, Main / Deposit is not the spend source and is not debited.
-
-Package activation consumes authoritative Total Wallet only:
+Package activation then consumes the exact package principal:
 
 ```text
-Total Wallet event: DEBIT <package amount>
-
 LedgerTransaction(
   kind = PACKAGE_ACTIVATION_FUNDING,
   sourceKey = DEPOSIT:<depositId>:PACKAGE_ACTIVATION
 )
 
-DEBIT   SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:<currency>   <package amount>
-CREDIT  SYSTEM:PACKAGE_PRINCIPAL:<currency>             <package amount>
+DEBIT   USER:<userId>:MAIN:<currency>          <package amount>
+CREDIT  SYSTEM:PACKAGE_PRINCIPAL:<currency>    <package amount>
 ```
 
-`SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL` is a legacy internal bucket/key name retained for migration compatibility. Under TOTAL-WALLET-01 it is the shared system control account for authoritative Total Wallet spends; it is not a USER payout balance and is not a USER component wallet.
-
-Package activation must not debit or rewrite any of these USER component balances:
-
-```text
-MAIN
-PACKAGE_EARNINGS
-REFERRAL_COMMISSION
-REWARDS
-```
-
-The funding transaction, Total Wallet debit event, Total Wallet balance projection, and USER subscription creation commit together or not at all. Insufficient Total Wallet fails closed.
+The funding transaction and USER subscription creation commit together or not at all.
 
 ## Idempotency
 
 One deposit can activate at most one USER package.
 
-Deterministic source keys:
+Deterministic source key:
 
 ```text
 DEPOSIT:<depositId>:PACKAGE_ACTIVATION
-DEPOSIT:<depositId>:PACKAGE_ACTIVATION:TOTAL_WALLET
 ```
 
 The USER package record also has a unique source-deposit relationship.
 
-Repeated activation for an already-activated deposit returns the existing subscription and never consumes Total Wallet twice.
+Repeated activation for an already-activated deposit returns the existing subscription and never consumes Main Wallet twice.
 
 Verified local retry response contract:
 
@@ -287,8 +267,7 @@ PATCH /admin/settings/operations
 - explain AUTO vs authorized MANUAL behavior;
 - block funding for unsupported execution engines;
 - display multiple simultaneous ACTIVE subscriptions independently;
-- retain historical policy snapshots on existing subscription records;
-- any funding-source wording for new package purchase/activation must identify **Total Wallet only**, never Main / Deposit or another component wallet as spendable source.
+- retain historical policy snapshots on existing subscription records.
 
 ### ADMIN
 
@@ -334,11 +313,7 @@ GREEN through combined backend + frontend testing:
 - root milestone verification;
 - unstaged and staged diff checks.
 
-The historical 2026-08-27 acceptance above proved the earlier MAIN-funded implementation and is **not** proof of the TOTAL-WALLET-01 funding revision.
-
-TOTAL-WALLET-01 requires fresh local API/browser/SQL acceptance proving that package activation reduces Total Wallet only and leaves all four component balances unchanged before PR/merge.
-
-OPS-01 timezone-source behavior added on 2026-08-28 also requires fresh local activation acceptance before the current combined feature is eligible for merge; historical evidence is not used as proof of either newer behavior.
+OPS-01 timezone-source behavior added on 2026-08-28 requires fresh local activation acceptance before the current combined RWD/OPS feature is eligible for merge; the historical SUB-02 evidence above is not used as proof of that new behavior.
 
 ## Explicitly deferred
 
@@ -357,10 +332,10 @@ SUB-02 does not implement:
 - PAYMENT_SUBMITTED execution engine;
 - RULE_BASED execution engine.
 
-Later milestones must consume immutable SUB-02 records and WAL-01 / TOTAL-WALLET-01 financial events rather than rewrite package/payment history.
+Later milestones must consume immutable SUB-02 records and WAL-01 ledger events rather than rewrite package/payment history.
 
 ## Delivery state
 
 Historical SUB-02 implementation/local acceptance was completed on `feature/package-subscription-activation`.
 
-The current feature branch adds the TOTAL-WALLET-01 package-funding revision and must pass fresh local Postman/API, browser/UI, and SQL/ledger acceptance before merge to `main`.
+The current RWD/OPS feature branch adds the OPS-01 timezone precedence described above and must pass fresh local API/browser acceptance before merge to `main`.

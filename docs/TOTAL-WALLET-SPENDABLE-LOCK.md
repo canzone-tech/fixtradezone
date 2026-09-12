@@ -1,139 +1,105 @@
-# TOTAL-WALLET-01 — Authoritative Spendable Balance Lock
+# TOTAL-WALLET-01 — Payout Spendable Balance Lock
 
-Status: **LOCKED**
+Status: **IMPLEMENTED / LOCAL ACCEPTANCE IN PROGRESS**.
 
-## Business invariant
+## Final business lock
 
-`Total Wallet` is the USER's authoritative spendable balance.
+Total Wallet is the authoritative spendable balance for **USER payouts only**.
 
-The existing component balances remain independent source/accounting balances:
+```text
+Payout           → Total Wallet ONLY
+Package Purchase → original Deposit / TXID flow
+```
 
-- `MAIN` / Main / Deposit
+Package purchase is not a direct Total Wallet purchase path. The existing package flow remains:
+
+```text
+Published package plan/item
+→ USER creates the package-specific deposit
+→ USER submits the public network TXID
+→ authorized deposit review approves the payment
+→ approved-deposit accounting credits USER Main / Deposit
+→ SUB-02 package activation consumes the approved package principal
+```
+
+## Payout accounting
+
+For a new payout request, the only USER spend source is `TOTAL_WALLET`.
+
+The four component balances retain their accounting/classification meaning:
+
+- `MAIN`
 - `PACKAGE_EARNINGS`
 - `REFERRAL_COMMISSION`
 - `REWARDS`
 
-Neither payout nor package purchase/activation debits or rewrites any of those four component balances.
+A payout reserve/release must not rewrite those four component balances.
 
-The only spendable source for both operations is `Total Wallet`.
+Current Total Wallet value is derived from the four USER component balances plus immutable Total-Wallet-only adjustment events.
 
 Example:
 
 ```text
-Before spend
-Main / Deposit       10
-Package Earnings      4
-Referral Commission   3
-Rewards               2
-Total Wallet          19
+Before payout:
+Main / Deposit        10
+Package Earnings       4
+Referral Commission    3
+Rewards                2
+Total Wallet           19
 
-Payout reserve        12
-
-After payout
-Main / Deposit       10
-Package Earnings      4
-Referral Commission   3
-Rewards               2
-Total Wallet           7
+Reserve payout 12:
+Main / Deposit        10   unchanged
+Package Earnings       4   unchanged
+Referral Commission    3   unchanged
+Rewards                2   unchanged
+Total Wallet            7
 ```
 
-If a package purchase of 5 follows:
+A rejected/cancelled payout restores the corresponding Total Wallet reserve exactly once. A completed payout does not restore it.
+
+## Package purchase remains deposit-backed
+
+TOTAL-WALLET-01 does not replace the established package payment/activation chain.
+
+Approved-deposit accounting first posts:
 
 ```text
-After package purchase
-Main / Deposit       10
-Package Earnings      4
-Referral Commission   3
-Rewards               2
-Total Wallet           2
+DEBIT   SYSTEM:DEPOSIT_CLEARING:<currency>
+CREDIT  USER:<userId>:MAIN:<currency>
 ```
 
-## Authoritative projection
-
-`Total Wallet` is not a fifth USER source ledger bucket.
-
-Its current spendable value is the live source-balance sum plus immutable Total-Wallet-only adjustments:
+Package activation then posts the exact approved package principal:
 
 ```text
-Total Wallet
-= MAIN
-+ PACKAGE_EARNINGS
-+ REFERRAL_COMMISSION
-+ REWARDS
-+ Total-Wallet-only CREDIT events
-- Total-Wallet-only DEBIT events
+DEBIT   USER:<userId>:MAIN:<currency>
+CREDIT  SYSTEM:PACKAGE_PRINCIPAL:<currency>
 ```
 
-The database exposes this read model through `user_total_wallet_balances` and stores the spend/release adjustments in `user_total_wallet_events`.
+The package subscription retains its immutable `sourceDepositId` and `sourceDepositAccountingTransactionId` lineage. There is no USER-facing direct package-purchase endpoint funded from Total Wallet.
 
-This design is intentionally **trigger-free**. It does not require MySQL `SUPER`, stored-function privileges, or `log_bin_trust_function_creators`. A normal component credit automatically changes Total Wallet because the projection reads the current component balances directly; it does not need a second mirrored Total Wallet credit.
+## Migration correction boundary
 
-## Package funding invariant
+Migration `0039_total_wallet_spendable_balance` introduced the payout Total Wallet projection and payout policy support. Migration `0040_total_wallet_package_purchase` was applied during pre-acceptance work but represented an incorrect package-purchase interpretation.
 
-Package purchase/activation is funded from `TOTAL_WALLET` only.
+Applied migrations are never rewritten or deleted. `0041_restore_deposit_package_purchase` is the forward-only correction that restores the original deposit-backed package schema and removes the pre-acceptance direct-wallet package-purchase fields.
 
-`MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` are never selected, checked, debited, consumed, or rewritten as package-purchase funding sources.
+If any direct Total-Wallet package row exists, `0041` fails closed on the restored NOT NULL deposit lineage instead of deleting or rewriting financial history.
 
-A successful package activation:
+## Acceptance requirements
 
-1. locks the USER/source-balance accounting boundary and verifies current Total Wallet has at least the required package amount;
-2. posts one immutable Total Wallet `DEBIT` event for that amount;
-3. records a balanced package-principal ledger transaction through the system Total Wallet control account;
-4. leaves all four component balances unchanged.
+Before merge, local evidence must prove:
 
-If authoritative Total Wallet is insufficient, package funding fails closed and no subscription or financial write may partially commit.
+1. payout policy exposes only `Total Wallet` as the new payout source;
+2. a payout reserve decreases Total Wallet by the exact reserved amount;
+3. `MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` remain unchanged by payout reserve/release;
+4. payout overdraw is rejected atomically;
+5. rejected payout restores the reserve exactly once;
+6. package selection still routes to the original Deposit/TXID flow;
+7. package activation still requires approved-deposit accounting and immutable deposit lineage;
+8. package activation still consumes USER Main / Deposit into SYSTEM Package Principal;
+9. no direct `Purchase from Total Wallet` package UI/API remains;
+10. financial ledger/event writes remain balanced, immutable and idempotent.
 
-## Payout posting model
+## History rule
 
-New payout reserve accounting does not debit a component USER ledger account. It:
-
-1. validates available Total Wallet under the same serialized accounting boundary;
-2. posts an immutable Total Wallet `DEBIT` adjustment event;
-3. records the balanced reserve transaction through the system Total Wallet control account.
-
-A rejected payout posts the matching Total Wallet `CREDIT` adjustment and releases the reserve. A completed payout leaves the original reserve debit consumed.
-
-## Source component events
-
-Future source-ledger credits and debits keep their own historical/accounting meaning and are **not duplicated** into `user_total_wallet_events`.
-
-Examples include deposit credits, package earnings, referral commissions, rewards and historical component-ledger lifecycle events. Because Total Wallet reads the live component balances, their economic effect is already included exactly once.
-
-Only economic actions that intentionally change spendable Total Wallet **without changing a component balance** create `user_total_wallet_events`, including:
-
-- new payout reserve (`DEBIT`);
-- payout rejection/release (`CREDIT`);
-- new package purchase/activation (`DEBIT`).
-
-## Historical and migration safety
-
-- Existing component ledger entries remain immutable.
-- Existing package activations retain their historical ledger/accounting records.
-- Existing payout requests retain their historical source-bucket snapshot.
-- Legacy payout requests may finish/reject under their historical accounting path.
-- New package activations after TOTAL-WALLET-01 use Total Wallet only.
-- Production/applied migrations are never rewritten.
-- The pre-acceptance `0039_total_wallet_spendable_balance` migration may be repaired while it is still failed/unreleased; recovery must mark that failed attempt **rolled back**, never applied, before rerunning the corrected forward migration.
-- The corrected `0039` removes only its own partially-created pre-acceptance Total Wallet projection objects before rebuilding them; it does not reset or rewrite existing ledger/history data.
-
-## Payout policy
-
-For new USER payouts, the only configurable source is `TOTAL_WALLET`.
-
-Component payout sources are historical-only and must not be selectable for new payout requests.
-
-## Acceptance proof
-
-Local acceptance must prove all of the following:
-
-1. `user_total_wallet_balances` reports the live source-balance sum plus immutable Total-Wallet-only adjustments.
-2. New payout reserve decreases Total Wallet only.
-3. Component balances are unchanged by payout reserve, rejection, and completion.
-4. Rejection restores exactly the reserved Total Wallet amount.
-5. Payout cannot reserve more than Total Wallet.
-6. Package purchase/activation decreases Total Wallet only.
-7. `MAIN`, `PACKAGE_EARNINGS`, `REFERRAL_COMMISSION`, and `REWARDS` remain unchanged by package purchase.
-8. Package activation fails atomically when Total Wallet is insufficient.
-9. Double-spend between payout reserve and package funding is rejected atomically.
-10. Ledger transactions remain balanced and Total Wallet adjustment events are immutable/idempotent.
-11. Migration deploy succeeds with MySQL binary logging enabled and without granting `SUPER` or changing global trust settings.
+Legacy payout source snapshots and all existing package/deposit/ledger history remain immutable. This correction changes only the forward behavior after the correction boundary.

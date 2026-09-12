@@ -33,14 +33,14 @@ function activationPolicyCopy(trigger: string, available: boolean) {
     return {
       headline: "AUTHORIZED MANUAL ACTIVATION",
       detail:
-        "Package funding is backed by Total Wallet and follows the published manual activation policy.",
+        "After payment approval and accounting, an authorized administrator completes package activation.",
     };
   }
 
   return {
-    headline: "TOTAL WALLET PURCHASE",
+    headline: "AUTO ACTIVATION ON APPROVAL",
     detail:
-      "A valid purchase is funded directly from Total Wallet and activates the package exactly once.",
+      "Approved and accounted payment activates the purchased package exactly once.",
   };
 }
 
@@ -175,9 +175,7 @@ export default function UserPackagesClient() {
             <p>
               Each package publishes an investment range and duration. Your
               exact selected amount is snapshotted as that package&apos;s principal
-              and each active package operates independently. Package purchase
-              spends Total Wallet only; Main / Deposit, Package Earnings,
-              Referral Commission and Rewards are not debited by the purchase.
+              and each active package operates independently.
             </p>
           </div>
 
@@ -311,7 +309,7 @@ export default function UserPackagesClient() {
                       {item.availability !== "AVAILABLE"
                         ? "This package cannot accept a new activation under the current plan."
                         : catalogue.activationAvailable
-                          ? `${activationPolicy?.detail} Your exact investment is validated against this package range. Total Wallet is the only package funding source.`
+                          ? `${activationPolicy?.detail} Your exact investment is validated against this package range.`
                           : "Funding is disabled until this plan's configured activation engine is available."}
                     </small>
                   </span>
@@ -320,10 +318,10 @@ export default function UserPackagesClient() {
                 {item.availability === "AVAILABLE" &&
                 catalogue.activationAvailable ? (
                   <Link
-                    href={`/user/packages/purchase/${encodeURIComponent(item.id)}`}
+                    href={`/user/deposits/${encodeURIComponent(item.id)}`}
                     className={styles.depositLink}
                   >
-                    Purchase from Total Wallet <i className="iconoir-arrow-right" />
+                    Choose Investment <i className="iconoir-arrow-right" />
                   </Link>
                 ) : null}
               </article>
@@ -343,9 +341,7 @@ export default function UserPackagesClient() {
                 come directly from one effective published plan version. Money
                 remains exact decimal data. Each activation snapshots its actual
                 selected principal and source package terms so later plan changes
-                never rewrite history. Total Wallet is the authoritative
-                spendable source for package purchase; component wallet balances
-                remain accounting categories and are unchanged by the purchase.
+                never rewrite history.
               </p>
             </div>
           </section>

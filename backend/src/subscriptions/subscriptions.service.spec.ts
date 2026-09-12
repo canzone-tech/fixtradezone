@@ -23,9 +23,6 @@ interface AuditCreateCall {
       currency: string;
       settlementTimezone: string;
       timezoneSource: string;
-      fundingSource: string;
-      totalWalletEventKey: string;
-      componentBalancesChanged: boolean;
       referralCommissionApplied: boolean;
       rewardsApplied: boolean;
     };
@@ -268,15 +265,15 @@ describe('SubscriptionsService', () => {
     expect(transaction.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it('creates balanced funding from Total Wallet only and snapshots the ranged investment', async () => {
-    const totalWalletControlAccount = {
+  it('creates balanced funding from the exact ranged investment and snapshots duration', async () => {
+    const mainAccount = {
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      accountKey: 'SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:USDT',
-      ownerType: 'SYSTEM',
-      ownerUserId: null,
-      bucket: 'PAYOUT_TOTAL_WALLET_CONTROL',
+      accountKey: `USER:${USER_ID}:MAIN:USDT`,
+      ownerType: 'USER',
+      ownerUserId: USER_ID,
+      bucket: 'MAIN',
       currency: 'USDT',
-      normalSide: 'DEBIT',
+      normalSide: 'CREDIT',
     };
     const principalAccount = {
       id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -307,9 +304,8 @@ describe('SubscriptionsService', () => {
         },
       ])
       .mockResolvedValueOnce([{ total: 0 }])
-      .mockResolvedValueOnce([totalWalletControlAccount])
+      .mockResolvedValueOnce([mainAccount])
       .mockResolvedValueOnce([principalAccount])
-      .mockResolvedValueOnce([{ balance: new Prisma.Decimal('20') }])
       .mockResolvedValueOnce([
         { side: 'DEBIT', amount: new Prisma.Decimal('12.5') },
         { side: 'CREDIT', amount: new Prisma.Decimal('12.5') },
@@ -340,7 +336,6 @@ describe('SubscriptionsService', () => {
 
     expect(result).toMatchObject({
       created: true,
-      message: 'Package activated and principal funded from Total Wallet.',
       subscription: {
         sourceDepositId: DEPOSIT_ID,
         packageCode: 'NEURAL_SCOUT',
@@ -358,7 +353,7 @@ describe('SubscriptionsService', () => {
         status: 'ACTIVE',
       },
     });
-    expect(transaction.$executeRaw).toHaveBeenCalledTimes(11);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(8);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
 
     const auditCall = auditCalls.at(0);
@@ -375,11 +370,6 @@ describe('SubscriptionsService', () => {
     expect(auditCall.data.metadata.timezoneSource).toBe(
       'SYSTEM_OPERATIONS_CONFIG',
     );
-    expect(auditCall.data.metadata.fundingSource).toBe('TOTAL_WALLET');
-    expect(auditCall.data.metadata.totalWalletEventKey).toBe(
-      `DEPOSIT:${DEPOSIT_ID}:PACKAGE_ACTIVATION:TOTAL_WALLET`,
-    );
-    expect(auditCall.data.metadata.componentBalancesChanged).toBe(false);
     expect(auditCall.data.metadata.referralCommissionApplied).toBe(false);
     expect(auditCall.data.metadata.rewardsApplied).toBe(false);
   });

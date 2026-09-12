@@ -1,15 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Matches,
-  Max,
-  Min,
-} from 'class-validator';
-
-const MONEY_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/;
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SubscriptionPageQueryDto {
   @IsOptional()
@@ -34,17 +24,4 @@ export class AdminSubscriptionQueryDto extends SubscriptionPageQueryDto {
   @IsOptional()
   @IsString()
   status?: string;
-}
-
-export class PurchasePackageFromTotalWalletDto {
-  // Retried requests must reuse the same key so package funding stays idempotent.
-  @IsUUID()
-  requestKey!: string;
-
-  @IsUUID()
-  packagePlanItemId!: string;
-
-  @IsString()
-  @Matches(MONEY_PATTERN)
-  amount!: string;
 }
