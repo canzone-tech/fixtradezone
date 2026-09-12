@@ -11,7 +11,12 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
-import { CreatePayoutDto, PayoutPageQueryDto } from './dto/payout.dto';
+import { TotalWalletPackagePurchaseService } from '../subscriptions/total-wallet-package-purchase.service';
+import {
+  CreatePayoutDto,
+  PayoutPageQueryDto,
+  ReinvestPayoutDto,
+} from './dto/payout.dto';
 import { PayoutPolicyService } from './payout-policy.service';
 import { PayoutsService } from './payouts.service';
 
@@ -20,6 +25,7 @@ export class PayoutsController {
   constructor(
     private readonly payoutsService: PayoutsService,
     private readonly payoutPolicyService: PayoutPolicyService,
+    private readonly totalWalletPackagePurchaseService: TotalWalletPackagePurchaseService,
   ) {}
 
   @Get('policy')
@@ -35,6 +41,20 @@ export class PayoutsController {
     @Query() query: PayoutPageQueryDto,
   ) {
     return this.payoutsService.getMyPayouts(actor.id, query);
+  }
+
+  @Post('reinvest')
+  @Header('Cache-Control', 'no-store')
+  reinvest(
+    @Body() dto: ReinvestPayoutDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.totalWalletPackagePurchaseService.purchase(
+      dto,
+      actor,
+      getRequestContext(request),
+    );
   }
 
   @Post()
