@@ -44,6 +44,18 @@ export class CreatePayoutDto {
   destinationAddress!: string;
 }
 
+export class ReinvestPayoutDto {
+  @IsUUID()
+  requestKey!: string;
+
+  @IsUUID()
+  packagePlanItemId!: string;
+
+  @IsString()
+  @Matches(MONEY_PATTERN)
+  amount!: string;
+}
+
 export class PayoutPageQueryDto {
   @Type(() => Number)
   @IsInt()
