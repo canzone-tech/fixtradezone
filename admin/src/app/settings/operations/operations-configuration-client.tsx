@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   notifyPlatformTimezoneChanged,
@@ -8,30 +8,14 @@ import {
 } from "@/components/platform/platform-time-provider";
 import FlashMessage from "@/components/ui/flash-message";
 import type { AdminUser } from "@/lib/auth";
-import { formatPlatformDateTime, isValidTimeZone } from "@/lib/platform-time";
+import {
+  DEFAULT_PLATFORM_TIMEZONE,
+  formatPlatformDateTime,
+} from "@/lib/platform-time";
 import PlatformSettingsNav from "../platform-settings-nav";
 import styles from "../platform-configuration.module.css";
 
 type OperationsMode = "AUTOMATIC" | "CONTROLLED_MANUAL";
-
-type IntlWithSupportedValues = typeof Intl & {
-  supportedValuesOf?: (key: "timeZone") => string[];
-};
-
-const FALLBACK_TIMEZONES = [
-  "UTC",
-  "Asia/Kolkata",
-  "Asia/Dubai",
-  "Asia/Singapore",
-  "Asia/Tokyo",
-  "Europe/London",
-  "Europe/Paris",
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "Australia/Sydney",
-];
 
 interface OperationsConfiguration {
   platformTimezone: string;
@@ -50,41 +34,16 @@ function apiErrorMessage(payload: ApiError, fallback: string): string {
   return fallback;
 }
 
-function supportedTimeZones(current: string): string[] {
-  const runtimeIntl = Intl as IntlWithSupportedValues;
-  const runtimeZones = runtimeIntl.supportedValuesOf?.("timeZone") ?? [];
-  const values = runtimeZones.length > 0 ? runtimeZones : FALLBACK_TIMEZONES;
-
-  return Array.from(new Set(["Asia/Kolkata", "UTC", current, ...values]))
-    .filter((timeZone) => isValidTimeZone(timeZone))
-    .sort((left, right) => left.localeCompare(right));
-}
-
-function timeZoneLabel(timeZone: string): string {
-  if (timeZone === "Asia/Kolkata") {
-    return "Asia/Kolkata — India Standard Time (IST)";
-  }
-  if (timeZone === "UTC") {
-    return "UTC — Coordinated Universal Time";
-  }
-  return timeZone;
-}
-
 export default function OperationsConfigurationClient() {
   const router = useRouter();
   const { timeZone } = usePlatformTime();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<OperationsConfiguration | null>(null);
-  const [platformTimezone, setPlatformTimezone] = useState("Asia/Kolkata");
   const [operationsMode, setOperationsMode] =
     useState<OperationsMode>("AUTOMATIC");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const timeZones = useMemo(
-    () => supportedTimeZones(platformTimezone),
-    [platformTimezone],
-  );
 
   useEffect(() => {
     let mounted = true;
@@ -133,7 +92,6 @@ export default function OperationsConfigurationClient() {
         if (!mounted) return;
         const config = payload as OperationsConfiguration;
         setSaved(config);
-        setPlatformTimezone(config.platformTimezone);
         setOperationsMode(config.operationsMode);
       } catch (caught) {
         if (mounted) {
@@ -157,20 +115,14 @@ export default function OperationsConfigurationClient() {
   async function save() {
     setError(null);
     setSuccess(null);
-
-    const timezone = platformTimezone.trim();
-    if (!isValidTimeZone(timezone)) {
-      setError("Select a valid platform timezone from the list.");
-      return;
-    }
-
     setSaving(true);
+
     try {
       const response = await fetch("/api/admin/settings/operations", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          platformTimezone: timezone,
+          platformTimezone: DEFAULT_PLATFORM_TIMEZONE,
           operationsMode,
         }),
       });
@@ -196,7 +148,6 @@ export default function OperationsConfigurationClient() {
 
       const config = payload as OperationsConfiguration;
       setSaved(config);
-      setPlatformTimezone(config.platformTimezone);
       setOperationsMode(config.operationsMode);
       setSuccess(config.message ?? "Operations configuration updated.");
       notifyPlatformTimezoneChanged();
@@ -220,7 +171,7 @@ export default function OperationsConfigurationClient() {
           </span>
           <div>
             <strong>Loading operations configuration</strong>
-            <p>Reading the single automation mode and platform timezone.</p>
+            <p>Reading the automation mode and UTC platform-time standard.</p>
           </div>
         </div>
       </section>
@@ -279,33 +230,23 @@ export default function OperationsConfigurationClient() {
             <div>
               <h3>Platform timezone</h3>
               <p>
-                Admin and USER screens render operational timestamps using this
-                timezone. Financial records continue storing absolute timestamps
-                and immutable settlement snapshots for auditability.
+                FixTradeZone operational timestamps and future platform
+                scheduling use UTC. Historical financial and trading timezone
+                snapshots remain immutable for auditability.
               </p>
             </div>
           </div>
 
           <label className={styles.field}>
             <span>Platform timezone</span>
-            <select
-              className={styles.select}
-              value={platformTimezone}
-              onChange={(event) => {
-                setPlatformTimezone(event.target.value);
-                setError(null);
-                setSuccess(null);
-              }}
-            >
-              {timeZones.map((zone) => (
-                <option key={zone} value={zone}>
-                  {timeZoneLabel(zone)}
-                </option>
-              ))}
-            </select>
+            <input
+              className={styles.input}
+              value="UTC — Coordinated Universal Time"
+              readOnly
+              aria-readonly="true"
+            />
             <small className={styles.fieldHelp}>
-              Choose from supported IANA timezones. Recommended: Asia/Kolkata —
-              India Standard Time (IST). Current display setting: {timeZone}.
+              UTC is the locked platform standard. Current display setting: {timeZone}.
             </small>
           </label>
         </article>
@@ -368,8 +309,8 @@ export default function OperationsConfigurationClient() {
               Manual package plans remain manual even in Automatic mode. Daily
               reward is not paid immediately on deposit approval. Failed
               downstream stages stay recoverable without undoing a successful
-              prior stage. Existing financial history is never rewritten by a
-              settings change.
+              prior stage. Existing financial and trading history is never
+              rewritten by a settings change.
             </div>
           </div>
         </article>
@@ -378,9 +319,7 @@ export default function OperationsConfigurationClient() {
       <footer className={styles.footer}>
         <div>
           <strong>SUPER_ADMIN only · audited</strong>
-          <p>
-            Last update: {formatPlatformDateTime(saved?.updatedAt, timeZone)}
-          </p>
+          <p>Last update: {formatPlatformDateTime(saved?.updatedAt)}</p>
         </div>
         <button
           type="button"
