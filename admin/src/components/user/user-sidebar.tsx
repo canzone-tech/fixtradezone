@@ -267,7 +267,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 onClick={close}
               >
                 <i className="iconoir-coins-swap" />
-                <span>Payouts</span>
+                <span>Withdrawal</span>
               </Link>
             ) : null}
           </div>
