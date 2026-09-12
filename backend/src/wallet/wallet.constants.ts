@@ -65,7 +65,9 @@ export function packageActivationSourceKey(depositId: string): string {
   return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION`;
 }
 
-export function packageActivationTotalWalletEventKey(depositId: string): string {
+export function packageActivationTotalWalletEventKey(
+  depositId: string,
+): string {
   return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION:TOTAL_WALLET`;
 }
 
