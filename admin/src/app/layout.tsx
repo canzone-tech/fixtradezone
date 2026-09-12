@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import PlatformTimeProvider from "@/components/platform/platform-time-provider";
 import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
@@ -41,6 +42,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body id="body">
+        <Script id="ftz-pwa-install-prompt-capture" strategy="beforeInteractive">
+          {`window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__ftzPwaInstallPrompt=event;});window.addEventListener("appinstalled",function(){window.__ftzPwaInstallPrompt=null;});`}
+        </Script>
         <AppPwa />
         <PlatformTimeProvider>{children}</PlatformTimeProvider>
       </body>
