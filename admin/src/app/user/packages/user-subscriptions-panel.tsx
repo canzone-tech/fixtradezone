@@ -8,7 +8,7 @@ import styles from "./user-subscriptions-panel.module.css";
 
 interface Subscription {
   id: string;
-  sourceDepositId: string;
+  sourceDepositId: string | null;
   packageCode: string;
   packageDisplayName: string;
   price: string;
@@ -40,7 +40,6 @@ function dateLabel(value: string) {
   return formatPlatformDateTime(value);
 }
 
-// Keep initial loading separate from manual refresh so React effects stay passive.
 async function fetchSubscriptions(): Promise<ResponsePayload> {
   const response = await fetch("/api/user/subscriptions?limit=100", {
     cache: "no-store",
@@ -121,8 +120,8 @@ export default function UserSubscriptionsPanel() {
           <span>SUB-02 / MY PACKAGES</span>
           <h3>My Active Packages</h3>
           <p>
-            Activated package principal is held in package accounting and is no
-            longer part of freely available Main / Deposit balance.
+            Package purchase spends authoritative Total Wallet only. Component
+            balances remain unchanged and continue to show their accounting categories.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>
@@ -136,8 +135,8 @@ export default function UserSubscriptionsPanel() {
           <div>
             <strong>No active packages</strong>
             <span>
-              Package activation follows the exact policy snapshot of the
-              published plan used for the payment.
+              Choose an available package and fund the purchase directly from
+              Total Wallet.
             </span>
           </div>
         </div>
@@ -217,7 +216,7 @@ export default function UserSubscriptionsPanel() {
                 </div>
               </dl>
               <small className={styles.source}>
-                Source deposit: {item.sourceDepositId}
+                Funding source: {item.sourceDepositId ? `Deposit ${item.sourceDepositId}` : "Total Wallet"}
               </small>
             </div>
           </article>
