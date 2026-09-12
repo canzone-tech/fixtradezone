@@ -82,10 +82,10 @@ async function fetchWorkspace(): Promise<{
 
   const payouts = await checkedAdminJson<
     AdminPayoutsResponse & ApiMessagePayload
-  >(payoutsResponse, "Could not load payout requests.");
+  >(payoutsResponse, "Could not load withdrawal requests.");
   const policies = await checkedAdminJson<
     PayoutPoliciesResponse & ApiMessagePayload
-  >(policiesResponse, "Could not load payout policies.");
+  >(policiesResponse, "Could not load withdrawal policies.");
   const subscriptions = await checkedAdminJson<AdminSubscriptionsResponse>(
     subscriptionsResponse,
     "Could not load reinvestment history.",
@@ -171,7 +171,7 @@ export default function PayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not load payout workspace.",
+          : "Could not load withdrawal workspace.",
       );
     } finally {
       setLoading(false);
@@ -218,7 +218,7 @@ export default function PayoutsClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Could not load payout workspace.",
+            : "Could not load withdrawal workspace.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -273,8 +273,8 @@ export default function PayoutsClient() {
     await runMutation(
       "/api/admin/payout-policies",
       { method: "POST" },
-      "Could not create payout policy draft.",
-      "Fail-closed payout policy draft created.",
+      "Could not create withdrawal policy draft.",
+      "Fail-closed withdrawal policy draft created.",
     );
   }
 
@@ -299,8 +299,8 @@ export default function PayoutsClient() {
           enabledBuckets,
         }),
       },
-      "Could not save payout policy draft.",
-      "Payout policy draft saved.",
+      "Could not save withdrawal policy draft.",
+      "Withdrawal policy draft saved.",
     );
   }
 
@@ -324,13 +324,16 @@ export default function PayoutsClient() {
           reason: reason.trim() || undefined,
         }),
       },
-      "Could not publish payout policy.",
-      "Payout policy published.",
+      "Could not publish withdrawal policy.",
+      "Withdrawal policy published.",
     );
   }
 
   async function approve(payout: AdminPayoutRequest) {
-    const note = window.prompt("Optional approval note:", "Approved for payout");
+    const note = window.prompt(
+      "Optional approval note:",
+      "Approved for withdrawal",
+    );
     if (note === null) return;
 
     await runMutation(
@@ -340,15 +343,15 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: note.trim() || undefined }),
       },
-      "Could not approve payout.",
-      `Payout ${payout.id} approved.`,
+      "Could not approve withdrawal.",
+      `Withdrawal ${payout.id} approved.`,
     );
   }
 
   async function rejectPayout(payout: AdminPayoutRequest) {
     const note = window.prompt(
       "Rejection note (reserved funds will be released):",
-      "Rejected by payout operations",
+      "Rejected by withdrawal operations",
     );
     if (note === null) return;
 
@@ -359,8 +362,8 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: note.trim() || undefined }),
       },
-      "Could not reject payout.",
-      `Payout ${payout.id} rejected and reserve released.`,
+      "Could not reject withdrawal.",
+      `Withdrawal ${payout.id} rejected and reserve released.`,
     );
   }
 
@@ -377,22 +380,22 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txid: txid.trim() }),
       },
-      "Could not record payout transaction ID.",
-      `External TXID recorded for payout ${payout.id}.`,
+      "Could not record withdrawal transaction ID.",
+      `External TXID recorded for withdrawal ${payout.id}.`,
     );
   }
 
   async function complete(payout: AdminPayoutRequest) {
     const confirmed = window.confirm(
-      `Mark payout ${payout.id} COMPLETED and settle its reserved accounting value?\n\nThis does not perform blockchain signing. Confirm only after payout operations has independently completed the external transfer.`,
+      `Mark withdrawal ${payout.id} COMPLETED and settle its reserved accounting value?\n\nThis does not perform blockchain signing. Confirm only after withdrawal operations has independently completed the external transfer.`,
     );
     if (!confirmed) return;
 
     await runMutation(
       `/api/admin/payouts/${encodeURIComponent(payout.id)}/complete`,
       { method: "POST" },
-      "Could not complete payout.",
-      `Payout ${payout.id} completed and reserve settled.`,
+      "Could not complete withdrawal.",
+      `Withdrawal ${payout.id} completed and reserve settled.`,
     );
   }
 
@@ -418,11 +421,11 @@ export default function PayoutsClient() {
 
       <section className={styles.hero}>
         <p className={styles.eyebrow}>PAYOUT-01 / OPERATIONS</p>
-        <h1>Withdrawal & Payouts</h1>
+        <h1>Withdrawal</h1>
         <p>
-          Configure versioned payout policy, review reserve-backed requests,
+          Configure versioned withdrawal policy, review reserve-backed requests,
           record the public external transaction reference, and settle accounting
-          only after manual payout operations confirms completion.
+          only after manual withdrawal operations confirms completion.
         </p>
       </section>
 
@@ -436,7 +439,7 @@ export default function PayoutsClient() {
         <div className={styles.cardHeader}>
           <div>
             <p className={styles.eyebrow}>Versioned Configuration</p>
-            <h2>Payout policy</h2>
+            <h2>Withdrawal policy</h2>
           </div>
           <div className={styles.actions}>
             {!draft ? (
@@ -524,7 +527,7 @@ export default function PayoutsClient() {
                     onChange={(event) => setRequestsEnabled(event.target.checked)}
                     disabled={busy}
                   />
-                  Enable USER payout requests
+                  Enable USER withdrawal requests
                 </label>
 
                 <div className={styles.field}>
@@ -618,7 +621,7 @@ export default function PayoutsClient() {
         ) : (
           <div className={styles.notice}>
             No editable draft exists. Published policies remain immutable; create
-            a new version to change payout terms.
+            a new version to change withdrawal terms.
           </div>
         )}
 
@@ -664,15 +667,15 @@ export default function PayoutsClient() {
         <div className={styles.cardHeader}>
           <div>
             <p className={styles.eyebrow}>Reserve-backed Queue</p>
-            <h2>Payout requests</h2>
+            <h2>Withdrawal requests</h2>
           </div>
           <span className={styles.badge}>{payouts?.total ?? 0} total</span>
         </div>
 
         {loading ? (
-          <div className={styles.empty}>Loading payout requests…</div>
+          <div className={styles.empty}>Loading withdrawal requests…</div>
         ) : payoutRows.length === 0 ? (
-          <div className={styles.empty}>No payout requests found.</div>
+          <div className={styles.empty}>No withdrawal requests found.</div>
         ) : (
           <div className={styles.list}>
             {payoutRows.map((payout) => {
