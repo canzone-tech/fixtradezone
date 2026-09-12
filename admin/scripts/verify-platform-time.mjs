@@ -12,6 +12,13 @@ const platformTimeLibrary = path.normalize(
 const sourceExtensions = new Set([".ts", ".tsx"]);
 const violations = [];
 
+const platformTimeSource = fs.readFileSync(platformTimeLibrary, "utf8");
+if (!/DEFAULT_PLATFORM_TIMEZONE\s*=\s*["']UTC["']/.test(platformTimeSource)) {
+  violations.push(
+    "src/lib/platform-time.ts FixTradeZone operational platform timezone must remain locked to UTC.",
+  );
+}
+
 function walk(directory) {
   const entries = fs.readdirSync(directory, { withFileTypes: true });
   const files = [];
@@ -113,9 +120,9 @@ if (violations.length > 0) {
   console.error("Platform-time verification failed:\n");
   for (const violation of violations) console.error(`- ${violation}`);
   console.error(
-    "\nOperational date/time displays must follow the configured platform timezone. Financial settlement timezone logic remains separate.",
+    "\nOperational date/time displays must follow the UTC platform-time standard. Immutable financial/trading timezone snapshots remain separate.",
   );
   process.exit(1);
 }
 
-console.log("Platform-time verification passed.");
+console.log("Platform-time verification passed: UTC standard locked.");
