@@ -241,6 +241,7 @@ export default function UserPayoutsClient() {
   const selectedPackage = useMemo(
     () =>
       eligiblePackages.find((item) => item.id === selectedPackagePlanItemId) ??
+      eligiblePackages[0] ??
       null,
     [eligiblePackages, selectedPackagePlanItemId],
   );
@@ -255,17 +256,6 @@ export default function UserPayoutsClient() {
       amountUnits <= availableUnits
     );
   }, [activeWallet?.totalWallet, amount]);
-
-  useEffect(() => {
-    if (walletAction !== "REINVESTMENT") return;
-    if (
-      selectedPackagePlanItemId &&
-      eligiblePackages.some((item) => item.id === selectedPackagePlanItemId)
-    ) {
-      return;
-    }
-    setSelectedPackagePlanItemId(eligiblePackages[0]?.id ?? "");
-  }, [eligiblePackages, selectedPackagePlanItemId, walletAction]);
 
   async function reload() {
     setLoading(true);
@@ -627,7 +617,9 @@ export default function UserPayoutsClient() {
             <div>
               <p className={styles.eyebrow}>New Total Wallet Action</p>
               <h2>
-                {walletAction === "PAYOUT" ? "Request payout" : "Reinvest into package"}
+                {walletAction === "PAYOUT"
+                  ? "Request payout"
+                  : "Reinvest into package"}
               </h2>
             </div>
           </div>
@@ -648,7 +640,8 @@ export default function UserPayoutsClient() {
                 <option value="REINVESTMENT">Reinvestment</option>
               </select>
               <span className={styles.help}>
-                Payout sends funds externally. Reinvestment activates an eligible package from Total Wallet.
+                Payout sends funds externally. Reinvestment activates an eligible
+                package from Total Wallet.
               </span>
             </div>
 
@@ -689,14 +682,17 @@ export default function UserPayoutsClient() {
                   disabled
                 />
                 <span className={styles.help}>
-                  Available for reinvestment: {compactDecimal(activeWallet?.totalWallet ?? "0")} {walletCurrency}
+                  Available for reinvestment:{" "}
+                  {compactDecimal(activeWallet?.totalWallet ?? "0")} {walletCurrency}
                 </span>
               </div>
             )}
 
             <div className={styles.field}>
               <label htmlFor="payout-amount">
-                {walletAction === "PAYOUT" ? "Gross amount" : "Reinvestment amount"}
+                {walletAction === "PAYOUT"
+                  ? "Gross amount"
+                  : "Reinvestment amount"}
               </label>
               <input
                 id="payout-amount"
@@ -705,11 +701,14 @@ export default function UserPayoutsClient() {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="100"
-                disabled={busy || (walletAction === "PAYOUT" && !requestsEnabled)}
+                disabled={
+                  busy || (walletAction === "PAYOUT" && !requestsEnabled)
+                }
               />
               {walletAction === "REINVESTMENT" ? (
                 <span className={styles.help}>
-                  Package choices below are filtered automatically by this exact amount.
+                  Package choices below are filtered automatically by this exact
+                  amount.
                 </span>
               ) : null}
             </div>
@@ -720,7 +719,7 @@ export default function UserPayoutsClient() {
                 <select
                   id="reinvestment-package"
                   className={styles.select}
-                  value={selectedPackagePlanItemId}
+                  value={selectedPackage?.id ?? ""}
                   onChange={(event) =>
                     setSelectedPackagePlanItemId(event.target.value)
                   }
@@ -735,13 +734,15 @@ export default function UserPayoutsClient() {
                   ) : (
                     eligiblePackages.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.displayName} · {investmentRangeLabel(item)} {item.currency} · {item.durationDays} days
+                        {item.displayName} · {investmentRangeLabel(item)}{" "}
+                        {item.currency} · {item.durationDays} days
                       </option>
                     ))
                   )}
                 </select>
                 <span className={styles.help}>
-                  Only AVAILABLE packages whose published investment range contains the entered amount are shown.
+                  Only AVAILABLE packages whose published investment range
+                  contains the entered amount are shown.
                 </span>
               </div>
             ) : null}
@@ -769,7 +770,8 @@ export default function UserPayoutsClient() {
             ) : (
               <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
                 <span className={styles.help}>
-                  Reinvestment uses the full entered amount as package principal. No payout fee, public address, or blockchain transfer is created.
+                  Reinvestment uses the full entered amount as package principal.
+                  No payout fee, public address, or blockchain transfer is created.
                 </span>
               </div>
             )}
@@ -824,7 +826,8 @@ export default function UserPayoutsClient() {
                           {compactPayoutDecimal(payout.grossAmount)} {payout.asset}
                         </strong>
                         <span className={styles.meta}>
-                          {payoutBucketLabel(payout.sourceBucket)} · {payout.networkCode} · {formatPayoutDate(payout.createdAt)}
+                          {payoutBucketLabel(payout.sourceBucket)} ·{" "}
+                          {payout.networkCode} · {formatPayoutDate(payout.createdAt)}
                         </span>
                       </div>
                       <span
@@ -859,14 +862,20 @@ export default function UserPayoutsClient() {
                     </div>
 
                     <p>
-                      Destination: <span className={styles.mono}>{payout.destinationAddress}</span>
+                      Destination:{" "}
+                      <span className={styles.mono}>
+                        {payout.destinationAddress}
+                      </span>
                     </p>
                     {payout.externalTxid ? (
                       <p>
-                        External TXID: <span className={styles.mono}>{payout.externalTxid}</span>
+                        External TXID:{" "}
+                        <span className={styles.mono}>{payout.externalTxid}</span>
                       </p>
                     ) : null}
-                    {payout.reviewNote ? <p>Review note: {payout.reviewNote}</p> : null}
+                    {payout.reviewNote ? (
+                      <p>Review note: {payout.reviewNote}</p>
+                    ) : null}
                   </article>
                 );
               })}
