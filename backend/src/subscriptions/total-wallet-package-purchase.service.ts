@@ -125,7 +125,9 @@ export class TotalWalletPackagePurchaseService {
 
       const requestedAmount = new Prisma.Decimal(dto.amount).toFixed(8);
       if (new Prisma.Decimal(requestedAmount).lte(0)) {
-        throw new ConflictException('Package purchase amount must be positive.');
+        throw new ConflictException(
+          'Package purchase amount must be positive.',
+        );
       }
 
       const existingRows = await transaction.$queryRaw<ExistingPurchaseRow[]>(
@@ -738,7 +740,9 @@ export class TotalWalletPackagePurchaseService {
         AND balance + (${direction} * CAST(${amount} AS DECIMAL(20, 8))) >= 0
     `);
     if (updated !== 1) {
-      throw new ConflictException('Package purchase ledger balance update failed.');
+      throw new ConflictException(
+        'Package purchase ledger balance update failed.',
+      );
     }
   }
 
