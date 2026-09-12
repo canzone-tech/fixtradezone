@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { validate } from 'class-validator';
 import { ReinvestPayoutDto } from './dto/payout.dto';
 
