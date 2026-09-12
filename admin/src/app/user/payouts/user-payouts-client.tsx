@@ -39,6 +39,23 @@ interface UserApiPayload extends ApiMessagePayload {
   redirectTo?: string | null;
 }
 
+interface ReinvestmentSubscription {
+  id: string;
+  sourceDepositId: string | null;
+  fundingLedgerTransactionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  price: string;
+  currency: string;
+  status: string;
+  activatedAt: string;
+  scheduledEndAt: string;
+}
+
+interface UserSubscriptionsResponse extends UserApiPayload {
+  history?: ReinvestmentSubscription[];
+}
+
 type WalletAction = "PAYOUT" | "REINVESTMENT";
 
 class UserPayoutAccessError extends Error {
@@ -146,6 +163,7 @@ async function fetchPayoutWorkspace(): Promise<{
   payouts: UserPayoutsResponse;
   wallet: UserWalletResponse;
   catalogue: PackageCatalogue | null;
+  subscriptions: UserSubscriptionsResponse;
 }> {
   const sessionResponse = await fetch("/api/user/session", {
     cache: "no-store",
@@ -159,13 +177,19 @@ async function fetchPayoutWorkspace(): Promise<{
     throw new Error("USER session is incomplete.");
   }
 
-  const [policyResponse, payoutsResponse, walletResponse, catalogueResponse] =
-    await Promise.all([
-      fetch("/api/user/payouts/policy", { cache: "no-store" }),
-      fetch("/api/user/payouts?limit=50", { cache: "no-store" }),
-      fetch("/api/user/wallet?page=1&limit=50", { cache: "no-store" }),
-      fetch("/api/user/packages", { cache: "no-store" }),
-    ]);
+  const [
+    policyResponse,
+    payoutsResponse,
+    walletResponse,
+    catalogueResponse,
+    subscriptionsResponse,
+  ] = await Promise.all([
+    fetch("/api/user/payouts/policy", { cache: "no-store" }),
+    fetch("/api/user/payouts?limit=50", { cache: "no-store" }),
+    fetch("/api/user/wallet?page=1&limit=50", { cache: "no-store" }),
+    fetch("/api/user/packages", { cache: "no-store" }),
+    fetch("/api/user/subscriptions?limit=100", { cache: "no-store" }),
+  ]);
 
   const policy = await checkedJson<
     CurrentPayoutPolicyResponse & UserApiPayload
@@ -178,6 +202,10 @@ async function fetchPayoutWorkspace(): Promise<{
     walletResponse,
     "Could not load wallet balances.",
   );
+  const subscriptions = await checkedJson<UserSubscriptionsResponse>(
+    subscriptionsResponse,
+    "Could not load reinvestment history.",
+  );
 
   const cataloguePayload = await readJson<PackageCatalogue & UserApiPayload>(
     catalogueResponse,
@@ -185,7 +213,7 @@ async function fetchPayoutWorkspace(): Promise<{
   const catalogue =
     catalogueResponse.ok && cataloguePayload ? cataloguePayload : null;
 
-  return { session, policy, payouts, wallet, catalogue };
+  return { session, policy, payouts, wallet, catalogue, subscriptions };
 }
 
 export default function UserPayoutsClient() {
@@ -195,6 +223,9 @@ export default function UserPayoutsClient() {
   const [payouts, setPayouts] = useState<UserPayoutsResponse | null>(null);
   const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
   const [catalogue, setCatalogue] = useState<PackageCatalogue | null>(null);
+  const [reinvestmentSubscriptions, setReinvestmentSubscriptions] = useState<
+    ReinvestmentSubscription[]
+  >([]);
   const [walletAction, setWalletAction] = useState<WalletAction>("PAYOUT");
   const [sourceBucket, setSourceBucket] =
     useState<PayoutBucket>("TOTAL_WALLET");
@@ -272,6 +303,11 @@ export default function UserPayoutsClient() {
       setPayouts(workspace.payouts);
       setWallet(workspace.wallet);
       setCatalogue(workspace.catalogue);
+      setReinvestmentSubscriptions(
+        (workspace.subscriptions.history ?? []).filter(
+          (item) => item.sourceDepositId === null,
+        ),
+      );
 
       if (
         workspace.policy.enabledBuckets.length > 0 &&
@@ -309,6 +345,11 @@ export default function UserPayoutsClient() {
         setPayouts(workspace.payouts);
         setWallet(workspace.wallet);
         setCatalogue(workspace.catalogue);
+        setReinvestmentSubscriptions(
+          (workspace.subscriptions.history ?? []).filter(
+            (item) => item.sourceDepositId === null,
+          ),
+        );
 
         if (workspace.policy.enabledBuckets.length > 0) {
           setSourceBucket(workspace.policy.enabledBuckets[0]);
@@ -816,8 +857,8 @@ export default function UserPayoutsClient() {
             </button>
           </div>
 
-          {payoutRows.length === 0 ? (
-            <div className={styles.empty}>No payout requests yet.</div>
+          {payoutRows.length === 0 && reinvestmentSubscriptions.length === 0 ? (
+            <div className={styles.empty}>No payout or reinvestment activity yet.</div>
           ) : (
             <div className={styles.list}>
               {payoutRows.map((payout) => {
@@ -883,6 +924,52 @@ export default function UserPayoutsClient() {
                   </article>
                 );
               })}
+
+              {reinvestmentSubscriptions.map((item) => (
+                <article className={styles.row} key={`reinvestment-${item.id}`}>
+                  <div className={styles.rowTop}>
+                    <div>
+                      <strong>
+                        {compactDecimal(item.price)} {item.currency} · {item.packageDisplayName}
+                      </strong>
+                      <span className={styles.meta}>
+                        Total Wallet · {formatPayoutDate(item.activatedAt)}
+                      </span>
+                    </div>
+                    <span className={styles.badge} data-tone="success">
+                      REINVESTMENT
+                    </span>
+                  </div>
+
+                  <div className={styles.metrics}>
+                    <div className={styles.metric}>
+                      <small>Package</small>
+                      <strong>{item.packageCode}</strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Principal</small>
+                      <strong>
+                        {compactDecimal(item.price)} {item.currency}
+                      </strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Status</small>
+                      <strong>{item.status}</strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Scheduled end</small>
+                      <strong>{formatPayoutDate(item.scheduledEndAt)}</strong>
+                    </div>
+                  </div>
+
+                  <p>
+                    Source reinvestment:{" "}
+                    <span className={styles.mono}>
+                      {item.fundingLedgerTransactionId}
+                    </span>
+                  </p>
+                </article>
+              ))}
             </div>
           )}
         </section>
