@@ -73,7 +73,7 @@ export default function UserTopbar({
               }
             : pathname.startsWith("/user/payouts")
               ? {
-                  title: "Payouts",
+                  title: "Withdrawal",
                   subtitle: "Withdrawal requests, fees and settlement history",
                 }
               : pathname.startsWith("/user/referrals")
