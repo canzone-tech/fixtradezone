@@ -1,15 +1,32 @@
-export const PAYOUT_BUCKETS = [
+export const PAYOUT_WALLET_BUCKETS = [
   'MAIN',
   'PACKAGE_EARNINGS',
   'REFERRAL_COMMISSION',
   'REWARDS',
 ] as const;
 
+export type PayoutWalletBucket = (typeof PAYOUT_WALLET_BUCKETS)[number];
+
+export const PAYOUT_BUCKETS = [
+  ...PAYOUT_WALLET_BUCKETS,
+  'TOTAL_WALLET',
+] as const;
+
 export type PayoutBucket = (typeof PAYOUT_BUCKETS)[number];
 
-// Global spending invariant: USER payouts may consume Main / Deposit only.
-// Other wallet buckets remain separately accounted and are never payout sources.
-export const PAYOUT_SPENDABLE_BUCKETS = ['MAIN'] as const;
+// Global payout invariant: every new USER payout consumes the aggregate Total
+// Wallet. The accounting layer records the exact underlying wallet-bucket
+// allocations so history, rejection releases, and settlement remain auditable.
+export const PAYOUT_SPENDABLE_BUCKETS = ['TOTAL_WALLET'] as const;
+
+// MAIN is intentionally consumed last because package purchase/activation is
+// funded exclusively from Main / Deposit.
+export const PAYOUT_TOTAL_WALLET_DRAW_ORDER = [
+  'PACKAGE_EARNINGS',
+  'REFERRAL_COMMISSION',
+  'REWARDS',
+  'MAIN',
+] as const satisfies readonly PayoutWalletBucket[];
 
 export const PAYOUT_STATUSES = [
   'PENDING_REVIEW',
