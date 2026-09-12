@@ -2,35 +2,50 @@
 -- Forward-only. Existing source-bucket, package and payout history remain immutable.
 --
 -- Locked business rules:
--- - Total Wallet is the authoritative spendable balance.
+-- - Total Wallet is the USER's spendable balance for BOTH payout and package
+--   purchase/activation.
 -- - MAIN / PACKAGE_EARNINGS / REFERRAL_COMMISSION / REWARDS remain source
 --   accounting balances and are NOT reduced by a Total Wallet payout or a new
 --   package purchase/activation.
--- - Future component ledger economic credits/debits are mirrored into immutable
---   Total Wallet events where they represent incoming/outgoing value.
+-- - Total Wallet available value is derived from the current source-bucket
+--   balances plus immutable Total-Wallet-only adjustment events.
 -- - New payouts reserve from TOTAL_WALLET only.
--- - New package activations spend TOTAL_WALLET only; component balances stay
---   unchanged and package-principal ledger accounting uses the system Total
---   Wallet control account.
+-- - New package activations spend TOTAL_WALLET only.
+-- - No database trigger, stored function, SUPER privilege, or
+--   log_bin_trust_function_creators override is required.
 -- - Legacy payout source buckets and historical package funding remain preserved
 --   for historical lifecycle completion/readback only.
+--
+-- Recovery safety:
+-- An earlier pre-acceptance revision of 0039 could fail while creating a MySQL
+-- trigger when binary logging was enabled. Prisma records that migration as
+-- failed, but MySQL DDL before the failing statement may remain. This migration
+-- therefore removes only 0039-owned pre-acceptance projection objects before
+-- rebuilding them in the trigger-free form. Existing ledger/history tables are
+-- never rewritten.
 
-CREATE TABLE `user_total_wallet_balances` (
-  `userId` CHAR(36) NOT NULL,
-  `currency` VARCHAR(10) NOT NULL,
-  `balance` DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
-  `revision` BIGINT NOT NULL DEFAULT 0,
-  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+DROP TRIGGER IF EXISTS `total_wallet_from_component_entry`;
+DROP TRIGGER IF EXISTS `total_wallet_balance_from_event`;
 
-  PRIMARY KEY (`userId`, `currency`),
-  INDEX `total_wallet_currency_idx` (`currency`),
+SET @total_wallet_balance_object_type = (
+  SELECT `TABLE_TYPE`
+  FROM `information_schema`.`TABLES`
+  WHERE `TABLE_SCHEMA` = DATABASE()
+    AND `TABLE_NAME` = 'user_total_wallet_balances'
+  LIMIT 1
+);
+SET @drop_total_wallet_balance_object = CASE
+  WHEN @total_wallet_balance_object_type = 'VIEW'
+    THEN 'DROP VIEW `user_total_wallet_balances`'
+  WHEN @total_wallet_balance_object_type = 'BASE TABLE'
+    THEN 'DROP TABLE `user_total_wallet_balances`'
+  ELSE 'SELECT 1'
+END;
+PREPARE total_wallet_drop_statement FROM @drop_total_wallet_balance_object;
+EXECUTE total_wallet_drop_statement;
+DEALLOCATE PREPARE total_wallet_drop_statement;
 
-  CONSTRAINT `total_wallet_user_fkey`
-    FOREIGN KEY (`userId`) REFERENCES `users`(`id`)
-    ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `total_wallet_balance_nonnegative_check` CHECK (`balance` >= 0)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP TABLE IF EXISTS `user_total_wallet_events`;
 
 CREATE TABLE `user_total_wallet_events` (
   `id` CHAR(36) NOT NULL,
@@ -57,86 +72,77 @@ CREATE TABLE `user_total_wallet_events` (
   CONSTRAINT `total_wallet_event_amount_check` CHECK (`amount` > 0)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Opening spendable balance equals the currently available sum at migration
--- time. Historical source ledger rows are not rewritten.
-INSERT INTO `user_total_wallet_balances` (
-  `userId`, `currency`, `balance`, `revision`, `createdAt`, `updatedAt`
-)
+-- Total Wallet is intentionally NOT a fifth USER ledger bucket. The four source
+-- balances keep their immutable accounting meaning. Only Total-Wallet-only
+-- economic actions (new payout reserve/release and new package purchase) create
+-- rows in user_total_wallet_events. This view therefore remains current when a
+-- future deposit/earning/commission/reward changes a source balance without any
+-- trigger-based mirroring.
+CREATE VIEW `user_total_wallet_balances` AS
 SELECT
-  la.ownerUserId,
-  la.currency,
-  SUM(COALESCE(lb.balance, 0.00000000)),
-  1,
-  CURRENT_TIMESTAMP(3),
-  CURRENT_TIMESTAMP(3)
-FROM `ledger_accounts` la
-LEFT JOIN `ledger_account_balances` lb ON lb.accountId = la.id
-WHERE la.ownerType = 'USER'
-  AND la.bucket IN ('MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS')
-GROUP BY la.ownerUserId, la.currency;
+  wallet_keys.`userId`,
+  wallet_keys.`currency`,
+  CAST(
+    COALESCE(source_balances.`sourceBalance`, 0.00000000)
+      + COALESCE(total_events.`eventDelta`, 0.00000000)
+    AS DECIMAL(20,8)
+  ) AS `balance`,
+  COALESCE(total_events.`eventCount`, 0) AS `revision`,
+  total_events.`firstEventAt` AS `createdAt`,
+  total_events.`lastEventAt` AS `updatedAt`
+FROM (
+  SELECT
+    la.`ownerUserId` AS `userId`,
+    la.`currency`
+  FROM `ledger_accounts` la
+  WHERE la.`ownerType` = 'USER'
+    AND la.`bucket` IN (
+      'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+    )
+  GROUP BY la.`ownerUserId`, la.`currency`
 
-INSERT INTO `user_total_wallet_events` (
-  `id`, `eventKey`, `userId`, `currency`, `direction`, `amount`, `reason`,
-  `ledgerTransactionId`, `createdAt`
-)
-SELECT
-  UUID(),
-  CONCAT('TOTAL_WALLET:OPENING:', tw.userId, ':', tw.currency),
-  tw.userId,
-  tw.currency,
-  'CREDIT',
-  tw.balance,
-  'OPENING_BALANCE',
-  NULL,
-  CURRENT_TIMESTAMP(3)
-FROM `user_total_wallet_balances` tw
-WHERE tw.balance > 0;
+  UNION
 
--- Future component ledger entries mirror their economic effect into the Total
--- Wallet event stream. Package purchase/activation does NOT debit a USER
--- component ledger account under the new lock; it posts its own explicit Total
--- Wallet debit event in application accounting. A duplicate event is an
--- accounting conflict and therefore fails closed instead of being ignored.
-CREATE TRIGGER `total_wallet_from_component_entry`
-AFTER INSERT ON `ledger_entries`
-FOR EACH ROW
-INSERT INTO `user_total_wallet_events` (
-  `id`, `eventKey`, `userId`, `currency`, `direction`, `amount`, `reason`,
-  `ledgerTransactionId`, `createdAt`
-)
-SELECT
-  UUID(),
-  CONCAT('LEDGER_ENTRY:', NEW.id),
-  la.ownerUserId,
-  la.currency,
-  NEW.side,
-  NEW.amount,
-  'SOURCE_LEDGER_SYNC',
-  NEW.transactionId,
-  CURRENT_TIMESTAMP(3)
-FROM `ledger_accounts` la
-WHERE la.id = NEW.accountId
-  AND la.ownerType = 'USER'
-  AND la.bucket IN ('MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS');
-
--- Total Wallet balances are a projection of immutable Total Wallet events.
-CREATE TRIGGER `total_wallet_balance_from_event`
-AFTER INSERT ON `user_total_wallet_events`
-FOR EACH ROW
-INSERT INTO `user_total_wallet_balances` (
-  `userId`, `currency`, `balance`, `revision`, `createdAt`, `updatedAt`
-) VALUES (
-  NEW.userId,
-  NEW.currency,
-  IF(NEW.direction = 'CREDIT', NEW.amount, -NEW.amount),
-  1,
-  CURRENT_TIMESTAMP(3),
-  CURRENT_TIMESTAMP(3)
-)
-ON DUPLICATE KEY UPDATE
-  `balance` = `balance` + IF(NEW.direction = 'CREDIT', NEW.amount, -NEW.amount),
-  `revision` = `revision` + 1,
-  `updatedAt` = CURRENT_TIMESTAMP(3);
+  SELECT
+    event_rows.`userId`,
+    event_rows.`currency`
+  FROM `user_total_wallet_events` event_rows
+  GROUP BY event_rows.`userId`, event_rows.`currency`
+) wallet_keys
+LEFT JOIN (
+  SELECT
+    la.`ownerUserId` AS `userId`,
+    la.`currency`,
+    SUM(COALESCE(lb.`balance`, 0.00000000)) AS `sourceBalance`
+  FROM `ledger_accounts` la
+  LEFT JOIN `ledger_account_balances` lb
+    ON lb.`accountId` = la.`id`
+  WHERE la.`ownerType` = 'USER'
+    AND la.`bucket` IN (
+      'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+    )
+  GROUP BY la.`ownerUserId`, la.`currency`
+) source_balances
+  ON source_balances.`userId` = wallet_keys.`userId`
+ AND source_balances.`currency` = wallet_keys.`currency`
+LEFT JOIN (
+  SELECT
+    event_rows.`userId`,
+    event_rows.`currency`,
+    SUM(
+      CASE
+        WHEN event_rows.`direction` = 'CREDIT' THEN event_rows.`amount`
+        ELSE -event_rows.`amount`
+      END
+    ) AS `eventDelta`,
+    COUNT(*) AS `eventCount`,
+    MIN(event_rows.`createdAt`) AS `firstEventAt`,
+    MAX(event_rows.`createdAt`) AS `lastEventAt`
+  FROM `user_total_wallet_events` event_rows
+  GROUP BY event_rows.`userId`, event_rows.`currency`
+) total_events
+  ON total_events.`userId` = wallet_keys.`userId`
+ AND total_events.`currency` = wallet_keys.`currency`;
 
 ALTER TABLE `payout_policy_bucket_rules`
   MODIFY `bucket` ENUM(
@@ -182,7 +188,7 @@ INSERT INTO `payout_policy_bucket_rules` (
 )
 SELECT
   UUID(),
-  p.id,
+  p.`id`,
   'TOTAL_WALLET',
   FALSE,
   CURRENT_TIMESTAMP(3),
@@ -191,6 +197,6 @@ FROM `payout_policy_versions` p
 WHERE NOT EXISTS (
   SELECT 1
   FROM `payout_policy_bucket_rules` existing
-  WHERE existing.policyVersionId = p.id
-    AND existing.bucket = 'TOTAL_WALLET'
+  WHERE existing.`policyVersionId` = p.`id`
+    AND existing.`bucket` = 'TOTAL_WALLET'
 );
