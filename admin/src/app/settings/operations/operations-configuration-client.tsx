@@ -240,13 +240,14 @@ export default function OperationsConfigurationClient() {
           <label className={styles.field}>
             <span>Platform timezone</span>
             <input
-              className={styles.input}
+              className={styles.textInput}
               value="UTC — Coordinated Universal Time"
               readOnly
               aria-readonly="true"
             />
             <small className={styles.fieldHelp}>
-              UTC is the locked platform standard. Current display setting: {timeZone}.
+              UTC is the locked platform standard. Current display setting:{" "}
+              {timeZone}.
             </small>
           </label>
         </article>
