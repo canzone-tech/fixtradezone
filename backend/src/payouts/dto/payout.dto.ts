@@ -29,9 +29,6 @@ export class CreatePayoutDto {
   @IsUUID()
   requestKey!: string;
 
-  @IsIn(PAYOUT_SPENDABLE_BUCKETS)
-  sourceBucket!: PayoutBucket;
-
   @IsString()
   @Matches(MONEY_PATTERN)
   amount!: string;
