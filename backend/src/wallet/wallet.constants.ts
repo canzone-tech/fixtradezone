@@ -34,6 +34,10 @@ export function userWalletAccountKey(
   return `USER:${userId}:${bucket}:${currency}`;
 }
 
+export function totalWalletControlAccountKey(currency: string): string {
+  return `SYSTEM:TOTAL_WALLET_CONTROL:${currency}`;
+}
+
 export function depositClearingAccountKey(currency: string): string {
   return `SYSTEM:DEPOSIT_CLEARING:${currency}`;
 }
@@ -56,6 +60,10 @@ export function depositCreditSourceKey(depositId: string): string {
 
 export function packageActivationSourceKey(depositId: string): string {
   return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION`;
+}
+
+export function packageActivationTotalWalletEventKey(depositId: string): string {
+  return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION:TOTAL_WALLET`;
 }
 
 export function referralCommissionSourceKey(
