@@ -193,10 +193,10 @@ async function fetchPayoutWorkspace(): Promise<{
 
   const policy = await checkedJson<
     CurrentPayoutPolicyResponse & UserApiPayload
-  >(policyResponse, "Could not load payout policy.");
+  >(policyResponse, "Could not load withdrawal policy.");
   const payouts = await checkedJson<UserPayoutsResponse & UserApiPayload>(
     payoutsResponse,
-    "Could not load payout history.",
+    "Could not load withdrawal history.",
   );
   const wallet = await checkedJson<UserWalletResponse & UserApiPayload>(
     walletResponse,
@@ -325,7 +325,7 @@ export default function UserPayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not load payout workspace.",
+          : "Could not load withdrawal workspace.",
       );
     } finally {
       setLoading(false);
@@ -366,7 +366,7 @@ export default function UserPayoutsClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Could not load payout workspace.",
+            : "Could not load withdrawal workspace.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -388,10 +388,10 @@ export default function UserPayoutsClient() {
 
     try {
       if (!requestsEnabled || !activePolicy) {
-        throw new Error("Payout requests are currently disabled.");
+        throw new Error("Withdrawal requests are currently disabled.");
       }
       if (!sourceBucketEnabled) {
-        throw new Error("Total Wallet is not enabled for payouts.");
+        throw new Error("Total Wallet is not enabled for withdrawals.");
       }
       if (!amount.trim() || !destinationAddress.trim()) {
         throw new Error("Amount and destination address are required.");
@@ -410,14 +410,14 @@ export default function UserPayoutsClient() {
 
       const payload = await checkedJson<
         ApiMessagePayload & { created: boolean; payout: PayoutRequest }
-      >(response, "Payout request could not be created.");
+      >(response, "Withdrawal request could not be created.");
 
       setAmount("");
       setDestinationAddress("");
       setSuccess(
         payload.created
-          ? `Payout ${payload.payout.id} created and Total Wallet funds reserved.`
-          : `Payout ${payload.payout.id} was already created.`,
+          ? `Withdrawal ${payload.payout.id} created and Total Wallet funds reserved.`
+          : `Withdrawal ${payload.payout.id} was already created.`,
       );
 
       await reload();
@@ -431,7 +431,7 @@ export default function UserPayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Payout request could not be created.",
+          : "Withdrawal request could not be created.",
       );
     } finally {
       setBusy(false);
@@ -540,7 +540,7 @@ export default function UserPayoutsClient() {
 
         <section className={styles.hero}>
           <p className={styles.eyebrow}>PAYOUT-01 / TOTAL WALLET ACTIONS</p>
-          <h1>Payouts</h1>
+          <h1>Withdrawal</h1>
           <p>
             Choose whether to withdraw from Total Wallet or reinvest the entered
             amount into an eligible published package. The existing Packages →
@@ -549,20 +549,20 @@ export default function UserPayoutsClient() {
         </section>
 
         <section className={styles.warning}>
-          External payout requires only a public destination address. Reinvestment
-          never asks for a blockchain address and does not create a payout fee or
-          external transfer.
+          External withdrawal requires only a public destination address.
+          Reinvestment never asks for a blockchain address and does not create a
+          withdrawal fee or external transfer.
         </section>
 
         {loading ? (
           <section className={styles.card}>
-            <div className={styles.empty}>Loading payout workspace…</div>
+            <div className={styles.empty}>Loading withdrawal workspace…</div>
           </section>
         ) : activePolicy ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.eyebrow}>Effective Payout Policy</p>
+                <p className={styles.eyebrow}>Effective Withdrawal Policy</p>
                 <h2>
                   {activePolicy.asset} / {activePolicy.networkCode}
                 </h2>
@@ -605,7 +605,8 @@ export default function UserPayoutsClient() {
         ) : (
           <section className={styles.card}>
             <div className={styles.empty}>
-              No published payout policy is effective. External payout requests are fail-closed.
+              No published withdrawal policy is effective. External withdrawal
+              requests are fail-closed.
             </div>
           </section>
         )}
@@ -652,7 +653,7 @@ export default function UserPayoutsClient() {
             </div>
           ) : (
             <div className={styles.empty}>
-              No wallet balance is available for the payout asset.
+              No wallet balance is available for the withdrawal asset.
             </div>
           )}
         </section>
@@ -663,7 +664,7 @@ export default function UserPayoutsClient() {
               <p className={styles.eyebrow}>New Total Wallet Action</p>
               <h2>
                 {walletAction === "PAYOUT"
-                  ? "Request payout"
+                  ? "Request withdrawal"
                   : "Reinvest into package"}
               </h2>
             </div>
@@ -681,18 +682,18 @@ export default function UserPayoutsClient() {
                 }
                 disabled={busy}
               >
-                <option value="PAYOUT">Payout</option>
+                <option value="PAYOUT">Withdrawal</option>
                 <option value="REINVESTMENT">Reinvestment</option>
               </select>
               <span className={styles.help}>
-                Payout sends funds externally. Reinvestment activates an eligible
-                package from Total Wallet.
+                Withdrawal sends funds externally. Reinvestment activates an
+                eligible package from Total Wallet.
               </span>
             </div>
 
             {walletAction === "PAYOUT" ? (
               <div className={styles.field}>
-                <label htmlFor="payout-source-bucket">Payout source</label>
+                <label htmlFor="payout-source-bucket">Withdrawal source</label>
                 <select
                   id="payout-source-bucket"
                   className={styles.select}
@@ -713,7 +714,7 @@ export default function UserPayoutsClient() {
                   )}
                 </select>
                 <span className={styles.help}>
-                  Available for payout: {compactDecimal(selectedBucketBalance)}{" "}
+                  Available for withdrawal: {compactDecimal(selectedBucketBalance)}{" "}
                   {walletCurrency}
                 </span>
               </div>
@@ -816,7 +817,8 @@ export default function UserPayoutsClient() {
               <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
                 <span className={styles.help}>
                   Reinvestment uses the full entered amount as package principal.
-                  No payout fee, public address, or blockchain transfer is created.
+                  No withdrawal fee, public address, or blockchain transfer is
+                  created.
                 </span>
               </div>
             )}
@@ -834,7 +836,7 @@ export default function UserPayoutsClient() {
                 {busy
                   ? "Submitting…"
                   : walletAction === "PAYOUT"
-                    ? "Reserve funds & request payout"
+                    ? "Reserve funds & request withdrawal"
                     : "Reinvest & activate package"}
               </button>
             </div>
@@ -845,7 +847,7 @@ export default function UserPayoutsClient() {
           <div className={styles.cardHeader}>
             <div>
               <p className={styles.eyebrow}>Immutable Workflow</p>
-              <h2>My payout history</h2>
+              <h2>My withdrawal history</h2>
             </div>
             <button
               type="button"
@@ -858,7 +860,9 @@ export default function UserPayoutsClient() {
           </div>
 
           {payoutRows.length === 0 && reinvestmentSubscriptions.length === 0 ? (
-            <div className={styles.empty}>No payout or reinvestment activity yet.</div>
+            <div className={styles.empty}>
+              No withdrawal or reinvestment activity yet.
+            </div>
           ) : (
             <div className={styles.list}>
               {payoutRows.map((payout) => {
@@ -891,7 +895,7 @@ export default function UserPayoutsClient() {
                         </strong>
                       </div>
                       <div className={styles.metric}>
-                        <small>Net payout</small>
+                        <small>Net withdrawal</small>
                         <strong>
                           {compactPayoutDecimal(payout.netAmount)} {payout.asset}
                         </strong>
