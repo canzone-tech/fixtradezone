@@ -90,11 +90,12 @@ WHERE tw.balance > 0;
 
 -- Every future component ledger entry mirrors its economic effect into the
 -- Total Wallet event stream. The component bucket itself remains independently
--- visible/auditable.
+-- visible/auditable. A duplicate event is an accounting conflict and therefore
+-- fails closed instead of being ignored.
 CREATE TRIGGER `total_wallet_from_component_entry`
 AFTER INSERT ON `ledger_entries`
 FOR EACH ROW
-INSERT IGNORE INTO `user_total_wallet_events` (
+INSERT INTO `user_total_wallet_events` (
   `id`, `eventKey`, `userId`, `currency`, `direction`, `amount`, `reason`,
   `ledgerTransactionId`, `createdAt`
 )
