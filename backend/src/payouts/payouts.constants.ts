@@ -48,7 +48,7 @@ export const PAYOUT_LEDGER_KINDS = {
 } as const;
 
 export const PAYOUT_SYSTEM_BUCKETS = {
-  TOTAL_WALLET_CONTROL: 'PAYOUT_TOTAL_WALLET_CONTROL',
+  TOTAL_WALLET_CONTROL: 'TOTAL_WALLET_CONTROL',
   RESERVE: 'PAYOUT_RESERVE',
   SETTLEMENT: 'PAYOUT_SETTLEMENT',
   FEE_REVENUE: 'PAYOUT_FEE_REVENUE',
@@ -85,10 +85,6 @@ export function payoutTotalWalletEventKey(
   operation: 'RESERVE' | 'RELEASE',
 ): string {
   return `PAYOUT:${payoutId}:TOTAL_WALLET:${operation}`;
-}
-
-export function payoutTotalWalletControlAccountKey(currency: string): string {
-  return `SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:${currency}`;
 }
 
 export function payoutReserveAccountKey(currency: string): string {
