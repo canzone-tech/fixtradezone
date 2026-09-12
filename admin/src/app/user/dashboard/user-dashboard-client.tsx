@@ -450,7 +450,6 @@ export default function UserDashboardClient() {
                   <div>
                     <small>Simulated Results</small>
                     <strong>SIMULATED ONLY</strong>
-                    <span className="orange">Never real trading</span>
                   </div>
                 </div>
               </article>
