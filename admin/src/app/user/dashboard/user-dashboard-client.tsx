@@ -84,7 +84,7 @@ const workspaceStrip = [
     code: "T",
     label: "Activity",
     value: "SIMULATED ONLY",
-    detail: "Never real trading",
+    detail: "SIMULATED",
     tone: "blue",
   },
 ] as const;
