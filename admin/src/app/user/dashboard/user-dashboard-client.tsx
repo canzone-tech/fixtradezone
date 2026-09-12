@@ -44,51 +44,6 @@ interface OptionalResponse<T> {
   payload: T | null;
 }
 
-const workspaceStrip = [
-  {
-    code: "A",
-    label: "Account",
-    value: "ACTIVE",
-    detail: "Verified session",
-    tone: "blue",
-  },
-  {
-    code: "S",
-    label: "Security",
-    value: "SECURE",
-    detail: "HttpOnly session",
-    tone: "dark",
-  },
-  {
-    code: "P",
-    label: "Package",
-    value: "LIVE",
-    detail: "Packages workspace",
-    tone: "purple",
-  },
-  {
-    code: "W",
-    label: "Wallet",
-    value: "LIVE",
-    detail: "Ledger-backed wallet",
-    tone: "orange",
-  },
-  {
-    code: "R",
-    label: "Referral",
-    value: "LIVE",
-    detail: "Referral workspace",
-    tone: "gold",
-  },
-  {
-    code: "T",
-    label: "Activity",
-    value: "SIMULATED ONLY",
-    detail: "SIMULATED",
-    tone: "blue",
-  },
-] as const;
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 async function readPayload<T>(response: Response): Promise<T | null> {
@@ -307,38 +262,6 @@ export default function UserDashboardClient() {
     );
   }, [session]);
 
-  const workspaceItems = useMemo(
-    () =>
-      workspaceStrip.map((item) => {
-        if (item.label === "Referral") {
-          return {
-            ...item,
-            value: referralProfile?.assignmentStatus ?? item.value,
-            detail: referralProfile ? "Live referral API" : item.detail,
-          };
-        }
-
-        if (item.label === "Package") {
-          return {
-            ...item,
-            value: activePackageTotal ?? "—",
-            detail: "Active subscriptions",
-          };
-        }
-
-        if (item.label === "Wallet") {
-          return {
-            ...item,
-            value: wallet?.totalActivity ?? "—",
-            detail: "Immutable activity",
-          };
-        }
-
-        return item;
-      }),
-    [activePackageTotal, referralProfile, wallet?.totalActivity],
-  );
-
   const walletTrend = useMemo(
     () => buildWalletTrend(wallet?.activity ?? []),
     [wallet?.activity],
@@ -377,26 +300,6 @@ export default function UserDashboardClient() {
   return (
     <UserShell session={session}>
       <div className="ftz-dashboard">
-        <div
-          className="ftz-market-ticker"
-          aria-label="FixTradeZone USER workspace status"
-        >
-          {workspaceItems.map((item) => (
-            <div className="ftz-market-item" key={item.label}>
-              <span className={`ftz-coin ftz-coin-${item.tone}`}>
-                {item.code}
-              </span>
-
-              <div>
-                <strong>{item.label}</strong>
-                <small>{item.detail}</small>
-              </div>
-
-              <b className={styles.stripValue}>{item.value}</b>
-            </div>
-          ))}
-        </div>
-
         <div className="ftz-dashboard-layout">
           <section className="ftz-dashboard-primary">
             <section className="ftz-hero">
@@ -406,7 +309,7 @@ export default function UserDashboardClient() {
                   Secure USER Workspace
                 </span>
 
-                <h2>Welcome back, {displayName}! 👋</h2>
+                <h2>Welcome back, {displayName}</h2>
 
                 <p>
                   Live account data from packages, wallet, deposits, payouts and
