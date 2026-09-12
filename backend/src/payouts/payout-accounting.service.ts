@@ -8,6 +8,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { insertTotalWalletEvent } from '../wallet/total-wallet-accounting';
 import {
   PAYOUT_AUDIT_OPERATIONS,
   PAYOUT_LEDGER_KINDS,
@@ -57,18 +58,6 @@ interface LedgerEntryRow {
 
 interface CountRow {
   total: bigint | number | string;
-}
-
-interface TotalWalletBalanceRow {
-  balance: DecimalValue;
-}
-
-interface TotalWalletEventRow {
-  userId: string;
-  currency: string;
-  direction: LedgerSide;
-  amount: DecimalValue;
-  ledgerTransactionId: string | null;
 }
 
 export interface PayoutAccountingInput {
@@ -127,7 +116,7 @@ export class PayoutAccountingService {
         'DEBIT',
       );
 
-      await this.insertTotalWalletEvent(transaction, {
+      await insertTotalWalletEvent(transaction, {
         eventKey: payoutTotalWalletEventKey(input.payoutId, 'RESERVE'),
         userId: input.userId,
         currency: input.currency,
@@ -292,7 +281,7 @@ export class PayoutAccountingService {
         'Payout Total Wallet control release failed.',
       );
 
-      await this.insertTotalWalletEvent(transaction, {
+      await insertTotalWalletEvent(transaction, {
         eventKey: payoutTotalWalletEventKey(input.payoutId, 'RELEASE'),
         userId: input.userId,
         currency: input.currency,
@@ -453,82 +442,6 @@ export class PayoutAccountingService {
     });
 
     return ledgerTransaction.id;
-  }
-
-  private async insertTotalWalletEvent(
-    transaction: Prisma.TransactionClient,
-    input: {
-      eventKey: string;
-      userId: string;
-      currency: string;
-      direction: LedgerSide;
-      amount: string;
-      reason: string;
-      ledgerTransactionId: string;
-      requireAvailable: boolean;
-    },
-  ): Promise<void> {
-    const amount = new Prisma.Decimal(input.amount);
-    if (amount.lte(0)) {
-      throw new ServiceUnavailableException(
-        'Total Wallet event amount must be positive.',
-      );
-    }
-
-    if (input.requireAvailable) {
-      const balances = await transaction.$queryRaw<TotalWalletBalanceRow[]>(
-        Prisma.sql`
-          SELECT balance
-          FROM user_total_wallet_balances
-          WHERE userId = ${input.userId}
-            AND currency = ${input.currency}
-          LIMIT 1
-          FOR UPDATE
-        `,
-      );
-      const available = balances[0]
-        ? new Prisma.Decimal(balances[0].balance)
-        : new Prisma.Decimal(0);
-
-      if (available.lt(amount)) {
-        throw new ConflictException('Insufficient Total Wallet balance.');
-      }
-    }
-
-    const inserted = await transaction.$executeRaw(Prisma.sql`
-      INSERT IGNORE INTO user_total_wallet_events (
-        id, eventKey, userId, currency, direction, amount, reason,
-        ledgerTransactionId, createdAt
-      ) VALUES (
-        ${randomUUID()}, ${input.eventKey}, ${input.userId}, ${input.currency},
-        ${input.direction}, ${amount.toFixed(8)}, ${input.reason},
-        ${input.ledgerTransactionId}, CURRENT_TIMESTAMP(3)
-      )
-    `);
-
-    if (inserted === 1) return;
-
-    const rows = await transaction.$queryRaw<TotalWalletEventRow[]>(Prisma.sql`
-      SELECT userId, currency, direction, amount, ledgerTransactionId
-      FROM user_total_wallet_events
-      WHERE eventKey = ${input.eventKey}
-      LIMIT 1
-      FOR UPDATE
-    `);
-    const existing = rows[0];
-
-    if (
-      !existing ||
-      existing.userId !== input.userId ||
-      existing.currency !== input.currency ||
-      existing.direction !== input.direction ||
-      !new Prisma.Decimal(existing.amount).equals(amount) ||
-      existing.ledgerTransactionId !== input.ledgerTransactionId
-    ) {
-      throw new ServiceUnavailableException(
-        'Total Wallet event key conflicts with existing accounting.',
-      );
-    }
   }
 
   private async establishTransaction(
