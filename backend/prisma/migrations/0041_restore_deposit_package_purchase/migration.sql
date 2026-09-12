@@ -1,26 +1,21 @@
--- PACKAGE-RESTORE-01 — restore the original deposit/TXID package-purchase lineage.
+-- PAYOUT-REINVEST-01 — compatibility boundary for Payout vs Reinvestment.
 -- Forward-only. Applied migration 0040 remains immutable.
 --
--- Locked business rule:
--- - Payout spends authoritative Total Wallet.
--- - Package purchase remains deposit/TXID funded exactly as before TOTAL-WALLET-02.
+-- Final business rule:
+-- - The existing Packages -> Deposit / TXID purchase flow remains unchanged.
+-- - Payouts spend authoritative Total Wallet.
+-- - Payouts also expose an explicit Reinvestment action that can fund a package
+--   directly from Total Wallet after the USER selects an amount-eligible package.
 --
--- Safety:
--- A pre-acceptance direct Total-Wallet package subscription created by 0040 would
--- have NULL sourceDepositId/sourceDepositAccountingTransactionId. Restoring the
--- NOT NULL constraints below therefore fails closed instead of deleting or
--- rewriting financial history. Any such row must be investigated explicitly.
+-- Reinvestment has no external deposit row, so deposit lineage on its immutable
+-- subscription/commission snapshots must remain nullable. This statement also
+-- repairs the partial first statement from the earlier failed local 0041 attempt.
 
 ALTER TABLE `referral_commission_runs`
-  MODIFY `sourceDepositId` CHAR(36) NOT NULL;
+  MODIFY `sourceDepositId` CHAR(36) NULL;
 
-ALTER TABLE `user_package_subscriptions`
-  MODIFY `sourceDepositId` CHAR(36) NOT NULL,
-  MODIFY `sourceDepositAccountingTransactionId` CHAR(36) NOT NULL;
-
-DROP INDEX `ups_user_purchase_request_key`
-  ON `user_package_subscriptions`;
-
-ALTER TABLE `user_package_subscriptions`
-  DROP COLUMN `purchaseRequestKey`,
-  DROP COLUMN `fundingSource`;
+-- Intentionally keep the 0040 columns on user_package_subscriptions:
+--   sourceDepositId/sourceDepositAccountingTransactionId nullable,
+--   fundingSource, purchaseRequestKey.
+-- Deposit-backed package activations continue writing their normal immutable
+-- deposit lineage; reinvestment writes fundingSource=TOTAL_WALLET and no deposit.
