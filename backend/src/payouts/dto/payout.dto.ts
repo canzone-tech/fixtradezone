@@ -14,7 +14,7 @@ import {
   Min,
 } from 'class-validator';
 import {
-  PAYOUT_BUCKETS,
+  PAYOUT_SPENDABLE_BUCKETS,
   PAYOUT_STATUSES,
   PAYOUT_VALIDATION_PROFILES,
   type PayoutBucket,
@@ -29,7 +29,7 @@ export class CreatePayoutDto {
   @IsUUID()
   requestKey!: string;
 
-  @IsIn(PAYOUT_BUCKETS)
+  @IsIn(PAYOUT_SPENDABLE_BUCKETS)
   sourceBucket!: PayoutBucket;
 
   @IsString()
@@ -124,7 +124,7 @@ export class UpdatePayoutPolicyDraftDto {
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn(PAYOUT_BUCKETS, { each: true })
+  @IsIn(PAYOUT_SPENDABLE_BUCKETS, { each: true })
   enabledBuckets?: PayoutBucket[];
 }
 

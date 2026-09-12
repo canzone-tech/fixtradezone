@@ -7,6 +7,10 @@ export const PAYOUT_BUCKETS = [
 
 export type PayoutBucket = (typeof PAYOUT_BUCKETS)[number];
 
+// Global spending invariant: USER payouts may consume Main / Deposit only.
+// Other wallet buckets remain separately accounted and are never payout sources.
+export const PAYOUT_SPENDABLE_BUCKETS = ['MAIN'] as const;
+
 export const PAYOUT_STATUSES = [
   'PENDING_REVIEW',
   'APPROVED',

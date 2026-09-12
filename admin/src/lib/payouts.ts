@@ -1,13 +1,14 @@
 import { formatPlatformDateTime } from "@/lib/platform-time";
 
-export const PAYOUT_BUCKETS = [
-  "MAIN",
-  "PACKAGE_EARNINGS",
-  "REFERRAL_COMMISSION",
-  "REWARDS",
-] as const;
+export type PayoutBucket =
+  | "MAIN"
+  | "PACKAGE_EARNINGS"
+  | "REFERRAL_COMMISSION"
+  | "REWARDS";
 
-export type PayoutBucket = (typeof PAYOUT_BUCKETS)[number];
+// Global spending invariant: only Main / Deposit may be configured for payout.
+// The full PayoutBucket union remains for immutable historical payout snapshots.
+export const PAYOUT_BUCKETS: readonly PayoutBucket[] = ["MAIN"];
 
 export type PayoutStatus =
   | "PENDING_REVIEW"
