@@ -821,10 +821,6 @@ export default function InternalTradingAdminClient() {
                 <dd>{published.assetSymbols.join(", ")}</dd>
               </div>
               <div>
-                <dt>Schedule timezone snapshot</dt>
-                <dd>{published.timezoneSnapshot ?? "Pending publication"}</dd>
-              </div>
-              <div>
                 <dt>Effective (UTC)</dt>
                 <dd>
                   {published.effectiveFrom
@@ -1039,10 +1035,6 @@ export default function InternalTradingAdminClient() {
                 <dd>
                   {money(selected.adminRecognizedAmount, selected.currency)}
                 </dd>
-              </div>
-              <div>
-                <dt>Schedule timezone snapshot</dt>
-                <dd>{selected.timezoneSnapshot}</dd>
               </div>
               <div>
                 <dt>Blocked reason</dt>
