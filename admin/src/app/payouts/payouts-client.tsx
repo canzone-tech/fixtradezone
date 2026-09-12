@@ -21,6 +21,26 @@ import {
   readJson,
 } from "@/lib/payouts";
 
+interface AdminReinvestmentSubscription {
+  id: string;
+  userId: string;
+  username?: string;
+  email?: string | null;
+  sourceDepositId: string | null;
+  fundingLedgerTransactionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  price: string;
+  currency: string;
+  status: string;
+  activatedAt: string;
+  scheduledEndAt: string;
+}
+
+interface AdminSubscriptionsResponse extends ApiMessagePayload {
+  subscriptions?: AdminReinvestmentSubscription[];
+}
+
 class AdminPayoutAccessError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -51,11 +71,14 @@ async function checkedAdminJson<T extends ApiMessagePayload>(
 async function fetchWorkspace(): Promise<{
   payouts: AdminPayoutsResponse;
   policies: PayoutPoliciesResponse;
+  subscriptions: AdminSubscriptionsResponse;
 }> {
-  const [payoutsResponse, policiesResponse] = await Promise.all([
-    fetch("/api/admin/payouts?limit=100", { cache: "no-store" }),
-    fetch("/api/admin/payout-policies?limit=50", { cache: "no-store" }),
-  ]);
+  const [payoutsResponse, policiesResponse, subscriptionsResponse] =
+    await Promise.all([
+      fetch("/api/admin/payouts?limit=100", { cache: "no-store" }),
+      fetch("/api/admin/payout-policies?limit=50", { cache: "no-store" }),
+      fetch("/api/admin/subscriptions?limit=100", { cache: "no-store" }),
+    ]);
 
   const payouts = await checkedAdminJson<
     AdminPayoutsResponse & ApiMessagePayload
@@ -63,8 +86,12 @@ async function fetchWorkspace(): Promise<{
   const policies = await checkedAdminJson<
     PayoutPoliciesResponse & ApiMessagePayload
   >(policiesResponse, "Could not load payout policies.");
+  const subscriptions = await checkedAdminJson<AdminSubscriptionsResponse>(
+    subscriptionsResponse,
+    "Could not load reinvestment history.",
+  );
 
-  return { payouts, policies };
+  return { payouts, policies, subscriptions };
 }
 
 function findDraft(policies: PayoutPoliciesResponse): PayoutPolicy | null {
@@ -75,6 +102,9 @@ export default function PayoutsClient() {
   const router = useRouter();
   const [payouts, setPayouts] = useState<AdminPayoutsResponse | null>(null);
   const [policies, setPolicies] = useState<PayoutPoliciesResponse | null>(null);
+  const [reinvestments, setReinvestments] = useState<
+    AdminReinvestmentSubscription[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +156,11 @@ export default function PayoutsClient() {
       const workspace = await fetchWorkspace();
       setPayouts(workspace.payouts);
       setPolicies(workspace.policies);
+      setReinvestments(
+        (workspace.subscriptions.subscriptions ?? []).filter(
+          (item) => item.sourceDepositId === null,
+        ),
+      );
       hydrateDraftForm(findDraft(workspace.policies));
     } catch (caught) {
       if (caught instanceof AdminPayoutAccessError && caught.status === 401) {
@@ -155,6 +190,11 @@ export default function PayoutsClient() {
 
         setPayouts(workspace.payouts);
         setPolicies(workspace.policies);
+        setReinvestments(
+          (workspace.subscriptions.subscriptions ?? []).filter(
+            (item) => item.sourceDepositId === null,
+          ),
+        );
 
         if (initialDraft) {
           setRequestsEnabled(initialDraft.requestsEnabled);
@@ -742,6 +782,68 @@ export default function PayoutsClient() {
                 </article>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.cardHeader}>
+          <div>
+            <p className={styles.eyebrow}>Total Wallet Activity</p>
+            <h2>Reinvestment history</h2>
+          </div>
+          <span className={styles.badge}>{reinvestments.length} total</span>
+        </div>
+
+        {loading ? (
+          <div className={styles.empty}>Loading reinvestment history…</div>
+        ) : reinvestments.length === 0 ? (
+          <div className={styles.empty}>No reinvestment activity found.</div>
+        ) : (
+          <div className={styles.list}>
+            {reinvestments.map((item) => (
+              <article className={styles.row} key={`reinvestment-${item.id}`}>
+                <div className={styles.rowTop}>
+                  <div>
+                    <strong>
+                      {compactPayoutDecimal(item.price)} {item.currency} · {item.username ?? item.userId}
+                    </strong>
+                    <span className={styles.meta}>
+                      {item.packageDisplayName} · Total Wallet · {formatPayoutDate(item.activatedAt)}
+                    </span>
+                  </div>
+                  <span className={styles.badge} data-tone="success">
+                    REINVESTMENT
+                  </span>
+                </div>
+
+                <div className={styles.metrics}>
+                  <div className={styles.metric}>
+                    <small>Package</small>
+                    <strong>{item.packageCode}</strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>Principal</small>
+                    <strong>
+                      {compactPayoutDecimal(item.price)} {item.currency}
+                    </strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>Status</small>
+                    <strong>{item.status}</strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>User</small>
+                    <strong>{item.email || item.username || item.userId}</strong>
+                  </div>
+                </div>
+
+                <p>
+                  Source reinvestment: <span className={styles.mono}>{item.fundingLedgerTransactionId}</span>
+                </p>
+                <p>Scheduled end: {formatPayoutDate(item.scheduledEndAt)}</p>
+              </article>
+            ))}
           </div>
         )}
       </section>
