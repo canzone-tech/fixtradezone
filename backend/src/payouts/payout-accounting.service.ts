@@ -12,20 +12,28 @@ import {
   PAYOUT_AUDIT_OPERATIONS,
   PAYOUT_LEDGER_KINDS,
   PAYOUT_SYSTEM_BUCKETS,
+  isPayoutWalletBucket,
   payoutFeeRevenueAccountKey,
   payoutReleaseSourceKey,
   payoutReserveAccountKey,
   payoutReserveSourceKey,
   payoutSettlementAccountKey,
   payoutSettlementSourceKey,
+  payoutTotalWalletControlAccountKey,
+  payoutTotalWalletEventKey,
   payoutUserAccountKey,
   type PayoutBucket,
+  type PayoutWalletBucket,
 } from './payouts.constants';
 
 type DecimalValue = Prisma.Decimal | number | string;
 type LedgerSide = 'DEBIT' | 'CREDIT';
 type LedgerBucket =
-  PayoutBucket | 'PAYOUT_RESERVE' | 'PAYOUT_SETTLEMENT' | 'PAYOUT_FEE_REVENUE';
+  | PayoutWalletBucket
+  | 'PAYOUT_TOTAL_WALLET_CONTROL'
+  | 'PAYOUT_RESERVE'
+  | 'PAYOUT_SETTLEMENT'
+  | 'PAYOUT_FEE_REVENUE';
 
 interface LedgerAccountRow {
   id: string;
@@ -49,6 +57,18 @@ interface LedgerEntryRow {
 
 interface CountRow {
   total: bigint | number | string;
+}
+
+interface TotalWalletBalanceRow {
+  balance: DecimalValue;
+}
+
+interface TotalWalletEventRow {
+  userId: string;
+  currency: string;
+  direction: LedgerSide;
+  amount: DecimalValue;
+  ledgerTransactionId: string | null;
 }
 
 export interface PayoutAccountingInput {
@@ -91,12 +111,6 @@ export class PayoutAccountingService {
       return ledgerTransaction.id;
     }
 
-    const userAccount = await this.getUserAccountForUpdate(
-      transaction,
-      input.userId,
-      input.sourceBucket,
-      input.currency,
-    );
     const reserveAccount = await this.ensureSystemAccount(
       transaction,
       payoutReserveAccountKey(input.currency),
@@ -104,28 +118,86 @@ export class PayoutAccountingService {
       input.currency,
     );
 
-    await this.insertEntry(transaction, {
-      transactionId: ledgerTransaction.id,
-      accountId: userAccount.id,
-      side: 'DEBIT',
-      amount: input.grossAmount,
-      memo: `Reserve payout ${input.payoutId} from ${input.sourceBucket}.`,
-    });
-    await this.insertEntry(transaction, {
-      transactionId: ledgerTransaction.id,
-      accountId: reserveAccount.id,
-      side: 'CREDIT',
-      amount: input.grossAmount,
-      memo: `Reserve liability for payout ${input.payoutId}.`,
-    });
+    if (input.sourceBucket === 'TOTAL_WALLET') {
+      const controlAccount = await this.ensureSystemAccount(
+        transaction,
+        payoutTotalWalletControlAccountKey(input.currency),
+        PAYOUT_SYSTEM_BUCKETS.TOTAL_WALLET_CONTROL,
+        input.currency,
+        'DEBIT',
+      );
 
-    await this.applyBalance(
-      transaction,
-      userAccount,
-      'DEBIT',
-      input.grossAmount,
-      'Insufficient available balance in the selected wallet bucket.',
-    );
+      await this.insertTotalWalletEvent(transaction, {
+        eventKey: payoutTotalWalletEventKey(input.payoutId, 'RESERVE'),
+        userId: input.userId,
+        currency: input.currency,
+        direction: 'DEBIT',
+        amount: input.grossAmount,
+        reason: 'PAYOUT_RESERVE',
+        ledgerTransactionId: ledgerTransaction.id,
+        requireAvailable: true,
+      });
+
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: controlAccount.id,
+        side: 'DEBIT',
+        amount: input.grossAmount,
+        memo: `Reserve payout ${input.payoutId} from authoritative Total Wallet.`,
+      });
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: reserveAccount.id,
+        side: 'CREDIT',
+        amount: input.grossAmount,
+        memo: `Reserve liability for payout ${input.payoutId}.`,
+      });
+
+      await this.applyBalance(
+        transaction,
+        controlAccount,
+        'DEBIT',
+        input.grossAmount,
+        'Payout Total Wallet control accounting failed.',
+      );
+    } else {
+      if (!isPayoutWalletBucket(input.sourceBucket)) {
+        throw new ServiceUnavailableException(
+          'Historical payout source bucket is unsupported.',
+        );
+      }
+
+      const userAccount = await this.getUserAccountForUpdate(
+        transaction,
+        input.userId,
+        input.sourceBucket,
+        input.currency,
+      );
+
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: userAccount.id,
+        side: 'DEBIT',
+        amount: input.grossAmount,
+        memo: `Reserve legacy payout ${input.payoutId} from ${input.sourceBucket}.`,
+      });
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: reserveAccount.id,
+        side: 'CREDIT',
+        amount: input.grossAmount,
+        memo: `Reserve liability for payout ${input.payoutId}.`,
+      });
+
+      await this.applyBalance(
+        transaction,
+        userAccount,
+        'DEBIT',
+        input.grossAmount,
+        'Insufficient available balance in the legacy wallet bucket.',
+      );
+    }
+
     await this.applyBalance(
       transaction,
       reserveAccount,
@@ -174,12 +246,6 @@ export class PayoutAccountingService {
       return ledgerTransaction.id;
     }
 
-    const userAccount = await this.getUserAccountForUpdate(
-      transaction,
-      input.userId,
-      input.sourceBucket,
-      input.currency,
-    );
     const reserveAccount = await this.ensureSystemAccount(
       transaction,
       payoutReserveAccountKey(input.currency),
@@ -194,14 +260,6 @@ export class PayoutAccountingService {
       amount: input.grossAmount,
       memo: `Release payout ${input.payoutId} reserve.`,
     });
-    await this.insertEntry(transaction, {
-      transactionId: ledgerTransaction.id,
-      accountId: userAccount.id,
-      side: 'CREDIT',
-      amount: input.grossAmount,
-      memo: `Return rejected payout ${input.payoutId} to ${input.sourceBucket}.`,
-    });
-
     await this.applyBalance(
       transaction,
       reserveAccount,
@@ -209,13 +267,70 @@ export class PayoutAccountingService {
       input.grossAmount,
       'Payout reserve release was rejected.',
     );
-    await this.applyBalance(
-      transaction,
-      userAccount,
-      'CREDIT',
-      input.grossAmount,
-      'Payout wallet release accounting failed.',
-    );
+
+    if (input.sourceBucket === 'TOTAL_WALLET') {
+      const controlAccount = await this.ensureSystemAccount(
+        transaction,
+        payoutTotalWalletControlAccountKey(input.currency),
+        PAYOUT_SYSTEM_BUCKETS.TOTAL_WALLET_CONTROL,
+        input.currency,
+        'DEBIT',
+      );
+
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: controlAccount.id,
+        side: 'CREDIT',
+        amount: input.grossAmount,
+        memo: `Return rejected payout ${input.payoutId} to Total Wallet.`,
+      });
+      await this.applyBalance(
+        transaction,
+        controlAccount,
+        'CREDIT',
+        input.grossAmount,
+        'Payout Total Wallet control release failed.',
+      );
+
+      await this.insertTotalWalletEvent(transaction, {
+        eventKey: payoutTotalWalletEventKey(input.payoutId, 'RELEASE'),
+        userId: input.userId,
+        currency: input.currency,
+        direction: 'CREDIT',
+        amount: input.grossAmount,
+        reason: 'PAYOUT_RELEASE',
+        ledgerTransactionId: ledgerTransaction.id,
+        requireAvailable: false,
+      });
+    } else {
+      if (!isPayoutWalletBucket(input.sourceBucket)) {
+        throw new ServiceUnavailableException(
+          'Historical payout source bucket is unsupported.',
+        );
+      }
+
+      const userAccount = await this.getUserAccountForUpdate(
+        transaction,
+        input.userId,
+        input.sourceBucket,
+        input.currency,
+      );
+
+      await this.insertEntry(transaction, {
+        transactionId: ledgerTransaction.id,
+        accountId: userAccount.id,
+        side: 'CREDIT',
+        amount: input.grossAmount,
+        memo: `Return rejected legacy payout ${input.payoutId} to ${input.sourceBucket}.`,
+      });
+      await this.applyBalance(
+        transaction,
+        userAccount,
+        'CREDIT',
+        input.grossAmount,
+        'Payout legacy wallet release accounting failed.',
+      );
+    }
 
     await this.assertBalanced(transaction, ledgerTransaction.id);
     await this.audit(transaction, {
@@ -340,6 +455,82 @@ export class PayoutAccountingService {
     return ledgerTransaction.id;
   }
 
+  private async insertTotalWalletEvent(
+    transaction: Prisma.TransactionClient,
+    input: {
+      eventKey: string;
+      userId: string;
+      currency: string;
+      direction: LedgerSide;
+      amount: string;
+      reason: string;
+      ledgerTransactionId: string;
+      requireAvailable: boolean;
+    },
+  ): Promise<void> {
+    const amount = new Prisma.Decimal(input.amount);
+    if (amount.lte(0)) {
+      throw new ServiceUnavailableException(
+        'Total Wallet event amount must be positive.',
+      );
+    }
+
+    if (input.requireAvailable) {
+      const balances = await transaction.$queryRaw<TotalWalletBalanceRow[]>(
+        Prisma.sql`
+          SELECT balance
+          FROM user_total_wallet_balances
+          WHERE userId = ${input.userId}
+            AND currency = ${input.currency}
+          LIMIT 1
+          FOR UPDATE
+        `,
+      );
+      const available = balances[0]
+        ? new Prisma.Decimal(balances[0].balance)
+        : new Prisma.Decimal(0);
+
+      if (available.lt(amount)) {
+        throw new ConflictException('Insufficient Total Wallet balance.');
+      }
+    }
+
+    const inserted = await transaction.$executeRaw(Prisma.sql`
+      INSERT IGNORE INTO user_total_wallet_events (
+        id, eventKey, userId, currency, direction, amount, reason,
+        ledgerTransactionId, createdAt
+      ) VALUES (
+        ${randomUUID()}, ${input.eventKey}, ${input.userId}, ${input.currency},
+        ${input.direction}, ${amount.toFixed(8)}, ${input.reason},
+        ${input.ledgerTransactionId}, CURRENT_TIMESTAMP(3)
+      )
+    `);
+
+    if (inserted === 1) return;
+
+    const rows = await transaction.$queryRaw<TotalWalletEventRow[]>(Prisma.sql`
+      SELECT userId, currency, direction, amount, ledgerTransactionId
+      FROM user_total_wallet_events
+      WHERE eventKey = ${input.eventKey}
+      LIMIT 1
+      FOR UPDATE
+    `);
+    const existing = rows[0];
+
+    if (
+      !existing ||
+      existing.userId !== input.userId ||
+      existing.currency !== input.currency ||
+      existing.direction !== input.direction ||
+      !new Prisma.Decimal(existing.amount).equals(amount) ||
+      existing.ledgerTransactionId !== input.ledgerTransactionId
+    ) {
+      throw new ServiceUnavailableException(
+        'Total Wallet event key conflicts with existing accounting.',
+      );
+    }
+  }
+
   private async establishTransaction(
     transaction: Prisma.TransactionClient,
     input: {
@@ -399,7 +590,7 @@ export class PayoutAccountingService {
   private async getUserAccountForUpdate(
     transaction: Prisma.TransactionClient,
     userId: string,
-    bucket: PayoutBucket,
+    bucket: PayoutWalletBucket,
     currency: string,
   ): Promise<LedgerAccountRow> {
     const accountKey = payoutUserAccountKey(userId, bucket, currency);
@@ -414,7 +605,7 @@ export class PayoutAccountingService {
 
     if (!account) {
       throw new ConflictException(
-        'Selected wallet bucket has no available balance.',
+        'Selected legacy wallet bucket has no available balance.',
       );
     }
 
@@ -438,6 +629,7 @@ export class PayoutAccountingService {
     accountKey: string,
     bucket: LedgerBucket,
     currency: string,
+    normalSide: LedgerSide = 'CREDIT',
   ): Promise<LedgerAccountRow> {
     const proposedId = randomUUID();
 
@@ -447,7 +639,7 @@ export class PayoutAccountingService {
         currency, normalSide, createdAt
       ) VALUES (
         ${proposedId}, ${accountKey}, 'SYSTEM', NULL, ${bucket},
-        ${currency}, 'CREDIT', CURRENT_TIMESTAMP(3)
+        ${currency}, ${normalSide}, CURRENT_TIMESTAMP(3)
       )
       ON DUPLICATE KEY UPDATE accountKey = VALUES(accountKey)
     `);
@@ -472,7 +664,7 @@ export class PayoutAccountingService {
       account.ownerUserId !== null ||
       account.bucket !== bucket ||
       account.currency !== currency ||
-      account.normalSide !== 'CREDIT'
+      account.normalSide !== normalSide
     ) {
       throw new ServiceUnavailableException(
         'Payout system account key conflicts with existing semantics.',
