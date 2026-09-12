@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -28,6 +28,12 @@ const PERCENT_PATTERN = /^(?:100(?:\.0{1,6})?|(?:\d|[1-9]\d)(?:\.\d{1,6})?)$/;
 export class CreatePayoutDto {
   @IsUUID()
   requestKey!: string;
+
+  // The client never chooses the accounting source. Any submitted legacy value
+  // is normalized to the locked authoritative Total Wallet source.
+  @Transform(() => 'TOTAL_WALLET')
+  @IsIn(PAYOUT_SPENDABLE_BUCKETS)
+  sourceBucket: PayoutBucket = 'TOTAL_WALLET';
 
   @IsString()
   @Matches(MONEY_PATTERN)
