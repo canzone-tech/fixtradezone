@@ -12,9 +12,7 @@ describe('allocateTotalWallet', () => {
         ],
         '10',
       ),
-    ).toEqual([
-      { bucket: 'REFERRAL_COMMISSION', amount: '10.00000000' },
-    ]);
+    ).toEqual([{ bucket: 'REFERRAL_COMMISSION', amount: '10.00000000' }]);
   });
 
   it('spans buckets deterministically and preserves Main / Deposit until last', () => {
