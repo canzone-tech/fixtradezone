@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { formatPlatformDate } from "@/lib/platform-time";
 import type { UserPortalSession } from "@/lib/user-session";
 import styles from "../../internal-trading/internal-trading.module.css";
 
@@ -470,11 +471,6 @@ export default function UserTradingClient() {
                   <dt>Total trades</dt>
                   <dd>{selected.settledTradeCount}</dd>
                 </div>
-
-                <div>
-                  <dt>Trading timezone</dt>
-                  <dd>{selected.timezoneSnapshot}</dd>
-                </div>
               </dl>
             </div>
           </section>
@@ -501,7 +497,7 @@ export default function UserTradingClient() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>UTC Date</th>
                   <th>Time (UTC)</th>
                   <th>Day / Slot</th>
                   <th>Asset</th>
@@ -519,7 +515,7 @@ export default function UserTradingClient() {
 
                   return (
                     <tr key={event.id}>
-                      <td>{event.localTradeDate}</td>
+                      <td>{formatPlatformDate(event.scheduledAt)}</td>
                       <td>{utcTime(event.scheduledAt)}</td>
                       <td>
                         D{event.tradeDayNumber} / {event.slotNumber}
