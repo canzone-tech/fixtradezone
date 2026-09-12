@@ -43,7 +43,7 @@ interface LedgerAccountRow {
 
 interface LedgerTransactionRow {
   id: string;
-  kind: 'DEPOSIT_CREDIT';
+  kind: string;
   sourceKey: string;
   sourceType: string;
   sourceId: string;
@@ -85,6 +85,11 @@ interface ApprovedDepositAccountingSource {
 
 interface WalletBucketRow {
   bucket: UserWalletBucket;
+  currency: string;
+  balance: DecimalValue;
+}
+
+interface TotalWalletRow {
   currency: string;
   balance: DecimalValue;
 }
@@ -136,9 +141,7 @@ export class WalletLedgerService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMyWallet(userId: string, query: WalletPageQueryDto) {
-    const bucketRows = await this.prisma.$queryRaw<
-      WalletBucketRow[]
-    >(Prisma.sql`
+    const bucketRows = await this.prisma.$queryRaw<WalletBucketRow[]>(Prisma.sql`
       SELECT
         la.bucket,
         la.currency,
@@ -147,6 +150,9 @@ export class WalletLedgerService {
       LEFT JOIN ledger_account_balances lb ON lb.accountId = la.id
       WHERE la.ownerType = 'USER'
         AND la.ownerUserId = ${userId}
+        AND la.bucket IN (
+          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+        )
       ORDER BY la.currency ASC,
         FIELD(
           la.bucket,
@@ -157,10 +163,17 @@ export class WalletLedgerService {
         ) ASC
     `);
 
+    const totalWalletRows = await this.prisma.$queryRaw<TotalWalletRow[]>(
+      Prisma.sql`
+        SELECT currency, balance
+        FROM user_total_wallet_balances
+        WHERE userId = ${userId}
+        ORDER BY currency ASC
+      `,
+    );
+
     const skip = (query.page - 1) * query.limit;
-    const activity = await this.prisma.$queryRaw<
-      WalletActivityRow[]
-    >(Prisma.sql`
+    const activity = await this.prisma.$queryRaw<WalletActivityRow[]>(Prisma.sql`
       SELECT
         lt.id AS transactionId,
         lt.kind,
@@ -177,6 +190,9 @@ export class WalletLedgerService {
       INNER JOIN ledger_accounts la ON la.id = le.accountId
       WHERE la.ownerType = 'USER'
         AND la.ownerUserId = ${userId}
+        AND la.bucket IN (
+          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+        )
       ORDER BY lt.postedAt DESC, le.createdAt DESC
       LIMIT ${query.limit} OFFSET ${skip}
     `);
@@ -187,10 +203,13 @@ export class WalletLedgerService {
       INNER JOIN ledger_accounts la ON la.id = le.accountId
       WHERE la.ownerType = 'USER'
         AND la.ownerUserId = ${userId}
+        AND la.bucket IN (
+          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+        )
     `);
 
     return {
-      wallets: this.buildWalletCurrencies(bucketRows),
+      wallets: this.buildWalletCurrencies(bucketRows, totalWalletRows),
       activity: activity.map((row) => ({
         transactionId: row.transactionId,
         kind: row.kind,
@@ -224,35 +243,21 @@ export class WalletLedgerService {
         u.username,
         u.email,
         la.currency,
-        SUM(
-          CASE WHEN la.bucket = 'MAIN'
-            THEN COALESCE(lb.balance, 0)
-            ELSE 0
-          END
-        ) AS mainBalance,
-        SUM(
-          CASE WHEN la.bucket = 'PACKAGE_EARNINGS'
-            THEN COALESCE(lb.balance, 0)
-            ELSE 0
-          END
-        ) AS packageEarningsBalance,
-        SUM(
-          CASE WHEN la.bucket = 'REFERRAL_COMMISSION'
-            THEN COALESCE(lb.balance, 0)
-            ELSE 0
-          END
-        ) AS referralCommissionBalance,
-        SUM(
-          CASE WHEN la.bucket = 'REWARDS'
-            THEN COALESCE(lb.balance, 0)
-            ELSE 0
-          END
-        ) AS rewardsBalance,
-        SUM(COALESCE(lb.balance, 0)) AS totalBalance
+        SUM(CASE WHEN la.bucket = 'MAIN' THEN COALESCE(lb.balance, 0) ELSE 0 END) AS mainBalance,
+        SUM(CASE WHEN la.bucket = 'PACKAGE_EARNINGS' THEN COALESCE(lb.balance, 0) ELSE 0 END) AS packageEarningsBalance,
+        SUM(CASE WHEN la.bucket = 'REFERRAL_COMMISSION' THEN COALESCE(lb.balance, 0) ELSE 0 END) AS referralCommissionBalance,
+        SUM(CASE WHEN la.bucket = 'REWARDS' THEN COALESCE(lb.balance, 0) ELSE 0 END) AS rewardsBalance,
+        COALESCE(MAX(tw.balance), 0.00000000) AS totalBalance
       FROM ledger_accounts la
       INNER JOIN users u ON u.id = la.ownerUserId
       LEFT JOIN ledger_account_balances lb ON lb.accountId = la.id
+      LEFT JOIN user_total_wallet_balances tw
+        ON tw.userId = la.ownerUserId
+       AND tw.currency = la.currency
       WHERE la.ownerType = 'USER'
+        AND la.bucket IN (
+          'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+        )
         ${userFilter}
         ${currencyFilter}
       GROUP BY u.id, u.username, u.email, la.currency
@@ -266,6 +271,9 @@ export class WalletLedgerService {
         SELECT la.ownerUserId, la.currency
         FROM ledger_accounts la
         WHERE la.ownerType = 'USER'
+          AND la.bucket IN (
+            'MAIN', 'PACKAGE_EARNINGS', 'REFERRAL_COMMISSION', 'REWARDS'
+          )
           ${userFilter}
           ${currencyFilter}
         GROUP BY la.ownerUserId, la.currency
@@ -333,8 +341,8 @@ export class WalletLedgerService {
       WHERE lt.id = ${transactionId}
       LIMIT 1
     `);
-    const transaction = rows[0];
-    if (!transaction) {
+    const ledgerTransaction = rows[0];
+    if (!ledgerTransaction) {
       throw new NotFoundException('Ledger transaction was not found.');
     }
 
@@ -353,7 +361,7 @@ export class WalletLedgerService {
     `);
 
     return {
-      transaction: this.transactionSnapshot(transaction),
+      transaction: this.transactionSnapshot(ledgerTransaction),
       entries: entries.map((entry) => this.entrySnapshot(entry)),
       balanced: this.entriesBalanced(entries),
     };
@@ -424,9 +432,7 @@ export class WalletLedgerService {
         },
       });
 
-      if (!deposit) {
-        throw new NotFoundException('Deposit was not found.');
-      }
+      if (!deposit) throw new NotFoundException('Deposit was not found.');
       if (deposit.status !== 'APPROVED') {
         throw new ConflictException(
           'Only an approved deposit may be posted into accounting.',
@@ -475,6 +481,7 @@ export class WalletLedgerService {
       packageDisplayName: deposit.packageDisplayName,
       reviewedAt: deposit.reviewedAt?.toISOString() ?? null,
       walletBucket: 'MAIN',
+      totalWalletApplied: true,
       packageActivationApplied: false,
       referralCommissionApplied: false,
       rewardsApplied: false,
@@ -482,42 +489,26 @@ export class WalletLedgerService {
 
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_transactions (
-        id,
-        kind,
-        sourceKey,
-        sourceType,
-        sourceId,
-        currency,
-        postedByUserId,
-        description,
-        metadata,
-        postedAt,
-        createdAt
+        id, kind, sourceKey, sourceType, sourceId, currency,
+        postedByUserId, description, metadata, postedAt, createdAt
       ) VALUES (
-        ${proposedTransactionId},
-        'DEPOSIT_CREDIT',
-        ${sourceKey},
-        'DEPOSIT',
-        ${deposit.id},
-        ${currency},
-        ${actor.id},
+        ${proposedTransactionId}, 'DEPOSIT_CREDIT', ${sourceKey}, 'DEPOSIT',
+        ${deposit.id}, ${currency}, ${actor.id},
         ${`Approved deposit ${deposit.id} credited to Main / Deposit Balance.`},
-        ${JSON.stringify(metadata)},
-        CURRENT_TIMESTAMP(3),
-        CURRENT_TIMESTAMP(3)
+        ${JSON.stringify(metadata)}, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
       )
       ON DUPLICATE KEY UPDATE sourceKey = VALUES(sourceKey)
     `);
 
-    const transactionRows = await transaction.$queryRaw<
-      LedgerTransactionRow[]
-    >(Prisma.sql`
-      SELECT lt.*
-      FROM ledger_transactions lt
-      WHERE lt.sourceKey = ${sourceKey}
-      LIMIT 1
-      FOR UPDATE
-    `);
+    const transactionRows = await transaction.$queryRaw<LedgerTransactionRow[]>(
+      Prisma.sql`
+        SELECT lt.*
+        FROM ledger_transactions lt
+        WHERE lt.sourceKey = ${sourceKey}
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
     const ledgerTransaction = transactionRows[0];
     if (!ledgerTransaction) {
       throw new ServiceUnavailableException(
@@ -525,13 +516,11 @@ export class WalletLedgerService {
       );
     }
 
-    const existingEntryCount = await transaction.$queryRaw<CountRow[]>(
-      Prisma.sql`
-        SELECT COUNT(*) AS total
-        FROM ledger_entries
-        WHERE transactionId = ${ledgerTransaction.id}
-      `,
-    );
+    const existingEntryCount = await transaction.$queryRaw<CountRow[]>(Prisma.sql`
+      SELECT COUNT(*) AS total
+      FROM ledger_entries
+      WHERE transactionId = ${ledgerTransaction.id}
+    `);
     if (this.countNumber(existingEntryCount[0]?.total) > 0) {
       return {
         message: 'Deposit accounting was already posted.',
@@ -603,6 +592,7 @@ export class WalletLedgerService {
           debitAccount: clearingAccount.accountKey,
           creditAccount: mainAccount.accountKey,
           balanced: true,
+          totalWalletApplied: true,
           packageActivationApplied: false,
           referralCommissionApplied: false,
           rewardsApplied: false,
@@ -647,36 +637,18 @@ export class WalletLedgerService {
     const id = randomUUID();
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_accounts (
-        id,
-        accountKey,
-        ownerType,
-        ownerUserId,
-        bucket,
-        currency,
-        normalSide,
-        createdAt
+        id, accountKey, ownerType, ownerUserId, bucket,
+        currency, normalSide, createdAt
       ) VALUES (
-        ${id},
-        ${input.accountKey},
-        ${input.ownerType},
-        ${input.ownerUserId},
-        ${input.bucket},
-        ${input.currency},
-        ${input.normalSide},
+        ${id}, ${input.accountKey}, ${input.ownerType}, ${input.ownerUserId},
+        ${input.bucket}, ${input.currency}, ${input.normalSide},
         CURRENT_TIMESTAMP(3)
       )
       ON DUPLICATE KEY UPDATE accountKey = VALUES(accountKey)
     `);
 
     const rows = await transaction.$queryRaw<LedgerAccountRow[]>(Prisma.sql`
-      SELECT
-        id,
-        accountKey,
-        ownerType,
-        ownerUserId,
-        bucket,
-        currency,
-        normalSide
+      SELECT id, accountKey, ownerType, ownerUserId, bucket, currency, normalSide
       FROM ledger_accounts
       WHERE accountKey = ${input.accountKey}
       LIMIT 1
@@ -702,17 +674,8 @@ export class WalletLedgerService {
     }
 
     await transaction.$executeRaw(Prisma.sql`
-      INSERT INTO ledger_account_balances (
-        accountId,
-        balance,
-        revision,
-        updatedAt
-      ) VALUES (
-        ${account.id},
-        0.00000000,
-        0,
-        CURRENT_TIMESTAMP(3)
-      )
+      INSERT INTO ledger_account_balances (accountId, balance, revision, updatedAt)
+      VALUES (${account.id}, 0.00000000, 0, CURRENT_TIMESTAMP(3))
       ON DUPLICATE KEY UPDATE accountId = VALUES(accountId)
     `);
 
@@ -731,21 +694,10 @@ export class WalletLedgerService {
   ) {
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_entries (
-        id,
-        transactionId,
-        accountId,
-        side,
-        amount,
-        memo,
-        createdAt
+        id, transactionId, accountId, side, amount, memo, createdAt
       ) VALUES (
-        ${randomUUID()},
-        ${input.transactionId},
-        ${input.accountId},
-        ${input.side},
-        ${input.amount},
-        ${input.memo},
-        CURRENT_TIMESTAMP(3)
+        ${randomUUID()}, ${input.transactionId}, ${input.accountId},
+        ${input.side}, ${input.amount}, ${input.memo}, CURRENT_TIMESTAMP(3)
       )
     `);
   }
@@ -760,15 +712,11 @@ export class WalletLedgerService {
     const updated = await transaction.$executeRaw(Prisma.sql`
       UPDATE ledger_account_balances
       SET
-        balance = balance + (
-          ${direction} * CAST(${amount} AS DECIMAL(20, 8))
-        ),
+        balance = balance + (${direction} * CAST(${amount} AS DECIMAL(20, 8))),
         revision = revision + 1,
         updatedAt = CURRENT_TIMESTAMP(3)
       WHERE accountId = ${account.id}
-        AND balance + (
-          ${direction} * CAST(${amount} AS DECIMAL(20, 8))
-        ) >= 0
+        AND balance + (${direction} * CAST(${amount} AS DECIMAL(20, 8))) >= 0
     `);
 
     if (updated !== 1) {
@@ -791,7 +739,10 @@ export class WalletLedgerService {
     return entries.length >= 2 && debits.equals(credits);
   }
 
-  private buildWalletCurrencies(rows: WalletBucketRow[]) {
+  private buildWalletCurrencies(
+    rows: WalletBucketRow[],
+    totalRows: TotalWalletRow[],
+  ) {
     const currencies = new Map<
       string,
       Record<UserWalletBucket, Prisma.Decimal>
@@ -808,22 +759,32 @@ export class WalletLedgerService {
       currencies.set(row.currency, buckets);
     }
 
-    return Array.from(currencies.entries()).map(([currency, buckets]) => {
-      const total = USER_WALLET_BUCKETS.reduce(
-        (sum, bucket) => sum.plus(buckets[bucket]),
-        new Prisma.Decimal(0),
-      );
-      return {
-        currency,
-        buckets: {
-          main: this.decimalString(buckets.MAIN),
-          packageEarnings: this.decimalString(buckets.PACKAGE_EARNINGS),
-          referralCommission: this.decimalString(buckets.REFERRAL_COMMISSION),
-          rewards: this.decimalString(buckets.REWARDS),
-        },
-        totalWallet: this.decimalString(total),
-      };
-    });
+    const totals = new Map(
+      totalRows.map((row) => [row.currency, new Prisma.Decimal(row.balance)]),
+    );
+    for (const row of totalRows) {
+      if (!currencies.has(row.currency)) {
+        currencies.set(row.currency, {
+          MAIN: new Prisma.Decimal(0),
+          PACKAGE_EARNINGS: new Prisma.Decimal(0),
+          REFERRAL_COMMISSION: new Prisma.Decimal(0),
+          REWARDS: new Prisma.Decimal(0),
+        });
+      }
+    }
+
+    return Array.from(currencies.entries()).map(([currency, buckets]) => ({
+      currency,
+      buckets: {
+        main: this.decimalString(buckets.MAIN),
+        packageEarnings: this.decimalString(buckets.PACKAGE_EARNINGS),
+        referralCommission: this.decimalString(buckets.REFERRAL_COMMISSION),
+        rewards: this.decimalString(buckets.REWARDS),
+      },
+      totalWallet: this.decimalString(
+        totals.get(currency) ?? new Prisma.Decimal(0),
+      ),
+    }));
   }
 
   private transactionSnapshot(row: LedgerTransactionRow) {
