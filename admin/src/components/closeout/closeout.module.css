@@ -37,6 +37,7 @@
 }
 
 .metric {
+  min-width: 0;
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 14px;
   background: rgba(2, 6, 23, 0.35);
@@ -50,7 +51,11 @@
 }
 
 .metric strong {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   font-size: 1.1rem;
+  line-height: 1.35;
 }
 
 .metric > strong,
@@ -59,7 +64,10 @@
 }
 
 .metric > .meta {
+  max-width: 100%;
   margin-top: 0.25rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   line-height: 1.35;
 }
 
