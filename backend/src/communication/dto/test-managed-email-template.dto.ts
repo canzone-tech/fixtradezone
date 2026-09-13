@@ -1,10 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import {
-  IsEmail,
-  IsString,
-  MaxLength,
-  ValidateNested,
-} from 'class-validator';
+import { IsEmail, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { CreateEmailTemplateDraftDto } from '../../content/dto/content.dto';
 
 export class TestManagedEmailTemplateDto {

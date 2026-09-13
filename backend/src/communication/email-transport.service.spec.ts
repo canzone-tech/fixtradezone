@@ -4,7 +4,9 @@ import { EmailTransportService } from './email-transport.service';
 function configService(values: Record<string, unknown>): ConfigService {
   return {
     get: jest.fn((key: string, fallback?: unknown) =>
-      Object.prototype.hasOwnProperty.call(values, key) ? values[key] : fallback,
+      Object.prototype.hasOwnProperty.call(values, key)
+        ? values[key]
+        : fallback,
     ),
   } as unknown as ConfigService;
 }

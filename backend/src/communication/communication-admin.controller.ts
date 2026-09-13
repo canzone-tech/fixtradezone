@@ -85,13 +85,14 @@ export class CommunicationAdminController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const delivery =
-      await this.communicationService.sendControlledTemplateTest({
+    const delivery = await this.communicationService.sendControlledTemplateTest(
+      {
         contentKey: templateKey,
         content: dto.content,
         to: dto.to,
         actorUsername: actor.username,
-      });
+      },
+    );
 
     const context = getRequestContext(request);
     await this.prisma.auditLog.create({

@@ -11,11 +11,7 @@ export type ContentKey = (typeof CONTENT_KEYS)[keyof typeof CONTENT_KEYS];
 export type EmailContentKey = Exclude<ContentKey, 'LANDING_PAGE'>;
 
 export type EmailTemplateCategory =
-  | 'AUTH'
-  | 'FINANCE'
-  | 'SUPPORT'
-  | 'MARKETING'
-  | 'SYSTEM';
+  'AUTH' | 'FINANCE' | 'SUPPORT' | 'MARKETING' | 'SYSTEM';
 
 export interface EmailTemplateDefinition {
   label: string;
