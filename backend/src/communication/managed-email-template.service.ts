@@ -1,6 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { EmailTemplateContent } from '../content/content.defaults';
+import {
+  EMAIL_ALLOWED_VARIABLES,
+  type EmailContentKey,
+  type EmailTemplateContent,
+  isEmailContentKey,
+} from '../content/content.defaults';
 import { ContentService } from '../content/content.service';
 import type { EmailMessage } from './communication.types';
 import { renderManagedEmailTemplate } from './email-template.renderer';
@@ -21,10 +30,7 @@ export class ManagedEmailTemplateService {
     const content = await this.contentService.getPublishedEmailTemplate(
       context.contentKey,
     );
-    const appUrl = (
-      this.configService.get<string>('PUBLIC_APP_URL') ??
-      'https://localhost:3001'
-    ).replace(/\/+$/, '');
+    const appUrl = this.getAppUrl();
     const values = {
       ...context.values,
       appUrl,
@@ -32,6 +38,25 @@ export class ManagedEmailTemplateService {
     const actionUrl = context.actionUrl ?? appUrl;
 
     return this.render(content, message.to, values, actionUrl);
+  }
+
+  renderControlledTest(
+    rawContentKey: string,
+    content: EmailTemplateContent,
+    to: string,
+    actorUsername: string,
+  ): EmailMessage {
+    const contentKey = this.assertContentKey(rawContentKey);
+    this.assertAllowedVariables(contentKey, content);
+
+    const appUrl = this.getAppUrl();
+    const test = this.getControlledTestContext(
+      contentKey,
+      actorUsername,
+      appUrl,
+    );
+
+    return this.render(content, to, test.values, test.actionUrl);
   }
 
   private render(
@@ -60,5 +85,103 @@ export class ManagedEmailTemplateService {
       /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g,
       (_match, variable: string) => values[variable] ?? '',
     );
+  }
+
+  private assertContentKey(rawContentKey: string): EmailContentKey {
+    const contentKey = rawContentKey.trim().toUpperCase();
+    if (!isEmailContentKey(contentKey)) {
+      throw new NotFoundException('Email template not found.');
+    }
+    return contentKey;
+  }
+
+  private assertAllowedVariables(
+    contentKey: EmailContentKey,
+    content: EmailTemplateContent,
+  ): void {
+    const allowed = new Set(EMAIL_ALLOWED_VARIABLES[contentKey]);
+    const variablePattern = /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g;
+
+    for (const value of Object.values(content)) {
+      for (const match of value.matchAll(variablePattern)) {
+        const variable = match[1];
+        if (!allowed.has(variable)) {
+          throw new BadRequestException(
+            `Template variable {{${variable}}} is not allowed for ${contentKey}.`,
+          );
+        }
+      }
+    }
+  }
+
+  private getControlledTestContext(
+    contentKey: EmailContentKey,
+    actorUsername: string,
+    appUrl: string,
+  ): { values: Record<string, string>; actionUrl: string } {
+    const displayName = 'FixTradeZone Test User';
+
+    switch (contentKey) {
+      case 'EMAIL_VERIFICATION': {
+        const verificationUrl = `${appUrl}/verify-email?token=CONTROLLED_TEST_ONLY`;
+        return {
+          values: {
+            displayName,
+            verificationUrl,
+            expiresInMinutes: '30',
+          },
+          actionUrl: verificationUrl,
+        };
+      }
+      case 'PASSWORD_RESET': {
+        const resetUrl = `${appUrl}/reset-password?token=CONTROLLED_TEST_ONLY`;
+        return {
+          values: {
+            displayName,
+            resetUrl,
+            expiresInMinutes: '30',
+          },
+          actionUrl: resetUrl,
+        };
+      }
+      case 'WELCOME':
+        return {
+          values: {
+            displayName,
+            userCode: '100000',
+            appUrl,
+          },
+          actionUrl: `${appUrl}/login`,
+        };
+      case 'MARKETING_OFFER': {
+        const offerUrl = `${appUrl}/user/packages`;
+        return {
+          values: {
+            displayName,
+            offerTitle: 'FixTradeZone Test Offer',
+            offerSummary:
+              'This is controlled preview content and is not a live promotion.',
+            offerUrl,
+            unsubscribeUrl: `${appUrl}/user/profile`,
+          },
+          actionUrl: offerUrl,
+        };
+      }
+      case 'DELIVERY_TEST':
+        return {
+          values: {
+            requestedBy: actorUsername.trim() || 'SUPER_ADMIN',
+            appUrl,
+          },
+          actionUrl: appUrl,
+        };
+    }
+  }
+
+  private getAppUrl(): string {
+    return (
+      this.configService.get<string>('PUBLIC_APP_URL') ??
+      'https://localhost:3001'
+    ).replace(/\/+$/, '');
   }
 }
