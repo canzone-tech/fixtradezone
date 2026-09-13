@@ -56,16 +56,18 @@ async function registerFullAppServiceWorker(): Promise<void> {
 
 export default function AppPwa() {
   const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+    useState<BeforeInstallPromptEvent | null>(() => {
+      if (typeof window === "undefined") {
+        return null;
+      }
+
+      return (window as InstallPromptWindow).__ftzPwaInstallPrompt ?? null;
+    });
   const [shouldRequireInstall, setShouldRequireInstall] = useState(false);
   const [ios, setIos] = useState(false);
 
   useEffect(() => {
     const installWindow = window as InstallPromptWindow;
-
-    if (installWindow.__ftzPwaInstallPrompt) {
-      setInstallPrompt(installWindow.__ftzPwaInstallPrompt);
-    }
 
     if ("serviceWorker" in navigator) {
       void registerFullAppServiceWorker().catch((error: unknown) => {
