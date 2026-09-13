@@ -31,14 +31,10 @@ export class CommunicationService {
     return this.emailTransport.send(message);
   }
 
-  getEmailConfigurationStatus(): {
-    mode: 'CONSOLE' | 'HTTP' | 'SMTP';
-    configured: boolean;
-  } {
-    const status = this.emailTransport.getConfigurationStatus();
-    return {
-      mode: status.mode,
-      configured: status.configured,
-    };
+  getEmailConfigurationStatus() {
+    // EmailTransportService intentionally returns only non-secret transport
+    // metadata. Credentials remain server-side while SUPER_ADMIN can verify
+    // sender, endpoint and TLS readiness from the Email Delivery screen.
+    return this.emailTransport.getConfigurationStatus();
   }
 }

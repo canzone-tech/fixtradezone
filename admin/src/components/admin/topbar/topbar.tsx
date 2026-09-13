@@ -90,6 +90,11 @@ const routeHeadings: Array<{
     subtitle: "Read-only operational and financial reporting",
   },
   {
+    path: "/templates",
+    title: "Templates / CMS",
+    subtitle: "Versioned landing content and managed email templates",
+  },
+  {
     path: "/audit-logs",
     title: "Audit Logs",
     subtitle: "Immutable administration activity and security history",

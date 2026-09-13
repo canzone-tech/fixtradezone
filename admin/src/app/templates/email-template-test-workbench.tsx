@@ -109,10 +109,14 @@ function messageFrom(payload: MessagePayload | null, fallback: string): string {
     : (payload.message[0] ?? fallback);
 }
 
-export default function EmailTemplateTestWorkbench() {
+export default function EmailTemplateTestWorkbench({
+  selectedContentKey = "",
+}: {
+  selectedContentKey?: string;
+}) {
   const [enabled, setEnabled] = useState(false);
   const [workspaces, setWorkspaces] = useState<EmailWorkspace[]>([]);
-  const [contentKey, setContentKey] = useState("WELCOME");
+  const [contentKey, setContentKey] = useState("");
   const [recipient, setRecipient] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -143,11 +147,7 @@ export default function EmailTemplateTestWorkbench() {
 
       if (active) {
         setWorkspaces(payload);
-        setContentKey(
-          payload.find((item) => item.contentKey === "WELCOME")?.contentKey ??
-            payload[0]?.contentKey ??
-            "",
-        );
+        setContentKey(payload[0]?.contentKey ?? "");
       }
     }
 
@@ -157,9 +157,20 @@ export default function EmailTemplateTestWorkbench() {
     };
   }, []);
 
+  const effectiveContentKey = useMemo(() => {
+    if (
+      selectedContentKey &&
+      workspaces.some((item) => item.contentKey === selectedContentKey)
+    ) {
+      return selectedContentKey;
+    }
+    return contentKey;
+  }, [contentKey, selectedContentKey, workspaces]);
+
   const selected = useMemo(
-    () => workspaces.find((item) => item.contentKey === contentKey) ?? null,
-    [contentKey, workspaces],
+    () =>
+      workspaces.find((item) => item.contentKey === effectiveContentKey) ?? null,
+    [effectiveContentKey, workspaces],
   );
 
   const preview = useMemo(() => {
@@ -250,7 +261,7 @@ export default function EmailTemplateTestWorkbench() {
               <h2>{meta.label}</h2>
             </div>
             <select
-              value={contentKey}
+              value={effectiveContentKey}
               onChange={(event) => {
                 setContentKey(event.target.value);
                 setNotice("");
