@@ -1,5 +1,9 @@
 export type ManagedEmailContentKey =
-  'EMAIL_VERIFICATION' | 'PASSWORD_RESET' | 'DELIVERY_TEST';
+  | 'EMAIL_VERIFICATION'
+  | 'PASSWORD_RESET'
+  | 'WELCOME'
+  | 'MARKETING_OFFER'
+  | 'DELIVERY_TEST';
 
 export interface ManagedEmailContext {
   contentKey: ManagedEmailContentKey;
