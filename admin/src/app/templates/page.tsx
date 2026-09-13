@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import ContentManagementClient from "./content-management-client";
+import EmailTemplateTestWorkbench from "./email-template-test-workbench";
 
 export const metadata: Metadata = {
   title: "Templates / CMS",
@@ -20,7 +21,10 @@ export default async function TemplatesPage() {
 
   return (
     <AdminShell>
-      <ContentManagementClient />
+      <div style={{ display: "grid", gap: 22 }}>
+        <ContentManagementClient />
+        <EmailTemplateTestWorkbench />
+      </div>
     </AdminShell>
   );
 }
