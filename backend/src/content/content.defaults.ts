@@ -2,11 +2,27 @@ export const CONTENT_KEYS = {
   LANDING_PAGE: 'LANDING_PAGE',
   EMAIL_VERIFICATION: 'EMAIL_VERIFICATION',
   PASSWORD_RESET: 'PASSWORD_RESET',
+  WELCOME: 'WELCOME',
+  MARKETING_OFFER: 'MARKETING_OFFER',
   DELIVERY_TEST: 'DELIVERY_TEST',
 } as const;
 
 export type ContentKey = (typeof CONTENT_KEYS)[keyof typeof CONTENT_KEYS];
 export type EmailContentKey = Exclude<ContentKey, 'LANDING_PAGE'>;
+
+export type EmailTemplateCategory =
+  | 'AUTH'
+  | 'FINANCE'
+  | 'SUPPORT'
+  | 'MARKETING'
+  | 'SYSTEM';
+
+export interface EmailTemplateDefinition {
+  label: string;
+  category: EmailTemplateCategory;
+  description: string;
+  transactional: boolean;
+}
 
 export const LANDING_TEMPLATE_KEY = 'DARK_NEO_V1';
 export const EMAIL_TEMPLATE_KEY = 'BRANDED_EMAIL_V1';
@@ -44,6 +60,47 @@ export interface EmailTemplateContent {
   ctaLabel: string;
   footer: string;
 }
+
+export const EMAIL_TEMPLATE_DEFINITIONS: Record<
+  EmailContentKey,
+  EmailTemplateDefinition
+> = {
+  EMAIL_VERIFICATION: {
+    label: 'Email verification',
+    category: 'AUTH',
+    description:
+      'Transactional account-verification message with a short-lived secure action link.',
+    transactional: true,
+  },
+  PASSWORD_RESET: {
+    label: 'Password reset',
+    category: 'AUTH',
+    description:
+      'Transactional password-recovery message with a short-lived one-time action link.',
+    transactional: true,
+  },
+  WELCOME: {
+    label: 'Welcome / signup',
+    category: 'AUTH',
+    description:
+      'Welcome message for a newly ready FixTradeZone account. Event wiring remains controlled by the account lifecycle.',
+    transactional: true,
+  },
+  MARKETING_OFFER: {
+    label: 'Marketing offer',
+    category: 'MARKETING',
+    description:
+      'Promotional template for eligible recipients. Delivery must respect marketing consent and preference rules.',
+    transactional: false,
+  },
+  DELIVERY_TEST: {
+    label: 'Delivery diagnostic',
+    category: 'SYSTEM',
+    description:
+      'Controlled SUPER_ADMIN diagnostic used to verify the configured email transport.',
+    transactional: true,
+  },
+};
 
 export const DEFAULT_LANDING_CONTENT: LandingContent = {
   brandName: 'FixTradeZone',
@@ -104,6 +161,24 @@ export const DEFAULT_EMAIL_CONTENT: Record<
     ctaLabel: 'Reset password',
     footer: 'If you did not request this change, you can ignore this message.',
   },
+  WELCOME: {
+    subject: 'Welcome to FixTradeZone',
+    preheader: 'Your FixTradeZone account is ready.',
+    headline: 'Welcome to FixTradeZone',
+    body: 'Hello {{displayName}}, your FixTradeZone account {{userCode}} is ready. Explore your dashboard, review available packages, manage deposits and wallet activity, and stay updated with account notifications.',
+    ctaLabel: 'Open FixTradeZone',
+    footer:
+      'Keep your login and verification details secure. FixTradeZone will never ask you to share your password.',
+  },
+  MARKETING_OFFER: {
+    subject: '{{offerTitle}} | FixTradeZone',
+    preheader: '{{offerSummary}}',
+    headline: '{{offerTitle}}',
+    body: 'Hello {{displayName}}, {{offerSummary}} Review the offer details in FixTradeZone before taking any action.',
+    ctaLabel: 'View offer',
+    footer:
+      'This is a promotional message. Manage your communication preferences here: {{unsubscribeUrl}}',
+  },
   DELIVERY_TEST: {
     subject: 'FixTradeZone email delivery test',
     preheader:
@@ -121,13 +196,17 @@ export const EMAIL_ALLOWED_VARIABLES: Record<
 > = {
   EMAIL_VERIFICATION: ['displayName', 'verificationUrl', 'expiresInMinutes'],
   PASSWORD_RESET: ['displayName', 'resetUrl', 'expiresInMinutes'],
+  WELCOME: ['displayName', 'userCode', 'appUrl'],
+  MARKETING_OFFER: [
+    'displayName',
+    'offerTitle',
+    'offerSummary',
+    'offerUrl',
+    'unsubscribeUrl',
+  ],
   DELIVERY_TEST: ['requestedBy', 'appUrl'],
 };
 
 export function isEmailContentKey(value: string): value is EmailContentKey {
-  return (
-    value === CONTENT_KEYS.EMAIL_VERIFICATION ||
-    value === CONTENT_KEYS.PASSWORD_RESET ||
-    value === CONTENT_KEYS.DELIVERY_TEST
-  );
+  return Object.prototype.hasOwnProperty.call(DEFAULT_EMAIL_CONTENT, value);
 }
