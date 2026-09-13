@@ -143,9 +143,11 @@ export default function EmailTemplateTestWorkbench() {
 
       if (active) {
         setWorkspaces(payload);
-        if (!payload.some((item) => item.contentKey === contentKey)) {
-          setContentKey(payload[0]?.contentKey ?? "");
-        }
+        setContentKey(
+          payload.find((item) => item.contentKey === "WELCOME")?.contentKey ??
+            payload[0]?.contentKey ??
+            "",
+        );
       }
     }
 
@@ -153,7 +155,7 @@ export default function EmailTemplateTestWorkbench() {
     return () => {
       active = false;
     };
-  }, [contentKey]);
+  }, []);
 
   const selected = useMemo(
     () => workspaces.find((item) => item.contentKey === contentKey) ?? null,
@@ -171,15 +173,10 @@ export default function EmailTemplateTestWorkbench() {
     ) as EmailTemplateContent;
   }, [selected]);
 
-  if (!enabled || !selected || !preview) return null;
-
-  const meta = TEMPLATE_META[selected.contentKey] ?? {
-    label: selected.contentKey,
-    category: "SYSTEM",
-    description: "Managed FixTradeZone email content.",
-  };
-
   async function sendTest() {
+    const template = selected;
+    if (!template) return;
+
     if (!recipient.trim()) {
       setError("Enter a recipient email address you control.");
       return;
@@ -190,13 +187,13 @@ export default function EmailTemplateTestWorkbench() {
     setError("");
     try {
       const response = await fetch(
-        `/api/admin/communication/email/templates/${encodeURIComponent(selected.contentKey)}/test`,
+        `/api/admin/communication/email/templates/${encodeURIComponent(template.contentKey)}/test`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: recipient,
-            content: selected.effective,
+            content: template.effective,
           }),
         },
       );
@@ -219,6 +216,14 @@ export default function EmailTemplateTestWorkbench() {
       setBusy(false);
     }
   }
+
+  if (!enabled || !selected || !preview) return null;
+
+  const meta = TEMPLATE_META[selected.contentKey] ?? {
+    label: selected.contentKey,
+    category: "SYSTEM",
+    description: "Managed FixTradeZone email content.",
+  };
 
   return (
     <section className={styles.workspace} aria-label="Email template preview and test">
