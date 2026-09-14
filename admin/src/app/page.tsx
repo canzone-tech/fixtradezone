@@ -166,7 +166,7 @@ export default async function Home() {
                 <div className={styles.packageMeta}>
                   <span>
                     <small>Daily trading</small>
-                    <strong>0.4–0.6% USER net / day</strong>
+                    <strong>0.4–0.6% /day</strong>
                   </span>
                   <span>
                     <small>Duration</small>
