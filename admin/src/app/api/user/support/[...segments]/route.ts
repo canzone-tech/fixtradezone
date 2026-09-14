@@ -12,19 +12,17 @@ async function proxy(
 ) {
   const { segments } = await context.params;
   const path = segments.map(encodeURIComponent).join("/");
-  const body = method === "GET" ? undefined : await request.text();
+  const body = method === "GET" ? undefined : await request.arrayBuffer();
+  const contentType = request.headers.get("content-type");
 
   return proxyUserRequest(
     request,
     `/support/${path}${request.nextUrl.search}`,
     {
       method,
-      ...(body
+      ...(body && body.byteLength > 0
         ? {
-            headers: {
-              "Content-Type":
-                request.headers.get("content-type") ?? "application/json",
-            },
+            ...(contentType ? { headers: { "Content-Type": contentType } } : {}),
             body,
           }
         : {}),

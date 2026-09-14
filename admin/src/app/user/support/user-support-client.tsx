@@ -8,12 +8,18 @@ import UserShell from "@/components/user/user-shell";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import {
   formatSupportStatus,
+  type SupportAttachment,
+  type SupportAttachmentList,
   type SupportCategory,
   type SupportTicket,
   type SupportTicketDetail,
   supportStatusTone,
 } from "@/lib/support-types";
 import type { UserDirectSession } from "@/lib/user-session";
+
+const MAX_ATTACHMENT_FILES = 3;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
 
 interface UserApiPayload {
   message?: string;
@@ -82,12 +88,57 @@ function statusChangeCopy(metadata: unknown): string {
   return `${from.replaceAll("_", " ")} → ${to.replaceAll("_", " ")}`;
 }
 
+function formatAttachmentSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateSelectedFiles(fileList: FileList | null): File[] {
+  const files = Array.from(fileList ?? []);
+  if (files.length > MAX_ATTACHMENT_FILES) {
+    throw new Error(`Select no more than ${MAX_ATTACHMENT_FILES} attachments.`);
+  }
+
+  for (const file of files) {
+    const name = file.name.toLowerCase();
+    const allowed = [".jpg", ".jpeg", ".png", ".pdf"].some((extension) =>
+      name.endsWith(extension),
+    );
+    if (!allowed) {
+      throw new Error("Only JPG, JPEG, PNG, and PDF attachments are allowed.");
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error("Each attachment must be 5 MB or smaller.");
+    }
+  }
+
+  return files;
+}
+
+async function uploadAttachments(
+  ticketId: string,
+  files: File[],
+): Promise<SupportAttachmentList> {
+  const formData = new FormData();
+  for (const file of files) formData.append("files", file, file.name);
+  const response = await fetch(
+    `/api/user/support/tickets/${encodeURIComponent(ticketId)}/attachments`,
+    { method: "POST", body: formData },
+  );
+  return checked<SupportAttachmentList>(
+    response,
+    "Support attachments could not be uploaded.",
+  );
+}
+
 export default function UserSupportClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [categories, setCategories] = useState<SupportCategory[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [selected, setSelected] = useState<SupportTicketDetail | null>(null);
+  const [attachments, setAttachments] = useState<SupportAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +147,10 @@ export default function UserSupportClient() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [reply, setReply] = useState("");
+  const [ticketFiles, setTicketFiles] = useState<File[]>([]);
+  const [replyFiles, setReplyFiles] = useState<File[]>([]);
+  const [ticketFileInputKey, setTicketFileInputKey] = useState(0);
+  const [replyFileInputKey, setReplyFileInputKey] = useState(0);
 
   const handleError = useCallback(
     (caught: unknown, fallback: string) => {
@@ -112,15 +167,25 @@ export default function UserSupportClient() {
   const loadTicket = useCallback(
     async (ticketId: string) => {
       try {
-        const response = await fetch(
-          `/api/user/support/tickets/${encodeURIComponent(ticketId)}`,
-          { cache: "no-store" },
-        );
+        const [response, attachmentResponse] = await Promise.all([
+          fetch(`/api/user/support/tickets/${encodeURIComponent(ticketId)}`, {
+            cache: "no-store",
+          }),
+          fetch(
+            `/api/user/support/tickets/${encodeURIComponent(ticketId)}/attachments`,
+            { cache: "no-store" },
+          ),
+        ]);
         const detail = await checked<SupportTicketDetail>(
           response,
           "Could not load the support ticket.",
         );
+        const attachmentPayload = await checked<SupportAttachmentList>(
+          attachmentResponse,
+          "Could not load support attachments.",
+        );
         setSelected(detail);
+        setAttachments(attachmentPayload.attachments);
       } catch (caught) {
         handleError(caught, "Could not load the support ticket.");
       }
@@ -163,7 +228,10 @@ export default function UserSupportClient() {
           (ticket) => ticket.id === selected.ticket.id,
         );
         if (stillExists) await loadTicket(selected.ticket.id);
-        else setSelected(null);
+        else {
+          setSelected(null);
+          setAttachments([]);
+        }
       }
     } catch (caught) {
       handleError(caught, "Could not load support.");
@@ -201,11 +269,30 @@ export default function UserSupportClient() {
         response,
         "Support ticket could not be created.",
       );
+
+      let attachmentError: string | null = null;
+      if (ticketFiles.length > 0) {
+        try {
+          await uploadAttachments(detail.ticket.id, ticketFiles);
+        } catch (caught) {
+          attachmentError =
+            caught instanceof Error
+              ? caught.message
+              : "Attachments could not be uploaded.";
+        }
+      }
+
       setSubject("");
       setMessage("");
+      setTicketFiles([]);
+      setTicketFileInputKey((current) => current + 1);
       setSelected(detail);
       setSuccess(`${detail.ticket.ticketNumber} created.`);
       await load();
+      await loadTicket(detail.ticket.id);
+      if (attachmentError) {
+        setError(`Ticket created, but ${attachmentError}`);
+      }
     } catch (caught) {
       handleError(caught, "Support ticket could not be created.");
     } finally {
@@ -221,22 +308,38 @@ export default function UserSupportClient() {
     setSuccess(null);
 
     try {
+      const ticketId = selected.ticket.id;
       const response = await fetch(
-        `/api/user/support/tickets/${encodeURIComponent(selected.ticket.id)}/replies`,
+        `/api/user/support/tickets/${encodeURIComponent(ticketId)}/replies`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: reply.trim() }),
         },
       );
-      const detail = await checked<SupportTicketDetail>(
-        response,
-        "Reply could not be sent.",
-      );
+      await checked<SupportTicketDetail>(response, "Reply could not be sent.");
+
+      let attachmentError: string | null = null;
+      if (replyFiles.length > 0) {
+        try {
+          await uploadAttachments(ticketId, replyFiles);
+        } catch (caught) {
+          attachmentError =
+            caught instanceof Error
+              ? caught.message
+              : "Attachments could not be uploaded.";
+        }
+      }
+
       setReply("");
-      setSelected(detail);
+      setReplyFiles([]);
+      setReplyFileInputKey((current) => current + 1);
       setSuccess("Reply added to the ticket.");
       await load();
+      await loadTicket(ticketId);
+      if (attachmentError) {
+        setError(`Reply sent, but ${attachmentError}`);
+      }
     } catch (caught) {
       handleError(caught, "Reply could not be sent.");
     } finally {
@@ -321,6 +424,31 @@ export default function UserSupportClient() {
                 disabled={busy}
                 required
               />
+            </div>
+            <div className={`${styles.field} ${styles.fieldFull}`}>
+              <label htmlFor="support-attachments">Attachments (optional)</label>
+              <input
+                key={ticketFileInputKey}
+                id="support-attachments"
+                className={styles.input}
+                type="file"
+                accept={ATTACHMENT_ACCEPT}
+                multiple
+                disabled={busy}
+                onChange={(event) => {
+                  try {
+                    setTicketFiles(validateSelectedFiles(event.target.files));
+                    setError(null);
+                  } catch (caught) {
+                    event.target.value = "";
+                    setTicketFiles([]);
+                    handleError(caught, "Invalid attachment selection.");
+                  }
+                }}
+              />
+              <span className={styles.meta}>
+                Optional · JPG/JPEG/PNG/PDF · up to 3 files · 5 MB each
+              </span>
             </div>
             <div className={styles.actions}>
               <button
@@ -415,7 +543,10 @@ export default function UserSupportClient() {
               <button
                 type="button"
                 className={styles.buttonSecondary}
-                onClick={() => setSelected(null)}
+                onClick={() => {
+                  setSelected(null);
+                  setAttachments([]);
+                }}
                 disabled={busy}
               >
                 Close view
@@ -439,6 +570,37 @@ export default function UserSupportClient() {
               ))}
             </div>
 
+            <div className={styles.page}>
+              <div className={styles.notificationHeader}>
+                <strong>Attachments</strong>
+                <span className={styles.meta}>{attachments.length} file(s)</span>
+              </div>
+              {attachments.length === 0 ? (
+                <p className={styles.meta}>No attachments on this ticket.</p>
+              ) : (
+                attachments.map((attachment) => (
+                  <article className={styles.notification} key={attachment.id}>
+                    <div className={styles.notificationHeader}>
+                      <div>
+                        <strong>{attachment.originalName}</strong>
+                        <div className={styles.meta}>
+                          {attachment.uploadedByLabel ?? "Support"} ·{" "}
+                          {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
+                          {formatPlatformDateTime(attachment.createdAt)}
+                        </div>
+                      </div>
+                      <a
+                        className={styles.buttonSecondary}
+                        href={`/api/user/support/tickets/${encodeURIComponent(selected.ticket.id)}/attachments/${encodeURIComponent(attachment.id)}`}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
             {replyable ? (
               <form className={styles.formGrid} onSubmit={sendReply}>
                 <div className={`${styles.field} ${styles.fieldFull}`}>
@@ -452,6 +614,33 @@ export default function UserSupportClient() {
                     disabled={busy}
                     required
                   />
+                </div>
+                <div className={`${styles.field} ${styles.fieldFull}`}>
+                  <label htmlFor="support-reply-attachments">
+                    Attachments (optional)
+                  </label>
+                  <input
+                    key={replyFileInputKey}
+                    id="support-reply-attachments"
+                    className={styles.input}
+                    type="file"
+                    accept={ATTACHMENT_ACCEPT}
+                    multiple
+                    disabled={busy}
+                    onChange={(event) => {
+                      try {
+                        setReplyFiles(validateSelectedFiles(event.target.files));
+                        setError(null);
+                      } catch (caught) {
+                        event.target.value = "";
+                        setReplyFiles([]);
+                        handleError(caught, "Invalid attachment selection.");
+                      }
+                    }}
+                  />
+                  <span className={styles.meta}>
+                    Optional · JPG/JPEG/PNG/PDF · up to 3 files · 5 MB each
+                  </span>
                 </div>
                 <div className={styles.actions}>
                   <button className={styles.button} type="submit" disabled={busy}>

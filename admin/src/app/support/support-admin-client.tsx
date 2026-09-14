@@ -9,6 +9,8 @@ import { formatPlatformDateTime } from "@/lib/platform-time";
 import {
   formatSupportStatus,
   type SupportAssignee,
+  type SupportAttachment,
+  type SupportAttachmentList,
   type SupportCategory,
   SUPPORT_STATUSES,
   SUPPORT_STATUS_TRANSITIONS,
@@ -17,6 +19,10 @@ import {
   type SupportTicketStatus,
   supportStatusTone,
 } from "@/lib/support-types";
+
+const MAX_ATTACHMENT_FILES = 3;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
 
 interface ApiMessage {
   message?: string;
@@ -65,12 +71,55 @@ function entryTitle(type: SupportTicketDetail["entries"][number]["type"]) {
   }
 }
 
+function formatAttachmentSize(sizeBytes: number): string {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function validateSelectedFiles(fileList: FileList | null): File[] {
+  const files = Array.from(fileList ?? []);
+  if (files.length > MAX_ATTACHMENT_FILES) {
+    throw new Error(`Select no more than ${MAX_ATTACHMENT_FILES} attachments.`);
+  }
+  for (const file of files) {
+    const name = file.name.toLowerCase();
+    const allowed = [".jpg", ".jpeg", ".png", ".pdf"].some((extension) =>
+      name.endsWith(extension),
+    );
+    if (!allowed) {
+      throw new Error("Only JPG, JPEG, PNG, and PDF attachments are allowed.");
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error("Each attachment must be 5 MB or smaller.");
+    }
+  }
+  return files;
+}
+
+async function uploadAttachments(
+  ticketId: string,
+  files: File[],
+): Promise<SupportAttachmentList> {
+  const formData = new FormData();
+  for (const file of files) formData.append("files", file, file.name);
+  const response = await fetch(
+    `/api/admin/support/tickets/${encodeURIComponent(ticketId)}/attachments`,
+    { method: "POST", body: formData },
+  );
+  return json<SupportAttachmentList>(
+    response,
+    "Support attachments could not be uploaded.",
+  );
+}
+
 export default function SupportAdminClient() {
   const router = useRouter();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [categories, setCategories] = useState<SupportCategory[]>([]);
   const [assignees, setAssignees] = useState<SupportAssignee[]>([]);
   const [selected, setSelected] = useState<SupportTicketDetail | null>(null);
+  const [attachments, setAttachments] = useState<SupportAttachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +133,8 @@ export default function SupportAdminClient() {
   const [status, setStatus] = useState<"" | SupportTicketStatus>("");
   const [filterCategoryId, setFilterCategoryId] = useState("");
   const [reply, setReply] = useState("");
+  const [replyFiles, setReplyFiles] = useState<File[]>([]);
+  const [replyFileInputKey, setReplyFileInputKey] = useState(0);
   const [note, setNote] = useState("");
   const [assigneeId, setAssigneeId] = useState("");
   const [categoryCode, setCategoryCode] = useState("");
@@ -91,15 +142,25 @@ export default function SupportAdminClient() {
   const [categoryDescription, setCategoryDescription] = useState("");
 
   const loadDetail = useCallback(async (ticketId: string) => {
-    const response = await fetch(
-      `/api/admin/support/tickets/${encodeURIComponent(ticketId)}`,
-      { cache: "no-store" },
-    );
+    const [response, attachmentResponse] = await Promise.all([
+      fetch(`/api/admin/support/tickets/${encodeURIComponent(ticketId)}`, {
+        cache: "no-store",
+      }),
+      fetch(
+        `/api/admin/support/tickets/${encodeURIComponent(ticketId)}/attachments`,
+        { cache: "no-store" },
+      ),
+    ]);
     const detail = await json<SupportTicketDetail>(
       response,
       "Could not load the support ticket.",
     );
+    const attachmentPayload = await json<SupportAttachmentList>(
+      attachmentResponse,
+      "Could not load support attachments.",
+    );
     setSelected(detail);
+    setAttachments(attachmentPayload.attachments);
     setAssigneeId(detail.ticket.assignedToUserId ?? "");
   }, []);
 
@@ -203,8 +264,8 @@ export default function SupportAdminClient() {
     method: "POST" | "PATCH",
     body: object,
     successMessage: string,
-  ) {
-    if (!selected) return;
+  ): Promise<boolean> {
+    if (!selected) return false;
     setBusy(true);
     setError(null);
     setSuccess(null);
@@ -225,12 +286,14 @@ export default function SupportAdminClient() {
       setAssigneeId(detail.ticket.assignedToUserId ?? "");
       setSuccess(successMessage);
       await loadWorkspace();
+      return true;
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : "Support ticket could not be updated.",
       );
+      return false;
     } finally {
       setBusy(false);
     }
@@ -238,8 +301,40 @@ export default function SupportAdminClient() {
 
   async function sendReply(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await mutateTicket("replies", "POST", { message: reply.trim() }, "Reply sent.");
+    if (!selected) return;
+    const ticketId = selected.ticket.id;
+    const updated = await mutateTicket(
+      "replies",
+      "POST",
+      { message: reply.trim() },
+      "Reply sent.",
+    );
+    if (!updated) return;
+
     setReply("");
+    let attachmentError: string | null = null;
+    if (replyFiles.length > 0) {
+      setBusy(true);
+      try {
+        await uploadAttachments(ticketId, replyFiles);
+      } catch (caught) {
+        attachmentError =
+          caught instanceof Error
+            ? caught.message
+            : "Attachments could not be uploaded.";
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    setReplyFiles([]);
+    setReplyFileInputKey((current) => current + 1);
+    await loadDetail(ticketId);
+    if (attachmentError) {
+      setError(`Reply sent, but ${attachmentError}`);
+    } else if (replyFiles.length > 0) {
+      setSuccess("Reply and attachments sent.");
+    }
   }
 
   async function addNote(event: FormEvent<HTMLFormElement>) {
@@ -524,7 +619,10 @@ export default function SupportAdminClient() {
             <button
               className={styles.buttonSecondary}
               type="button"
-              onClick={() => setSelected(null)}
+              onClick={() => {
+                setSelected(null);
+                setAttachments([]);
+              }}
               disabled={busy}
             >
               Close view
@@ -610,6 +708,37 @@ export default function SupportAdminClient() {
             ))}
           </div>
 
+          <div className={styles.page}>
+            <div className={styles.notificationHeader}>
+              <strong>Attachments</strong>
+              <span className={styles.meta}>{attachments.length} file(s)</span>
+            </div>
+            {attachments.length === 0 ? (
+              <p className={styles.meta}>No attachments on this ticket.</p>
+            ) : (
+              attachments.map((attachment) => (
+                <article className={styles.notification} key={attachment.id}>
+                  <div className={styles.notificationHeader}>
+                    <div>
+                      <strong>{attachment.originalName}</strong>
+                      <div className={styles.meta}>
+                        {attachment.uploadedBy?.username ?? "Unknown uploader"} ·{" "}
+                        {formatAttachmentSize(attachment.sizeBytes)} ·{" "}
+                        {formatPlatformDateTime(attachment.createdAt)}
+                      </div>
+                    </div>
+                    <a
+                      className={styles.buttonSecondary}
+                      href={`/api/admin/support/tickets/${encodeURIComponent(selected.ticket.id)}/attachments/${encodeURIComponent(attachment.id)}`}
+                    >
+                      Download
+                    </a>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+
           {canReply && staffReplyable ? (
             <form className={styles.formGrid} onSubmit={sendReply}>
               <div className={`${styles.field} ${styles.fieldFull}`}>
@@ -623,6 +752,37 @@ export default function SupportAdminClient() {
                   disabled={busy}
                   required
                 />
+              </div>
+              <div className={`${styles.field} ${styles.fieldFull}`}>
+                <label htmlFor="staff-support-reply-attachments">
+                  Attachments (optional)
+                </label>
+                <input
+                  key={replyFileInputKey}
+                  id="staff-support-reply-attachments"
+                  className={styles.input}
+                  type="file"
+                  accept={ATTACHMENT_ACCEPT}
+                  multiple
+                  disabled={busy}
+                  onChange={(event) => {
+                    try {
+                      setReplyFiles(validateSelectedFiles(event.target.files));
+                      setError(null);
+                    } catch (caught) {
+                      event.target.value = "";
+                      setReplyFiles([]);
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : "Invalid attachment selection.",
+                      );
+                    }
+                  }}
+                />
+                <span className={styles.meta}>
+                  Optional · JPG/JPEG/PNG/PDF · up to 3 files · 5 MB each
+                </span>
               </div>
               <div className={styles.actions}>
                 <button className={styles.button} type="submit" disabled={busy}>

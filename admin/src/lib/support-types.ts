@@ -66,6 +66,22 @@ export interface SupportTicketDetail {
   entries: SupportEntry[];
 }
 
+export interface SupportAttachment {
+  id: string;
+  ticketId: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+  uploadedByLabel?: string;
+  uploadedBy?: SupportUserSummary;
+  sha256?: string;
+  createdAt: string;
+}
+
+export interface SupportAttachmentList {
+  attachments: SupportAttachment[];
+}
+
 export interface SupportAssignee {
   id: string;
   username: string;
