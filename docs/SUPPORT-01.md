@@ -71,6 +71,8 @@ Administration permissions:
 
 SUPER_ADMIN retains the existing platform permission bypass. SUPPORT-01 does not introduce a hard-coded SUPPORT role; support staff access is composed through existing RBAC.
 
+Ticket assignment targets are role-based: only users with an active `ADMIN` or `SUPER_ADMIN` role are eligible to appear in the assignee list or pass backend assignment validation. Assignment eligibility does not depend on `support.tickets.read`; action access remains controlled separately by the existing support permissions and SUPER_ADMIN bypass.
+
 ## API surface
 
 USER:
@@ -112,7 +114,7 @@ Transactional managed email keys:
 - `SUPPORT_TICKET_REPLY`
 - `SUPPORT_TICKET_STATUS_CHANGED`
 
-These use the existing managed template and email delivery engine. SMTP/Titan logic is not duplicated. Notification/email errors are caught after authoritative ticket persistence and cannot roll back ticket state.
+These use the existing managed template and email delivery engine. SMTP/Titan logic is not duplicated. Notification/email errors are caught after authoritative ticket persistence and cannot roll back ticket state. Ticket mutations return after the authoritative MySQL write/readback; secondary notification/email delivery does not hold the API response open.
 
 `MARKETING_OFFER` remains outside SUPPORT-01 and is not part of the support workflow.
 
@@ -131,7 +133,7 @@ After CI is GREEN and the branch is pulled locally:
 
 1. Apply migrations only with `npx prisma migrate deploy` and confirm `npx prisma migrate status`.
 2. Browser-first USER acceptance: create with zero attachments, create with a valid attachment, own-list, detail/history, authenticated download, reply with/without attachment, resolved/closed read-only, responsive/mobile.
-3. Browser-first ADMIN acceptance: queue/filter, detail, attachment list/download, staff reply with/without attachment, assign, status, internal note, category oversight according to permissions.
-4. Targeted local Postman/API checks for ownership isolation, RBAC denials, lifecycle rejection, optional zero-file behavior, invalid type/oversize rejection, and attachment download authorization.
+3. Browser-first ADMIN acceptance: queue/filter, detail, attachment list/download, staff reply with/without attachment, assign to ADMIN/SUPER_ADMIN, status, internal note, category oversight according to permissions.
+4. Targeted local Postman/API checks for ownership isolation, RBAC denials, lifecycle rejection, role-based assignment rejection, optional zero-file behavior, invalid type/oversize rejection, and attachment download authorization.
 5. Targeted MySQL readback for ticket owner/state, append-only entries, attachment metadata/hash, notification source references, and audit records.
 6. PR to `main` only after all local acceptance gates are GREEN.
