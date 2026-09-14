@@ -1,0 +1,185 @@
+/*
+ * FixTradeZone protected-workspace alignment lock.
+ *
+ * This layer normalizes outer gutters, primary box padding and compact control
+ * alignment across SUPER_ADMIN, ADMIN and USER workspaces without changing the
+ * Founder-locked navy/cyan visual language or any application behavior.
+ */
+
+:root {
+  --ftz-shell-gutter: 16px;
+  --ftz-box-pad: clamp(16px, 1.15vw, 20px);
+  --ftz-tile-pad: clamp(13px, 0.9vw, 15px);
+  --ftz-control-height: 42px;
+}
+
+/*
+ * One horizontal alignment line for every protected page. Dashboards already
+ * use an internal gutter; ordinary pages use a padded page wrapper. Keep both
+ * on the same token so card borders start at the same x-position.
+ */
+.ftz-page-frame > .ftz-dashboard,
+.ftz-page-frame > :not(.ftz-dashboard):not(.ftz-platform-promise) {
+  padding-inline: var(--ftz-shell-gutter) !important;
+}
+
+/* The shared platform promise is itself a bordered surface, so it needs an
+ * outer gutter rather than the generic direct-child inner padding. */
+.ftz-page-frame > .ftz-platform-promise {
+  width: auto !important;
+  min-width: 0;
+  margin: var(--ftz-page-gap) var(--ftz-shell-gutter) 0 !important;
+  padding: var(--ftz-box-pad) !important;
+}
+
+/* Shared primary-surface padding. Page modules retain layout/grid geometry, but
+ * the actual card/hero/panel breathing room stays consistent. */
+.ftz-page-frame :where(section, article, aside)[class*="card"],
+.ftz-page-frame :where(section, article, aside)[class*="Card"],
+.ftz-page-frame :where(section, article, aside)[class*="panel"],
+.ftz-page-frame :where(section, article, aside)[class*="Panel"],
+.ftz-page-frame :where(section, article, aside)[class*="hero"],
+.ftz-page-frame :where(section, article, aside)[class*="Hero"] {
+  box-sizing: border-box;
+  padding: var(--ftz-box-pad) !important;
+}
+
+/* Metrics/stat tiles remain intentionally denser than primary surfaces. */
+.ftz-page-frame .ftz-metric-card,
+.ftz-page-frame :where(
+    [class*="summaryGrid"],
+    [class*="SummaryGrid"],
+    [class*="heroStats"],
+    [class*="HeroStats"],
+    [class*="stats"],
+    [class*="Stats"],
+    [class*="metricGrid"],
+    [class*="MetricGrid"],
+    [class*="metrics"],
+    [class*="Metrics"]
+  ) > :where(article, div) {
+  padding: var(--ftz-tile-pad) !important;
+}
+
+/* Native check/radio controls should sit on the same visual center line even
+ * when legacy page CSS does not provide a dedicated flex wrapper. */
+.ftz-page-frame :where(input[type="checkbox"], input[type="radio"]) {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  vertical-align: middle;
+}
+
+/* Keep common action/pagination controls on one center line. Dedicated page
+ * components may still control wrapping and horizontal justification. */
+.ftz-page-frame :where(
+    [class*="pagination"],
+    [class*="Pagination"],
+    [class*="pager"],
+    [class*="Pager"],
+    [class*="pageControls"],
+    [class*="PageControls"]
+  ) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center !important;
+  gap: 12px;
+}
+
+.ftz-page-frame :where(
+    [class*="pagination"],
+    [class*="Pagination"],
+    [class*="pager"],
+    [class*="Pager"],
+    [class*="pageControls"],
+    [class*="PageControls"]
+  ) > :where(span, p, small) {
+  display: inline-flex;
+  min-height: var(--ftz-control-height);
+  align-items: center;
+  margin: 0;
+}
+
+/* Shared platform-promise composition. Keeping this here avoids inline spacing
+ * rules diverging between desktop/tablet/mobile. */
+.ftz-platform-promise {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 2.1fr);
+  align-items: center;
+  gap: clamp(18px, 2vw, 32px);
+}
+
+.ftz-platform-promise-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ftz-platform-promise-kicker {
+  color: var(--ftz-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.ftz-platform-promise-headline {
+  color: var(--ftz-copy);
+  font-size: 20px;
+}
+
+.ftz-platform-promise-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 20px;
+  min-width: 0;
+}
+
+.ftz-platform-promise-point {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ftz-copy-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ftz-platform-promise-point b {
+  flex: 0 0 auto;
+  color: var(--ftz-primary);
+}
+
+@media (max-width: 1199.98px) {
+  :root {
+    --ftz-shell-gutter: 14px;
+  }
+}
+
+@media (max-width: 991.98px) {
+  :root {
+    --ftz-shell-gutter: 10px;
+  }
+
+  .ftz-platform-promise {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --ftz-box-pad: 16px;
+    --ftz-tile-pad: 14px;
+  }
+
+  .ftz-platform-promise-points {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 575.98px) {
+  :root {
+    --ftz-shell-gutter: 8px;
+  }
+}
