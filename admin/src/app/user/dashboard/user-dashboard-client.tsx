@@ -111,6 +111,7 @@ export default function UserDashboardClient() {
   const [depositTotal, setDepositTotal] = useState<number | null>(null);
   const [payoutTotal, setPayoutTotal] = useState<number | null>(null);
   const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
+  const [inviteCopied, setInviteCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -272,6 +273,17 @@ export default function UserDashboardClient() {
     [wallet?.activity],
   );
 
+  async function copyInviteLink() {
+    if (!referralProfile?.referralCode) return;
+
+    const inviteUrl = new URL("/register", window.location.origin);
+    inviteUrl.searchParams.set("ref", referralProfile.referralCode);
+
+    await navigator.clipboard.writeText(inviteUrl.toString());
+    setInviteCopied(true);
+    window.setTimeout(() => setInviteCopied(false), 1600);
+  }
+
   if (loading) {
     return (
       <UserShell session={null}>
@@ -311,14 +323,29 @@ export default function UserDashboardClient() {
 
                 <h2>Welcome back, {displayName}</h2>
 
-                <p>
-                  Live account data from packages, wallet, deposits, payouts and
-                  referrals in one ledger-aware workspace. Financial values remain
-                  currency-specific and simulated activity stays clearly labelled.
-                </p>
+                <div className={styles.heroReferral}>
+                  <span className={styles.heroReferralIcon}>
+                    <i className="iconoir-community" />
+                  </span>
+
+                  <div className={styles.heroReferralCopy}>
+                    <small>MY REFERRAL CODE</small>
+                    <strong>{referralProfile?.referralCode ?? "Not assigned"}</strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    className={styles.heroReferralButton}
+                    onClick={() => void copyInviteLink()}
+                    disabled={!referralProfile?.referralCode}
+                  >
+                    <i className="iconoir-copy" />
+                    {inviteCopied ? "Copied" : "Copy invite link"}
+                  </button>
+                </div>
 
                 <div className="ftz-hero-meta">
-                  <span>
+                  <span className={styles.usernameChip}>
                     <i className="iconoir-user" />@{user.username}
                   </span>
 
