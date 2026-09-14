@@ -1,0 +1,8 @@
+/*
+ * Small auth-only presentation refinements.
+ * Keep login composition intact while softening the desktop split boundary.
+ */
+
+.ftz-auth-visual {
+  border-right-color: rgba(69, 115, 190, 0.08);
+}
