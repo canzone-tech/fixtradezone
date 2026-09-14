@@ -257,16 +257,16 @@ export default function ContentManagementClient() {
     <div className={styles.workspace}>
       <div className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>CONTENT OPERATIONS</span>
-          <h1>Templates / CMS</h1>
+          <span className={styles.eyebrow}>CONTENT MANAGER</span>
+          <h1>Website & Email Content</h1>
           <p>
-            Structured content only. Published revisions remain immutable; rollback
-            changes only the current publication pointer.
+            Update customer-facing text, save it as a draft, and publish only when
+            it is ready to go live.
           </p>
         </div>
         <div className={styles.permissionGrid}>
-          <span className={canRead ? styles.allowed : styles.denied}>Read</span>
-          <span className={canManage ? styles.allowed : styles.denied}>Draft</span>
+          <span className={canRead ? styles.allowed : styles.denied}>View</span>
+          <span className={canManage ? styles.allowed : styles.denied}>Edit</span>
           <span className={canPublish ? styles.allowed : styles.denied}>Publish</span>
         </div>
       </div>
@@ -280,7 +280,7 @@ export default function ContentManagementClient() {
           className={tab === "landing" ? styles.activeTab : ""}
           onClick={() => setTab("landing")}
         >
-          Public Landing
+          Landing Page
         </button>
         <button
           type="button"
@@ -303,12 +303,22 @@ export default function ContentManagementClient() {
             }}
           >
             <PanelHeading
-              label="LANDING CONTENT"
-              title={landing.templateKey}
-              trailing={landing.effectiveSource}
+              label="LANDING PAGE"
+              title="Website content"
+              trailing={
+                landing.effectiveSource === "PUBLISHED_REVISION"
+                  ? "PUBLISHED"
+                  : "DEFAULT"
+              }
             />
+            <div className={styles.safeNote}>
+              Package cards are automatic from the published Package Plan. This page
+              controls the surrounding website text only.
+            </div>
+
+            <div className={styles.subheading}>Hero</div>
             <div className={styles.formGrid}>
-              <Field label="Brand name">
+              <Field label="Website name">
                 <input
                   required
                   maxLength={80}
@@ -318,7 +328,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Badge">
+              <Field label="Small headline">
                 <input
                   required
                   maxLength={100}
@@ -328,7 +338,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Hero title" wide>
+              <Field label="Main headline" wide>
                 <input
                   required
                   maxLength={180}
@@ -338,7 +348,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Hero accent" wide>
+              <Field label="Highlighted headline" wide>
                 <input
                   required
                   maxLength={120}
@@ -348,7 +358,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Hero description" wide>
+              <Field label="Intro text" wide>
                 <textarea
                   required
                   rows={4}
@@ -362,7 +372,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Primary CTA label">
+              <Field label="Main button text">
                 <input
                   required
                   maxLength={60}
@@ -375,7 +385,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Primary CTA path / HTTPS URL">
+              <Field label="Main button link">
                 <input
                   required
                   maxLength={300}
@@ -388,7 +398,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Secondary CTA label">
+              <Field label="Second button text">
                 <input
                   required
                   maxLength={60}
@@ -401,7 +411,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Secondary CTA path / HTTPS URL">
+              <Field label="Second button link">
                 <input
                   required
                   maxLength={300}
@@ -416,14 +426,14 @@ export default function ContentManagementClient() {
               </Field>
             </div>
 
-            <div className={styles.subheading}>Feature cards</div>
+            <div className={styles.subheading}>How it works</div>
             <div className={styles.featureEditors}>
               {landingForm.features.map((feature, index) => (
                 <div className={styles.featureEditor} key={`${index}-${feature.title}`}>
                   <input
                     required
                     maxLength={80}
-                    aria-label={`Feature ${index + 1} title`}
+                    aria-label={`Step ${index + 1} title`}
                     value={feature.title}
                     onChange={(event) => {
                       const features = clone(landingForm.features);
@@ -435,7 +445,7 @@ export default function ContentManagementClient() {
                     required
                     rows={3}
                     maxLength={320}
-                    aria-label={`Feature ${index + 1} description`}
+                    aria-label={`Step ${index + 1} description`}
                     value={feature.description}
                     onChange={(event) => {
                       const features = clone(landingForm.features);
@@ -447,8 +457,9 @@ export default function ContentManagementClient() {
               ))}
             </div>
 
+            <div className={styles.subheading}>Team business</div>
             <div className={styles.formGrid}>
-              <Field label="Trust title" wide>
+              <Field label="Team business heading" wide>
                 <input
                   required
                   maxLength={160}
@@ -458,7 +469,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Trust description" wide>
+              <Field label="Team business text" wide>
                 <textarea
                   required
                   rows={3}
@@ -472,7 +483,11 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="Simulated activity disclosure" wide>
+            </div>
+
+            <div className={styles.subheading}>Footer & search</div>
+            <div className={styles.formGrid}>
+              <Field label="Important disclosure" wide>
                 <textarea
                   required
                   rows={4}
@@ -493,7 +508,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="SEO title" wide>
+              <Field label="Search title" wide>
                 <input
                   required
                   maxLength={120}
@@ -503,7 +518,7 @@ export default function ContentManagementClient() {
                   }
                 />
               </Field>
-              <Field label="SEO description" wide>
+              <Field label="Search description" wide>
                 <textarea
                   required
                   rows={3}
@@ -524,7 +539,7 @@ export default function ContentManagementClient() {
           </form>
 
           <History
-            title="Landing revision history"
+            title="Landing page versions"
             revisions={landing.revisions}
             currentId={landing.publishedRevision?.id ?? null}
             busy={busy}
@@ -697,7 +712,7 @@ function EditorActions({
   return (
     <div className={styles.actions}>
       <button type="submit" disabled={!canManage || busy}>
-        Create immutable draft revision
+        Save as draft
       </button>
       <button
         type="button"
@@ -705,7 +720,7 @@ function EditorActions({
         onClick={onReset}
         disabled={busy}
       >
-        Reset to current
+        Reset changes
       </button>
     </div>
   );
@@ -730,9 +745,9 @@ function History<T>({
 }) {
   return (
     <aside className={styles.history}>
-      <PanelHeading label="VERSION HISTORY" title={title} trailing="IMMUTABLE" />
+      <PanelHeading label="VERSION HISTORY" title={title} trailing="SAVED" />
       {revisions.length === 0 ? (
-        <div className={styles.empty}>No saved revisions yet.</div>
+        <div className={styles.empty}>No saved versions yet.</div>
       ) : (
         <div className={styles.revisions}>
           {revisions.map((revision) => {
@@ -758,7 +773,7 @@ function History<T>({
                     onClick={() => onLoad(revision)}
                     disabled={busy}
                   >
-                    Load content
+                    Edit this version
                   </button>
                   <button
                     type="button"
