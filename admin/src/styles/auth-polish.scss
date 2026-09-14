@@ -18,28 +18,47 @@
 }
 
 .ftz-auth-public-home-link {
+  position: fixed;
+  right: 22px;
+  bottom: 18px;
+  z-index: 1200;
   display: inline-flex;
-  width: fit-content;
+  min-height: 38px;
   align-items: center;
   gap: 8px;
-  margin: 18px auto 0;
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 0 12px;
+  border: 1px solid rgba(74, 129, 206, 0.24);
+  border-radius: 10px;
   color: #8ea0bd;
+  background: rgba(4, 13, 36, 0.86);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
   transition:
     color 140ms ease,
+    border-color 140ms ease,
     background 140ms ease;
 }
 
 .ftz-auth-public-home-link:hover {
+  border-color: rgba(31, 255, 240, 0.38);
   color: #43e9df;
-  background: rgba(31, 255, 240, 0.06);
+  background: rgba(8, 23, 53, 0.96);
 }
 
 .ftz-auth-public-home-link:focus-visible {
   outline: 2px solid rgba(31, 255, 240, 0.72);
   outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .ftz-auth-public-home-link {
+    right: 12px;
+    bottom: 12px;
+    min-height: 36px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
 }
