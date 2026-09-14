@@ -163,6 +163,10 @@ export default async function Home() {
                 </div>
                 <h3>{item.displayName}</h3>
                 <div className={styles.packageAmount}>{investmentLabel(item)}</div>
+                <div className={styles.packageTrading}>
+                  <small>Daily trading</small>
+                  <strong>0.4–0.6% USER net / day</strong>
+                </div>
                 <div className={styles.packageMeta}>
                   <span>
                     <small>Duration</small>
@@ -261,11 +265,6 @@ export default async function Home() {
           <strong>Payout access</strong>
           <span>Track eligible withdrawal and payout activity.</span>
         </article>
-      </section>
-
-      <section className={styles.disclosure} aria-label="Simulated activity disclosure">
-        <strong>IMPORTANT DISCLOSURE</strong>
-        <p>{content.disclosure}</p>
       </section>
 
       <section className={styles.finalCta}>
