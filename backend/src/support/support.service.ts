@@ -334,7 +334,7 @@ export class SupportService {
     });
 
     const result = await this.getMineTicket(actor.id, ticketId);
-    await this.notifyTicketCreated(result.ticket);
+    void this.notifyTicketCreated(result.ticket);
     return result;
   }
 
@@ -544,7 +544,7 @@ export class SupportService {
     });
 
     const result = await this.getAdminTicket(ticketId);
-    await this.notifyStaffReply(result.ticket);
+    void this.notifyStaffReply(result.ticket);
     return result;
   }
 
@@ -679,7 +679,7 @@ export class SupportService {
     });
 
     const result = await this.getAdminTicket(ticketId);
-    await this.notifyStatusChanged(result.ticket);
+    void this.notifyStatusChanged(result.ticket);
     return result;
   }
 
