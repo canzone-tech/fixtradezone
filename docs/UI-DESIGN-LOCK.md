@@ -63,6 +63,21 @@ Locked direction:
 
 This typography layer may increase readability without changing the Founder-locked navy/cyan palette, card geometry or financial-console hierarchy.
 
+## Responsive text-flow and table scrolling
+
+Dense operational tables must preserve readable labels and identifiers instead of compressing words into narrow columns. Horizontal scrolling is the approved overflow behavior when a table cannot fit the available viewport, including on mobile.
+
+Founder-approved text-flow behavior:
+
+- table headers must remain intact and must never split a single word across lines
+- table cells, transaction IDs, status labels and other single-token identifiers must not be force-broken inside a word
+- multi-word prose may still wrap naturally at spaces where appropriate
+- page headings may wrap between words, but a single word must not be split or automatically hyphenated
+- responsive table shells must remain horizontally scrollable on both desktop and mobile when their content exceeds the available width
+- page-level rules such as `overflow-wrap: anywhere` must not override this behavior inside protected tables
+
+The shared implementation authority is `admin/src/styles/text-flow-lock.scss`, loaded after `universal-ui.scss` so this rule remains consistent across SUPER_ADMIN, ADMIN and USER protected pages.
+
 ## Shared platform promise
 
 The protected dashboard for **SUPER_ADMIN, ADMIN and USER must render the same shared platform promise** from one reusable component. Role-specific wording is not permitted.
