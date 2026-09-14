@@ -16,6 +16,37 @@ function packageDefinitionIdFrom(value: unknown): string | null {
   return typeof packageDefinitionId === 'string' ? packageDefinitionId : null;
 }
 
+function compactRate(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.replace(/0+$/, '').replace(/\.$/, '');
+  return trimmed || '0';
+}
+
+function dailyRateLabel(item: {
+  rewardRateMode: string;
+  fixedRewardRate: string | null;
+  minimumRewardRate: string | null;
+  maximumRewardRate: string | null;
+}): string | null {
+  if (item.rewardRateMode === 'FIXED') {
+    const rate = compactRate(item.fixedRewardRate);
+    return rate === null ? null : `${rate}%`;
+  }
+
+  if (item.rewardRateMode === 'RANDOM_RANGE') {
+    const minimum = compactRate(item.minimumRewardRate);
+    const maximum = compactRate(item.maximumRewardRate);
+    return minimum === null || maximum === null
+      ? null
+      : `${minimum}–${maximum}%`;
+  }
+
+  return null;
+}
+
 @Controller('public/packages')
 export class PublicPackagesController {
   constructor(private readonly packagesService: PackagesService) {}
@@ -39,6 +70,7 @@ export class PublicPackagesController {
         rangeConfigured: item.rangeConfigured,
         durationDays: item.durationDays,
         currency: item.currency,
+        dailyRateLabel: dailyRateLabel(item),
       })),
     };
   }
