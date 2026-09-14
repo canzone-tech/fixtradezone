@@ -12,54 +12,20 @@ export default function PlatformPromise() {
     <section
       className="ftz-panel ftz-platform-promise"
       aria-label="FixTradeZone platform promise"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-        gap: "16px",
-        alignItems: "center",
-        margin: "var(--ftz-page-gap) 0 0",
-        padding: "16px 18px",
-      }}
     >
-      <div style={{ display: "grid", gap: "4px" }}>
-        <span
-          style={{
-            color: "var(--ftz-primary)",
-            fontSize: "10px",
-            fontWeight: 800,
-            letterSpacing: "0.1em",
-          }}
-        >
+      <div className="ftz-platform-promise-copy">
+        <span className="ftz-platform-promise-kicker">
           FIXTRADEZONE INTELLIGENCE
         </span>
-        <strong style={{ color: "var(--ftz-copy)", fontSize: "20px" }}>
+        <strong className="ftz-platform-promise-headline">
           {PLATFORM_PROMISE.headline}
         </strong>
       </div>
 
-      <div
-        className="ftz-platform-promise-points"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "10px 16px",
-        }}
-      >
+      <div className="ftz-platform-promise-points">
         {PLATFORM_PROMISE.points.map((point) => (
-          <span
-            key={point}
-            style={{
-              display: "flex",
-              gap: "8px",
-              alignItems: "flex-start",
-              color: "var(--ftz-copy-muted)",
-              fontSize: "12px",
-              lineHeight: 1.5,
-            }}
-          >
-            <b aria-hidden="true" style={{ color: "var(--ftz-primary)" }}>
-              ◆
-            </b>
+          <span className="ftz-platform-promise-point" key={point}>
+            <b aria-hidden="true">◆</b>
             {point}
           </span>
         ))}
