@@ -78,6 +78,25 @@ Founder-approved text-flow behavior:
 
 The shared implementation authority is `admin/src/styles/text-flow-lock.scss`, loaded after `universal-ui.scss` so this rule remains consistent across SUPER_ADMIN, ADMIN and USER protected pages.
 
+## Shared box spacing and alignment
+
+Protected workspace boxes must follow one horizontal rhythm across **SUPER_ADMIN, ADMIN and USER** screens. A page must not look wider or narrower simply because it is implemented as a dashboard, a closeout workspace, or a CSS-module page.
+
+Founder-approved spacing behavior:
+
+- desktop protected-workspace outer gutter: `16px`
+- medium desktop outer gutter: `14px`
+- tablet outer gutter: `10px`
+- phone outer gutter: `8px`
+- primary card / panel / hero padding: responsive `16px` to `20px`
+- compact metric / summary tile padding: responsive `13px` to `15px`
+- the shared platform-promise border must align with the first card border below it; it uses the shared **outer gutter**, not direct-child inner padding
+- action rows and pager controls must align on their vertical center line; page labels must not sit lower than Previous/Next buttons
+- native checkbox and radio controls use a stable `16px × 16px` box with zero browser-default margin so labels and controls center consistently
+- page-level styles may change unique grid geometry, but must not reintroduce a conflicting protected-workspace outer gutter or arbitrary primary-box padding
+
+`admin/src/styles/universal-ui.scss` remains the protected visual authority. Shared geometry/alignment normalization is implemented by `admin/src/styles/layout-alignment.scss`, loaded after the universal/text-flow layers so legacy page modules cannot reintroduce inconsistent box spacing.
+
 ## Shared platform promise
 
 The protected dashboard for **SUPER_ADMIN, ADMIN and USER must render the same shared platform promise** from one reusable component. Role-specific wording is not permitted.
