@@ -228,8 +228,12 @@ export class SupportAttachmentService {
         throw new BadRequestException('Each attachment must be 5 MB or smaller.');
       }
 
-      const originalName = basename(file.originalname ?? '')
-        .replace(/[\u0000-\u001f\u007f]/g, '')
+      const originalName = Array.from(basename(file.originalname ?? ''))
+        .filter((character) => {
+          const code = character.charCodeAt(0);
+          return code > 31 && code !== 127;
+        })
+        .join('')
         .trim();
       if (!originalName || originalName.length > 255) {
         throw new BadRequestException('Attachment filename is invalid.');
