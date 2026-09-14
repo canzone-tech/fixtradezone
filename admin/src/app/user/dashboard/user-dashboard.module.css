@@ -19,13 +19,39 @@
   letter-spacing: 0.08em;
 }
 
+:global(.ftz-hero-copy) {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+:global(.ftz-hero-copy > .ftz-secure-pill) {
+  order: 0;
+  align-self: flex-start;
+}
+
+:global(.ftz-hero-copy > h2) {
+  order: 1;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(22px, 2.2vw, 34px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:global(.ftz-hero-meta) {
+  display: contents;
+}
+
 .heroReferral {
+  order: 3;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   width: min(100%, 620px);
-  margin: 4px 0 14px;
+  margin: 0 0 12px;
   padding: 11px 12px;
   border: 1px solid rgba(22, 229, 224, 0.2);
   border-radius: 13px;
@@ -94,12 +120,21 @@
 }
 
 .usernameChip {
-  font-size: 11px !important;
+  order: 2;
+  align-self: flex-start;
+  margin: 2px 0 10px;
+  font-size: 12px !important;
   font-weight: 900 !important;
 }
 
 .usernameChip i {
-  font-size: 13px !important;
+  font-size: 14px !important;
+}
+
+:global(.ftz-hero-meta > span:last-child) {
+  order: 4;
+  align-self: flex-start;
+  margin-top: 2px;
 }
 
 .chartEmpty {
@@ -283,6 +318,10 @@
     font-size: 7px !important;
   }
 
+  :global(.ftz-hero-copy > h2) {
+    font-size: clamp(19px, 6.3vw, 27px);
+  }
+
   .heroReferral {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
@@ -300,7 +339,8 @@
   }
 
   .usernameChip {
-    font-size: 11px !important;
+    margin-bottom: 9px;
+    font-size: 12px !important;
   }
 
   .chartEmpty {
