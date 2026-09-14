@@ -8,6 +8,7 @@ import "../styles/fixtradezone-theme.scss";
 import "../styles/fixtradezone-readability.scss";
 import "../styles/fixtradezone-responsive.scss";
 import "../styles/universal-ui.scss";
+import "../styles/text-flow-lock.scss";
 
 export const metadata: Metadata = {
   applicationName: "FixTradeZone",
