@@ -12,8 +12,23 @@ async function proxy(
 ) {
   const { segments } = await context.params;
   const path = segments.map(encodeURIComponent).join("/");
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (method !== "GET" && contentType.toLowerCase().includes("multipart/form-data")) {
+    const body = await request.formData();
+
+    return proxyUserRequest(
+      request,
+      `/support/${path}${request.nextUrl.search}`,
+      {
+        method,
+        body,
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+  }
+
   const body = method === "GET" ? undefined : await request.arrayBuffer();
-  const contentType = request.headers.get("content-type");
 
   return proxyUserRequest(
     request,
