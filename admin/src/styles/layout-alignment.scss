@@ -24,11 +24,12 @@
 }
 
 /* The shared platform promise is itself a bordered surface, so it needs an
- * outer gutter rather than the generic direct-child inner padding. */
+ * outer gutter rather than the generic direct-child inner padding. Keep a
+ * matching bottom gap so the following dashboard hero never touches it. */
 .ftz-page-frame > .ftz-platform-promise {
   width: auto !important;
   min-width: 0;
-  margin: var(--ftz-page-gap) var(--ftz-shell-gutter) 0 !important;
+  margin: var(--ftz-page-gap) var(--ftz-shell-gutter) var(--ftz-page-gap) !important;
   padding: var(--ftz-box-pad) !important;
 }
 
@@ -42,6 +43,12 @@
 .ftz-page-frame :where(section, article, aside)[class*="Hero"] {
   box-sizing: border-box;
   padding: var(--ftz-box-pad) !important;
+}
+
+/* Composite surfaces with their own padded header/body regions must not receive
+ * a second outer padding layer. The genealogy tree is one such shared surface. */
+.ftz-page-frame :where(section, article, aside)[class*="treeCard"] {
+  padding: 0 !important;
 }
 
 /* Metrics/stat tiles remain intentionally denser than primary surfaces. */
