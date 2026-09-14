@@ -1,6 +1,7 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Public } from '../auth/public.decorator';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { PackagesService } from './packages.service';
@@ -13,6 +14,34 @@ function packageDefinitionIdFrom(value: unknown): string | null {
   const candidate = value as Record<string, unknown>;
   const packageDefinitionId = candidate['packageDefinitionId'];
   return typeof packageDefinitionId === 'string' ? packageDefinitionId : null;
+}
+
+@Controller('public/packages')
+export class PublicPackagesController {
+  constructor(private readonly packagesService: PackagesService) {}
+
+  @Get()
+  @Public()
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
+  async getCatalogue() {
+    const catalogue = await this.packagesService.getEffectiveCatalogue();
+
+    return {
+      catalogueAvailable: catalogue.catalogueAvailable,
+      items: catalogue.items.map((item) => ({
+        displayName: item.displayName,
+        slug: item.slug,
+        sortOrder: item.sortOrder,
+        availability: item.availability,
+        price: item.price,
+        minimumInvestment: item.minimumInvestment,
+        maximumInvestment: item.maximumInvestment,
+        rangeConfigured: item.rangeConfigured,
+        durationDays: item.durationDays,
+        currency: item.currency,
+      })),
+    };
+  }
 }
 
 @Controller('packages')
