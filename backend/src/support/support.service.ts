@@ -123,6 +123,25 @@ export class SupportService {
     return { categories: rows.map((row) => this.serializeCategory(row)) };
   }
 
+  async listAssignableStaff() {
+    const rows = await this.prisma.$queryRaw<AssignableStaffRow[]>(Prisma.sql`
+      SELECT DISTINCT u.id, u.username, u.email
+      FROM users u
+      INNER JOIN user_roles ur ON ur.userId = u.id
+      INNER JOIN roles r ON r.id = ur.roleId AND r.status = 'ACTIVE'
+      LEFT JOIN role_permissions rp ON rp.roleId = r.id
+      LEFT JOIN permissions p ON p.id = rp.permissionId
+      WHERE u.status IN ('ACTIVE', 'RESTRICTED')
+        AND (
+          r.name = 'SUPER_ADMIN'
+          OR (r.name = 'ADMIN' AND p.code = 'support.tickets.read')
+        )
+      ORDER BY u.username ASC, u.id ASC
+    `);
+
+    return { assignees: rows };
+  }
+
   async createCategory(
     dto: CreateSupportCategoryDto,
     actor: AuthenticatedUser,
@@ -165,8 +184,7 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, id);
-    if (!category)
-      throw new Error('Support category insert did not read back.');
+    if (!category) throw new Error('Support category insert did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -177,8 +195,7 @@ export class SupportService {
     context: RequestContext = {},
   ) {
     const current = await this.findCategoryById(this.prisma, categoryId);
-    if (!current)
-      throw new NotFoundException('Support category was not found.');
+    if (!current) throw new NotFoundException('Support category was not found.');
 
     const name =
       dto.name === undefined
@@ -228,8 +245,7 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, categoryId);
-    if (!category)
-      throw new Error('Support category update did not read back.');
+    if (!category) throw new Error('Support category update did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -266,7 +282,7 @@ export class SupportService {
     const message = this.visibleText(dto.message, 'Ticket message');
     const category = await this.findCategoryById(this.prisma, dto.categoryId);
 
-    if (!category || !category.isActive) {
+    if (!category || !Boolean(category.isActive)) {
       throw new BadRequestException('Select an active support category.');
     }
 
@@ -324,10 +340,7 @@ export class SupportService {
     if (!ticket) throw new NotFoundException('Support ticket was not found.');
 
     const entries = await this.listEntries(ticketId, false);
-    return {
-      ticket: this.serializeTicket(ticket),
-      entries,
-    };
+    return { ticket: this.serializeTicket(ticket), entries };
   }
 
   async replyMine(
@@ -347,18 +360,16 @@ export class SupportService {
     }
 
     await this.prisma.$transaction(async (transaction) => {
-      const entryId = randomUUID();
       await transaction.$executeRaw(Prisma.sql`
         INSERT INTO support_ticket_entries (
           id, ticketId, type, authorUserId, body, metadata, createdAt
         ) VALUES (
-          ${entryId}, ${ticketId}, 'USER_REPLY', ${actor.id}, ${message}, NULL,
+          ${randomUUID()}, ${ticketId}, 'USER_REPLY', ${actor.id}, ${message}, NULL,
           CURRENT_TIMESTAMP(3)
         )
       `);
 
       if (current.status === 'WAITING_FOR_USER') {
-        const statusEntryId = randomUUID();
         await transaction.$executeRaw(Prisma.sql`
           UPDATE support_tickets
           SET status = 'IN_PROGRESS', lastActivityAt = CURRENT_TIMESTAMP(3),
@@ -369,7 +380,7 @@ export class SupportService {
           INSERT INTO support_ticket_entries (
             id, ticketId, type, authorUserId, body, metadata, createdAt
           ) VALUES (
-            ${statusEntryId}, ${ticketId}, 'STATUS_CHANGE', ${actor.id}, NULL,
+            ${randomUUID()}, ${ticketId}, 'STATUS_CHANGE', ${actor.id}, NULL,
             ${JSON.stringify({ fromStatus: 'WAITING_FOR_USER', toStatus: 'IN_PROGRESS', source: 'USER_REPLY' })},
             CURRENT_TIMESTAMP(3)
           )
@@ -460,7 +471,6 @@ export class SupportService {
   async getAdminTicket(ticketId: string) {
     const ticket = await this.findTicket(this.prisma, ticketId);
     if (!ticket) throw new NotFoundException('Support ticket was not found.');
-
     return {
       ticket: this.serializeTicket(ticket),
       entries: await this.listEntries(ticketId, true),
@@ -610,9 +620,7 @@ export class SupportService {
     const current = await this.findTicket(this.prisma, ticketId);
     if (!current) throw new NotFoundException('Support ticket was not found.');
     if (current.status === dto.status) {
-      throw new BadRequestException(
-        'Support ticket is already in that status.',
-      );
+      throw new BadRequestException('Support ticket is already in that status.');
     }
     if (!canTransitionSupportStatus(current.status, dto.status)) {
       throw new BadRequestException(
@@ -753,7 +761,7 @@ export class SupportService {
   private async listEntries(ticketId: string, includeInternal: boolean) {
     const internalFilter = includeInternal
       ? Prisma.empty
-      : Prisma.sql`AND e.type <> 'INTERNAL_NOTE'`;
+      : Prisma.sql`AND e.type NOT IN ('INTERNAL_NOTE', 'ASSIGNMENT_CHANGE')`;
     const rows = await this.prisma.$queryRaw<SupportEntryRow[]>(Prisma.sql`
       SELECT
         e.id, e.ticketId, e.type, e.authorUserId, e.body, e.metadata, e.createdAt,
@@ -765,7 +773,7 @@ export class SupportService {
         ${internalFilter}
       ORDER BY e.createdAt ASC, e.id ASC
     `);
-    return rows.map((row) => this.serializeEntry(row));
+    return rows.map((row) => this.serializeEntry(row, includeInternal));
   }
 
   private async findCategoryById(
@@ -855,7 +863,11 @@ export class SupportService {
     };
   }
 
-  private serializeEntry(row: SupportEntryRow) {
+  private serializeEntry(row: SupportEntryRow, includeInternal: boolean) {
+    const publicStaffIdentity =
+      !includeInternal &&
+      (row.type === 'STAFF_REPLY' || row.type === 'STATUS_CHANGE');
+
     return {
       id: row.id,
       ticketId: row.ticketId,
@@ -864,8 +876,8 @@ export class SupportService {
       author: row.authorUserId
         ? {
             id: row.authorUserId,
-            username: row.authorUsername,
-            email: row.authorEmail,
+            username: publicStaffIdentity ? 'Support' : row.authorUsername,
+            email: includeInternal ? row.authorEmail : null,
           }
         : null,
       body: row.body,
@@ -890,8 +902,9 @@ export class SupportService {
 
   private visibleText(value: string, label: string) {
     const text = value.trim();
-    if (!text)
+    if (!text) {
       throw new BadRequestException(`${label} must contain visible text.`);
+    }
     return text;
   }
 

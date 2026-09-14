@@ -70,6 +70,13 @@ export class AdminSupportController {
     );
   }
 
+  @Get('assignees')
+  @Header('Cache-Control', 'no-store')
+  @RequirePermissions(PERMISSIONS.SUPPORT_TICKETS_ASSIGN)
+  listAssignees() {
+    return this.supportService.listAssignableStaff();
+  }
+
   @Get('tickets')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SUPPORT_TICKETS_READ)
