@@ -124,41 +124,41 @@ export const EMAIL_TEMPLATE_DEFINITIONS: Record<
 
 export const DEFAULT_LANDING_CONTENT: LandingContent = {
   brandName: 'FixTradeZone',
-  badge: 'SECURE DIGITAL ASSET PLATFORM',
-  heroTitle: 'Operate your account with',
-  heroAccent: 'clarity and control.',
+  badge: 'DIGITAL ASSET PLATFORM',
+  heroTitle: 'Build your journey with',
+  heroAccent: 'FixTradeZone.',
   heroDescription:
-    'A secure workspace for packages, deposits, referral activity, rewards, payouts and clearly labelled simulated activity.',
-  primaryCtaLabel: 'Sign in',
-  primaryCtaHref: '/login',
-  secondaryCtaLabel: 'Create account',
-  secondaryCtaHref: '/register',
+    'Choose a package, manage your account, grow your network and track your progress from one simple workspace.',
+  primaryCtaLabel: 'Get started',
+  primaryCtaHref: '/register',
+  secondaryCtaLabel: 'Sign in',
+  secondaryCtaHref: '/login',
   features: [
     {
-      title: 'Account operations',
+      title: 'Choose a package',
       description:
-        'Manage package, deposit, wallet and payout workflows from one protected account.',
+        'Explore the available packages and select the option that fits your plan.',
     },
     {
-      title: 'Referral visibility',
+      title: 'Activate your account',
       description:
-        'Review direct referrals, genealogy and eligible package-based commission activity.',
+        'Complete the required account steps and follow your package status from your dashboard.',
     },
     {
-      title: 'Transparent activity',
+      title: 'Build your network',
       description:
-        'Simulated results are clearly disclosed and remain separate from real wallet and ledger accounting.',
+        'Invite your team, track referrals and follow eligible team business from one place.',
     },
   ],
-  trustTitle: 'Security-first account boundary',
+  trustTitle: 'Grow with clear team visibility',
   trustDescription:
-    'Protected authentication, role-based access controls, session security and immutable accounting records support platform operations.',
+    'Use your referral link, follow your direct network and genealogy, and track eligible package-based team activity from your account.',
   disclosure:
     'SIMULATED RESULTS ARE NOT REAL TRADING. Displayed simulated activity does not represent exchange execution or guaranteed, realized or withdrawable trading profit.',
-  footerText: 'FixTradeZone — secure platform operations.',
-  seoTitle: 'FixTradeZone | Secure Platform Operations',
+  footerText: 'FixTradeZone — simple, secure account access.',
+  seoTitle: 'FixTradeZone | Packages, Team Business & Account Access',
   seoDescription:
-    'Secure FixTradeZone access for packages, deposits, referrals, rewards, payouts and clearly disclosed simulated activity.',
+    'Explore FixTradeZone packages, manage your account, follow referrals and team activity, and access wallet and payout features from one protected workspace.',
 };
 
 export const DEFAULT_EMAIL_CONTENT: Record<
