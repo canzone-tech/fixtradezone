@@ -129,13 +129,8 @@ export class SupportService {
       FROM users u
       INNER JOIN user_roles ur ON ur.userId = u.id
       INNER JOIN roles r ON r.id = ur.roleId AND r.status = 'ACTIVE'
-      LEFT JOIN role_permissions rp ON rp.roleId = r.id
-      LEFT JOIN permissions p ON p.id = rp.permissionId
       WHERE u.status IN ('ACTIVE', 'RESTRICTED')
-        AND (
-          r.name = 'SUPER_ADMIN'
-          OR (r.name = 'ADMIN' AND p.code = 'support.tickets.read')
-        )
+        AND r.name IN ('SUPER_ADMIN', 'ADMIN')
       ORDER BY u.username ASC, u.id ASC
     `);
 
@@ -566,7 +561,7 @@ export class SupportService {
       assignee = await this.findAssignableStaff(nextAssigneeId);
       if (!assignee) {
         throw new BadRequestException(
-          'Assignee must be an active administrator with support queue access.',
+          'Assignee must have an active ADMIN or SUPER_ADMIN role.',
         );
       }
     }
@@ -807,14 +802,9 @@ export class SupportService {
       FROM users u
       INNER JOIN user_roles ur ON ur.userId = u.id
       INNER JOIN roles r ON r.id = ur.roleId AND r.status = 'ACTIVE'
-      LEFT JOIN role_permissions rp ON rp.roleId = r.id
-      LEFT JOIN permissions p ON p.id = rp.permissionId
       WHERE u.id = ${userId}
         AND u.status IN ('ACTIVE', 'RESTRICTED')
-        AND (
-          r.name = 'SUPER_ADMIN'
-          OR (r.name = 'ADMIN' AND p.code = 'support.tickets.read')
-        )
+        AND r.name IN ('SUPER_ADMIN', 'ADMIN')
       LIMIT 1
     `);
     return rows[0] ?? null;
