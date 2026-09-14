@@ -134,6 +134,12 @@
   letter-spacing: 0.3px;
 }
 
+.badges .levelBadge {
+  color: #8fc8ff;
+  background: rgba(72, 167, 255, 0.1);
+  border-color: rgba(72, 167, 255, 0.28);
+}
+
 .badges .activePackage {
   color: #8ef0d8;
   background: rgba(105, 223, 194, 0.1);
