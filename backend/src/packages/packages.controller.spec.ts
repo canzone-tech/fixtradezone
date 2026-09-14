@@ -36,6 +36,8 @@ const catalogue = {
       currency: 'USDT',
       rewardRateMode: 'FIXED',
       fixedRewardRate: '1.000000',
+      minimumRewardRate: null,
+      maximumRewardRate: null,
     },
     {
       id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -50,8 +52,10 @@ const catalogue = {
       rangeConfigured: true,
       durationDays: 45,
       currency: 'USDT',
-      rewardRateMode: 'FIXED',
-      fixedRewardRate: '1.250000',
+      rewardRateMode: 'RANDOM_RANGE',
+      fixedRewardRate: null,
+      minimumRewardRate: '0.400000',
+      maximumRewardRate: '0.600000',
     },
   ],
 };
@@ -66,7 +70,7 @@ describe('PublicPackagesController', () => {
     packagesService.getEffectiveCatalogue.mockResolvedValue(catalogue);
   });
 
-  it('returns only landing-safe package fields', async () => {
+  it('returns only landing-safe package fields with package-specific rate labels', async () => {
     const controller = new PublicPackagesController(
       packagesService as unknown as PackagesService,
     );
@@ -85,9 +89,13 @@ describe('PublicPackagesController', () => {
       rangeConfigured: true,
       durationDays: 30,
       currency: 'USDT',
+      dailyRateLabel: '1%',
     });
+    expect(result.items[1].dailyRateLabel).toBe('0.4–0.6%');
     expect(result.items[0]).not.toHaveProperty('rewardRateMode');
     expect(result.items[0]).not.toHaveProperty('fixedRewardRate');
+    expect(result.items[0]).not.toHaveProperty('minimumRewardRate');
+    expect(result.items[0]).not.toHaveProperty('maximumRewardRate');
     expect(result.items[0]).not.toHaveProperty('packageDefinitionId');
   });
 });
