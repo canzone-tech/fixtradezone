@@ -27,6 +27,14 @@ import {
 } from './dto/support.dto';
 import { SupportService } from './support.service';
 
+interface SupportAssigneeResponse {
+  assignees: Array<{
+    id: string;
+    username: string;
+    email: string | null;
+  }>;
+}
+
 @Controller('admin/support')
 export class AdminSupportController {
   constructor(private readonly supportService: SupportService) {}
@@ -73,7 +81,7 @@ export class AdminSupportController {
   @Get('assignees')
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SUPPORT_TICKETS_ASSIGN)
-  listAssignees() {
+  listAssignees(): Promise<SupportAssigneeResponse> {
     return this.supportService.listAssignableStaff();
   }
 
