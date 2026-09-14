@@ -24,6 +24,7 @@ import { RewardsModule } from './rewards/rewards.module';
 import { SecurityConfigModule } from './security-config/security-config.module';
 import { SimulatedActivityModule } from './simulated-activity/simulated-activity.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { SupportModule } from './support/support.module';
 import { UsersModule } from './users/users.module';
 import { WalletModule } from './wallet/wallet.module';
 
@@ -59,6 +60,7 @@ import { WalletModule } from './wallet/wallet.module';
     InternalTradingModule,
     PayoutsModule,
     NotificationsModule,
+    SupportModule,
     ReportsModule,
     DashboardModule,
     HealthModule,

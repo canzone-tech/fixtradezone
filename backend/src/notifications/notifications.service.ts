@@ -93,47 +93,28 @@ export class NotificationsService {
 
   async markRead(userId: string, notificationId: string) {
     const before = await this.findMine(userId, notificationId);
-
-    if (!before) {
-      throw new NotFoundException('Notification was not found.');
-    }
+    if (!before) throw new NotFoundException('Notification was not found.');
 
     if (!before.readAt) {
       await this.prisma.$executeRaw(Prisma.sql`
         UPDATE user_notifications
-        SET
-          readAt = CURRENT_TIMESTAMP(3),
-          updatedAt = CURRENT_TIMESTAMP(3)
-        WHERE id = ${notificationId}
-          AND userId = ${userId}
-          AND readAt IS NULL
+        SET readAt = CURRENT_TIMESTAMP(3), updatedAt = CURRENT_TIMESTAMP(3)
+        WHERE id = ${notificationId} AND userId = ${userId} AND readAt IS NULL
       `);
     }
 
     const notification = await this.findMine(userId, notificationId);
-
-    if (!notification) {
-      throw new NotFoundException('Notification was not found.');
-    }
-
-    return {
-      notification: this.snapshot(notification),
-    };
+    if (!notification) throw new NotFoundException('Notification was not found.');
+    return { notification: this.snapshot(notification) };
   }
 
   async markAllRead(userId: string) {
     const updated = await this.prisma.$executeRaw(Prisma.sql`
       UPDATE user_notifications
-      SET
-        readAt = CURRENT_TIMESTAMP(3),
-        updatedAt = CURRENT_TIMESTAMP(3)
-      WHERE userId = ${userId}
-        AND readAt IS NULL
+      SET readAt = CURRENT_TIMESTAMP(3), updatedAt = CURRENT_TIMESTAMP(3)
+      WHERE userId = ${userId} AND readAt IS NULL
     `);
-
-    return {
-      updated: Number(updated),
-    };
+    return { updated: Number(updated) };
   }
 
   async listAdmin(query: AdminNotificationQueryDto) {
@@ -150,10 +131,7 @@ export class NotificationsService {
 
     const [rows, counts] = await Promise.all([
       this.prisma.$queryRaw<AdminNotificationRow[]>(Prisma.sql`
-        SELECT
-          n.*,
-          u.username,
-          u.email
+        SELECT n.*, u.username, u.email
         FROM user_notifications n
         INNER JOIN users u ON u.id = n.userId
         WHERE 1 = 1
@@ -198,13 +176,9 @@ export class NotificationsService {
         'Notification title and message must contain visible text.',
       );
     }
-
     if (dto.audience === 'USER' && !dto.recipientUserId) {
-      throw new BadRequestException(
-        'recipientUserId is required for USER audience.',
-      );
+      throw new BadRequestException('recipientUserId is required for USER audience.');
     }
-
     if (dto.audience === 'ALL_USERS' && dto.recipientUserId) {
       throw new BadRequestException(
         'recipientUserId must not be supplied for ALL_USERS audience.',
@@ -223,78 +197,57 @@ export class NotificationsService {
           WHERE u.id = ${dto.recipientUserId!}
             AND u.status IN ('ACTIVE', 'RESTRICTED')
             AND EXISTS (
-              SELECT 1
-              FROM user_roles ur
+              SELECT 1 FROM user_roles ur
               INNER JOIN roles r ON r.id = ur.roleId
-              WHERE ur.userId = u.id
-                AND r.name = 'USER'
-                AND r.status = 'ACTIVE'
+              WHERE ur.userId = u.id AND r.name = 'USER' AND r.status = 'ACTIVE'
             )
             AND NOT EXISTS (
-              SELECT 1
-              FROM user_roles aur
+              SELECT 1 FROM user_roles aur
               INNER JOIN roles ar ON ar.id = aur.roleId
-              WHERE aur.userId = u.id
-                AND ar.name IN ('ADMIN', 'SUPER_ADMIN')
+              WHERE aur.userId = u.id AND ar.name IN ('ADMIN', 'SUPER_ADMIN')
             )
           LIMIT 1
         `);
-
         targetedUser = users[0] ?? null;
-
         if (!targetedUser) {
           throw new NotFoundException(
             'Eligible standard USER notification recipient was not found.',
           );
         }
-
         notificationId = randomUUID();
-
         await transaction.$executeRaw(Prisma.sql`
           INSERT INTO user_notifications (
-            id, userId, category, title, message,
-            sourceType, sourceId, createdByUserId,
-            readAt, createdAt, updatedAt
+            id, userId, category, title, message, sourceType, sourceId,
+            createdByUserId, readAt, createdAt, updatedAt
           ) VALUES (
-            ${notificationId}, ${targetedUser.id}, ${dto.category},
-            ${title}, ${message},
-            'ADMIN_TARGETED', NULL, ${actor.id},
-            NULL, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+            ${notificationId}, ${targetedUser.id}, ${dto.category}, ${title}, ${message},
+            'ADMIN_TARGETED', NULL, ${actor.id}, NULL,
+            CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
           )
         `);
-
         recipientCount = 1;
       } else {
-        recipientCount = Number(
-          await transaction.$executeRaw(Prisma.sql`
-            INSERT INTO user_notifications (
-              id, userId, category, title, message,
-              sourceType, sourceId, createdByUserId,
-              readAt, createdAt, updatedAt
+        recipientCount = Number(await transaction.$executeRaw(Prisma.sql`
+          INSERT INTO user_notifications (
+            id, userId, category, title, message, sourceType, sourceId,
+            createdByUserId, readAt, createdAt, updatedAt
+          )
+          SELECT UUID(), u.id, ${dto.category}, ${title}, ${message},
+            'ADMIN_BROADCAST', NULL, ${actor.id}, NULL,
+            CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+          FROM users u
+          WHERE u.status IN ('ACTIVE', 'RESTRICTED')
+            AND EXISTS (
+              SELECT 1 FROM user_roles ur
+              INNER JOIN roles r ON r.id = ur.roleId
+              WHERE ur.userId = u.id AND r.name = 'USER' AND r.status = 'ACTIVE'
             )
-            SELECT
-              UUID(), u.id, ${dto.category}, ${title}, ${message},
-              'ADMIN_BROADCAST', NULL, ${actor.id},
-              NULL, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
-            FROM users u
-            WHERE u.status IN ('ACTIVE', 'RESTRICTED')
-              AND EXISTS (
-                SELECT 1
-                FROM user_roles ur
-                INNER JOIN roles r ON r.id = ur.roleId
-                WHERE ur.userId = u.id
-                  AND r.name = 'USER'
-                  AND r.status = 'ACTIVE'
-              )
-              AND NOT EXISTS (
-                SELECT 1
-                FROM user_roles aur
-                INNER JOIN roles ar ON ar.id = aur.roleId
-                WHERE aur.userId = u.id
-                  AND ar.name IN ('ADMIN', 'SUPER_ADMIN')
-              )
-          `),
-        );
+            AND NOT EXISTS (
+              SELECT 1 FROM user_roles aur
+              INNER JOIN roles ar ON ar.id = aur.roleId
+              WHERE aur.userId = u.id AND ar.name IN ('ADMIN', 'SUPER_ADMIN')
+            )
+        `));
       }
 
       await transaction.auditLog.create({
@@ -303,10 +256,9 @@ export class NotificationsService {
           action: 'CREATE',
           entityType: 'UserNotification',
           entityId: notificationId,
-          description:
-            dto.audience === 'USER'
-              ? 'Targeted in-app user notification created.'
-              : 'Broadcast in-app user notification created.',
+          description: dto.audience === 'USER'
+            ? 'Targeted in-app user notification created.'
+            : 'Broadcast in-app user notification created.',
           metadata: {
             source: 'NOTIFICATIONS',
             operation: NOTIFICATION_AUDIT_OPERATION,
@@ -323,7 +275,6 @@ export class NotificationsService {
       const notification = notificationId
         ? await this.findById(transaction, notificationId)
         : null;
-
       return {
         created: true,
         audience: dto.audience,
@@ -333,15 +284,43 @@ export class NotificationsService {
     });
   }
 
-  private async findMine(userId: string, notificationId: string) {
-    const rows = await this.prisma.$queryRaw<NotificationRow[]>(Prisma.sql`
-      SELECT *
-      FROM user_notifications
-      WHERE id = ${notificationId}
-        AND userId = ${userId}
-      LIMIT 1
+  async createEventNotification(input: {
+    userId: string;
+    category: NotificationCategory;
+    title: string;
+    message: string;
+    sourceType?: string | null;
+    sourceId?: string | null;
+  }) {
+    const title = input.title.trim();
+    const message = input.message.trim();
+    if (!title || !message) {
+      throw new BadRequestException(
+        'Notification title and message must contain visible text.',
+      );
+    }
+
+    const id = randomUUID();
+    await this.prisma.$executeRaw(Prisma.sql`
+      INSERT INTO user_notifications (
+        id, userId, category, title, message, sourceType, sourceId,
+        createdByUserId, readAt, createdAt, updatedAt
+      ) VALUES (
+        ${id}, ${input.userId}, ${input.category}, ${title}, ${message},
+        ${input.sourceType ?? null}, ${input.sourceId ?? null}, NULL, NULL,
+        CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+      )
     `);
 
+    return { created: true, notificationId: id };
+  }
+
+  private async findMine(userId: string, notificationId: string) {
+    const rows = await this.prisma.$queryRaw<NotificationRow[]>(Prisma.sql`
+      SELECT * FROM user_notifications
+      WHERE id = ${notificationId} AND userId = ${userId}
+      LIMIT 1
+    `);
     return rows[0] ?? null;
   }
 
@@ -350,12 +329,8 @@ export class NotificationsService {
     notificationId: string,
   ) {
     const rows = await client.$queryRaw<NotificationRow[]>(Prisma.sql`
-      SELECT *
-      FROM user_notifications
-      WHERE id = ${notificationId}
-      LIMIT 1
+      SELECT * FROM user_notifications WHERE id = ${notificationId} LIMIT 1
     `);
-
     return rows[0] ?? null;
   }
 

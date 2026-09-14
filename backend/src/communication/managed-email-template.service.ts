@@ -23,20 +23,14 @@ export class ManagedEmailTemplateService {
 
   async apply(message: EmailMessage): Promise<EmailMessage> {
     const context = message.managedTemplate;
-    if (!context) {
-      return message;
-    }
+    if (!context) return message;
 
     const content = await this.contentService.getPublishedEmailTemplate(
       context.contentKey,
     );
     const appUrl = this.getAppUrl();
-    const values = {
-      ...context.values,
-      appUrl,
-    };
+    const values = { ...context.values, appUrl };
     const actionUrl = context.actionUrl ?? appUrl;
-
     return this.render(content, message.to, values, actionUrl);
   }
 
@@ -48,14 +42,8 @@ export class ManagedEmailTemplateService {
   ): EmailMessage {
     const contentKey = this.assertContentKey(rawContentKey);
     this.assertAllowedVariables(contentKey, content);
-
     const appUrl = this.getAppUrl();
-    const test = this.getControlledTestContext(
-      contentKey,
-      actorUsername,
-      appUrl,
-    );
-
+    const test = this.getControlledTestContext(contentKey, actorUsername, appUrl);
     return this.render(content, to, test.values, test.actionUrl);
   }
 
@@ -77,10 +65,7 @@ export class ManagedEmailTemplateService {
     });
   }
 
-  private interpolate(
-    template: string,
-    values: Record<string, string>,
-  ): string {
+  private interpolate(template: string, values: Record<string, string>): string {
     return template.replace(
       /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g,
       (_match, variable: string) => values[variable] ?? '',
@@ -101,7 +86,6 @@ export class ManagedEmailTemplateService {
   ): void {
     const allowed = new Set(EMAIL_ALLOWED_VARIABLES[contentKey]);
     const variablePattern = /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g;
-
     for (const value of Object.values(content)) {
       for (const match of value.matchAll(variablePattern)) {
         const variable = match[1];
@@ -120,37 +104,26 @@ export class ManagedEmailTemplateService {
     appUrl: string,
   ): { values: Record<string, string>; actionUrl: string } {
     const displayName = 'FixTradeZone Test User';
+    const supportUrl = `${appUrl}/user/support`;
 
     switch (contentKey) {
       case 'EMAIL_VERIFICATION': {
         const verificationUrl = `${appUrl}/verify-email?token=CONTROLLED_TEST_ONLY`;
         return {
-          values: {
-            displayName,
-            verificationUrl,
-            expiresInMinutes: '30',
-          },
+          values: { displayName, verificationUrl, expiresInMinutes: '30' },
           actionUrl: verificationUrl,
         };
       }
       case 'PASSWORD_RESET': {
         const resetUrl = `${appUrl}/reset-password?token=CONTROLLED_TEST_ONLY`;
         return {
-          values: {
-            displayName,
-            resetUrl,
-            expiresInMinutes: '30',
-          },
+          values: { displayName, resetUrl, expiresInMinutes: '30' },
           actionUrl: resetUrl,
         };
       }
       case 'WELCOME':
         return {
-          values: {
-            displayName,
-            userCode: '100000',
-            appUrl,
-          },
+          values: { displayName, userCode: '100000', appUrl },
           actionUrl: `${appUrl}/login`,
         };
       case 'MARKETING_OFFER': {
@@ -159,8 +132,7 @@ export class ManagedEmailTemplateService {
           values: {
             displayName,
             offerTitle: 'FixTradeZone Test Offer',
-            offerSummary:
-              'This is controlled preview content and is not a live promotion.',
+            offerSummary: 'This is controlled preview content and is not a live promotion.',
             offerUrl,
             unsubscribeUrl: `${appUrl}/user/profile`,
           },
@@ -169,11 +141,40 @@ export class ManagedEmailTemplateService {
       }
       case 'DELIVERY_TEST':
         return {
-          values: {
-            requestedBy: actorUsername.trim() || 'SUPER_ADMIN',
-            appUrl,
-          },
+          values: { requestedBy: actorUsername.trim() || 'SUPER_ADMIN', appUrl },
           actionUrl: appUrl,
+        };
+      case 'SUPPORT_TICKET_CREATED':
+        return {
+          values: {
+            displayName,
+            ticketNumber: 'FTZ-CONTROLLED-TEST',
+            subject: 'Controlled support template test',
+            status: 'OPEN',
+            ticketUrl: supportUrl,
+          },
+          actionUrl: supportUrl,
+        };
+      case 'SUPPORT_TICKET_REPLY':
+        return {
+          values: {
+            displayName,
+            ticketNumber: 'FTZ-CONTROLLED-TEST',
+            subject: 'Controlled support template test',
+            ticketUrl: supportUrl,
+          },
+          actionUrl: supportUrl,
+        };
+      case 'SUPPORT_TICKET_STATUS_CHANGED':
+        return {
+          values: {
+            displayName,
+            ticketNumber: 'FTZ-CONTROLLED-TEST',
+            subject: 'Controlled support template test',
+            status: 'IN_PROGRESS',
+            ticketUrl: supportUrl,
+          },
+          actionUrl: supportUrl,
         };
     }
   }
