@@ -138,6 +138,13 @@ const sections: Array<{
     label: "PLATFORM",
     items: [
       {
+        href: "/support",
+        label: "Support Queue",
+        icon: "iconoir-help-circle",
+        permission: "support.tickets.read",
+        enabled: true,
+      },
+      {
         href: "/notifications",
         label: "Notifications",
         icon: "iconoir-bell",
