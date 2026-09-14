@@ -204,6 +204,9 @@ export default function GenealogyTree({
           <div className={styles.badges}>
             <span>{node.status}</span>
             <span>{node.assignmentStatus}</span>
+            <span className={styles.levelBadge}>
+              {depth === 0 ? "ROOT" : `LEVEL ${depth}`}
+            </span>
             <span className={node.hasActivePackage ? styles.activePackage : ""}>
               {node.activePackageCount} active package
               {node.activePackageCount === 1 ? "" : "s"}
