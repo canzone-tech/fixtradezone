@@ -35,6 +35,7 @@ export interface PublicPackageSummary {
   rangeConfigured: boolean;
   durationDays: number;
   currency: string;
+  dailyRateLabel: string | null;
 }
 
 export interface PublicPackageCatalogue {
@@ -177,7 +178,8 @@ function isPublicPackageSummary(value: unknown): value is PublicPackageSummary {
     typeof item.durationDays === "number" &&
     Number.isFinite(item.durationDays) &&
     item.durationDays > 0 &&
-    isStringWithin(item.currency, 16)
+    isStringWithin(item.currency, 16) &&
+    (item.dailyRateLabel === null || isStringWithin(item.dailyRateLabel, 40))
   );
 }
 
