@@ -17,7 +17,6 @@ import {
   type PackageCatalogue,
 } from "@/lib/packages";
 import UserRewardProgressPanel from "./user-reward-progress-panel";
-import UserSubscriptionsPanel from "./user-subscriptions-panel";
 import styles from "./user-packages.module.css";
 
 function activationPolicyCopy(trigger: string, available: boolean) {
@@ -192,8 +191,6 @@ export default function UserPackagesClient() {
             </span>
           </div>
         </header>
-
-        <UserSubscriptionsPanel />
 
         {!catalogueReady ? (
           <section className={styles.emptyState}>
