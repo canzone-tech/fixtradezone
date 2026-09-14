@@ -2,24 +2,17 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect } from "react";
 
 const PUBLIC_AUTH_PATHS = new Set(["/login", "/register"]);
 
 export default function AuthPublicNavigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const [portalTarget, setPortalTarget] = useState<Element | null>(null);
   const isPublicAuthPage = PUBLIC_AUTH_PATHS.has(pathname);
 
   useEffect(() => {
-    if (!isPublicAuthPage) {
-      setPortalTarget(null);
-      return;
-    }
-
-    setPortalTarget(document.querySelector(".ftz-login-card"));
+    if (!isPublicAuthPage) return;
 
     const brandTargets = Array.from(
       document.querySelectorAll<HTMLElement>(
@@ -55,13 +48,12 @@ export default function AuthPublicNavigation() {
     };
   }, [isPublicAuthPage, router]);
 
-  if (!isPublicAuthPage || !portalTarget) return null;
+  if (!isPublicAuthPage) return null;
 
-  return createPortal(
+  return (
     <Link className="ftz-auth-public-home-link" href="/">
       <i className="iconoir-arrow-left" aria-hidden="true" />
       <span>Back to website</span>
-    </Link>,
-    portalTarget,
+    </Link>
   );
 }
