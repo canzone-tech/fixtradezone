@@ -51,53 +51,204 @@ export const PERMISSIONS = {
 } as const;
 
 export const SYSTEM_PERMISSIONS = [
-  { code: PERMISSIONS.DASHBOARD_READ, description: 'View administration dashboard and operational data' },
+  {
+    code: PERMISSIONS.DASHBOARD_READ,
+    description: 'View administration dashboard and operational data',
+  },
   { code: PERMISSIONS.USERS_READ, description: 'View users and user details' },
   { code: PERMISSIONS.USERS_CREATE, description: 'Create platform users' },
-  { code: PERMISSIONS.USERS_STATUS_MANAGE, description: 'Activate, suspend, block, and unblock users' },
-  { code: PERMISSIONS.USERS_ROLES_MANAGE, description: 'Assign and remove permitted user roles' },
-  { code: PERMISSIONS.USERS_IMPERSONATE, description: 'Temporarily access an eligible user account for support' },
-  { code: PERMISSIONS.REFERRALS_READ, description: 'View referral genealogy and network hierarchy' },
-  { code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE, description: 'Assign and exceptionally reassign referral sponsors' },
-  { code: PERMISSIONS.PACKAGES_READ, description: 'View package plan versions and draft package terms' },
-  { code: PERMISSIONS.PACKAGES_DRAFT_MANAGE, description: 'Create and edit package plan drafts' },
-  { code: PERMISSIONS.DEPOSIT_ACCOUNTS_READ, description: 'View configured deposit payment rails and receiving accounts' },
-  { code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE, description: 'Create and manage deposit payment rails and receiving accounts' },
-  { code: PERMISSIONS.DEPOSITS_READ, description: 'View deposit requests and payment review state' },
-  { code: PERMISSIONS.DEPOSITS_REVIEW, description: 'Approve or reject submitted deposit payments' },
-  { code: PERMISSIONS.WALLETS_READ, description: 'View USER wallet totals and accounting bucket balances' },
-  { code: PERMISSIONS.LEDGER_READ, description: 'View immutable accounting transactions and entries' },
-  { code: PERMISSIONS.LEDGER_POST, description: 'Post or reconcile eligible approved deposits into accounting' },
-  { code: PERMISSIONS.SUBSCRIPTIONS_READ, description: 'View USER package subscriptions and activation history' },
-  { code: PERMISSIONS.SUBSCRIPTIONS_ACTIVATE, description: 'Reconcile eligible approved and accounted deposits into package activation' },
-  { code: PERMISSIONS.COMMISSIONS_READ, description: 'View referral commission plans, events and reconciliation state' },
-  { code: PERMISSIONS.COMMISSIONS_PLAN_MANAGE, description: 'Create, edit and publish versioned referral commission plans' },
-  { code: PERMISSIONS.COMMISSIONS_RECONCILE, description: 'Reconcile package subscriptions into referral commission events' },
-  { code: PERMISSIONS.REWARDS_READ, description: 'View package reward events, cap state and package lifecycle progress' },
-  { code: PERMISSIONS.REWARDS_RECONCILE, description: 'Reconcile due package rewards through the authoritative reward engine' },
-  { code: PERMISSIONS.AWARD_REWARDS_READ, description: 'View Award & Reward policies, team-business progress and award history' },
-  { code: PERMISSIONS.AWARD_REWARDS_MANAGE, description: 'Create, edit and publish versioned package-based Award & Reward policies' },
-  { code: PERMISSIONS.AWARD_REWARDS_RECONCILE, description: 'Run idempotent sequential Team Business Award & Reward reconciliation' },
-  { code: PERMISSIONS.SIMULATED_ACTIVITY_READ, description: 'View simulated trade activity policies, events and generator health' },
-  { code: PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE, description: 'Run idempotent simulated activity reconciliation for eligible subscriptions' },
-  { code: PERMISSIONS.INTERNAL_TRADING_READ, description: 'View internal trading policies, events and lifecycle state' },
-  { code: PERMISSIONS.INTERNAL_TRADING_RECONCILE, description: 'Reconcile internal trading lifecycle for eligible package subscriptions' },
-  { code: PERMISSIONS.PAYOUTS_READ, description: 'View payout policies, requests and payout operational state' },
-  { code: PERMISSIONS.PAYOUTS_REVIEW, description: 'Approve, reject, submit and complete payout requests' },
-  { code: PERMISSIONS.PAYOUTS_POLICY_MANAGE, description: 'Create, edit and publish versioned payout policies' },
-  { code: PERMISSIONS.NOTIFICATIONS_READ, description: 'View administration notification delivery and read state' },
-  { code: PERMISSIONS.NOTIFICATIONS_MANAGE, description: 'Create targeted or broadcast in-app user notifications' },
-  { code: PERMISSIONS.SUPPORT_TICKETS_READ, description: 'View the support ticket queue and ticket details' },
-  { code: PERMISSIONS.SUPPORT_TICKETS_REPLY, description: 'Reply to support tickets as staff' },
-  { code: PERMISSIONS.SUPPORT_TICKETS_ASSIGN, description: 'Assign and unassign support tickets' },
-  { code: PERMISSIONS.SUPPORT_TICKETS_STATUS_MANAGE, description: 'Change support ticket lifecycle status' },
-  { code: PERMISSIONS.SUPPORT_TICKETS_NOTES_MANAGE, description: 'Create staff-only internal support ticket notes' },
-  { code: PERMISSIONS.SUPPORT_CATEGORIES_MANAGE, description: 'Create and manage support ticket categories' },
-  { code: PERMISSIONS.REPORTS_READ, description: 'View read-only administration operational and financial reports' },
-  { code: PERMISSIONS.AUDIT_LOGS_READ, description: 'View immutable administration audit logs' },
-  { code: PERMISSIONS.CONTENT_READ, description: 'View administration content and template revisions' },
-  { code: PERMISSIONS.CONTENT_MANAGE, description: 'Create versioned landing and email-template drafts' },
-  { code: PERMISSIONS.CONTENT_PUBLISH, description: 'Publish approved landing and email-template revisions' },
+  {
+    code: PERMISSIONS.USERS_STATUS_MANAGE,
+    description: 'Activate, suspend, block, and unblock users',
+  },
+  {
+    code: PERMISSIONS.USERS_ROLES_MANAGE,
+    description: 'Assign and remove permitted user roles',
+  },
+  {
+    code: PERMISSIONS.USERS_IMPERSONATE,
+    description: 'Temporarily access an eligible user account for support',
+  },
+  {
+    code: PERMISSIONS.REFERRALS_READ,
+    description: 'View referral genealogy and network hierarchy',
+  },
+  {
+    code: PERMISSIONS.REFERRALS_SPONSOR_MANAGE,
+    description: 'Assign and exceptionally reassign referral sponsors',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_READ,
+    description: 'View package plan versions and draft package terms',
+  },
+  {
+    code: PERMISSIONS.PACKAGES_DRAFT_MANAGE,
+    description: 'Create and edit package plan drafts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_READ,
+    description: 'View configured deposit payment rails and receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSIT_ACCOUNTS_MANAGE,
+    description:
+      'Create and manage deposit payment rails and receiving accounts',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_READ,
+    description: 'View deposit requests and payment review state',
+  },
+  {
+    code: PERMISSIONS.DEPOSITS_REVIEW,
+    description: 'Approve or reject submitted deposit payments',
+  },
+  {
+    code: PERMISSIONS.WALLETS_READ,
+    description: 'View USER wallet totals and accounting bucket balances',
+  },
+  {
+    code: PERMISSIONS.LEDGER_READ,
+    description: 'View immutable accounting transactions and entries',
+  },
+  {
+    code: PERMISSIONS.LEDGER_POST,
+    description: 'Post or reconcile eligible approved deposits into accounting',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_READ,
+    description: 'View USER package subscriptions and activation history',
+  },
+  {
+    code: PERMISSIONS.SUBSCRIPTIONS_ACTIVATE,
+    description:
+      'Reconcile eligible approved and accounted deposits into package activation',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_READ,
+    description:
+      'View referral commission plans, events and reconciliation state',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_PLAN_MANAGE,
+    description: 'Create, edit and publish versioned referral commission plans',
+  },
+  {
+    code: PERMISSIONS.COMMISSIONS_RECONCILE,
+    description:
+      'Reconcile package subscriptions into referral commission events',
+  },
+  {
+    code: PERMISSIONS.REWARDS_READ,
+    description:
+      'View package reward events, cap state and package lifecycle progress',
+  },
+  {
+    code: PERMISSIONS.REWARDS_RECONCILE,
+    description:
+      'Reconcile due package rewards through the authoritative reward engine',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_READ,
+    description:
+      'View Award & Reward policies, team-business progress and award history',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_MANAGE,
+    description:
+      'Create, edit and publish versioned package-based Award & Reward policies',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_RECONCILE,
+    description:
+      'Run idempotent sequential Team Business Award & Reward reconciliation',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_READ,
+    description:
+      'View simulated trade activity policies, events and generator health',
+  },
+  {
+    code: PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE,
+    description:
+      'Run idempotent simulated activity reconciliation for eligible subscriptions',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_READ,
+    description: 'View internal trading policies, events and lifecycle state',
+  },
+  {
+    code: PERMISSIONS.INTERNAL_TRADING_RECONCILE,
+    description:
+      'Reconcile internal trading lifecycle for eligible package subscriptions',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_READ,
+    description: 'View payout policies, requests and payout operational state',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_REVIEW,
+    description: 'Approve, reject, submit and complete payout requests',
+  },
+  {
+    code: PERMISSIONS.PAYOUTS_POLICY_MANAGE,
+    description: 'Create, edit and publish versioned payout policies',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_READ,
+    description: 'View administration notification delivery and read state',
+  },
+  {
+    code: PERMISSIONS.NOTIFICATIONS_MANAGE,
+    description: 'Create targeted or broadcast in-app user notifications',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_READ,
+    description: 'View the support ticket queue and ticket details',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_REPLY,
+    description: 'Reply to support tickets as staff',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_ASSIGN,
+    description: 'Assign and unassign support tickets',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_STATUS_MANAGE,
+    description: 'Change support ticket lifecycle status',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_NOTES_MANAGE,
+    description: 'Create staff-only internal support ticket notes',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_CATEGORIES_MANAGE,
+    description: 'Create and manage support ticket categories',
+  },
+  {
+    code: PERMISSIONS.REPORTS_READ,
+    description:
+      'View read-only administration operational and financial reports',
+  },
+  {
+    code: PERMISSIONS.AUDIT_LOGS_READ,
+    description: 'View immutable administration audit logs',
+  },
+  {
+    code: PERMISSIONS.CONTENT_READ,
+    description: 'View administration content and template revisions',
+  },
+  {
+    code: PERMISSIONS.CONTENT_MANAGE,
+    description: 'Create versioned landing and email-template drafts',
+  },
+  {
+    code: PERMISSIONS.CONTENT_PUBLISH,
+    description: 'Publish approved landing and email-template revisions',
+  },
   { code: PERMISSIONS.RBAC_READ, description: 'View roles and permissions' },
-  { code: PERMISSIONS.RBAC_MANAGE, description: 'Manage roles and role permissions' },
+  {
+    code: PERMISSIONS.RBAC_MANAGE,
+    description: 'Manage roles and role permissions',
+  },
 ] as const;

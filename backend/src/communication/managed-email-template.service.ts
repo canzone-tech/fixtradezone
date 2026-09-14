@@ -43,7 +43,11 @@ export class ManagedEmailTemplateService {
     const contentKey = this.assertContentKey(rawContentKey);
     this.assertAllowedVariables(contentKey, content);
     const appUrl = this.getAppUrl();
-    const test = this.getControlledTestContext(contentKey, actorUsername, appUrl);
+    const test = this.getControlledTestContext(
+      contentKey,
+      actorUsername,
+      appUrl,
+    );
     return this.render(content, to, test.values, test.actionUrl);
   }
 
@@ -65,7 +69,10 @@ export class ManagedEmailTemplateService {
     });
   }
 
-  private interpolate(template: string, values: Record<string, string>): string {
+  private interpolate(
+    template: string,
+    values: Record<string, string>,
+  ): string {
     return template.replace(
       /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g,
       (_match, variable: string) => values[variable] ?? '',
@@ -132,7 +139,8 @@ export class ManagedEmailTemplateService {
           values: {
             displayName,
             offerTitle: 'FixTradeZone Test Offer',
-            offerSummary: 'This is controlled preview content and is not a live promotion.',
+            offerSummary:
+              'This is controlled preview content and is not a live promotion.',
             offerUrl,
             unsubscribeUrl: `${appUrl}/user/profile`,
           },
@@ -141,7 +149,10 @@ export class ManagedEmailTemplateService {
       }
       case 'DELIVERY_TEST':
         return {
-          values: { requestedBy: actorUsername.trim() || 'SUPER_ADMIN', appUrl },
+          values: {
+            requestedBy: actorUsername.trim() || 'SUPER_ADMIN',
+            appUrl,
+          },
           actionUrl: appUrl,
         };
       case 'SUPPORT_TICKET_CREATED':

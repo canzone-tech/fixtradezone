@@ -104,7 +104,8 @@ export class NotificationsService {
     }
 
     const notification = await this.findMine(userId, notificationId);
-    if (!notification) throw new NotFoundException('Notification was not found.');
+    if (!notification)
+      throw new NotFoundException('Notification was not found.');
     return { notification: this.snapshot(notification) };
   }
 
@@ -177,7 +178,9 @@ export class NotificationsService {
       );
     }
     if (dto.audience === 'USER' && !dto.recipientUserId) {
-      throw new BadRequestException('recipientUserId is required for USER audience.');
+      throw new BadRequestException(
+        'recipientUserId is required for USER audience.',
+      );
     }
     if (dto.audience === 'ALL_USERS' && dto.recipientUserId) {
       throw new BadRequestException(
@@ -227,7 +230,8 @@ export class NotificationsService {
         `);
         recipientCount = 1;
       } else {
-        recipientCount = Number(await transaction.$executeRaw(Prisma.sql`
+        recipientCount = Number(
+          await transaction.$executeRaw(Prisma.sql`
           INSERT INTO user_notifications (
             id, userId, category, title, message, sourceType, sourceId,
             createdByUserId, readAt, createdAt, updatedAt
@@ -247,7 +251,8 @@ export class NotificationsService {
               INNER JOIN roles ar ON ar.id = aur.roleId
               WHERE aur.userId = u.id AND ar.name IN ('ADMIN', 'SUPER_ADMIN')
             )
-        `));
+        `),
+        );
       }
 
       await transaction.auditLog.create({
@@ -256,9 +261,10 @@ export class NotificationsService {
           action: 'CREATE',
           entityType: 'UserNotification',
           entityId: notificationId,
-          description: dto.audience === 'USER'
-            ? 'Targeted in-app user notification created.'
-            : 'Broadcast in-app user notification created.',
+          description:
+            dto.audience === 'USER'
+              ? 'Targeted in-app user notification created.'
+              : 'Broadcast in-app user notification created.',
           metadata: {
             source: 'NOTIFICATIONS',
             operation: NOTIFICATION_AUDIT_OPERATION,

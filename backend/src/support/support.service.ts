@@ -165,7 +165,8 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, id);
-    if (!category) throw new Error('Support category insert did not read back.');
+    if (!category)
+      throw new Error('Support category insert did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -176,14 +177,17 @@ export class SupportService {
     context: RequestContext = {},
   ) {
     const current = await this.findCategoryById(this.prisma, categoryId);
-    if (!current) throw new NotFoundException('Support category was not found.');
+    if (!current)
+      throw new NotFoundException('Support category was not found.');
 
-    const name = dto.name === undefined
-      ? current.name
-      : this.visibleText(dto.name, 'Category name');
-    const description = dto.description === undefined
-      ? current.description
-      : dto.description.trim() || null;
+    const name =
+      dto.name === undefined
+        ? current.name
+        : this.visibleText(dto.name, 'Category name');
+    const description =
+      dto.description === undefined
+        ? current.description
+        : dto.description.trim() || null;
     const isActive = dto.isActive ?? Boolean(current.isActive);
     const sortOrder = dto.sortOrder ?? current.sortOrder;
 
@@ -224,7 +228,8 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, categoryId);
-    if (!category) throw new Error('Support category update did not read back.');
+    if (!category)
+      throw new Error('Support category update did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -261,7 +266,7 @@ export class SupportService {
     const message = this.visibleText(dto.message, 'Ticket message');
     const category = await this.findCategoryById(this.prisma, dto.categoryId);
 
-    if (!category || !Boolean(category.isActive)) {
+    if (!category || !category.isActive) {
       throw new BadRequestException('Select an active support category.');
     }
 
@@ -605,7 +610,9 @@ export class SupportService {
     const current = await this.findTicket(this.prisma, ticketId);
     if (!current) throw new NotFoundException('Support ticket was not found.');
     if (current.status === dto.status) {
-      throw new BadRequestException('Support ticket is already in that status.');
+      throw new BadRequestException(
+        'Support ticket is already in that status.',
+      );
     }
     if (!canTransitionSupportStatus(current.status, dto.status)) {
       throw new BadRequestException(
@@ -731,7 +738,9 @@ export class SupportService {
     ticketId: string,
     userId?: string,
   ) {
-    const ownerFilter = userId ? Prisma.sql`AND t.userId = ${userId}` : Prisma.empty;
+    const ownerFilter = userId
+      ? Prisma.sql`AND t.userId = ${userId}`
+      : Prisma.empty;
     const rows = await client.$queryRaw<SupportTicketRow[]>(Prisma.sql`
       ${this.ticketSelectSql()}
       WHERE t.id = ${ticketId}
@@ -881,7 +890,8 @@ export class SupportService {
 
   private visibleText(value: string, label: string) {
     const text = value.trim();
-    if (!text) throw new BadRequestException(`${label} must contain visible text.`);
+    if (!text)
+      throw new BadRequestException(`${label} must contain visible text.`);
     return text;
   }
 
@@ -907,8 +917,11 @@ export class SupportService {
   private async notifyTicketCreated(
     ticket: ReturnType<SupportService['serializeTicket']>,
   ) {
-    await this.safeNotification(ticket, 'Support ticket created',
-      `${ticket.ticketNumber} has been created and is currently OPEN.`);
+    await this.safeNotification(
+      ticket,
+      'Support ticket created',
+      `${ticket.ticketNumber} has been created and is currently OPEN.`,
+    );
     await this.safeEmail(ticket, 'SUPPORT_TICKET_CREATED', {
       displayName: this.displayName(ticket),
       ticketNumber: ticket.ticketNumber,
@@ -921,8 +934,11 @@ export class SupportService {
   private async notifyStaffReply(
     ticket: ReturnType<SupportService['serializeTicket']>,
   ) {
-    await this.safeNotification(ticket, 'Support replied to your ticket',
-      `${ticket.ticketNumber} has a new support reply.`);
+    await this.safeNotification(
+      ticket,
+      'Support replied to your ticket',
+      `${ticket.ticketNumber} has a new support reply.`,
+    );
     await this.safeEmail(ticket, 'SUPPORT_TICKET_REPLY', {
       displayName: this.displayName(ticket),
       ticketNumber: ticket.ticketNumber,
@@ -934,8 +950,11 @@ export class SupportService {
   private async notifyStatusChanged(
     ticket: ReturnType<SupportService['serializeTicket']>,
   ) {
-    await this.safeNotification(ticket, 'Support ticket status updated',
-      `${ticket.ticketNumber} is now ${ticket.status.replaceAll('_', ' ')}.`);
+    await this.safeNotification(
+      ticket,
+      'Support ticket status updated',
+      `${ticket.ticketNumber} is now ${ticket.status.replaceAll('_', ' ')}.`,
+    );
     await this.safeEmail(ticket, 'SUPPORT_TICKET_STATUS_CHANGED', {
       displayName: this.displayName(ticket),
       ticketNumber: ticket.ticketNumber,
