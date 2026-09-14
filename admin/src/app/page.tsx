@@ -163,11 +163,11 @@ export default async function Home() {
                 </div>
                 <h3>{item.displayName}</h3>
                 <div className={styles.packageAmount}>{investmentLabel(item)}</div>
-                <div className={styles.packageTrading}>
-                  <small>Daily trading</small>
-                  <strong>0.4–0.6% USER net / day</strong>
-                </div>
                 <div className={styles.packageMeta}>
+                  <span>
+                    <small>Daily trading</small>
+                    <strong>0.4–0.6% USER net / day</strong>
+                  </span>
                   <span>
                     <small>Duration</small>
                     <strong>{item.durationDays} days</strong>
