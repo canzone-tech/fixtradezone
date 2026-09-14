@@ -82,6 +82,20 @@
   align-items: end;
 }
 
+.toolbar > label {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.toolbar > label > input[type="checkbox"],
+.toolbar > label > input[type="radio"] {
+  margin: 0;
+}
+
 .actions {
   align-items: center;
 }
@@ -259,5 +273,31 @@
 
   .fieldFull {
     grid-column: auto;
+  }
+
+  .notificationHeader > .toolbar {
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .notificationHeader > .toolbar .buttonSecondary {
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .notificationHeader > .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .notificationHeader > .toolbar > label {
+    min-height: auto;
+  }
+
+  .notificationHeader > .toolbar .buttonSecondary {
+    width: 100% !important;
   }
 }
