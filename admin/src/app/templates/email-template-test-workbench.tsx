@@ -109,6 +109,10 @@ function messageFrom(payload: MessagePayload | null, fallback: string): string {
     : (payload.message[0] ?? fallback);
 }
 
+function sourceLabel(source: EmailWorkspace["effectiveSource"]): string {
+  return source === "PUBLISHED_REVISION" ? "Published revision" : "Default content";
+}
+
 export default function EmailTemplateTestWorkbench({
   selectedContentKey = "",
 }: {
@@ -282,15 +286,28 @@ export default function EmailTemplateTestWorkbench({
           </div>
 
           <div className={styles.subheading}>Rendered preview</div>
-          <div className={styles.revisions}>
-            <article className={styles.revision}>
+          <div className={styles.emailPreviewShell}>
+            <div className={styles.emailPreviewMeta}>
+              <span>SUBJECT</span>
               <strong>{preview.subject}</strong>
               <small>{preview.preheader}</small>
-              <div>{preview.headline}</div>
-              <div>{preview.body}</div>
-              <small>CTA: {preview.ctaLabel}</small>
-              <small>{preview.footer}</small>
-            </article>
+            </div>
+            <div className={styles.emailPreviewStage}>
+              <article className={styles.emailPreviewCard}>
+                <header className={styles.emailPreviewBrand}>
+                  <strong>FixTradeZone</strong>
+                  <span>SECURE ACCOUNT MESSAGE</span>
+                </header>
+                <div className={styles.emailPreviewBody}>
+                  <h3>{preview.headline}</h3>
+                  <p>{preview.body}</p>
+                  {preview.ctaLabel ? (
+                    <span className={styles.emailPreviewCta}>{preview.ctaLabel}</span>
+                  ) : null}
+                </div>
+                <footer className={styles.emailPreviewFooter}>{preview.footer}</footer>
+              </article>
+            </div>
           </div>
 
           <div className={styles.variables}>
@@ -345,6 +362,32 @@ export default function EmailTemplateTestWorkbench({
               </small>
             </article>
           </div>
+
+          <div className={styles.contextDivider} />
+          <div className={styles.panelHeading}>
+            <div>
+              <span>CURRENT TEMPLATE</span>
+              <h2>Effective context</h2>
+            </div>
+          </div>
+          <dl className={styles.templateContext}>
+            <div>
+              <dt>Source</dt>
+              <dd>{sourceLabel(selected.effectiveSource)}</dd>
+            </div>
+            <div>
+              <dt>Template key</dt>
+              <dd>{selected.templateKey}</dd>
+            </div>
+            <div>
+              <dt>Variables</dt>
+              <dd>{selected.allowedVariables.length} allowed</dd>
+            </div>
+            <div>
+              <dt>Delivery</dt>
+              <dd>Server-managed transport</dd>
+            </div>
+          </dl>
         </aside>
       </div>
     </section>
