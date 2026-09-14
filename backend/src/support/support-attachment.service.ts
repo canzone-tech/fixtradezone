@@ -210,7 +210,9 @@ export class SupportAttachmentService {
     files: SupportUploadedFile[] | undefined,
   ): PreparedAttachment[] {
     if (!files || files.length === 0) {
-      throw new BadRequestException('Select at least one attachment to upload.');
+      throw new BadRequestException(
+        'Select at least one attachment to upload.',
+      );
     }
 
     if (files.length > SUPPORT_ATTACHMENT_MAX_FILES) {
@@ -225,7 +227,9 @@ export class SupportAttachmentService {
         throw new BadRequestException('Attachment file content is empty.');
       }
       if (buffer.length > SUPPORT_ATTACHMENT_MAX_FILE_SIZE_BYTES) {
-        throw new BadRequestException('Each attachment must be 5 MB or smaller.');
+        throw new BadRequestException(
+          'Each attachment must be 5 MB or smaller.',
+        );
       }
 
       const originalName = Array.from(basename(file.originalname ?? ''))
@@ -339,7 +343,9 @@ export class SupportAttachmentService {
     const ownerFilter = userId
       ? Prisma.sql`AND userId = ${userId}`
       : Prisma.empty;
-    const rows = await this.prisma.$queryRaw<SupportTicketAccessRow[]>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<
+      SupportTicketAccessRow[]
+    >(Prisma.sql`
       SELECT id, ticketNumber, userId, status
       FROM support_tickets
       WHERE id = ${ticketId} ${ownerFilter}

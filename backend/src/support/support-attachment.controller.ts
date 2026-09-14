@@ -26,12 +26,16 @@ import {
   type SupportUploadedFile,
 } from './support-attachment.service';
 
-const attachmentInterceptor = FilesInterceptor('files', SUPPORT_ATTACHMENT_MAX_FILES, {
-  limits: {
-    files: SUPPORT_ATTACHMENT_MAX_FILES,
-    fileSize: SUPPORT_ATTACHMENT_MAX_FILE_SIZE_BYTES,
+const attachmentInterceptor = FilesInterceptor(
+  'files',
+  SUPPORT_ATTACHMENT_MAX_FILES,
+  {
+    limits: {
+      files: SUPPORT_ATTACHMENT_MAX_FILES,
+      fileSize: SUPPORT_ATTACHMENT_MAX_FILE_SIZE_BYTES,
+    },
   },
-});
+);
 
 function contentDisposition(filename: string): string {
   const fallback = filename
@@ -41,15 +45,21 @@ function contentDisposition(filename: string): string {
   return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
 }
 
-function applyDownloadHeaders(response: Response, file: {
-  originalName: string;
-  mimeType: string;
-  sizeBytes: number;
-}) {
+function applyDownloadHeaders(
+  response: Response,
+  file: {
+    originalName: string;
+    mimeType: string;
+    sizeBytes: number;
+  },
+) {
   response.setHeader('Cache-Control', 'private, no-store');
   response.setHeader('Content-Type', file.mimeType);
   response.setHeader('Content-Length', String(file.sizeBytes));
-  response.setHeader('Content-Disposition', contentDisposition(file.originalName));
+  response.setHeader(
+    'Content-Disposition',
+    contentDisposition(file.originalName),
+  );
   response.setHeader('X-Content-Type-Options', 'nosniff');
 }
 
