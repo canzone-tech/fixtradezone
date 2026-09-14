@@ -184,7 +184,8 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, id);
-    if (!category) throw new Error('Support category insert did not read back.');
+    if (!category)
+      throw new Error('Support category insert did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -195,7 +196,8 @@ export class SupportService {
     context: RequestContext = {},
   ) {
     const current = await this.findCategoryById(this.prisma, categoryId);
-    if (!current) throw new NotFoundException('Support category was not found.');
+    if (!current)
+      throw new NotFoundException('Support category was not found.');
 
     const name =
       dto.name === undefined
@@ -245,7 +247,8 @@ export class SupportService {
     });
 
     const category = await this.findCategoryById(this.prisma, categoryId);
-    if (!category) throw new Error('Support category update did not read back.');
+    if (!category)
+      throw new Error('Support category update did not read back.');
     return { category: this.serializeCategory(category) };
   }
 
@@ -282,7 +285,7 @@ export class SupportService {
     const message = this.visibleText(dto.message, 'Ticket message');
     const category = await this.findCategoryById(this.prisma, dto.categoryId);
 
-    if (!category || !Boolean(category.isActive)) {
+    if (!category || !category.isActive) {
       throw new BadRequestException('Select an active support category.');
     }
 
@@ -620,7 +623,9 @@ export class SupportService {
     const current = await this.findTicket(this.prisma, ticketId);
     if (!current) throw new NotFoundException('Support ticket was not found.');
     if (current.status === dto.status) {
-      throw new BadRequestException('Support ticket is already in that status.');
+      throw new BadRequestException(
+        'Support ticket is already in that status.',
+      );
     }
     if (!canTransitionSupportStatus(current.status, dto.status)) {
       throw new BadRequestException(
