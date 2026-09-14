@@ -6,3 +6,40 @@
 .ftz-auth-visual {
   border-right-color: rgba(69, 115, 190, 0.08);
 }
+
+.ftz-auth-home-enabled {
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.ftz-auth-home-enabled:focus-visible {
+  outline: 2px solid rgba(31, 255, 240, 0.72);
+  outline-offset: 4px;
+}
+
+.ftz-auth-public-home-link {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  margin: 18px auto 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  color: #8ea0bd;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.ftz-auth-public-home-link:hover {
+  color: #43e9df;
+  background: rgba(31, 255, 240, 0.06);
+}
+
+.ftz-auth-public-home-link:focus-visible {
+  outline: 2px solid rgba(31, 255, 240, 0.72);
+  outline-offset: 2px;
+}
