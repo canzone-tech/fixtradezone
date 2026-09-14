@@ -1,0 +1,45 @@
+/*
+ * FixTradeZone shared text-flow lock.
+ *
+ * Tables are allowed to scroll horizontally on narrow viewports. Labels and
+ * identifiers must therefore stay readable instead of being split inside a
+ * word. Multi-word headings may still wrap naturally at spaces.
+ */
+
+/* Headings may wrap between words, but never split a single word. */
+.ftz-page-frame :where(h1, h2, h3, h4, h5, h6) {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+/*
+ * Table content uses horizontal scrolling when space is tight. Override legacy
+ * page rules such as overflow-wrap:anywhere so headers, status labels, IDs and
+ * other single tokens remain intact on desktop and mobile.
+ */
+.ftz-page-frame table :where(th, td, th *, td *) {
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+  hyphens: none;
+}
+
+.ftz-page-frame table th {
+  white-space: nowrap;
+}
+
+/* Keep existing responsive table shells scrollable across protected screens. */
+.ftz-page-frame :where(
+    .table-responsive,
+    [class*="tableWrap"],
+    [class*="TableWrap"],
+    [class*="tableShell"],
+    [class*="TableShell"],
+    [class*="tableContainer"],
+    [class*="TableContainer"]
+  ) {
+  max-width: 100%;
+  overflow-x: auto !important;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
