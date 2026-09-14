@@ -1,14 +1,10 @@
-"use client";
+import type { Metadata } from "next";
+import UserDepositsClient from "./user-deposits-client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+export const metadata: Metadata = {
+  title: "Deposits | FixTradeZone",
+};
 
 export default function UserDepositsPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/user/packages");
-  }, [router]);
-
-  return null;
+  return <UserDepositsClient />;
 }
