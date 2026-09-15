@@ -88,7 +88,13 @@ async function bootstrap() {
     new PermissionsGuard(reflector),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  const port = process.env.PORT ?? 3000;
+
+  if (process.env.NODE_ENV === 'production') {
+    await app.listen(port, '127.0.0.1');
+  } else {
+    await app.listen(port);
+  }
 }
 
 void bootstrap();
