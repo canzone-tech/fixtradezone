@@ -6,6 +6,11 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { PackagesService } from './packages.service';
 
+interface PublicPackageNetworkRow {
+  packageDefinitionId: string;
+  networkCode: string;
+}
+
 function packageDefinitionIdFrom(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) {
     return null;
@@ -49,13 +54,35 @@ function dailyRateLabel(item: {
 
 @Controller('public/packages')
 export class PublicPackagesController {
-  constructor(private readonly packagesService: PackagesService) {}
+  constructor(
+    private readonly packagesService: PackagesService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   @Public()
   @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=300')
   async getCatalogue() {
     const catalogue = await this.packagesService.getEffectiveCatalogue();
+
+    const networkRows =
+      catalogue.items.length === 0
+        ? []
+        : await this.prisma.$queryRaw<PublicPackageNetworkRow[]>(Prisma.sql`
+            SELECT
+              routes.packageDefinitionId,
+              rails.networkCode
+            FROM deposit_package_account_routes routes
+            INNER JOIN deposit_accounts accounts
+              ON accounts.id = routes.depositAccountId
+            INNER JOIN deposit_payment_rails rails
+              ON rails.id = accounts.paymentRailId
+            WHERE accounts.isActive = TRUE
+              AND rails.isActive = TRUE
+          `);
+    const networkByPackageDefinitionId = new Map(
+      networkRows.map((row) => [row.packageDefinitionId, row.networkCode]),
+    );
 
     return {
       catalogueAvailable: catalogue.catalogueAvailable,
@@ -70,6 +97,8 @@ export class PublicPackagesController {
         rangeConfigured: item.rangeConfigured,
         durationDays: item.durationDays,
         currency: item.currency,
+        networkCode:
+          networkByPackageDefinitionId.get(item.packageDefinitionId) ?? null,
         dailyRateLabel: dailyRateLabel(item),
       })),
     };
