@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import PlatformPromise from "@/components/brand/platform-promise";
+import SiteModeBanner from "@/components/platform/site-mode-banner";
 import AdminIdleLock from "@/components/security/admin-idle-lock";
 import Startbar from "./navigation/startbar";
 import Topbar from "./topbar/topbar";
@@ -29,6 +30,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       <Topbar />
       <AdminIdleLock />
       <main className="ftz-main">
+        <SiteModeBanner />
         <div className="ftz-page-frame">
           {showPlatformPromise ? <PlatformPromise /> : null}
           {children}

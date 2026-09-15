@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import PlatformPromise from "@/components/brand/platform-promise";
+import SiteModeBanner from "@/components/platform/site-mode-banner";
 import IdleLock from "@/components/security/idle-lock";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
@@ -64,8 +65,7 @@ export default function UserShell({
         });
       })
       .catch(() => {
-        // Device observation is a duplicate-risk signal. It must never break the
-        // authenticated USER portal when browser storage or the observer is down.
+        // Duplicate-risk observation must never break the USER portal.
       });
 
     return () => {
@@ -98,6 +98,8 @@ export default function UserShell({
       />
 
       <main className="ftz-main">
+        <SiteModeBanner />
+
         {session && impersonated ? (
           <div className={styles.impersonationBar}>
             <span className={styles.bannerIcon}>
@@ -106,7 +108,6 @@ export default function UserShell({
 
             <div className={styles.bannerCopy}>
               <strong>{`Viewing as ${session.user.email}`}</strong>
-
               <span>{`Administrator: ${session.impersonation.actor.email}`}</span>
             </div>
 

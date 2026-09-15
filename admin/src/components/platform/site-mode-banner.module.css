@@ -1,0 +1,37 @@
+.banner {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px var(--ftz-page-pad) 0;
+  padding: 10px 14px;
+  border: 1px solid var(--ftz-border-strong);
+  border-radius: var(--ftz-radius-control);
+  color: var(--ftz-copy);
+  background: var(--ftz-surface-gradient);
+  box-shadow: var(--ftz-shadow-card);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.banner strong {
+  color: var(--ftz-primary);
+}
+
+.maintenance {
+  border-color: var(--ftz-warning);
+}
+
+.maintenance strong {
+  color: var(--ftz-warning);
+}
+
+@media (max-width: 640px) {
+  .banner {
+    align-items: flex-start;
+    margin-inline: 10px;
+    text-align: left;
+  }
+}

@@ -1,0 +1,127 @@
+.page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(20px, 5vw, 60px);
+  color: var(--ftz-copy);
+  background: var(--ftz-canvas);
+}
+
+.card {
+  width: min(100%, 720px);
+  padding: clamp(26px, 5vw, 52px);
+  border: 1px solid var(--ftz-border);
+  border-radius: var(--ftz-radius-hero);
+  background: var(--ftz-surface-gradient);
+  box-shadow: var(--ftz-shadow-card);
+  text-align: center;
+}
+
+.mark {
+  display: inline-grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  margin-bottom: 22px;
+  border: 1px solid var(--ftz-border-strong);
+  border-radius: 20px;
+  color: var(--ftz-primary);
+  background: var(--ftz-surface-nested);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 7px 12px;
+  border: 1px solid var(--ftz-border-strong);
+  border-radius: 999px;
+  color: var(--ftz-primary);
+  background: var(--ftz-surface-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.card h1 {
+  margin: 0;
+  color: var(--ftz-copy);
+  font-size: clamp(30px, 6vw, 52px);
+  line-height: 1.08;
+}
+
+.copy {
+  max-width: 580px;
+  margin: 18px auto 0;
+  color: var(--ftz-copy-muted);
+  font-size: clamp(14px, 2vw, 17px);
+  line-height: 1.7;
+}
+
+.countdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 28px 0 0;
+}
+
+.countdown div {
+  padding: 14px 8px;
+  border: 1px solid var(--ftz-border-soft);
+  border-radius: var(--ftz-radius-control);
+  background: var(--ftz-surface-nested);
+}
+
+.countdown strong {
+  display: block;
+  color: var(--ftz-primary);
+  font-size: clamp(18px, 4vw, 28px);
+}
+
+.countdown span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ftz-copy-faint);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 30px;
+}
+
+.actions a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--ftz-border-strong);
+  border-radius: var(--ftz-radius-control);
+  color: var(--ftz-canvas);
+  background: var(--ftz-primary);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.note {
+  margin: 22px 0 0;
+  color: var(--ftz-copy-faint);
+  font-size: 11px;
+}
+
+@media (max-width: 560px) {
+  .countdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
