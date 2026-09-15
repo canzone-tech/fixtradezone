@@ -2,73 +2,21 @@
 
 ## Canonical Checkpoint — 2026-09-15
 
-Repository state plus completed local runtime acceptance are the delivery authority.
-Source code and CI alone are not treated as complete runtime acceptance.
+Repository state plus completed local/runtime acceptance are the delivery
+authority. Source code and CI alone are not treated as complete runtime
+acceptance.
 
-## Active Development Branch
+## Mainline Checkpoint
 
-`feature/site-mode-control`
+`main` contains the merged SITE-MODE-01 milestone through PR #20.
 
-Accepted code checkpoint before this documentation refresh:
+Accepted main checkpoint before starting PROD-01:
 
 ```text
-62e098cb7384a7a543c409081d763dc6378cf139  fix(site-mode): satisfy admin hook lint gate
+3bc1233f443ae459e8002e93a36a4631186a6cf4  Merge pull request #20 — SITE-MODE-01
 ```
 
-## Current Milestone — SITE-MODE-01
-
-Status: **FUNCTIONALLY COMPLETE / LOCAL POSTMAN GREEN / BROWSER GREEN / FINAL LOCAL GATES GREEN / DOCUMENTATION CLOSEOUT IN PROGRESS**.
-
-Canonical feature documentation:
-
-- `docs/SITE-MODE-CONTROL.md`
-
-SITE-MODE-01 establishes one authoritative Platform Mode control with three locked
-states:
-
-- `LIVE` -> public application available, registration enabled, public login
-  policy, `AUTOMATIC` operations;
-- `TESTING` -> Coming Soon, registration disabled, approved ACTIVE testers plus
-  `SUPER_ADMIN`, `CONTROLLED_MANUAL` operations;
-- `MAINTENANCE` -> Maintenance page, registration disabled, `SUPER_ADMIN` only,
-  `CONTROLLED_MANUAL` operations.
-
-Platform Mode is the authority for the master operations profile. The old
-independent operations mutation is intentionally rejected so it cannot contradict
-Site Mode.
-
-Mode transitions also synchronize deposit posting behavior:
-
-- `AUTOMATIC` -> `AUTO_ON_APPROVAL`;
-- `CONTROLLED_MANUAL` -> `MANUAL_RECONCILIATION`.
-
-Emergency recovery is LIVE-only, `SUPER_ADMIN`-only, audited and time-bounded to
-5–60 minutes. Ordinary manual recovery remains locked while LIVE unless that
-explicit recovery window is active.
-
-Migration `0044_site_mode_control` is applied in local MySQL. The database contains
-44 Prisma migrations and reports the schema as up to date.
-
-## Accepted SITE-MODE-01 Runtime Evidence
-
-Backend API/Postman acceptance was completed before frontend browser acceptance and
-must not be repeated unless a later failure requires a targeted diagnostic test.
-
-Browser acceptance is GREEN for:
-
-- TESTING public Coming Soon behavior;
-- registration blocking outside LIVE;
-- TESTING login/banner behavior;
-- normal-user denial before tester approval;
-- tester add -> USER access -> tester removal -> denial flow;
-- tester count restored to `0`;
-- MAINTENANCE public page and `SUPER_ADMIN`-only access;
-- LIVE public application and registration restoration;
-- normal USER access in LIVE;
-- LIVE emergency recovery unlock and explicit lock;
-- cross-device local-network verification.
-
-Final accepted runtime state:
+SITE-MODE-01 is closed and merged. Its accepted final runtime state was:
 
 ```text
 siteMode: LIVE
@@ -77,41 +25,69 @@ recoveryActive: false
 testerCount: 0
 ```
 
-## Final Local Automated Gates
+Passed SITE-MODE Postman/browser acceptance must not be repeated unless a later
+failure requires a targeted diagnostic retest.
 
-At code checkpoint `62e098cb7384a7a543c409081d763dc6378cf139`:
+## Active Development Branch
 
-```text
-Prisma migrations: 44
-Database schema: up to date
-Admin platform-time verification: GREEN
-Admin lint: GREEN
-Admin typecheck: GREEN
-Admin production build: GREEN
-```
+`feature/production-cutover-readiness`
 
-UTC remains the locked platform standard.
+## Current Milestone — PROD-01 Production Cutover Readiness
 
-## Closeout Gate Before PR to `main`
+Status: **STARTED — REPO/RELEASE DISCOVERY ONLY**.
 
-1. commit this documentation checkpoint to `feature/site-mode-control`;
-2. review repository CI/check behavior for the documentation head (docs-only
-   changes may legitimately skip path-filtered Admin/Backend CI);
-3. pull the documentation head locally with fast-forward only;
-4. confirm branch/HEAD/status;
-5. keep `backups/` untouched and untracked;
-6. keep `postman/__pycache__/` untouched and untracked;
-7. do not repeat already accepted SITE-MODE-01 Postman/browser tests;
-8. open the PR to `main` only after the final local checkpoint remains clean.
+Canonical milestone documentation:
 
-No new feature work starts before this closeout/PR checkpoint is complete.
+- `docs/PRODUCTION-CUTOVER.md`
+- `docs/SITE-MODE-CONTROL.md`
+
+PROD-01 prepares the first production deployment without importing local/QA
+acceptance data into production and without weakening the locked database,
+security, accounting, or Site Mode architecture.
+
+### Production database decision — LOCKED
+
+- Keep the accepted local/QA MySQL database intact as test/acceptance evidence.
+- Production uses a separate, fresh MySQL database.
+- Do not copy local synthetic/test business or financial rows into production.
+- Apply production schema only through repository forward migrations with
+  `prisma migrate deploy`.
+- Never use `prisma migrate dev` or `prisma migrate reset`.
+- Never blank/reset a populated live production database after go-live.
+- After LIVE, preserve production history and use audited/forward-only changes.
+
+### First go-live order — LOCKED
+
+1. complete repo/release discovery;
+2. provision production infrastructure and secrets;
+3. provision fresh production MySQL;
+4. deploy accepted `main` code;
+5. apply and verify migrations;
+6. perform minimum reviewed production bootstrap;
+7. start public state in `MAINTENANCE` or controlled `TESTING`;
+8. run production smoke/readback checks;
+9. verify tester/recovery baseline;
+10. switch Platform Mode to `LIVE` only as the final release action.
+
+No production infrastructure/database mutation is authorized during the current
+repo/discovery phase.
+
+## Current Database / Delivery Facts
+
+- MySQL is the single relational/business/accounting source of truth.
+- Local accepted schema currently contains 44 Prisma migrations and is up to
+  date.
+- Applied migrations are immutable; corrections are forward-only.
+- Financial/accounting historical facts are never silently rewritten/deleted.
+- UTC remains the locked platform-time standard.
+- FixTradeZone does not use MongoDB.
 
 ## Permanent Delivery Locks
 
-- MySQL is the relational/business/accounting source of truth.
+- Repo + `/docs` are the permanent source of truth.
 - Never introduce MongoDB into FixTradeZone.
-- Never use `prisma migrate dev` for project delivery.
-- Never reset the database.
+- Never use `prisma migrate dev` for delivery.
+- Never reset the application database to bypass a migration/deployment problem.
 - Forward migrations only with `prisma migrate deploy` when a reviewed migration
   is actually required.
 - `backups/` must never be touched, added, deleted or stashed.
@@ -120,11 +96,13 @@ No new feature work starts before this closeout/PR checkpoint is complete.
 - Backend remains authoritative for security, financial and business rules;
   frontend behavior mirrors those rules for UX but cannot replace server
   enforcement.
-- Complete one module/API at a time.
+- Complete one module/stage at a time.
 - Repo-first implementation remains locked: feature-branch change -> repository
-  CI/checks -> local fast-forward pull -> local Postman/API acceptance when needed
-  -> browser acceptance -> financial SQL/ledger/readback proof when needed -> PR.
-- PR to `main` only after every required local acceptance gate is GREEN.
+  CI/checks -> local fast-forward pull -> local Postman/API acceptance when
+  needed -> browser acceptance -> financial SQL/ledger/readback proof when
+  needed -> PR.
+- Production cutover also proceeds one stage at a time with readback before the
+  next stage.
 - Do not repeat completed modules/tests unless a new failure requires a targeted
   retest.
 
@@ -134,5 +112,6 @@ FixTradeZone does not execute real trades in v1. Any trade-like presentation is
 limited to explicitly labelled simulated activity and must not silently mutate
 real wallet/ledger balances.
 
-Production/live release remains the current priority, subject to the locked local
-acceptance and PR gates above.
+Production/live release is the current priority. The first production cutover
+remains HOLD until PROD-01 discovery, infrastructure, migration, bootstrap and
+controlled smoke gates are explicitly completed.

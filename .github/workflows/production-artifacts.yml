@@ -1,0 +1,302 @@
+name: Production Runtime Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - feature/production-cutover-readiness
+    paths:
+      - 'backend/**'
+      - 'admin/**'
+      - '.github/workflows/production-artifacts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-runtime:
+    name: Backend compiled runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: production
+      DATABASE_URL: mysql://artifact_user:artifact_password@127.0.0.1:3306/fixtradezone_artifact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact build dependencies
+        run: npm ci --include=dev
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Verify compiled production entrypoints
+        run: |
+          test -f dist/src/main.js
+          test -f dist/scripts/bootstrap-super-admin.js
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev
+
+      - name: Package compiled runtime only
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-backend"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-backend-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+
+          find dist -type f \( -name '*.map' -o -name '*.d.ts' \) -delete
+          cp -a dist node_modules package.json package-lock.json "$RELEASE_DIR/"
+
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "backend",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "sourceIncluded": false
+          }
+          EOF
+
+          test -f "$RELEASE_DIR/dist/src/main.js"
+          test -f "$RELEASE_DIR/dist/scripts/bootstrap-super-admin.js"
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR/dist" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Source-like backend build files detected in runtime artifact."
+            exit 1
+          fi
+
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
+
+      - name: Upload backend runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-backend-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  admin-runtime:
+    name: Admin standalone runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: admin
+    env:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      API_BASE_URL: http://127.0.0.1:3000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install exact build dependencies
+        run: npm ci --include=dev
+
+      - name: Build standalone admin
+        run: npm run build
+
+      - name: Package standalone runtime only
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-admin"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-admin-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+
+          test -f .next/standalone/server.js
+          cp -a .next/standalone/. "$RELEASE_DIR/"
+          mkdir -p "$RELEASE_DIR/.next"
+          cp -a .next/static "$RELEASE_DIR/.next/static"
+          if [ -d public ]; then
+            cp -a public "$RELEASE_DIR/public"
+          fi
+
+          find "$RELEASE_DIR" -type f -name '*.map' -delete
+          rm -rf "$RELEASE_DIR/src" "$RELEASE_DIR/.git"
+
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "admin",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "sourceIncluded": false
+          }
+          EOF
+
+          test -f "$RELEASE_DIR/server.js"
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR" -path "$RELEASE_DIR/node_modules" -prune -o -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Source-like admin build files detected in runtime artifact."
+            exit 1
+          fi
+
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
+
+      - name: Upload admin runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-admin-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-admin-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-admin-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  migration-bundle:
+    name: Temporary Prisma migration bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: mysql://artifact_user:artifact_password@127.0.0.1:3306/fixtradezone_artifact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact migration tooling
+        run: npm ci --include=dev
+
+      - name: Package temporary migration bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-migrations"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-migrations-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR/prisma"
+
+          cp -a prisma/migrations "$RELEASE_DIR/prisma/"
+          cp prisma/schema.prisma "$RELEASE_DIR/prisma/schema.prisma"
+          cp -a node_modules "$RELEASE_DIR/node_modules"
+
+          cat > "$RELEASE_DIR/prisma.config.js" <<'EOF'
+          const { defineConfig } = require('prisma/config');
+
+          module.exports = defineConfig({
+            schema: 'prisma/schema.prisma',
+            migrations: {
+              path: 'prisma/migrations',
+            },
+            datasource: {
+              url: process.env.DATABASE_URL,
+            },
+          });
+          EOF
+
+          cat > "$RELEASE_DIR/run-migrate.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          : "${DATABASE_URL:?DATABASE_URL must be set for the target database}"
+
+          echo "===== PRISMA MIGRATION STATUS ====="
+          ./node_modules/.bin/prisma migrate status --config ./prisma.config.js
+
+          if [ "${1:-}" != "--deploy" ]; then
+            echo "Read-only status complete. Re-run as ./run-migrate.sh --deploy only after the target database is confirmed."
+            exit 0
+          fi
+
+          echo "===== PRISMA MIGRATE DEPLOY ====="
+          ./node_modules/.bin/prisma migrate deploy --config ./prisma.config.js
+
+          echo "===== PRISMA MIGRATION STATUS AFTER DEPLOY ====="
+          ./node_modules/.bin/prisma migrate status --config ./prisma.config.js
+          EOF
+          chmod 750 "$RELEASE_DIR/run-migrate.sh"
+
+          MIGRATION_COUNT="$(find "$RELEASE_DIR/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "migrations",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "migrationCount": ${MIGRATION_COUNT},
+            "temporary": true,
+            "sourceIncluded": false
+          }
+          EOF
+
+          test -f "$RELEASE_DIR/prisma/schema.prisma"
+          test -x "$RELEASE_DIR/run-migrate.sh"
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR" -path "$RELEASE_DIR/node_modules" -prune -o -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Application source-like files detected in migration artifact."
+            exit 1
+          fi
+
+          (
+            cd "$RELEASE_DIR"
+            ./node_modules/.bin/prisma validate --config ./prisma.config.js
+          )
+
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
+
+      - name: Upload migration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-migrations-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-migrations-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-migrations-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
