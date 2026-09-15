@@ -55,16 +55,19 @@ export class OperationsConfigService {
     return (await this.getOperationsMode(client)) === 'AUTOMATIC';
   }
 
-  async updateOperations(
+  updateOperations(
     settings: UpdateOperationsConfigDto,
     actor: AuthenticatedUser,
-    _context: RequestContext = {},
+    context: RequestContext = {},
   ): Promise<never> {
+    void context;
     this.assertSuperAdmin(actor);
     this.assertUtcTimezone(settings.platformTimezone);
 
-    throw new BadRequestException(
-      'Operations mode is controlled by Platform Mode. Use /admin/settings/site-mode.',
+    return Promise.reject(
+      new BadRequestException(
+        'Operations mode is controlled by Platform Mode. Use /admin/settings/site-mode.',
+      ),
     );
   }
 

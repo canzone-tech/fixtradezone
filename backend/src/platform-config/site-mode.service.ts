@@ -215,7 +215,7 @@ export class SiteModeService {
             dto.siteMode === 'LIVE'
               ? 'Platform is LIVE. Automatic processing is enabled.'
               : `${dto.siteMode} mode enabled. Automatic processing is paused.`,
-          ...(await this.toAdminResponse(current)),
+          ...this.toAdminResponse(current),
         };
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -589,7 +589,7 @@ export class SiteModeService {
     return rows.length === 1;
   }
 
-  private async toAdminResponse(snapshot: SiteModeSnapshot) {
+  private toAdminResponse(snapshot: SiteModeSnapshot) {
     const now = new Date();
     return {
       ...snapshot,
