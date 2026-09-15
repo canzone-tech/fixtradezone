@@ -41,6 +41,39 @@ The following remain prohibited:
 - rewriting applied migrations;
 - deleting or rewriting immutable financial/business history.
 
+## Client Production Server Source Protection — LOCKED
+
+The production host is client-owned. Original FixTradeZone application source code
+must not be left on that host.
+
+Production delivery therefore uses release artifacts produced by repository CI from
+an accepted commit. The running server must not contain a FixTradeZone Git checkout
+or application source tree.
+
+Allowed persistent runtime material includes:
+
+- compiled NestJS backend output and required production runtime dependencies;
+- Next.js standalone production output, static assets, and public assets;
+- release metadata/checksums;
+- server-side environment/secrets with restrictive ownership and permissions;
+- operational configuration required to run the accepted release.
+
+The production runtime package must not intentionally contain:
+
+- `.git/` or repository history;
+- FixTradeZone `src/` application source directories;
+- original `.ts` / `.tsx` application source files;
+- tests, development-only project files, or local developer certificates;
+- application source maps.
+
+Frontend JavaScript/assets necessarily delivered to browsers are production build
+outputs, not a repository source checkout.
+
+Database migrations are deployment artifacts, not application runtime source. Any
+minimum migration bundle required for `prisma migrate deploy` is transferred only
+for the migration gate and removed from the running release after migration/readback
+is complete. Do not deploy the full repository merely to run migrations.
+
 ## Go-Live Order — LOCKED
 
 The first production boot must not expose the public application as LIVE before
@@ -50,15 +83,16 @@ Required order:
 
 1. provision production infrastructure and secrets;
 2. provision a fresh production MySQL database;
-3. deploy application code from accepted `main`;
-4. apply reviewed migrations with `prisma migrate deploy`;
-5. verify migration/readback state;
-6. complete required founder/SUPER_ADMIN and system bootstrap;
-7. verify required production configuration and published policies;
-8. start the platform in `MAINTENANCE` or controlled `TESTING` mode;
-9. perform production smoke checks and targeted readback;
-10. verify final recovery/tester baseline;
-11. switch Platform Mode to `LIVE` as the final release action.
+3. produce release artifacts from accepted `main` in repository CI;
+4. deploy only verified release artifacts to the client production server;
+5. apply reviewed migrations with `prisma migrate deploy`;
+6. verify migration/readback state;
+7. complete required founder/SUPER_ADMIN and system bootstrap;
+8. verify required production configuration and published policies;
+9. start the platform in `MAINTENANCE` or controlled `TESTING` mode;
+10. perform production smoke checks and targeted readback;
+11. verify final recovery/tester baseline;
+12. switch Platform Mode to `LIVE` as the final release action.
 
 Expected final public operating state:
 
@@ -105,6 +139,19 @@ Confirm or provision, as applicable:
 
 Secrets remain environment/secret-manager values and must never be committed to
 Git or stored in business tables.
+
+Production topology currently targeted:
+
+```text
+fixtradezone.com      -> Apache -> Next.js standalone on 127.0.0.1:3001
+api.fixtradezone.com  -> Apache -> NestJS backend on 127.0.0.1:3000
+MySQL                 -> 127.0.0.1:3306
+Redis                 -> private/local endpoint after final Redis gate
+```
+
+The public Apache vhosts currently serve bootstrap/launch-preparation content only;
+they must not proxy to the application until the controlled application gate is
+explicitly opened.
 
 ## Phase C — Fresh Production Database
 
@@ -198,6 +245,13 @@ PROD-01 continues the locked FixTradeZone workflow:
 7. one production stage at a time with readback before moving on;
 8. PR to `main` only after required local gates are GREEN.
 
+For production delivery specifically:
+
+1. build and verify on GitHub/CI;
+2. verify the exact release commit and SHA-256 checksum;
+3. transfer only release artifacts to the client server;
+4. never clone the FixTradeZone source repository onto the client server.
+
 ## Protected Local Paths
 
 Never touch/add/delete/stash:
@@ -211,7 +265,34 @@ Never touch local stashes without explicit approval.
 
 ## Current PROD-01 Status
 
-Status: **STARTED — REPO/RELEASE DISCOVERY ONLY**.
+Status: **IN PROGRESS — INFRASTRUCTURE + SOURCE-FREE RELEASE PACKAGING**.
 
-No production server, production database, DNS, TLS, process, or live customer
-data mutation has been performed by this milestone yet.
+Completed/verified production readiness items:
+
+- `fixtradezone.com` and `api.fixtradezone.com` resolve to the intended production
+  server;
+- Apache HTTP vhosts and valid Let's Encrypt TLS certificates are active for both
+  hostnames;
+- public hostnames still serve bootstrap content rather than the application;
+- Ubuntu/Node/npm/PM2/MySQL runtime baseline has been inventoried;
+- fresh production MySQL database `fixtradezone` and dedicated local application
+  user have been created and login-readback verified;
+- no local/QA application data was imported;
+- an accidental temporary Git source checkout on the client server was removed;
+- client-server source-code prohibition is now explicit and locked;
+- source-free backend/admin runtime artifact CI packaging is being established on
+  `feature/production-cutover-readiness`.
+
+Still HOLD before application deployment:
+
+- release artifact CI must be GREEN and locally inspected;
+- Redis ownership/configuration must be finalized without introducing MongoDB;
+- no production migrations have been applied yet;
+- no application runtime has been deployed or started yet;
+- Apache is not yet proxying production traffic to Next.js/NestJS;
+- founder/SUPER_ADMIN production bootstrap has not been performed;
+- LIVE/AUTOMATIC transition is not authorized yet.
+
+The existing Docker `fixtradezone-mongo` container is not part of the locked
+FixTradeZone MySQL architecture and must not be used by the production application.
+It remains untouched pending a separate safe cleanup decision.
