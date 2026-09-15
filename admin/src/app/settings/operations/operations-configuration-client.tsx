@@ -24,28 +24,24 @@ interface ApiError {
 
 const MODE_OPTIONS: Array<{
   mode: SiteMode;
-  title: string;
   description: string;
   consequence: string;
   icon: string;
 }> = [
   {
     mode: "LIVE",
-    title: "LIVE",
     description: "Public application live with normal account access.",
     consequence: "Operations AUTOMATIC · normal manual recovery locked.",
     icon: "iconoir-flash",
   },
   {
     mode: "TESTING",
-    title: "TESTING",
     description: "Pre-launch access for approved testers and SUPER_ADMIN.",
     consequence: "Operations CONTROLLED_MANUAL · automatic processing paused.",
     icon: "iconoir-flask",
   },
   {
     mode: "MAINTENANCE",
-    title: "MAINTENANCE",
     description: "Public and normal user access paused for maintenance.",
     consequence: "Operations CONTROLLED_MANUAL · automatic processing paused.",
     icon: "iconoir-tools",
@@ -63,7 +59,7 @@ function apiErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-async function jsonPayload(response: Response): Promise<unknown> {
+async function readPayload(response: Response): Promise<unknown> {
   return response.json().catch(() => ({}));
 }
 
@@ -87,85 +83,90 @@ export default function OperationsConfigurationClient() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const loadData = useCallback(
-    async (showLoader = false) => {
-      if (showLoader) setLoading(true);
+  const loadData = useCallback(async () => {
+    try {
+      const sessionResponse = await fetch("/api/auth/session", {
+        cache: "no-store",
+      });
+      const session = (await readPayload(sessionResponse)) as {
+        user?: AdminUser;
+      };
 
-      try {
-        const sessionResponse = await fetch("/api/auth/session", {
-          cache: "no-store",
-        });
-        const session = (await jsonPayload(sessionResponse)) as {
-          user?: AdminUser;
-        };
-
-        if (!sessionResponse.ok || !session.user) {
-          router.replace("/login");
-          return;
-        }
-        if (!session.user.roles.includes("SUPER_ADMIN")) {
-          router.replace("/dashboard");
-          return;
-        }
-
-        const [statusResponse, testersResponse] = await Promise.all([
-          fetch("/api/admin/settings/site-mode", { cache: "no-store" }),
-          fetch("/api/admin/settings/site-mode/testers", { cache: "no-store" }),
-        ]);
-
-        if (statusResponse.status === 401 || testersResponse.status === 401) {
-          router.replace("/login");
-          return;
-        }
-        if (statusResponse.status === 403 || testersResponse.status === 403) {
-          router.replace("/dashboard");
-          return;
-        }
-
-        const statusPayload = await jsonPayload(statusResponse);
-        const testersPayload = await jsonPayload(testersResponse);
-
-        if (!statusResponse.ok) {
-          throw new Error(
-            apiErrorMessage(statusPayload, "Unable to load Platform Mode."),
-          );
-        }
-        if (!testersResponse.ok) {
-          throw new Error(
-            apiErrorMessage(testersPayload, "Unable to load testing access."),
-          );
-        }
-
-        const nextStatus = statusPayload as AdminSiteModeStatus;
-        setStatus(nextStatus);
-        setTesters(
-          Array.isArray(testersPayload)
-            ? (testersPayload as SiteModeTester[])
-            : [],
-        );
-        setModeMessage(nextStatus.modeMessage ?? "");
-        setLaunchAt(platformIsoToLocalDateTimeInput(nextStatus.launchAt));
-      } catch (caught) {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "Unable to load Platform Mode.",
-        );
-      } finally {
-        if (showLoader) setLoading(false);
+      if (!sessionResponse.ok || !session.user) {
+        router.replace("/login");
+        return;
       }
-    },
-    [router],
-  );
+      if (!session.user.roles.includes("SUPER_ADMIN")) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const [statusResponse, testersResponse] = await Promise.all([
+        fetch("/api/admin/settings/site-mode", { cache: "no-store" }),
+        fetch("/api/admin/settings/site-mode/testers", { cache: "no-store" }),
+      ]);
+
+      if (statusResponse.status === 401 || testersResponse.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (statusResponse.status === 403 || testersResponse.status === 403) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const statusPayload = await readPayload(statusResponse);
+      const testersPayload = await readPayload(testersResponse);
+
+      if (!statusResponse.ok) {
+        throw new Error(
+          apiErrorMessage(statusPayload, "Unable to load Platform Mode."),
+        );
+      }
+      if (!testersResponse.ok) {
+        throw new Error(
+          apiErrorMessage(testersPayload, "Unable to load testing access."),
+        );
+      }
+
+      const nextStatus = statusPayload as AdminSiteModeStatus;
+      setStatus(nextStatus);
+      setTesters(
+        Array.isArray(testersPayload)
+          ? (testersPayload as SiteModeTester[])
+          : [],
+      );
+      setModeMessage(nextStatus.modeMessage ?? "");
+      setLaunchAt(platformIsoToLocalDateTimeInput(nextStatus.launchAt));
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load Platform Mode.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
-    void loadData(true);
+    const initialLoad = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(initialLoad);
   }, [loadData]);
 
   const currentOption = useMemo(
     () => MODE_OPTIONS.find((item) => item.mode === status?.siteMode),
     [status?.siteMode],
   );
+
+  async function refreshAfterMutation(message: string) {
+    notifySiteModeChanged();
+    setSuccess(message);
+    await loadData();
+  }
 
   async function switchMode(nextMode: SiteMode) {
     if (!status || nextMode === status.siteMode) return;
@@ -192,12 +193,15 @@ export default function OperationsConfigurationClient() {
     }
 
     const option = MODE_OPTIONS.find((item) => item.mode === nextMode);
-    const confirmed = window.confirm(
-      `Switch Platform Mode from ${status.siteMode} to ${nextMode}?\n\n${
-        option?.consequence ?? ""
-      }`,
-    );
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        `Switch Platform Mode from ${status.siteMode} to ${nextMode}?\n\n${
+          option?.consequence ?? ""
+        }`,
+      )
+    ) {
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -214,27 +218,17 @@ export default function OperationsConfigurationClient() {
           launchAt: nextMode === "LIVE" ? null : launchAtIso,
         }),
       });
-      const payload = await jsonPayload(response);
+      const payload = await readPayload(response);
 
-      if (response.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (response.status === 403) {
-        router.replace("/dashboard");
-        return;
-      }
       if (!response.ok) {
         throw new Error(
           apiErrorMessage(payload, "Unable to change Platform Mode."),
         );
       }
 
-      notifySiteModeChanged();
-      setSuccess(
+      await refreshAfterMutation(
         apiErrorMessage(payload, `Platform Mode changed to ${nextMode}.`),
       );
-      await loadData();
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -248,11 +242,12 @@ export default function OperationsConfigurationClient() {
 
   async function addTester() {
     const identifier = testerIdentifier.trim();
+    const note = testerNote.trim();
+
     if (identifier.length < 2) {
       setError("Enter a tester username or email.");
       return;
     }
-    const note = testerNote.trim();
     if (note && note.length < 3) {
       setError("Tester note must be at least 3 characters or blank.");
       return;
@@ -268,7 +263,7 @@ export default function OperationsConfigurationClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, note: note || null }),
       });
-      const payload = await jsonPayload(response);
+      const payload = await readPayload(response);
 
       if (!response.ok) {
         throw new Error(
@@ -278,8 +273,9 @@ export default function OperationsConfigurationClient() {
 
       setTesterIdentifier("");
       setTesterNote("");
-      setSuccess(apiErrorMessage(payload, "Testing access saved."));
-      await loadData();
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Testing access saved."),
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -305,7 +301,7 @@ export default function OperationsConfigurationClient() {
         )}`,
         { method: "DELETE" },
       );
-      const payload = await jsonPayload(response);
+      const payload = await readPayload(response);
 
       if (!response.ok) {
         throw new Error(
@@ -313,8 +309,9 @@ export default function OperationsConfigurationClient() {
         );
       }
 
-      setSuccess(apiErrorMessage(payload, "Testing access removed."));
-      await loadData();
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Testing access removed."),
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -334,11 +331,19 @@ export default function OperationsConfigurationClient() {
       setError("Enter an emergency recovery reason.");
       return;
     }
-    if (!Number.isInteger(durationMinutes) || durationMinutes < 5 || durationMinutes > 60) {
+    if (
+      !Number.isInteger(durationMinutes) ||
+      durationMinutes < 5 ||
+      durationMinutes > 60
+    ) {
       setError("Emergency recovery duration must be between 5 and 60 minutes.");
       return;
     }
-    if (!window.confirm(`Unlock emergency recovery for ${durationMinutes} minutes?`)) {
+    if (
+      !window.confirm(
+        `Unlock emergency recovery for ${durationMinutes} minutes?`,
+      )
+    ) {
       return;
     }
 
@@ -358,7 +363,7 @@ export default function OperationsConfigurationClient() {
           }),
         },
       );
-      const payload = await jsonPayload(response);
+      const payload = await readPayload(response);
 
       if (!response.ok) {
         throw new Error(
@@ -366,10 +371,9 @@ export default function OperationsConfigurationClient() {
         );
       }
 
-      setSuccess(
+      await refreshAfterMutation(
         apiErrorMessage(payload, "Emergency recovery temporarily unlocked."),
       );
-      await loadData();
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -402,7 +406,7 @@ export default function OperationsConfigurationClient() {
           body: JSON.stringify({ reason: recoveryAuditReason }),
         },
       );
-      const payload = await jsonPayload(response);
+      const payload = await readPayload(response);
 
       if (!response.ok) {
         throw new Error(
@@ -410,8 +414,9 @@ export default function OperationsConfigurationClient() {
         );
       }
 
-      setSuccess(apiErrorMessage(payload, "Emergency recovery locked."));
-      await loadData();
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Emergency recovery locked."),
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -459,11 +464,13 @@ export default function OperationsConfigurationClient() {
           return (
             <article
               key={option.mode}
-              className={`${styles.modeCard} ${active ? styles.modeCardActive : ""}`}
+              className={`${styles.modeCard} ${
+                active ? styles.modeCardActive : ""
+              }`}
             >
               <div className={styles.modeBadge}>
                 <i className={option.icon} />
-                {option.title}
+                {option.mode}
               </div>
               <h3>{option.description}</h3>
               <p>{option.consequence}</p>
@@ -472,7 +479,7 @@ export default function OperationsConfigurationClient() {
                 disabled={busy || active}
                 onClick={() => void switchMode(option.mode)}
               >
-                {active ? "Current mode" : `Switch to ${option.title}`}
+                {active ? "Current mode" : `Switch to ${option.mode}`}
               </button>
             </article>
           );
@@ -538,8 +545,16 @@ export default function OperationsConfigurationClient() {
                   : "The normal public application is available.")}
           </p>
           <div className={styles.previewMeta}>
-            <span>Login: {status?.siteMode === "LIVE" ? "PUBLIC" : status?.siteMode === "TESTING" ? "TESTERS + SUPER_ADMIN" : "SUPER_ADMIN ONLY"}</span>
-            <span>Registration: {status?.siteMode === "LIVE" ? "ENABLED" : "DISABLED"}</span>
+            <span>
+              Login: {status?.siteMode === "LIVE"
+                ? "PUBLIC"
+                : status?.siteMode === "TESTING"
+                  ? "TESTERS + SUPER_ADMIN"
+                  : "SUPER_ADMIN ONLY"}
+            </span>
+            <span>
+              Registration: {status?.siteMode === "LIVE" ? "ENABLED" : "DISABLED"}
+            </span>
             <span>Launch: {formatPlatformDateTime(status?.launchAt)}</span>
           </div>
         </aside>
@@ -633,7 +648,9 @@ export default function OperationsConfigurationClient() {
 
         <div className={styles.inlineMeta}>
           <span>Recovery active: {status?.recoveryActive ? "YES" : "NO"}</span>
-          <span>Until: {formatPlatformDateTime(status?.recoveryUnlockedUntil)}</span>
+          <span>
+            Until: {formatPlatformDateTime(status?.recoveryUnlockedUntil)}
+          </span>
           <span>Reason: {status?.recoveryReason ?? "—"}</span>
         </div>
 
@@ -647,7 +664,9 @@ export default function OperationsConfigurationClient() {
             <button
               className={styles.secondary}
               type="button"
-              disabled={busy || status?.siteMode !== "LIVE" || status?.recoveryActive}
+              disabled={
+                busy || status?.siteMode !== "LIVE" || status?.recoveryActive
+              }
               onClick={() => void unlockRecovery()}
             >
               Unlock recovery
@@ -668,7 +687,8 @@ export default function OperationsConfigurationClient() {
         <div>
           <strong>UTC platform standard · SUPER_ADMIN only · audited</strong>
           <p>
-            Last mode update: {formatPlatformDateTime(status?.updatedAt)} · Tester count: {status?.testerCount ?? testers.length}
+            Last mode update: {formatPlatformDateTime(status?.updatedAt)} · Tester
+            count: {status?.testerCount ?? testers.length}
           </p>
         </div>
         <Link href="/audit-logs">Open Audit Logs →</Link>

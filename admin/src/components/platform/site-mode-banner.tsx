@@ -27,13 +27,15 @@ export default function SiteModeBanner() {
   }, []);
 
   useEffect(() => {
-    void load();
-
+    const initialLoad = window.setTimeout(() => {
+      void load();
+    }, 0);
     const refresh = () => void load();
     const interval = window.setInterval(refresh, 30_000);
     window.addEventListener(SITE_MODE_CHANGED_EVENT, refresh);
 
     return () => {
+      window.clearTimeout(initialLoad);
       window.clearInterval(interval);
       window.removeEventListener(SITE_MODE_CHANGED_EVENT, refresh);
     };
