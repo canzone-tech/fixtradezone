@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { ManualOperation } from '../platform-config/manual-operation.decorator';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import {
@@ -165,6 +166,7 @@ export class AdminRewardsController {
   }
 
   @Post('process-due')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.REWARDS_RECONCILE)
@@ -185,6 +187,7 @@ export class AdminSubscriptionRewardsController {
   constructor(private readonly rewardsService: RewardsService) {}
 
   @Post(':subscriptionId/process-rewards')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.REWARDS_RECONCILE)

@@ -15,8 +15,6 @@ import {
 } from './update-operations-config.dto';
 
 const CONFIG_ID = 1;
-// These values are bootstrap/fail-safe fallbacks only. Migration 0015 seeds the
-// singleton row and migration 0038 locks its persisted timezone to UTC.
 export const DEFAULT_PLATFORM_TIMEZONE = PLATFORM_TIMEZONE;
 export const DEFAULT_OPERATIONS_MODE: OperationsMode = 'AUTOMATIC';
 
@@ -60,97 +58,13 @@ export class OperationsConfigService {
   async updateOperations(
     settings: UpdateOperationsConfigDto,
     actor: AuthenticatedUser,
-    context: RequestContext = {},
-  ) {
+    _context: RequestContext = {},
+  ): Promise<never> {
     this.assertSuperAdmin(actor);
     this.assertUtcTimezone(settings.platformTimezone);
 
-    return this.prisma.$transaction(
-      async (transaction) => {
-        const previous = await this.getOperationsWithClient(transaction);
-        const depositPostingMode =
-          settings.operationsMode === 'AUTOMATIC'
-            ? 'AUTO_ON_APPROVAL'
-            : 'MANUAL_RECONCILIATION';
-
-        await transaction.$executeRaw(Prisma.sql`
-          INSERT INTO system_operations_config (
-            id,
-            platformTimezone,
-            operationsMode,
-            updatedByUserId,
-            createdAt,
-            updatedAt
-          ) VALUES (
-            ${CONFIG_ID},
-            ${PLATFORM_TIMEZONE},
-            ${settings.operationsMode},
-            ${actor.id},
-            UTC_TIMESTAMP(3),
-            UTC_TIMESTAMP(3)
-          )
-          ON DUPLICATE KEY UPDATE
-            platformTimezone = VALUES(platformTimezone),
-            operationsMode = VALUES(operationsMode),
-            updatedByUserId = VALUES(updatedByUserId),
-            updatedAt = UTC_TIMESTAMP(3)
-        `);
-
-        // Keep the legacy accounting endpoint/state compatible with the single
-        // operations mode so old clients cannot observe contradictory policy.
-        await transaction.$executeRaw(Prisma.sql`
-          INSERT INTO system_accounting_config (
-            id,
-            depositPostingMode,
-            updatedByUserId,
-            createdAt,
-            updatedAt
-          ) VALUES (
-            ${CONFIG_ID},
-            ${depositPostingMode},
-            ${actor.id},
-            UTC_TIMESTAMP(3),
-            UTC_TIMESTAMP(3)
-          )
-          ON DUPLICATE KEY UPDATE
-            depositPostingMode = VALUES(depositPostingMode),
-            updatedByUserId = VALUES(updatedByUserId),
-            updatedAt = UTC_TIMESTAMP(3)
-        `);
-
-        const current = await this.getOperationsWithClient(transaction);
-
-        await transaction.auditLog.create({
-          data: {
-            actorUserId: actor.id,
-            action: 'UPDATE',
-            entityType: 'SystemOperationsConfig',
-            entityId: String(CONFIG_ID),
-            description:
-              'SUPER_ADMIN updated operations automation mode under the UTC platform-time standard.',
-            metadata: {
-              source: 'ADMIN_OPERATIONS_CONFIG',
-              previous: {
-                platformTimezone: previous.platformTimezone,
-                operationsMode: previous.operationsMode,
-              },
-              current: {
-                platformTimezone: current.platformTimezone,
-                operationsMode: current.operationsMode,
-              },
-              synchronizedDepositPostingMode: depositPostingMode,
-            },
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-          },
-        });
-
-        return {
-          message: 'Operations configuration updated.',
-          ...current,
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    throw new BadRequestException(
+      'Operations mode is controlled by Platform Mode. Use /admin/settings/site-mode.',
     );
   }
 

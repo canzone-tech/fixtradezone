@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { ManualOperation } from '../platform-config/manual-operation.decorator';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import {
@@ -132,6 +133,7 @@ export class AdminSimulatedActivityController {
   }
 
   @Post('process-due')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE)
@@ -149,6 +151,7 @@ export class AdminSubscriptionSimulatedActivityController {
   constructor(private readonly service: SimulatedActivityService) {}
 
   @Post(':subscriptionId/process-simulated-activity')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.SIMULATED_ACTIVITY_RECONCILE)

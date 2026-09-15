@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { ManualOperation } from '../platform-config/manual-operation.decorator';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import {
@@ -129,6 +130,7 @@ export class AdminSubscriptionCommissionController {
   constructor(private readonly commissionsService: CommissionsService) {}
 
   @Post(':subscriptionId/process-commissions')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.COMMISSIONS_RECONCILE)

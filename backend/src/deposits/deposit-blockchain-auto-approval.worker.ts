@@ -6,6 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OperationsConfigService } from '../platform-config/operations-config.service';
 import { RedisService } from '../redis/redis.service';
 import { DepositApprovalModeService } from './deposit-approval-mode.service';
 import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
@@ -29,6 +30,7 @@ export class DepositBlockchainAutoApprovalWorker
     private readonly redis: RedisService,
     private readonly approvalMode: DepositApprovalModeService,
     private readonly processing: DepositBlockchainProcessingService,
+    private readonly operationsConfigService: OperationsConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -40,7 +42,7 @@ export class DepositBlockchainAutoApprovalWorker
     }, WORKER_INTERVAL_MS);
     this.timer.unref();
     this.logger.log(
-      'Deposit blockchain auto-approval worker armed at 60000ms; only rails explicitly set to AUTO_AFTER_BLOCKCHAIN_VERIFIED are eligible.',
+      'Deposit blockchain auto-approval worker armed at 60000ms; Platform Operations and rail approval mode remain authoritative.',
     );
   }
 
@@ -54,6 +56,8 @@ export class DepositBlockchainAutoApprovalWorker
     this.running = true;
 
     try {
+      if (!(await this.operationsConfigService.isAutomatic())) return;
+
       const candidates = await this.approvalMode.listAutomaticCandidates();
       if (candidates.length === 0) return;
 
