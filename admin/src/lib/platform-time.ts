@@ -1,8 +1,9 @@
-export const DEFAULT_PLATFORM_TIMEZONE = "Asia/Kolkata";
+export const DEFAULT_PLATFORM_TIMEZONE = "UTC";
+export const PLATFORM_TIMEZONE_LABEL = "UTC";
 
-// Operational UI timestamps resolve through this runtime value so a SUPER_ADMIN
-// timezone change propagates consistently without changing immutable settlement
-// timezone snapshots or absolute database timestamps.
+// Operational UI timestamps are globally locked to UTC. Explicit timezone
+// overrides remain available only for rendering immutable historical schedule
+// snapshots where the snapshot itself is part of the audited record.
 let runtimePlatformTimezone = DEFAULT_PLATFORM_TIMEZONE;
 
 export function isValidTimeZone(timeZone: string): boolean {
@@ -19,13 +20,13 @@ export function getRuntimePlatformTimezone(): string {
 }
 
 export function setRuntimePlatformTimezone(timeZone: string): boolean {
-  if (!isValidTimeZone(timeZone)) return false;
-  runtimePlatformTimezone = timeZone;
+  if (timeZone !== DEFAULT_PLATFORM_TIMEZONE) return false;
+  runtimePlatformTimezone = DEFAULT_PLATFORM_TIMEZONE;
   return true;
 }
 
-// Explicit overrides are reserved for controlled previews/tests; ordinary UI
-// rendering follows the runtime platform timezone set by PlatformTimeProvider.
+// Explicit overrides are reserved for immutable historical schedule snapshots
+// and controlled tests. Ordinary UI rendering always resolves to runtime UTC.
 function resolveTimeZone(timeZone?: string): string {
   return timeZone && isValidTimeZone(timeZone)
     ? timeZone
@@ -115,8 +116,8 @@ export function platformLocalDateTimeToIso(
     return null;
   }
 
-  // Resolve the timezone offset iteratively so DST-aware zones are handled
-  // without leaking browser-local timezone semantics into operational filters.
+  // Resolve the timezone offset iteratively so historical snapshot zones remain
+  // DST-aware without leaking browser-local timezone semantics into filters.
   let candidate = wallClockUtc;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const parts = zonedParts(new Date(candidate), zone);
@@ -143,8 +144,6 @@ export function platformLocalDateTimeToIso(
     parts.minute !== minute ||
     parts.second !== second
   ) {
-    // Reject nonexistent/ambiguous wall-clock values rather than silently
-    // shifting an operational report window.
     return null;
   }
 
@@ -166,7 +165,7 @@ export function formatPlatformDateTime(
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false,
     timeZoneName: "short",
   }).format(date);
 }
@@ -184,5 +183,22 @@ export function formatPlatformDate(
     day: "2-digit",
     month: "short",
     year: "numeric",
+  }).format(date);
+}
+
+export function formatPlatformTime(
+  value: string | Date | null | undefined,
+  timeZone?: string,
+): string {
+  if (!value) return "—";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: resolveTimeZone(timeZone),
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
   }).format(date);
 }

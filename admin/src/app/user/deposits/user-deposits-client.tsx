@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
@@ -8,8 +9,6 @@ import {
   type ApiMessagePayload,
   type Deposit,
   type DepositMutationResponse,
-  type DepositPaymentRail,
-  type DepositPaymentRailsResponse,
   type DepositsResponse,
   compactDecimal,
   messageFrom,
@@ -19,20 +18,11 @@ import {
   statusTone,
   transactionIdHint,
 } from "@/lib/deposits";
-import {
-  investmentRangeLabel,
-  principalReturnLabel,
-  type PackageCatalogue,
-  type PackagePlanItem,
-} from "@/lib/packages";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 
 interface UserDepositWorkspace {
   session: UserDirectSession;
-  plan: PackageCatalogue["plan"];
-  packages: PackagePlanItem[];
-  rails: DepositPaymentRail[];
   deposits: Deposit[];
 }
 
@@ -47,22 +37,8 @@ class UserWorkspaceAccessError extends Error {
   }
 }
 
-const INVESTMENT_PATTERN = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,8})?$/;
-
 function formatDate(value: string | null): string {
   return formatPlatformDateTime(value);
-}
-
-function activationPolicyText(trigger: string): string {
-  if (trigger === "MANUAL_ACTIVATION") {
-    return "Payment approval posts accounting first; an authorized administrator then activates the package.";
-  }
-
-  if (trigger === "PAYMENT_APPROVED") {
-    return "Payment approval posts accounting and automatically activates the package exactly once.";
-  }
-
-  return "This package activation engine is not available for new funding yet.";
 }
 
 function redirectFor(error: unknown): string | null {
@@ -104,20 +80,6 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
     throw new Error("USER session is incomplete.");
   }
 
-  const packageResponse = await fetch("/api/user/packages", {
-    cache: "no-store",
-  });
-  const packagePayload = await checkedUserJson<
-    PackageCatalogue & ApiMessagePayload
-  >(packageResponse, "Could not load available packages.");
-
-  const railResponse = await fetch("/api/user/deposit-payment-rails", {
-    cache: "no-store",
-  });
-  const railPayload = await checkedUserJson<
-    DepositPaymentRailsResponse & ApiMessagePayload
-  >(railResponse, "Could not load available payment networks.");
-
   const depositResponse = await fetch("/api/user/deposits", {
     cache: "no-store",
   });
@@ -127,14 +89,6 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
 
   return {
     session,
-    plan: packagePayload.plan,
-    packages:
-      packagePayload.catalogueAvailable && packagePayload.activationAvailable
-        ? packagePayload.items.filter(
-            (item) => item.availability === "AVAILABLE",
-          )
-        : [],
-    rails: railPayload.rails,
     deposits: depositPayload.deposits,
   };
 }
@@ -142,14 +96,7 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
 export default function UserDepositsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
-  const [packagePlan, setPackagePlan] =
-    useState<PackageCatalogue["plan"]>(null);
-  const [packages, setPackages] = useState<PackagePlanItem[]>([]);
-  const [rails, setRails] = useState<DepositPaymentRail[]>([]);
   const [deposits, setDeposits] = useState<Deposit[]>([]);
-  const [selectedPackageId, setSelectedPackageId] = useState("");
-  const [selectedRailId, setSelectedRailId] = useState("");
-  const [investmentAmount, setInvestmentAmount] = useState("");
   const [txid, setTxid] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -167,41 +114,9 @@ export default function UserDepositsClient() {
     [deposits],
   );
 
-  const selectedPackage = useMemo(
-    () => packages.find((item) => item.id === selectedPackageId) ?? null,
-    [packages, selectedPackageId],
-  );
-
-  const eligibleRails = useMemo(
-    () =>
-      selectedPackage
-        ? rails.filter(
-            (rail) => rail.asset === selectedPackage.currency && rail.isActive,
-          )
-        : [],
-    [rails, selectedPackage],
-  );
-
-  const selectedRail = useMemo(
-    () => eligibleRails.find((rail) => rail.id === selectedRailId) ?? null,
-    [eligibleRails, selectedRailId],
-  );
-
   function applyWorkspace(workspace: UserDepositWorkspace) {
     setSession(workspace.session);
-    setPackagePlan(workspace.plan);
-    setPackages(workspace.packages);
-    setRails(workspace.rails);
     setDeposits(workspace.deposits);
-
-    const nextPackage =
-      workspace.packages.find((item) => item.id === selectedPackageId) ??
-      workspace.packages[0] ??
-      null;
-    setSelectedPackageId(nextPackage?.id ?? "");
-    if (nextPackage && !investmentAmount) {
-      setInvestmentAmount(nextPackage.minimumInvestment);
-    }
   }
 
   async function reloadWorkspace() {
@@ -233,15 +148,8 @@ export default function UserDepositsClient() {
       try {
         const workspace = await fetchUserDepositWorkspace();
         if (!mounted) return;
-
-        const firstPackage = workspace.packages[0] ?? null;
         setSession(workspace.session);
-        setPackagePlan(workspace.plan);
-        setPackages(workspace.packages);
-        setRails(workspace.rails);
         setDeposits(workspace.deposits);
-        setSelectedPackageId(firstPackage?.id ?? "");
-        setInvestmentAmount(firstPackage?.minimumInvestment ?? "");
       } catch (caught) {
         const redirectTo = redirectFor(caught);
         if (redirectTo) {
@@ -266,67 +174,6 @@ export default function UserDepositsClient() {
       mounted = false;
     };
   }, [router]);
-
-  useEffect(() => {
-    if (eligibleRails.some((rail) => rail.id === selectedRailId)) return;
-    const nextRailId = eligibleRails[0]?.id ?? "";
-    queueMicrotask(() => setSelectedRailId(nextRailId));
-  }, [eligibleRails, selectedRailId]);
-
-  function choosePackage(packageId: string) {
-    const nextPackage = packages.find((item) => item.id === packageId) ?? null;
-    setSelectedPackageId(packageId);
-    setInvestmentAmount(nextPackage?.minimumInvestment ?? "");
-    setError(null);
-    setNotice(null);
-  }
-
-  async function createDeposit() {
-    if (!selectedPackageId || !selectedRailId || !selectedPackage || openDeposit) {
-      return;
-    }
-
-    const normalizedAmount = investmentAmount.trim();
-    if (!INVESTMENT_PATTERN.test(normalizedAmount) || normalizedAmount === "0") {
-      setError("Enter a valid USDT investment amount with up to 8 decimals.");
-      return;
-    }
-
-    setBusy("create");
-    setError(null);
-    setNotice(null);
-
-    try {
-      const response = await fetch("/api/user/deposits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          packagePlanItemId: selectedPackageId,
-          paymentRailId: selectedRailId,
-          investmentAmount: normalizedAmount,
-        }),
-      });
-      const payload = await readJson<
-        DepositMutationResponse & ApiMessagePayload
-      >(response);
-      if (!response.ok || !payload) {
-        throw new Error(
-          messageFrom(payload, "Could not create deposit request."),
-        );
-      }
-
-      setNotice(payload.message);
-      await reloadWorkspace();
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not create deposit request.",
-      );
-    } finally {
-      setBusy(null);
-    }
-  }
 
   async function submitTxid(deposit: Deposit) {
     const normalized = normalizeTransactionId(
@@ -384,13 +231,12 @@ export default function UserDepositsClient() {
       <div className={styles.page}>
         <section className={styles.hero}>
           <div>
-            <p className={styles.eyebrow}>CONFIGURED PAYMENT NETWORKS</p>
+            <p className={styles.eyebrow}>PAYMENT HISTORY</p>
             <h1>Deposits</h1>
             <p>
-              Choose a package, enter the exact investment inside its published
-              range, then select a supported payment network. The backend
-              snapshots that exact principal before assigning a receiving
-              account.
+              Track pending funding requests and review your complete deposit
+              history. New funding always starts by choosing a package from the
+              Packages workspace.
             </p>
           </div>
           {openDeposit ? (
@@ -405,16 +251,6 @@ export default function UserDepositsClient() {
 
         {notice ? <div className={styles.success}>{notice}</div> : null}
         {error ? <div className={styles.error}>{error}</div> : null}
-
-        {packagePlan ? (
-          <div className={styles.notice}>
-            <strong>Package policy:</strong>{" "}
-            {packagePlan.activePackageMode === "MULTIPLE_ACTIVE"
-              ? "Each purchased package may remain active and operate independently. "
-              : "Only one package may remain active at a time. "}
-            {activationPolicyText(packagePlan.activationTrigger)}
-          </div>
-        ) : null}
 
         {loading ? (
           <div className={styles.card}>
@@ -532,107 +368,22 @@ export default function UserDepositsClient() {
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.eyebrow}>New Deposit</p>
-                <h2>Select package, exact investment and payment network</h2>
+                <p className={styles.eyebrow}>No Open Deposit</p>
+                <h2>No pending deposit request</h2>
               </div>
             </div>
-
-            {packages.length === 0 ? (
-              <div className={styles.empty}>
-                No package is currently available.
+            <div className={styles.empty}>
+              <p>
+                Your previous deposit records remain available below. To start a
+                new funding request, choose the package and exact investment from
+                Packages first.
+              </p>
+              <div className={styles.actions}>
+                <Link className={styles.button} href="/user/packages">
+                  Choose a package
+                </Link>
               </div>
-            ) : (
-              <div className={styles.formGrid}>
-                <div className={styles.field}>
-                  <label htmlFor="deposit-package">Package</label>
-                  <select
-                    className={styles.select}
-                    id="deposit-package"
-                    value={selectedPackageId}
-                    onChange={(event) => choosePackage(event.target.value)}
-                  >
-                    {packages.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.displayName} — {investmentRangeLabel(item)}{" "}
-                        {item.currency}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={styles.field}>
-                  <label htmlFor="deposit-investment">Investment amount</label>
-                  <input
-                    className={styles.input}
-                    id="deposit-investment"
-                    inputMode="decimal"
-                    value={investmentAmount}
-                    onChange={(event) => setInvestmentAmount(event.target.value)}
-                    placeholder={selectedPackage?.minimumInvestment ?? "0"}
-                    maxLength={22}
-                    autoComplete="off"
-                  />
-                </div>
-
-                <div className={styles.field}>
-                  <label htmlFor="deposit-rail">Payment network</label>
-                  <select
-                    className={styles.select}
-                    id="deposit-rail"
-                    value={selectedRailId}
-                    onChange={(event) => setSelectedRailId(event.target.value)}
-                    disabled={eligibleRails.length === 0}
-                  >
-                    {eligibleRails.length === 0 ? (
-                      <option value="">No active payment network</option>
-                    ) : (
-                      eligibleRails.map((rail) => (
-                        <option key={rail.id} value={rail.id}>
-                          {rail.displayName}
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                {selectedPackage ? (
-                  <div className={`${styles.notice} ${styles.full}`}>
-                    <strong>{selectedPackage.displayName}</strong>: published
-                    investment range {investmentRangeLabel(selectedPackage)}{" "}
-                    {selectedPackage.currency}, duration{" "}
-                    {selectedPackage.durationDays} days. {" "}
-                    {principalReturnLabel(selectedPackage)}.
-                  </div>
-                ) : null}
-
-                {selectedPackage && selectedRail && investmentAmount.trim() ? (
-                  <div className={`${styles.notice} ${styles.full}`}>
-                    After the backend validates the range, pay exactly{" "}
-                    <strong>
-                      {investmentAmount.trim()} {selectedPackage.currency}
-                    </strong>{" "}
-                    on <strong>{selectedRail.networkCode}</strong>. The receiving
-                    address is assigned from that rail&apos;s active account pool.
-                  </div>
-                ) : null}
-
-                <div className={`${styles.actions} ${styles.full}`}>
-                  <button
-                    className={styles.button}
-                    type="button"
-                    disabled={
-                      !selectedPackageId ||
-                      !selectedRailId ||
-                      !investmentAmount.trim() ||
-                      busy !== null
-                    }
-                    onClick={() => void createDeposit()}
-                  >
-                    {busy === "create" ? "Creating…" : "Create deposit request"}
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </section>
         )}
 
@@ -653,7 +404,7 @@ export default function UserDepositsClient() {
           </div>
 
           {deposits.length === 0 ? (
-            <div className={styles.empty}>No deposit requests yet.</div>
+            <div className={styles.empty}>No deposit history yet.</div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>

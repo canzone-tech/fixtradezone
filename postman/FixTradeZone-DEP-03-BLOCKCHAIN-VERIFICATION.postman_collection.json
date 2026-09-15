@@ -1,0 +1,286 @@
+{
+  "info": {
+    "_postman_id": "9d5e6df2-c44f-4c41-a71a-843d62af0303",
+    "name": "FixTradeZone DEP-03 Blockchain Verification",
+    "description": "LOCAL API ACCEPTANCE ONLY. Run after migration 0035_deposit_blockchain_verification is deployed. Phase 1 is VERIFY_ONLY: it configures BSC/EVM token verification and checks an existing deposit TxID against BNB Smart Chain without approving, accounting, activating packages, or triggering downstream earnings. Before request 04, set blockchainTokenContractAddress and blockchainTokenDecimals to the exact token contract used by the configured BEP20 payment rail. Do not guess the token contract. blockchainDepositId is optional; when blank, the collection selects the latest deposit on blockchainNetworkCode with a TxID. blockchainExpectVerified defaults false for the current synthetic QA transaction. Set it true only when testing a known real transfer whose token, receiver and amount match the deposit.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "blockchainNetworkCode", "value": "BEP20" },
+    { "key": "blockchainChainId", "value": "56" },
+    { "key": "blockchainTokenContractAddress", "value": "" },
+    { "key": "blockchainTokenDecimals", "value": "" },
+    { "key": "blockchainRequiredConfirmations", "value": "3" },
+    { "key": "blockchainDepositId", "value": "" },
+    { "key": "blockchainExpectVerified", "value": "false" }
+  ],
+  "item": [
+    {
+      "name": "01 Admin Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('admin login 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.accessToken).to.be.a('string').and.not.empty;",
+              "pm.expect(body.user.roles).to.include.oneOf(['ADMIN', 'SUPER_ADMIN']);",
+              "pm.environment.set('adminAccessToken', body.accessToken);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"{{adminIdentifier}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      }
+    },
+    {
+      "name": "02 Select Active BSC Payment Rail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('payment rail list 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "const network = (pm.variables.get('blockchainNetworkCode') || 'BEP20').trim().toUpperCase();",
+              "const rail = (body.rails || []).find(r => r.isActive && r.networkCode === network && r.validationProfile === 'EVM');",
+              "pm.test('active EVM payment rail exists for configured network', () => pm.expect(rail, `Need active EVM rail for ${network}`).to.exist);",
+              "if (rail) {",
+              "  pm.environment.set('blockchainPaymentRailId', rail.id);",
+              "  pm.environment.set('blockchainRailAsset', rail.asset);",
+              "  pm.environment.set('blockchainRailNetwork', rail.networkCode);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposit-payment-rails"
+      }
+    },
+    {
+      "name": "03 Blockchain Config Readback Before",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('blockchain config readback 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.rail.id).to.eql(pm.environment.get('blockchainPaymentRailId'));",
+              "pm.expect(body.rail.validationProfile).to.eql('EVM');",
+              "pm.expect(body.blockchainVerification).to.be.an('object');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposit-payment-rails/{{blockchainPaymentRailId}}/blockchain-config"
+      }
+    },
+    {
+      "name": "04 Enable BSC Verify Only",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const contract = (pm.variables.get('blockchainTokenContractAddress') || pm.environment.get('blockchainTokenContractAddress') || '').trim();",
+              "const decimalsRaw = String(pm.variables.get('blockchainTokenDecimals') || pm.environment.get('blockchainTokenDecimals') || '').trim();",
+              "const confirmationsRaw = String(pm.variables.get('blockchainRequiredConfirmations') || '3').trim();",
+              "if (!/^0x[0-9a-fA-F]{40}$/.test(contract)) throw new Error('Set blockchainTokenContractAddress to the exact BEP20 token contract address before enabling verification. Do not guess it.');",
+              "if (!/^\\d+$/.test(decimalsRaw) || Number(decimalsRaw) < 0 || Number(decimalsRaw) > 36) throw new Error('Set blockchainTokenDecimals to the exact integer decimals used by that token contract.');",
+              "if (!/^\\d+$/.test(confirmationsRaw) || Number(confirmationsRaw) < 1 || Number(confirmationsRaw) > 100) throw new Error('blockchainRequiredConfirmations must be 1..100.');"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('enable verification 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "const cfg = body.blockchainVerification;",
+              "pm.expect(cfg.enabled).to.eql(true);",
+              "pm.expect(cfg.verificationMode).to.eql('VERIFY_ONLY');",
+              "pm.expect(cfg.chainId).to.eql(Number(pm.variables.get('blockchainChainId') || 56));",
+              "pm.expect(cfg.tokenContractAddress).to.eql((pm.variables.get('blockchainTokenContractAddress') || pm.environment.get('blockchainTokenContractAddress')).toLowerCase());",
+              "pm.expect(cfg.tokenDecimals).to.eql(Number(pm.variables.get('blockchainTokenDecimals') || pm.environment.get('blockchainTokenDecimals')));",
+              "pm.expect(cfg.requiredConfirmations).to.eql(Number(pm.variables.get('blockchainRequiredConfirmations') || 3));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"enabled\": true,\n  \"chainId\": {{blockchainChainId}},\n  \"tokenContractAddress\": \"{{blockchainTokenContractAddress}}\",\n  \"tokenDecimals\": {{blockchainTokenDecimals}},\n  \"requiredConfirmations\": {{blockchainRequiredConfirmations}},\n  \"reason\": \"LOCAL QA DEP-03 enable BSC blockchain verification\"\n}"
+        },
+        "url": "{{baseUrl}}/admin/deposit-payment-rails/{{blockchainPaymentRailId}}/blockchain-config"
+      }
+    },
+    {
+      "name": "05 Blockchain Config Readback After",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('config readback 200', () => pm.response.to.have.status(200));",
+              "const cfg = pm.response.json().blockchainVerification;",
+              "pm.expect(cfg.enabled).to.eql(true);",
+              "pm.expect(cfg.verificationMode).to.eql('VERIFY_ONLY');",
+              "pm.expect(cfg.chainId).to.eql(56);",
+              "pm.expect(cfg.revision).to.be.a('number').and.at.least(1);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposit-payment-rails/{{blockchainPaymentRailId}}/blockchain-config"
+      }
+    },
+    {
+      "name": "06 Select Existing Deposit For Verification",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('deposit list 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "const explicitId = (pm.variables.get('blockchainDepositId') || pm.environment.get('blockchainDepositId') || '').trim();",
+              "const network = pm.environment.get('blockchainRailNetwork') || (pm.variables.get('blockchainNetworkCode') || 'BEP20');",
+              "const deposits = body.deposits || [];",
+              "const candidate = explicitId ? deposits.find(d => d.id === explicitId) : deposits.find(d => d.assignedNetwork === network && d.assignedValidationProfile === 'EVM' && d.txid);",
+              "pm.test('verification candidate exists in latest 100 deposits', () => pm.expect(candidate, explicitId ? `Deposit ${explicitId} must be present in latest 100 results` : `Need an existing ${network} EVM deposit with TxID`).to.exist);",
+              "if (candidate) {",
+              "  pm.environment.set('blockchainTestDepositId', candidate.id);",
+              "  pm.environment.set('blockchainDepositStatusBefore', candidate.status);",
+              "  pm.environment.set('blockchainDepositTxid', candidate.txid);",
+              "  pm.environment.set('blockchainDepositAmount', candidate.amount);",
+              "  pm.environment.set('blockchainDepositReceivingAddress', candidate.assignedWalletAddress);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposits?limit=100"
+      }
+    },
+    {
+      "name": "07 Verify Deposit On BSC",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('verification request 201', () => pm.response.to.have.status(201));",
+              "const body = pm.response.json();",
+              "const verification = body.verification;",
+              "pm.expect(verification.depositId).to.eql(pm.environment.get('blockchainTestDepositId'));",
+              "pm.expect(verification.txid).to.eql(pm.environment.get('blockchainDepositTxid'));",
+              "pm.expect(verification.receivingAddress.toLowerCase()).to.eql(pm.environment.get('blockchainDepositReceivingAddress').toLowerCase());",
+              "pm.expect(['PENDING', 'VERIFIED', 'FAILED', 'UNAVAILABLE']).to.include(verification.status);",
+              "const expectVerified = String(pm.variables.get('blockchainExpectVerified') || 'false').toLowerCase() === 'true';",
+              "if (expectVerified) {",
+              "  pm.test('known real transfer is blockchain verified', () => pm.expect(verification.status).to.eql('VERIFIED'));",
+              "} else {",
+              "  pm.test('synthetic/local QA TxID is never marked verified', () => pm.expect(verification.status).to.not.eql('VERIFIED'));",
+              "}",
+              "pm.environment.set('blockchainVerificationStatus', verification.status);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposits/{{blockchainTestDepositId}}/verify-blockchain"
+      }
+    },
+    {
+      "name": "08 Verification Evidence Readback",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('verification readback 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.depositId).to.eql(pm.environment.get('blockchainTestDepositId'));",
+              "pm.expect(body.required).to.eql(true);",
+              "pm.expect(body.verification).to.be.an('object');",
+              "pm.expect(body.verification.status).to.eql(pm.environment.get('blockchainVerificationStatus'));",
+              "pm.expect(body.verification.attemptCount).to.be.a('number').and.at.least(1);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposits/{{blockchainTestDepositId}}/blockchain-verification"
+      }
+    },
+    {
+      "name": "09 Verify Only Does Not Change Deposit Status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('deposit readback 200', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.deposit.id).to.eql(pm.environment.get('blockchainTestDepositId'));",
+              "pm.expect(body.deposit.status).to.eql(pm.environment.get('blockchainDepositStatusBefore'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{adminAccessToken}}" }
+        ],
+        "url": "{{baseUrl}}/admin/deposits/{{blockchainTestDepositId}}"
+      }
+    }
+  ]
+}

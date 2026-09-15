@@ -126,6 +126,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                   <i className="iconoir-bell" />
                   <span>Notifications</span>
                 </Link>
+
+                <Link
+                  href="/user/support"
+                  className={`ftz-nav-link ${
+                    isActive("/user/support") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-help-circle" />
+                  <span>Support</span>
+                </Link>
               </>
             )}
           </div>
@@ -156,6 +167,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             </Link>
 
             <Link
+              href="/user/subscriptions"
+              className={`ftz-nav-link ${
+                isActive("/user/subscriptions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-clock-rotate-right" />
+              <span>Subscriptions</span>
+            </Link>
+
+            <Link
               href="/user/wallet"
               className={`ftz-nav-link ${
                 isActive("/user/wallet") ? "is-active" : ""
@@ -165,41 +187,6 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <i className="iconoir-bank" />
               <span>Wallet</span>
             </Link>
-
-            <Link
-              href="/user/commissions"
-              className={`ftz-nav-link ${
-                isActive("/user/commissions") ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-coins" />
-              <span>Referral Commissions</span>
-            </Link>
-
-            <Link
-              href="/user/rewards"
-              className={`ftz-nav-link ${
-                isActive("/user/rewards") ? "is-active" : ""
-              }`}
-              onClick={close}
-            >
-              <i className="iconoir-trophy" />
-              <span>Rewards & Caps</span>
-            </Link>
-
-            {!impersonated ? (
-              <Link
-                href="/user/payouts"
-                className={`ftz-nav-link ${
-                  isActive("/user/payouts") ? "is-active" : ""
-                }`}
-                onClick={close}
-              >
-                <i className="iconoir-coins-swap" />
-                <span>Payouts</span>
-              </Link>
-            ) : null}
 
             <Link
               href="/user/referrals"
@@ -226,6 +213,41 @@ export default function UserSidebar({ session }: UserSidebarProps) {
             ) : null}
 
             <Link
+              href="/user/commissions"
+              className={`ftz-nav-link ${
+                isActive("/user/commissions") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-coins" />
+              <span>Referral Commissions</span>
+            </Link>
+
+            <Link
+              href="/user/rewards"
+              className={`ftz-nav-link ${
+                isActive("/user/rewards") ? "is-active" : ""
+              }`}
+              onClick={close}
+            >
+              <i className="iconoir-trophy" />
+              <span>Rewards & Caps</span>
+            </Link>
+
+            {!impersonated ? (
+              <Link
+                href="/user/award-rewards"
+                className={`ftz-nav-link ${
+                  isActive("/user/award-rewards") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-trophy" />
+                <span>Team Business Awards</span>
+              </Link>
+            ) : null}
+
+            <Link
               href="/user/trading"
               className={`ftz-nav-link ${
                 isActive("/user/trading") ? "is-active" : ""
@@ -246,6 +268,19 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <i className="iconoir-graph-up" />
               <span>Daily Trades</span>
             </Link>
+
+            {!impersonated ? (
+              <Link
+                href="/user/payouts"
+                className={`ftz-nav-link ${
+                  isActive("/user/payouts") ? "is-active" : ""
+                }`}
+                onClick={close}
+              >
+                <i className="iconoir-coins-swap" />
+                <span>Withdrawal</span>
+              </Link>
+            ) : null}
           </div>
         </nav>
 

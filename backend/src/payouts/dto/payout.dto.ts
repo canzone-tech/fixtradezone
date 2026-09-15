@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -14,7 +14,7 @@ import {
   Min,
 } from 'class-validator';
 import {
-  PAYOUT_BUCKETS,
+  PAYOUT_SPENDABLE_BUCKETS,
   PAYOUT_STATUSES,
   PAYOUT_VALIDATION_PROFILES,
   type PayoutBucket,
@@ -29,8 +29,11 @@ export class CreatePayoutDto {
   @IsUUID()
   requestKey!: string;
 
-  @IsIn(PAYOUT_BUCKETS)
-  sourceBucket!: PayoutBucket;
+  // The client never chooses the accounting source. Any submitted legacy value
+  // is normalized to the locked authoritative Total Wallet source.
+  @Transform(() => 'TOTAL_WALLET')
+  @IsIn(PAYOUT_SPENDABLE_BUCKETS)
+  sourceBucket: PayoutBucket = 'TOTAL_WALLET';
 
   @IsString()
   @Matches(MONEY_PATTERN)
@@ -39,6 +42,18 @@ export class CreatePayoutDto {
   @IsString()
   @MaxLength(191)
   destinationAddress!: string;
+}
+
+export class ReinvestPayoutDto {
+  @IsUUID()
+  requestKey!: string;
+
+  @IsUUID()
+  packagePlanItemId!: string;
+
+  @IsString()
+  @Matches(MONEY_PATTERN)
+  amount!: string;
 }
 
 export class PayoutPageQueryDto {
@@ -124,7 +139,7 @@ export class UpdatePayoutPolicyDraftDto {
   @IsOptional()
   @IsArray()
   @ArrayUnique()
-  @IsIn(PAYOUT_BUCKETS, { each: true })
+  @IsIn(PAYOUT_SPENDABLE_BUCKETS, { each: true })
   enabledBuckets?: PayoutBucket[];
 }
 

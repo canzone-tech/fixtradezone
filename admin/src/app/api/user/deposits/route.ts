@@ -4,11 +4,3 @@ import { proxyUserRequest } from "@/lib/user-backend";
 export function GET(request: NextRequest) {
   return proxyUserRequest(request, "/deposits/me", { method: "GET" });
 }
-
-export async function POST(request: NextRequest) {
-  return proxyUserRequest(request, "/deposits", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: await request.text(),
-  });
-}

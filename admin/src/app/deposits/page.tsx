@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import FieldHelpTarget from "@/components/ui/field-help-target";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
+import DepositApprovalModePanel from "./deposit-approval-mode-panel";
+import DepositBlockchainVerificationPanel from "./deposit-blockchain-verification-panel";
 import DepositsClient from "./deposits-client";
 
 export const metadata: Metadata = {
@@ -21,6 +23,8 @@ export default async function DepositsPage() {
 
   return (
     <AdminShell>
+      <DepositApprovalModePanel />
+      <DepositBlockchainVerificationPanel />
       <DepositsClient />
       <FieldHelpTarget
         targetId="account-qr"

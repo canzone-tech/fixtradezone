@@ -13,8 +13,8 @@ interface Subscription {
   userId: string;
   username?: string;
   email?: string | null;
-  sourceDepositId: string;
-  sourceDepositAccountingTransactionId: string;
+  sourceDepositId: string | null;
+  sourceDepositAccountingTransactionId: string | null;
   fundingLedgerTransactionId: string;
   packageCode: string;
   packageDisplayName: string;
@@ -336,7 +336,7 @@ export default function SubscriptionsClient() {
                   <th>ACTIVATION</th>
                   <th>ACTIVATED</th>
                   <th>SCHEDULED END</th>
-                  <th>SOURCE DEPOSIT</th>
+                  <th>SOURCE</th>
                 </tr>
               </thead>
               <tbody>
@@ -360,7 +360,11 @@ export default function SubscriptionsClient() {
                     <td>{enumLabel(item.activationTrigger)}</td>
                     <td>{dateLabel(item.activatedAt)}</td>
                     <td>{dateLabel(item.scheduledEndAt)}</td>
-                    <td className={styles.mono}>{item.sourceDepositId}</td>
+                    <td className={styles.mono}>
+                      {item.sourceDepositId
+                        ? `Deposit · ${item.sourceDepositId}`
+                        : `Reinvestment · ${item.fundingLedgerTransactionId}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

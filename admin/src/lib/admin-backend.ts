@@ -18,6 +18,30 @@ import {
 async function mirrorBackendResponse(
   backendResponse: Response,
 ): Promise<NextResponse> {
+  const contentType = backendResponse.headers.get("content-type") ?? "";
+
+  if (
+    backendResponse.ok &&
+    contentType &&
+    !contentType.toLowerCase().includes("application/json")
+  ) {
+    const headers = new Headers({ "Cache-Control": "private, no-store" });
+    for (const name of [
+      "content-type",
+      "content-disposition",
+      "content-length",
+      "x-content-type-options",
+    ]) {
+      const value = backendResponse.headers.get(name);
+      if (value) headers.set(name, value);
+    }
+
+    return new NextResponse(await backendResponse.arrayBuffer(), {
+      status: backendResponse.status,
+      headers,
+    });
+  }
+
   const payload = await readJson(backendResponse);
 
   return NextResponse.json(

@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
-import { formatPlatformDateTime } from "@/lib/platform-time";
+import {
+  formatPlatformDate,
+  formatPlatformDateTime,
+  formatPlatformTime,
+} from "@/lib/platform-time";
 import styles from "./internal-trading.module.css";
 
 interface ApiMessage {
@@ -817,11 +821,7 @@ export default function InternalTradingAdminClient() {
                 <dd>{published.assetSymbols.join(", ")}</dd>
               </div>
               <div>
-                <dt>Timezone</dt>
-                <dd>{published.timezoneSnapshot ?? "Pending publication"}</dd>
-              </div>
-              <div>
-                <dt>Effective</dt>
+                <dt>Effective (UTC)</dt>
                 <dd>
                   {published.effectiveFrom
                     ? formatPlatformDateTime(published.effectiveFrom)
@@ -951,15 +951,15 @@ export default function InternalTradingAdminClient() {
                 <dd>{money(selected.grossHighWaterMark, selected.currency)}</dd>
               </div>
               <div>
-                <dt>Activation day</dt>
+                <dt>Activation schedule day</dt>
                 <dd>{selected.activationLocalDate}</dd>
               </div>
               <div>
-                <dt>Final day</dt>
+                <dt>Final schedule day</dt>
                 <dd>{selected.finalLocalDate}</dd>
               </div>
               <div>
-                <dt>Next trading day</dt>
+                <dt>Next trading schedule day</dt>
                 <dd>{selected.nextTradeLocalDate}</dd>
               </div>
             </dl>
@@ -1037,10 +1037,6 @@ export default function InternalTradingAdminClient() {
                 </dd>
               </div>
               <div>
-                <dt>Timezone</dt>
-                <dd>{selected.timezoneSnapshot}</dd>
-              </div>
-              <div>
                 <dt>Blocked reason</dt>
                 <dd>{selected.blockedReason ?? "—"}</dd>
               </div>
@@ -1054,7 +1050,8 @@ export default function InternalTradingAdminClient() {
           <div>
             <h3>Trade History</h3>
             <p className={styles.muted}>
-              Immutable package-linked internal trade events.
+              Immutable package-linked internal trade events · timestamps shown
+              in UTC.
             </p>
           </div>
 
@@ -1067,7 +1064,8 @@ export default function InternalTradingAdminClient() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Date</th>
+                <th>UTC Date</th>
+                <th>Time (UTC)</th>
                 <th>Day / Slot</th>
                 <th>Asset</th>
                 <th>Result</th>
@@ -1084,7 +1082,8 @@ export default function InternalTradingAdminClient() {
             <tbody>
               {events.map((event) => (
                 <tr key={event.id}>
-                  <td>{event.localTradeDate}</td>
+                  <td>{formatPlatformDate(event.scheduledAt)}</td>
+                  <td>{formatPlatformTime(event.scheduledAt)}</td>
                   <td>
                     D{event.tradeDayNumber} / {event.slotNumber}
                   </td>
@@ -1116,7 +1115,7 @@ export default function InternalTradingAdminClient() {
 
               {!events.length ? (
                 <tr>
-                  <td colSpan={11} className={styles.empty}>
+                  <td colSpan={12} className={styles.empty}>
                     Select a package to view immutable trade history.
                   </td>
                 </tr>

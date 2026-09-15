@@ -13,6 +13,13 @@ export interface WalletCurrencySummary {
   totalWallet: string;
 }
 
+export type WalletActivityBucket =
+  | "MAIN"
+  | "PACKAGE_EARNINGS"
+  | "REFERRAL_COMMISSION"
+  | "REWARDS"
+  | "TOTAL_WALLET";
+
 export interface WalletActivity {
   transactionId: string;
   kind: string;
@@ -21,7 +28,7 @@ export interface WalletActivity {
   description: string;
   currency: string;
   postedAt: string;
-  bucket: "MAIN" | "PACKAGE_EARNINGS" | "REFERRAL_COMMISSION" | "REWARDS";
+  bucket: WalletActivityBucket;
   direction: "CREDIT" | "DEBIT";
   amount: string;
 }
@@ -154,4 +161,12 @@ export function compactDecimal(value: string): string {
 
 export function formatWalletDate(value: string | null): string {
   return formatPlatformDateTime(value);
+}
+
+export function walletActivityBucketLabel(bucket: WalletActivityBucket): string {
+  if (bucket === "TOTAL_WALLET") return "Total Wallet";
+  if (bucket === "MAIN") return "Main / Deposit";
+  if (bucket === "PACKAGE_EARNINGS") return "Package Earnings";
+  if (bucket === "REFERRAL_COMMISSION") return "Referral Commission";
+  return "Rewards";
 }

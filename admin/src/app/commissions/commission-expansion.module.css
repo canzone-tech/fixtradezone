@@ -1,0 +1,272 @@
+.card {
+  display: grid;
+  gap: 18px;
+  margin: 0 24px 24px;
+  padding: 22px;
+  border: 1px solid rgba(74, 129, 206, 0.26);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(8, 23, 53, 0.94), rgba(4, 13, 36, 0.97));
+  box-shadow: inset 0 0 26px rgba(0, 112, 255, 0.04);
+  color: #d9e2f1;
+}
+
+.header,
+.sectionTitle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.header span,
+.sectionTitle span {
+  color: #43e9df;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+}
+
+.header h2,
+.sectionTitle h3 {
+  margin: 5px 0 7px;
+  color: #f5f8ff;
+}
+
+.header p,
+.sectionTitle p {
+  max-width: 780px;
+  margin: 0;
+  color: #8ea0bd;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actions select,
+.actions button,
+.rangeEditor input,
+.rangeEditor button,
+.tableWrap input {
+  border: 1px solid rgba(74, 129, 206, 0.3);
+  border-radius: 9px;
+  color: #e9f0ff;
+  background: #08152d;
+}
+
+.actions select,
+.actions button,
+.rangeEditor button {
+  padding: 9px 11px;
+}
+
+.actions button,
+.rangeEditor button {
+  cursor: pointer;
+}
+
+.actions button:disabled,
+.rangeEditor button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.actions .primary {
+  border-color: rgba(31, 255, 240, 0.45);
+  color: #1ffff0;
+  background: rgba(7, 74, 84, 0.68);
+}
+
+.flashStack {
+  display: grid;
+  gap: 8px;
+}
+
+.unsaved {
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 188, 63, 0.4);
+  border-radius: 10px;
+  color: #ffd27a;
+  background: rgba(73, 48, 7, 0.75);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summaryGrid > div,
+.summaryGrid > label {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(74, 129, 206, 0.18);
+  border-radius: 11px;
+  background: rgba(4, 18, 40, 0.55);
+}
+
+.summaryGrid small {
+  color: #7d91ae;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.summaryGrid strong {
+  color: #f5f8ff;
+}
+
+.summaryGrid input {
+  width: 100%;
+  max-width: 140px;
+  padding: 8px;
+  border: 1px solid rgba(74, 129, 206, 0.3);
+  border-radius: 8px;
+  color: #e9f0ff;
+  background: #08152d;
+}
+
+.section {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.rangeEditor {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.rangeEditor label {
+  display: grid;
+  gap: 5px;
+  color: #8ea0bd;
+  font-size: 10px;
+}
+
+.rangeEditor input {
+  width: 100%;
+  padding: 8px;
+}
+
+.rangeEditor .checkLabel {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 7px;
+}
+
+.rangeEditor .checkLabel input {
+  width: auto;
+}
+
+.levelGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.levelChip {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid rgba(74, 129, 206, 0.16);
+  border-radius: 9px;
+  background: rgba(4, 18, 40, 0.5);
+}
+
+.levelChip strong {
+  color: #f5f8ff;
+}
+
+.levelChip span {
+  color: #43e9df;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.levelChip small {
+  color: #7286a4;
+  font-size: 8px;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.tableWrap table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 11px 13px;
+  border-bottom: 1px solid rgba(74, 129, 206, 0.12);
+  text-align: left;
+  font-size: 11px;
+}
+
+.tableWrap th {
+  color: #768aa8;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+
+.tableWrap td strong,
+.tableWrap td small {
+  display: block;
+}
+
+.tableWrap td small {
+  margin-top: 3px;
+  color: #7890ae;
+}
+
+.tableWrap input[type="number"] {
+  width: 110px;
+  padding: 8px;
+}
+
+.empty {
+  padding: 24px;
+  color: #8ea0bd;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .rangeEditor {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .card {
+    margin: 0 16px 16px;
+    padding: 16px;
+  }
+
+  .header,
+  .sectionTitle {
+    flex-direction: column;
+  }
+
+  .actions {
+    justify-content: flex-start;
+  }
+
+  .summaryGrid,
+  .rangeEditor {
+    grid-template-columns: 1fr;
+  }
+}

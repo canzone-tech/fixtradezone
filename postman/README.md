@@ -49,3 +49,39 @@ The runner discovers `depositPaymentRailId` from the active account preflight; d
 The current deterministic acceptance lane uses USDT/TRC20/TRON. That is test data, not a platform-wide network hardcode.
 
 Synthetic transaction IDs are local QA data only. DEP-01 does not perform blockchain credit, wallet balance changes or package activation. Never run this collection against production.
+
+## COMM-02 Expanded Referral Commissions
+
+Use:
+
+`FixTradeZone-COMM-02-REFERRAL-EXPANSION.postman_collection.json`
+
+This focused collection covers the approved expansion of the existing Referral Commissions engine. It is **not** a separate Level Income module.
+
+### COMM-02 prerequisites and order
+
+1. Repository Backend + Admin CI are GREEN.
+2. Pull the accepted feature-branch HEAD locally.
+3. Apply forward migration `0033_referral_commission_level_depth` with `prisma migrate deploy`; never use `prisma migrate dev` or reset the database.
+4. Complete SUPER_ADMIN frontend acceptance on `/commissions` first.
+5. Only then use this Postman collection.
+6. `adminAccessToken` must be a current SUPER_ADMIN/delegated admin token from the normal local login flow.
+
+Requests `03`, `04`, and `06` are explicitly marked **MANUAL WRITE**. Do not blindly run the full collection. Request `06` publishes a new effective commission plan and must only be used after frontend approval.
+
+### Approved COMM-02 policy reference
+
+- L1: 10%
+- L2: 4%
+- L3: 3%
+- L4: 2%
+- L5: 1%
+- L6-L10: 0.5%
+- L11-L20: 1%
+- L21-L30: 1.5%
+- L31-L40: 2%
+- L41-L50: 3%
+
+Package depth is cumulative and based on the receiver's highest qualifying ACTIVE package. The reference mapping is CryptoBot L5, DynamoBot L5, EliteBot L10, JupiterBot L20, LegendBot L30, NovaBot L40, and PrimeBot L50 when that package exists in the published catalogue.
+
+Package matching remains `min(upline package basis, downline source package value)`. A source package activation is processed once, sponsor routing is snapshotted at source activation time, publication is forward-only, old commission events remain immutable, and manual reconciliation is recovery-only.

@@ -28,6 +28,8 @@ yarn-error.log*
 .temp/
 *.pid
 *.pid.lock
+/backend/storage/
+/storage/
 
 # OS
 .DS_Store

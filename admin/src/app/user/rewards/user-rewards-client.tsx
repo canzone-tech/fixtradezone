@@ -64,6 +64,71 @@ interface RewardsResponse extends UserApiPayload {
   total: number;
 }
 
+interface AwardLevelProgress {
+  levelNumber: number;
+  requiredBusiness: string | null;
+  currentBusiness: string;
+  required: boolean;
+  achieved: boolean;
+  achievedAt: string | null;
+  progressPercent: string;
+}
+
+interface AwardTrack {
+  id: string;
+  packageCode: string;
+  packageDisplayName: string;
+  trackOrder: number;
+  awardAmount: string;
+  currency: string;
+  levelCount: number;
+  status: "ACTIVE_TRACK" | "QUALIFIED" | "AWARD_POSTED" | "CLOSED";
+  startedAt: string;
+  qualifiedAt: string | null;
+  awardPostedAt: string | null;
+  closedAt: string | null;
+  ledgerTransactionId: string | null;
+  levels?: AwardLevelProgress[];
+}
+
+interface WaitingAwardTrack {
+  sourceSubscriptionId: string;
+  packageDefinitionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  trackOrder: number;
+  awardAmount: string;
+  status: "WAITING";
+}
+
+interface AwardEvent {
+  id: string;
+  packageCode: string;
+  packageDisplayName: string;
+  awardAmount: string;
+  currency: string;
+  ledgerTransactionId: string;
+  postedAt: string;
+}
+
+interface AwardPolicySummary {
+  id: string;
+  versionNumber: number;
+  status: "DRAFT" | "PUBLISHED";
+  enabled: boolean;
+  levelCount: number;
+  asset: string;
+}
+
+interface AwardRewardsResponse extends UserApiPayload {
+  currentTrack: AwardTrack | null;
+  waitingTracks: WaitingAwardTrack[];
+  completedTracks: AwardTrack[];
+  events: AwardEvent[];
+  effectivePolicy: AwardPolicySummary | null;
+  rewardsWalletBalance: string;
+}
+
 class UserAccessError extends Error {
   constructor(
     message: string,
@@ -116,10 +181,19 @@ function stateTone(status: RewardState["status"]): "success" | "warning" | undef
   return undefined;
 }
 
+function awardTone(
+  status: AwardTrack["status"],
+): "success" | "warning" | undefined {
+  if (status === "CLOSED" || status === "AWARD_POSTED") return "success";
+  if (status === "QUALIFIED") return "warning";
+  return undefined;
+}
+
 export default function UserRewardsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [data, setData] = useState<RewardsResponse | null>(null);
+  const [awardData, setAwardData] = useState<AwardRewardsResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,17 +212,24 @@ export default function UserRewardsClient() {
           "USER session is unavailable.",
         );
 
-        const rewardsResponse = await fetch(
-          `/api/user/rewards?page=${nextPage}&limit=50`,
-          { cache: "no-store" },
-        );
+        const [rewardsResponse, awardResponse] = await Promise.all([
+          fetch(`/api/user/rewards?page=${nextPage}&limit=50`, {
+            cache: "no-store",
+          }),
+          fetch("/api/user/award-rewards", { cache: "no-store" }),
+        ]);
         const rewards = await checked<RewardsResponse>(
           rewardsResponse,
           "Could not load rewards and cap progress.",
         );
+        const awards = await checked<AwardRewardsResponse>(
+          awardResponse,
+          "Could not load Team Business Award & Reward progress.",
+        );
 
         setSession(nextSession);
         setData(rewards);
+        setAwardData(awards);
         setPage(rewards.page);
       } catch (caught) {
         const redirectTo = redirectFor(caught);
@@ -177,6 +258,7 @@ export default function UserRewardsClient() {
   }, [load]);
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1;
+  const awardAsset = awardData?.effectivePolicy?.asset ?? "USDT";
 
   return (
     <UserShell session={session}>
@@ -194,7 +276,8 @@ export default function UserRewardsClient() {
           <h1>Rewards & Caps</h1>
           <p>
             View package reward lifecycle state, cap consumption, upcoming
-            settlement position, and immutable posted reward history.
+            settlement position, immutable posted reward history, and your
+            sequential Team Business Award & Reward track.
           </p>
         </section>
 
@@ -279,8 +362,173 @@ export default function UserRewardsClient() {
         <section className={styles.card}>
           <div className={styles.notificationHeader}>
             <div>
+              <p className={styles.eyebrow}>AWR-01 / TEAM BUSINESS ACHIEVEMENT</p>
+              <h2>Sequential Award & Reward track</h2>
+              <p>
+                Every eligible ACTIVE package gets its own award track in policy
+                order. A later package remains waiting until the previous award
+                posts and closes; the new track then starts from zero.
+              </p>
+            </div>
+            <span className={styles.badge} data-tone="success">
+              Rewards wallet: {compactDecimal(awardData?.rewardsWalletBalance ?? "0")} {awardAsset}
+            </span>
+          </div>
+
+          {loading && !awardData ? (
+            <div className={styles.empty}>Loading Award & Reward progress…</div>
+          ) : !awardData?.effectivePolicy ? (
+            <div className={styles.empty}>
+              No enabled published Award & Reward policy is effective yet.
+            </div>
+          ) : (
+            <div className={styles.page}>
+              {awardData.currentTrack ? (
+                <article className={styles.notification}>
+                  <div className={styles.notificationHeader}>
+                    <div>
+                      <strong>{awardData.currentTrack.packageDisplayName}</strong>
+                      <div className={styles.meta}>
+                        Track #{awardData.currentTrack.trackOrder} · {awardData.currentTrack.packageCode} · started {formatPlatformDateTime(awardData.currentTrack.startedAt)}
+                      </div>
+                    </div>
+                    <div className={styles.actions}>
+                      <span className={styles.badge} data-tone={awardTone(awardData.currentTrack.status)}>
+                        {awardData.currentTrack.status}
+                      </span>
+                      <span className={styles.badge}>
+                        Award {compactDecimal(awardData.currentTrack.awardAmount)} {awardData.currentTrack.currency}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={styles.grid}>
+                    {(awardData.currentTrack.levels ?? []).map((level) => (
+                      <div className={styles.metric} key={level.levelNumber}>
+                        <small>Level {level.levelNumber}</small>
+                        {level.required ? (
+                          <>
+                            <strong>
+                              {compactDecimal(level.currentBusiness)} / {compactDecimal(level.requiredBusiness ?? "0")} {awardData.currentTrack?.currency}
+                            </strong>
+                            <span className={styles.meta}>
+                              {compactDecimal(level.progressPercent)}% · {level.achieved ? "ACHIEVED" : "IN PROGRESS"}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <strong>NOT_REQUIRED</strong>
+                            <span className={styles.meta}>No target on this genealogy level</span>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ) : (
+                <div className={styles.empty}>
+                  No Award & Reward package track is currently open.
+                </div>
+              )}
+
+              {awardData.waitingTracks.length > 0 ? (
+                <article className={styles.notification}>
+                  <div className={styles.notificationHeader}>
+                    <div>
+                      <strong>Waiting package tracks</strong>
+                      <div className={styles.meta}>
+                        These tracks do not count Team Business yet. Each starts
+                        from zero only after the prior track closes.
+                      </div>
+                    </div>
+                    <span className={styles.badge}>
+                      {awardData.waitingTracks.length} WAITING
+                    </span>
+                  </div>
+                  <div className={styles.grid}>
+                    {awardData.waitingTracks.map((track) => (
+                      <div className={styles.metric} key={track.sourceSubscriptionId}>
+                        <small>Track #{track.trackOrder}</small>
+                        <strong>{track.packageDisplayName}</strong>
+                        <span className={styles.meta}>
+                          {track.packageCode} · award {compactDecimal(track.awardAmount)} {awardAsset}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+
+              {awardData.completedTracks.length > 0 ? (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Completed Package</th>
+                        <th>Track</th>
+                        <th>Award</th>
+                        <th>Started</th>
+                        <th>Closed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {awardData.completedTracks.map((track) => (
+                        <tr key={track.id}>
+                          <td>
+                            <strong>{track.packageDisplayName}</strong>
+                            <div className={styles.meta}>{track.packageCode}</div>
+                          </td>
+                          <td>#{track.trackOrder}</td>
+                          <td>
+                            {compactDecimal(track.awardAmount)} {track.currency}
+                          </td>
+                          <td>{formatPlatformDateTime(track.startedAt)}</td>
+                          <td>{formatPlatformDateTime(track.closedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+
+              {awardData.events.length > 0 ? (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Award Event</th>
+                        <th>Amount</th>
+                        <th>Posted</th>
+                        <th>Ledger Transaction</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {awardData.events.map((event) => (
+                        <tr key={event.id}>
+                          <td>
+                            <strong>{event.packageDisplayName}</strong>
+                            <div className={styles.meta}>{event.packageCode}</div>
+                          </td>
+                          <td>
+                            {compactDecimal(event.awardAmount)} {event.currency}
+                          </td>
+                          <td>{formatPlatformDateTime(event.postedAt)}</td>
+                          <td className={styles.meta}>{event.ledgerTransactionId}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        <section className={styles.card}>
+          <div className={styles.notificationHeader}>
+            <div>
               <p className={styles.eyebrow}>Immutable History</p>
-              <h2>Reward events</h2>
+              <h2>Package reward events</h2>
               <p>{data?.total ?? 0} event(s)</p>
             </div>
             <div className={styles.actions}>

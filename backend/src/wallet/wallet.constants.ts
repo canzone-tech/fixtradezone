@@ -34,6 +34,13 @@ export function userWalletAccountKey(
   return `USER:${userId}:${bucket}:${currency}`;
 }
 
+// Shared authoritative Total Wallet ledger-control account. The persisted
+// bucket/key retain the original payout-prefixed internal name for migration
+// compatibility; it is not a payout-only balance and is never shown to USERs.
+export function totalWalletControlAccountKey(currency: string): string {
+  return `SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:${currency}`;
+}
+
 export function depositClearingAccountKey(currency: string): string {
   return `SYSTEM:DEPOSIT_CLEARING:${currency}`;
 }
@@ -56,6 +63,12 @@ export function depositCreditSourceKey(depositId: string): string {
 
 export function packageActivationSourceKey(depositId: string): string {
   return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION`;
+}
+
+export function packageActivationTotalWalletEventKey(
+  depositId: string,
+): string {
+  return `DEPOSIT:${depositId}:PACKAGE_ACTIVATION:TOTAL_WALLET`;
 }
 
 export function referralCommissionSourceKey(

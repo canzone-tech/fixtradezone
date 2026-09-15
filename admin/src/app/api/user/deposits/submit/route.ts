@@ -1,0 +1,10 @@
+import { NextRequest } from "next/server";
+import { proxyUserRequest } from "@/lib/user-backend";
+
+export async function POST(request: NextRequest) {
+  return proxyUserRequest(request, "/deposits/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: await request.text(),
+  });
+}

@@ -40,7 +40,7 @@ const routeHeadings: Array<{
   },
   {
     path: "/payouts",
-    title: "Payouts",
+    title: "Withdrawal",
     subtitle: "Withdrawal policy, request review and settlement operations",
   },
   {
@@ -88,6 +88,11 @@ const routeHeadings: Array<{
     path: "/reports",
     title: "Reports",
     subtitle: "Read-only operational and financial reporting",
+  },
+  {
+    path: "/templates",
+    title: "Templates / CMS",
+    subtitle: "Versioned landing content and managed email templates",
   },
   {
     path: "/audit-logs",

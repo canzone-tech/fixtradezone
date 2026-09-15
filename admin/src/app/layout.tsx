@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
+import AuthPublicNavigation from "@/components/auth/auth-public-navigation";
 import PlatformTimeProvider from "@/components/platform/platform-time-provider";
 import AppPwa from "@/components/pwa/app-pwa";
 import "./globals.css";
@@ -6,6 +8,10 @@ import "iconoir/css/iconoir.css";
 import "../styles/fixtradezone-theme.scss";
 import "../styles/fixtradezone-readability.scss";
 import "../styles/fixtradezone-responsive.scss";
+import "../styles/universal-ui.scss";
+import "../styles/text-flow-lock.scss";
+import "../styles/layout-alignment.scss";
+import "../styles/auth-polish.scss";
 
 export const metadata: Metadata = {
   applicationName: "FixTradeZone",
@@ -40,6 +46,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body id="body">
+        <Script id="ftz-pwa-install-prompt-capture" strategy="beforeInteractive">
+          {`window.addEventListener("beforeinstallprompt",function(event){event.preventDefault();window.__ftzPwaInstallPrompt=event;});window.addEventListener("appinstalled",function(){window.__ftzPwaInstallPrompt=null;});`}
+        </Script>
+        <AuthPublicNavigation />
         <AppPwa />
         <PlatformTimeProvider>{children}</PlatformTimeProvider>
       </body>

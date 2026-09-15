@@ -15,6 +15,7 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { trimString } from '../../auth/dto/string.transformers';
 import {
@@ -128,6 +129,34 @@ export class CreateDepositAccountDto {
   reason!: string;
 }
 
+export class CreatePackageDepositAccountDto {
+  @Transform(trimString)
+  @IsUUID()
+  packageDefinitionId!: string;
+
+  @Transform(trimString)
+  @IsUUID()
+  paymentRailId!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @Length(20, 100)
+  walletAddress!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(360_000)
+  @Matches(QR_DATA_URL_PATTERN, {
+    message: 'qrCodeDataUrl must be a supported base64 image data URL.',
+  })
+  qrCodeDataUrl!: string;
+
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
 export class UpdateDepositAccountDto {
   @IsInt()
   @Min(1)
@@ -158,6 +187,17 @@ export class UpdateDepositAccountDto {
   reason!: string;
 }
 
+export class ConfigureDepositPackageAccountDto {
+  @ValidateIf((_, value: unknown) => value !== null)
+  @IsUUID()
+  depositAccountId!: string | null;
+
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
 export class CreateDepositDto {
   @Transform(trimString)
   @IsString()
@@ -174,6 +214,24 @@ export class CreateDepositDto {
   @IsString()
   @Matches(INVESTMENT_AMOUNT_PATTERN)
   investmentAmount?: string;
+}
+
+export class SubmitPackageDepositDto {
+  @Transform(trimString)
+  @IsString()
+  @IsUUID()
+  packagePlanItemId!: string;
+
+  @Transform(trimString)
+  @IsOptional()
+  @IsString()
+  @Matches(INVESTMENT_AMOUNT_PATTERN)
+  investmentAmount?: string;
+
+  @Transform(normalizeTxid)
+  @IsString()
+  @Length(1, 191)
+  txid!: string;
 }
 
 export class SubmitDepositTxidDto {

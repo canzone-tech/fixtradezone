@@ -55,6 +55,17 @@ export const envValidationSchema = Joi.object({
 
   REDIS_PASSWORD: Joi.string().allow('').default(''),
 
+  DEPOSIT_BSC_RPC_URL: Joi.string()
+    .uri({ scheme: ['https'] })
+    .allow('')
+    .default(''),
+
+  DEPOSIT_BSC_RPC_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1_000)
+    .max(30_000)
+    .default(8_000),
+
   PUBLIC_APP_URL: Joi.string().uri().default('https://localhost:3001'),
 
   COMMUNICATION_EMAIL_MODE: Joi.string()
@@ -124,6 +135,14 @@ export const envValidationSchema = Joi.object({
   REWARD_WORKER_ENABLED: boolean.default(false),
 
   REWARD_WORKER_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .max(3_600_000)
+    .default(60_000),
+
+  AWARD_REWARD_WORKER_ENABLED: boolean.default(false),
+
+  AWARD_REWARD_WORKER_INTERVAL_MS: Joi.number()
     .integer()
     .min(10_000)
     .max(3_600_000)
@@ -238,7 +257,7 @@ export const envValidationSchema = Joi.object({
         }
       } catch {
         return helpers.error('any.custom', {
-          message: 'PUBLIC_APP_URL must be a valid URL in production',
+          message: 'PUBLIC_APP_URL must be a valid URL',
         });
       }
 

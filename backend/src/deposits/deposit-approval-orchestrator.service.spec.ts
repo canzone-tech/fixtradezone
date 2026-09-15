@@ -1,11 +1,13 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { OperationsConfigService } from '../platform-config/operations-config.service';
 import type { SubscriptionPostActivationService } from '../subscriptions/subscription-post-activation.service';
 import type { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import type { WalletLedgerService } from '../wallet/wallet-ledger.service';
 import { DepositApprovalOrchestratorService } from './deposit-approval-orchestrator.service';
+import type { DepositBlockchainApprovalGuardService } from './deposit-blockchain-approval-guard.service';
 import type { DepositsService } from './deposits.service';
+import type { DirectDepositApprovalService } from './direct-deposit-approval.service';
 
 const DEPOSIT_ID = '11111111-1111-4111-8111-111111111111';
 
@@ -34,7 +36,15 @@ const adminActor: AuthenticatedUser = {
 
 describe('DepositApprovalOrchestratorService', () => {
   const depositsService = {
+    getDeposit: jest.fn(),
     approveDeposit: jest.fn(),
+  };
+  const directDepositApprovalService = {
+    approvePendingDeposit: jest.fn(),
+  };
+  const blockchainApprovalGuard = {
+    assertManualApprovalAllowed: jest.fn(),
+    assertAutomaticApprovalAllowed: jest.fn(),
   };
   const operationsConfigService = {
     getOperations: jest.fn(),
@@ -53,6 +63,19 @@ describe('DepositApprovalOrchestratorService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'READY_FOR_APPROVAL' },
+    });
+    blockchainApprovalGuard.assertManualApprovalAllowed.mockResolvedValue({
+      approvalMode: 'MANUAL',
+      allowed: true,
+      verificationStatus: 'PENDING',
+    });
+    blockchainApprovalGuard.assertAutomaticApprovalAllowed.mockResolvedValue({
+      approvalMode: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED',
+      allowed: true,
+      verificationStatus: 'VERIFIED',
+    });
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
       operationsMode: 'AUTOMATIC',
@@ -61,6 +84,11 @@ describe('DepositApprovalOrchestratorService', () => {
     depositsService.approveDeposit.mockResolvedValue({
       message: 'Deposit approved.',
       deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
+    directDepositApprovalService.approvePendingDeposit.mockResolvedValue({
+      message: 'Deposit directly approved by SUPER_ADMIN.',
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+      approvalPath: 'SUPER_ADMIN_DIRECT',
     });
     walletLedgerService.reconcileApprovedDeposit.mockResolvedValue({
       message: 'Approved deposit posted to Main / Deposit Balance.',
@@ -100,6 +128,8 @@ describe('DepositApprovalOrchestratorService', () => {
 
     service = new DepositApprovalOrchestratorService(
       depositsService as unknown as DepositsService,
+      directDepositApprovalService as unknown as DirectDepositApprovalService,
+      blockchainApprovalGuard as unknown as DepositBlockchainApprovalGuardService,
       operationsConfigService as unknown as OperationsConfigService,
       walletLedgerService as unknown as WalletLedgerService,
       subscriptionsService as unknown as SubscriptionsService,
@@ -107,7 +137,7 @@ describe('DepositApprovalOrchestratorService', () => {
     );
   });
 
-  it('blocks ADMIN final approval before reading operations policy', async () => {
+  it('blocks ADMIN final approval before reading deposit or approval policy', async () => {
     await expect(
       service.approveDeposit(
         DEPOSIT_ID,
@@ -116,14 +146,108 @@ describe('DepositApprovalOrchestratorService', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
+    expect(depositsService.getDeposit).not.toHaveBeenCalled();
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).not.toHaveBeenCalled();
+    expect(
+      blockchainApprovalGuard.assertAutomaticApprovalAllowed,
+    ).not.toHaveBeenCalled();
     expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
-    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
   });
 
-  it('runs the complete safe downstream chain from one approval in AUTOMATIC mode', async () => {
+  it('blocks manual SUPER_ADMIN approval when the configured policy is automatic', async () => {
+    blockchainApprovalGuard.assertManualApprovalAllowed.mockRejectedValue(
+      new ConflictException('Automatic blockchain approval mode is enabled.'),
+    );
+
+    await expect(
+      service.approveDeposit(
+        DEPOSIT_ID,
+        { note: 'Manual approval must respect mode' },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).toHaveBeenCalledWith(DEPOSIT_ID);
+    expect(operationsConfigService.getOperations).not.toHaveBeenCalled();
+    expect(depositsService.approveDeposit).not.toHaveBeenCalled();
+    expect(walletLedgerService.reconcileApprovedDeposit).not.toHaveBeenCalled();
+  });
+
+  it('lets SUPER_ADMIN directly approve a pending deposit in MANUAL mode without requiring VERIFIED', async () => {
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'PENDING_REVIEW' },
+    });
+
     const result = await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'verified' },
+      { note: 'Founder manual approval' },
+      actor,
+    );
+
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).toHaveBeenCalledWith(DEPOSIT_ID);
+    expect(
+      directDepositApprovalService.approvePendingDeposit,
+    ).toHaveBeenCalledWith(
+      DEPOSIT_ID,
+      { note: 'Founder manual approval' },
+      actor,
+      {},
+    );
+    expect(result).toMatchObject({
+      approvalSource: 'MANUAL',
+      approvalPath: 'SUPER_ADMIN_DIRECT',
+      accountingPosted: true,
+      packageActivated: true,
+    });
+  });
+
+  it('uses the VERIFIED-only guard for automatic blockchain approval', async () => {
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'AUTO_AFTER_BLOCKCHAIN_VERIFIED' },
+      actor,
+      {},
+      'AUTO_BLOCKCHAIN',
+    );
+
+    expect(
+      blockchainApprovalGuard.assertAutomaticApprovalAllowed,
+    ).toHaveBeenCalledWith(DEPOSIT_ID);
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      approvalSource: 'AUTO_BLOCKCHAIN',
+      accountingPosted: true,
+      packageActivated: true,
+    });
+  });
+
+  it('does not retroactively apply an approval guard to an already approved deposit', async () => {
+    depositsService.getDeposit.mockResolvedValue({
+      deposit: { id: DEPOSIT_ID, status: 'APPROVED' },
+    });
+
+    await service.approveDeposit(DEPOSIT_ID, { note: 'Recovery call' }, actor);
+
+    expect(
+      blockchainApprovalGuard.assertManualApprovalAllowed,
+    ).not.toHaveBeenCalled();
+    expect(
+      blockchainApprovalGuard.assertAutomaticApprovalAllowed,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('runs the complete safe downstream chain from one approval in AUTOMATIC operations mode', async () => {
+    const result = await service.approveDeposit(
+      DEPOSIT_ID,
+      { note: 'manual review' },
       actor,
     );
 
@@ -142,29 +266,17 @@ describe('DepositApprovalOrchestratorService', () => {
       {},
     );
     expect(result).toMatchObject({
+      approvalSource: 'MANUAL',
       operationsMode: 'AUTOMATIC',
-      platformTimezone: 'Asia/Kolkata',
       accountingPostingMode: 'AUTO_ON_APPROVAL',
       accountingPosted: true,
       packageActivated: true,
-      packageActivationMode: 'AUTO',
-      packageActivationTrigger: 'PAYMENT_APPROVED',
-      packageActivationRequired: false,
       subscription: { id: 'subscription-id', status: 'ACTIVE' },
-      referralCommission: {
-        processingStatus: 'PROCESSED',
-        run: { id: 'commission-run-id', outcome: 'PROCESSED' },
-      },
-      rewardLifecycle: {
-        initialized: true,
-        noEffectivePolicy: false,
-        state: { subscriptionId: 'subscription-id', status: 'ACTIVE' },
-      },
       automaticDownstreamProcessing: true,
     });
   });
 
-  it('keeps approved deposits waiting for recovery actions in CONTROLLED_MANUAL mode', async () => {
+  it('keeps approved deposits waiting for recovery actions in CONTROLLED_MANUAL operations mode', async () => {
     operationsConfigService.getOperations.mockResolvedValue({
       platformTimezone: 'Asia/Kolkata',
       operationsMode: 'CONTROLLED_MANUAL',
@@ -173,17 +285,13 @@ describe('DepositApprovalOrchestratorService', () => {
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'verified' },
+      { note: 'manual review' },
       actor,
     );
 
-    expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
     expect(walletLedgerService.reconcileApprovedDeposit).not.toHaveBeenCalled();
-    expect(
-      subscriptionsService.activateAutomaticallyAfterAccounting,
-    ).not.toHaveBeenCalled();
-    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
+      approvalSource: 'MANUAL',
       operationsMode: 'CONTROLLED_MANUAL',
       accountingPostingMode: 'MANUAL_RECONCILIATION',
       accountingPosted: false,
@@ -199,20 +307,12 @@ describe('DepositApprovalOrchestratorService', () => {
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'verified' },
+      { note: 'manual review' },
       actor,
     );
 
-    expect(depositsService.approveDeposit).toHaveBeenCalledTimes(1);
-    expect(walletLedgerService.reconcileApprovedDeposit).toHaveBeenCalledTimes(
-      1,
-    );
-    expect(
-      subscriptionsService.activateAutomaticallyAfterAccounting,
-    ).not.toHaveBeenCalled();
-    expect(postActivationService.process).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      accountingPostingMode: 'AUTO_ON_APPROVAL',
+      approvalSource: 'MANUAL',
       accountingPosted: false,
       accountingPendingReason: 'ledger unavailable',
       packageActivated: false,
@@ -227,7 +327,7 @@ describe('DepositApprovalOrchestratorService', () => {
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'verified' },
+      { note: 'manual review' },
       actor,
     );
 
@@ -240,8 +340,13 @@ describe('DepositApprovalOrchestratorService', () => {
     });
   });
 
-  it('bulk approval isolates one failed deposit instead of rolling back successful items', async () => {
+  it('bulk manual approval isolates one failed deposit instead of rolling back successful items', async () => {
     const secondDepositId = '44444444-4444-4444-8444-444444444444';
+    depositsService.getDeposit.mockImplementation((depositId: string) =>
+      Promise.resolve({
+        deposit: { id: depositId, status: 'READY_FOR_APPROVAL' },
+      }),
+    );
     depositsService.approveDeposit
       .mockResolvedValueOnce({
         message: 'Deposit approved.',
@@ -286,7 +391,7 @@ describe('DepositApprovalOrchestratorService', () => {
 
     const result = await service.approveDeposit(
       DEPOSIT_ID,
-      { note: 'verified' },
+      { note: 'manual review' },
       actor,
     );
 

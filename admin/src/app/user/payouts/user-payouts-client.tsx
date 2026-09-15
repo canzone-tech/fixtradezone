@@ -12,6 +12,11 @@ import UserShell from "@/components/user/user-shell";
 import styles from "@/components/payouts/payout.module.css";
 import type { UserDirectSession } from "@/lib/user-session";
 import {
+  type PackageCatalogue,
+  type PackagePlanItem,
+  investmentRangeLabel,
+} from "@/lib/packages";
+import {
   type ApiMessagePayload,
   type CurrentPayoutPolicyResponse,
   type PayoutBucket,
@@ -33,6 +38,25 @@ import {
 interface UserApiPayload extends ApiMessagePayload {
   redirectTo?: string | null;
 }
+
+interface ReinvestmentSubscription {
+  id: string;
+  sourceDepositId: string | null;
+  fundingLedgerTransactionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  price: string;
+  currency: string;
+  status: string;
+  activatedAt: string;
+  scheduledEndAt: string;
+}
+
+interface UserSubscriptionsResponse extends UserApiPayload {
+  history?: ReinvestmentSubscription[];
+}
+
+type WalletAction = "PAYOUT" | "REINVESTMENT";
 
 class UserPayoutAccessError extends Error {
   constructor(
@@ -82,6 +106,8 @@ function payoutBucketBalance(
   if (!wallet) return "0";
 
   switch (bucket) {
+    case "TOTAL_WALLET":
+      return wallet.totalWallet;
     case "MAIN":
       return wallet.buckets.main;
     case "PACKAGE_EARNINGS":
@@ -93,11 +119,51 @@ function payoutBucketBalance(
   }
 }
 
+function decimalUnits(value: string): bigint | null {
+  const normalized = value.trim();
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,8})?$/.test(normalized)) {
+    return null;
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  return (
+    BigInt(whole) * BigInt(100000000) +
+    BigInt((fraction + "00000000").slice(0, 8))
+  );
+}
+
+function amountFitsPackage(item: PackagePlanItem, amount: string): boolean {
+  if (item.availability !== "AVAILABLE") return false;
+
+  const amountUnits = decimalUnits(amount);
+  const minimumUnits = decimalUnits(item.minimumInvestment);
+  if (
+    amountUnits === null ||
+    minimumUnits === null ||
+    amountUnits <= BigInt(0)
+  ) {
+    return false;
+  }
+
+  if (!item.rangeConfigured) {
+    const priceUnits = decimalUnits(item.price);
+    return priceUnits !== null && amountUnits === priceUnits;
+  }
+
+  if (amountUnits < minimumUnits) return false;
+  if (item.maximumInvestment === null) return true;
+
+  const maximumUnits = decimalUnits(item.maximumInvestment);
+  return maximumUnits !== null && amountUnits <= maximumUnits;
+}
+
 async function fetchPayoutWorkspace(): Promise<{
   session: UserDirectSession;
   policy: CurrentPayoutPolicyResponse;
   payouts: UserPayoutsResponse;
   wallet: UserWalletResponse;
+  catalogue: PackageCatalogue | null;
+  subscriptions: UserSubscriptionsResponse;
 }> {
   const sessionResponse = await fetch("/api/user/session", {
     cache: "no-store",
@@ -111,25 +177,43 @@ async function fetchPayoutWorkspace(): Promise<{
     throw new Error("USER session is incomplete.");
   }
 
-  const [policyResponse, payoutsResponse, walletResponse] = await Promise.all([
+  const [
+    policyResponse,
+    payoutsResponse,
+    walletResponse,
+    catalogueResponse,
+    subscriptionsResponse,
+  ] = await Promise.all([
     fetch("/api/user/payouts/policy", { cache: "no-store" }),
     fetch("/api/user/payouts?limit=50", { cache: "no-store" }),
     fetch("/api/user/wallet?page=1&limit=50", { cache: "no-store" }),
+    fetch("/api/user/packages", { cache: "no-store" }),
+    fetch("/api/user/subscriptions?limit=100", { cache: "no-store" }),
   ]);
 
   const policy = await checkedJson<
     CurrentPayoutPolicyResponse & UserApiPayload
-  >(policyResponse, "Could not load payout policy.");
+  >(policyResponse, "Could not load withdrawal policy.");
   const payouts = await checkedJson<UserPayoutsResponse & UserApiPayload>(
     payoutsResponse,
-    "Could not load payout history.",
+    "Could not load withdrawal history.",
   );
   const wallet = await checkedJson<UserWalletResponse & UserApiPayload>(
     walletResponse,
     "Could not load wallet balances.",
   );
+  const subscriptions = await checkedJson<UserSubscriptionsResponse>(
+    subscriptionsResponse,
+    "Could not load reinvestment history.",
+  );
 
-  return { session, policy, payouts, wallet };
+  const cataloguePayload = await readJson<PackageCatalogue & UserApiPayload>(
+    catalogueResponse,
+  );
+  const catalogue =
+    catalogueResponse.ok && cataloguePayload ? cataloguePayload : null;
+
+  return { session, policy, payouts, wallet, catalogue, subscriptions };
 }
 
 export default function UserPayoutsClient() {
@@ -138,9 +222,17 @@ export default function UserPayoutsClient() {
   const [policy, setPolicy] = useState<CurrentPayoutPolicyResponse | null>(null);
   const [payouts, setPayouts] = useState<UserPayoutsResponse | null>(null);
   const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
-  const [sourceBucket, setSourceBucket] = useState<PayoutBucket>("MAIN");
+  const [catalogue, setCatalogue] = useState<PackageCatalogue | null>(null);
+  const [reinvestmentSubscriptions, setReinvestmentSubscriptions] = useState<
+    ReinvestmentSubscription[]
+  >([]);
+  const [walletAction, setWalletAction] = useState<WalletAction>("PAYOUT");
+  const [sourceBucket, setSourceBucket] =
+    useState<PayoutBucket>("TOTAL_WALLET");
   const [amount, setAmount] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [selectedPackagePlanItemId, setSelectedPackagePlanItemId] =
+    useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,6 +259,38 @@ export default function UserPayoutsClient() {
   }, [activePolicy?.asset, wallet]);
 
   const selectedBucketBalance = payoutBucketBalance(activeWallet, sourceBucket);
+  const walletCurrency = activeWallet?.currency ?? activePolicy?.asset ?? "USDT";
+
+  const eligiblePackages = useMemo(() => {
+    if (!catalogue?.catalogueAvailable || !catalogue.activationAvailable) {
+      return [];
+    }
+
+    return catalogue.items.filter(
+      (item) =>
+        item.currency.toUpperCase() === walletCurrency.toUpperCase() &&
+        amountFitsPackage(item, amount),
+    );
+  }, [amount, catalogue, walletCurrency]);
+
+  const selectedPackage = useMemo(
+    () =>
+      eligiblePackages.find((item) => item.id === selectedPackagePlanItemId) ??
+      eligiblePackages[0] ??
+      null,
+    [eligiblePackages, selectedPackagePlanItemId],
+  );
+
+  const canAffordReinvestment = useMemo(() => {
+    const amountUnits = decimalUnits(amount);
+    const availableUnits = decimalUnits(activeWallet?.totalWallet ?? "0");
+    return (
+      amountUnits !== null &&
+      availableUnits !== null &&
+      amountUnits > BigInt(0) &&
+      amountUnits <= availableUnits
+    );
+  }, [activeWallet?.totalWallet, amount]);
 
   async function reload() {
     setLoading(true);
@@ -178,6 +302,12 @@ export default function UserPayoutsClient() {
       setPolicy(workspace.policy);
       setPayouts(workspace.payouts);
       setWallet(workspace.wallet);
+      setCatalogue(workspace.catalogue);
+      setReinvestmentSubscriptions(
+        (workspace.subscriptions.history ?? []).filter(
+          (item) => item.sourceDepositId === null,
+        ),
+      );
 
       if (
         workspace.policy.enabledBuckets.length > 0 &&
@@ -195,7 +325,7 @@ export default function UserPayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not load payout workspace.",
+          : "Could not load withdrawal workspace.",
       );
     } finally {
       setLoading(false);
@@ -214,6 +344,12 @@ export default function UserPayoutsClient() {
         setPolicy(workspace.policy);
         setPayouts(workspace.payouts);
         setWallet(workspace.wallet);
+        setCatalogue(workspace.catalogue);
+        setReinvestmentSubscriptions(
+          (workspace.subscriptions.history ?? []).filter(
+            (item) => item.sourceDepositId === null,
+          ),
+        );
 
         if (workspace.policy.enabledBuckets.length > 0) {
           setSourceBucket(workspace.policy.enabledBuckets[0]);
@@ -230,7 +366,7 @@ export default function UserPayoutsClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Could not load payout workspace.",
+            : "Could not load withdrawal workspace.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -252,10 +388,10 @@ export default function UserPayoutsClient() {
 
     try {
       if (!requestsEnabled || !activePolicy) {
-        throw new Error("Payout requests are currently disabled.");
+        throw new Error("Withdrawal requests are currently disabled.");
       }
       if (!sourceBucketEnabled) {
-        throw new Error("Selected wallet bucket is not enabled for payouts.");
+        throw new Error("Total Wallet is not enabled for withdrawals.");
       }
       if (!amount.trim() || !destinationAddress.trim()) {
         throw new Error("Amount and destination address are required.");
@@ -274,14 +410,14 @@ export default function UserPayoutsClient() {
 
       const payload = await checkedJson<
         ApiMessagePayload & { created: boolean; payout: PayoutRequest }
-      >(response, "Payout request could not be created.");
+      >(response, "Withdrawal request could not be created.");
 
       setAmount("");
       setDestinationAddress("");
       setSuccess(
         payload.created
-          ? `Payout ${payload.payout.id} created and funds reserved.`
-          : `Payout ${payload.payout.id} was already created.`,
+          ? `Withdrawal ${payload.payout.id} created and Total Wallet funds reserved.`
+          : `Withdrawal ${payload.payout.id} was already created.`,
       );
 
       await reload();
@@ -295,12 +431,93 @@ export default function UserPayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Payout request could not be created.",
+          : "Withdrawal request could not be created.",
       );
     } finally {
       setBusy(false);
     }
   }
+
+  async function submitReinvestment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      if (!amount.trim()) {
+        throw new Error("Reinvestment amount is required.");
+      }
+      if (!catalogue?.catalogueAvailable || !catalogue.activationAvailable) {
+        throw new Error("Package reinvestment is currently unavailable.");
+      }
+      if (!selectedPackage) {
+        throw new Error("Choose a package that matches the reinvestment amount.");
+      }
+      if (!canAffordReinvestment) {
+        throw new Error("Total Wallet balance is insufficient for this reinvestment.");
+      }
+
+      const response = await fetch("/api/user/payouts/reinvest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestKey: crypto.randomUUID(),
+          packagePlanItemId: selectedPackage.id,
+          amount: amount.trim(),
+        }),
+      });
+
+      const payload = await checkedJson<
+        ApiMessagePayload & {
+          created: boolean;
+          subscriptionId: string;
+          amount: string;
+          currency: string;
+        }
+      >(response, "Reinvestment could not be completed.");
+
+      setAmount("");
+      setSelectedPackagePlanItemId("");
+      setSuccess(
+        payload.created
+          ? `${selectedPackage.displayName} activated from ${compactDecimal(payload.amount)} ${payload.currency} Total Wallet reinvestment.`
+          : `Reinvestment already exists as subscription ${payload.subscriptionId}.`,
+      );
+
+      await reload();
+    } catch (caught) {
+      const redirectTo = redirectFor(caught);
+      if (redirectTo) {
+        router.replace(redirectTo);
+        return;
+      }
+
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Reinvestment could not be completed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submitWalletAction(event: FormEvent<HTMLFormElement>) {
+    if (walletAction === "REINVESTMENT") {
+      void submitReinvestment(event);
+      return;
+    }
+    void submitPayout(event);
+  }
+
+  const payoutSubmitDisabled =
+    busy ||
+    !requestsEnabled ||
+    !sourceBucketEnabled ||
+    enabledBuckets.length === 0;
+  const reinvestmentSubmitDisabled =
+    busy || !selectedPackage || !canAffordReinvestment;
 
   return (
     <UserShell session={session}>
@@ -322,30 +539,30 @@ export default function UserPayoutsClient() {
         ) : null}
 
         <section className={styles.hero}>
-          <p className={styles.eyebrow}>PAYOUT-01 / WITHDRAWAL & PAYOUTS</p>
-          <h1>Payouts</h1>
+          <p className={styles.eyebrow}>PAYOUT-01 / TOTAL WALLET ACTIONS</p>
+          <h1>Withdrawal</h1>
           <p>
-            Request a payout from an enabled accounting bucket to the published
-            network. Creating a request atomically reserves the requested wallet
-            amount until an administrator rejects it or completes settlement.
+            Choose whether to withdraw from Total Wallet or reinvest the entered
+            amount into an eligible published package. The existing Packages →
+            Deposit / TXID flow remains unchanged.
           </p>
         </section>
 
         <section className={styles.warning}>
-          FixTradeZone never asks for a private key, seed phrase, or signing
-          secret. Only a public destination address is required. Network transfer
-          completion is controlled separately by the payout operations workflow.
+          External withdrawal requires only a public destination address.
+          Reinvestment never asks for a blockchain address and does not create a
+          withdrawal fee or external transfer.
         </section>
 
         {loading ? (
           <section className={styles.card}>
-            <div className={styles.empty}>Loading payout workspace…</div>
+            <div className={styles.empty}>Loading withdrawal workspace…</div>
           </section>
         ) : activePolicy ? (
           <section className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.eyebrow}>Effective Policy</p>
+                <p className={styles.eyebrow}>Effective Withdrawal Policy</p>
                 <h2>
                   {activePolicy.asset} / {activePolicy.networkCode}
                 </h2>
@@ -388,7 +605,8 @@ export default function UserPayoutsClient() {
         ) : (
           <section className={styles.card}>
             <div className={styles.empty}>
-              No published payout policy is effective. Payout requests are fail-closed.
+              No published withdrawal policy is effective. External withdrawal
+              requests are fail-closed.
             </div>
           </section>
         )}
@@ -435,7 +653,7 @@ export default function UserPayoutsClient() {
             </div>
           ) : (
             <div className={styles.empty}>
-              No wallet balance is available for the payout asset.
+              No wallet balance is available for the withdrawal asset.
             </div>
           )}
         </section>
@@ -443,41 +661,85 @@ export default function UserPayoutsClient() {
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
-              <p className={styles.eyebrow}>New Request</p>
-              <h2>Request payout</h2>
+              <p className={styles.eyebrow}>New Total Wallet Action</p>
+              <h2>
+                {walletAction === "PAYOUT"
+                  ? "Request withdrawal"
+                  : "Reinvest into package"}
+              </h2>
             </div>
           </div>
 
-          <form onSubmit={submitPayout} className={styles.formGrid}>
+          <form onSubmit={submitWalletAction} className={styles.formGrid}>
             <div className={styles.field}>
-              <label htmlFor="payout-source-bucket">Source wallet bucket</label>
+              <label htmlFor="wallet-action">Action</label>
               <select
-                id="payout-source-bucket"
+                id="wallet-action"
                 className={styles.select}
-                value={sourceBucket}
+                value={walletAction}
                 onChange={(event) =>
-                  setSourceBucket(event.target.value as PayoutBucket)
+                  setWalletAction(event.target.value as WalletAction)
                 }
-                disabled={busy || !requestsEnabled}
+                disabled={busy}
               >
-                {enabledBuckets.length === 0 ? (
-                  <option value="MAIN">No bucket enabled</option>
-                ) : (
-                  enabledBuckets.map((bucket) => (
-                    <option value={bucket} key={bucket}>
-                      {payoutBucketLabel(bucket)}
-                    </option>
-                  ))
-                )}
+                <option value="PAYOUT">Withdrawal</option>
+                <option value="REINVESTMENT">Reinvestment</option>
               </select>
               <span className={styles.help}>
-                Available in selected bucket: {compactDecimal(selectedBucketBalance)}{" "}
-                {activeWallet?.currency ?? activePolicy?.asset ?? "USDT"}
+                Withdrawal sends funds externally. Reinvestment activates an
+                eligible package from Total Wallet.
               </span>
             </div>
 
+            {walletAction === "PAYOUT" ? (
+              <div className={styles.field}>
+                <label htmlFor="payout-source-bucket">Withdrawal source</label>
+                <select
+                  id="payout-source-bucket"
+                  className={styles.select}
+                  value={sourceBucket}
+                  onChange={(event) =>
+                    setSourceBucket(event.target.value as PayoutBucket)
+                  }
+                  disabled={busy || !requestsEnabled}
+                >
+                  {enabledBuckets.length === 0 ? (
+                    <option value="TOTAL_WALLET">Total Wallet not enabled</option>
+                  ) : (
+                    enabledBuckets.map((bucket) => (
+                      <option value={bucket} key={bucket}>
+                        {payoutBucketLabel(bucket)}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <span className={styles.help}>
+                  Available for withdrawal: {compactDecimal(selectedBucketBalance)}{" "}
+                  {walletCurrency}
+                </span>
+              </div>
+            ) : (
+              <div className={styles.field}>
+                <label>Reinvestment source</label>
+                <input
+                  className={styles.input}
+                  value="Total Wallet"
+                  readOnly
+                  disabled
+                />
+                <span className={styles.help}>
+                  Available for reinvestment:{" "}
+                  {compactDecimal(activeWallet?.totalWallet ?? "0")} {walletCurrency}
+                </span>
+              </div>
+            )}
+
             <div className={styles.field}>
-              <label htmlFor="payout-amount">Gross amount</label>
+              <label htmlFor="payout-amount">
+                {walletAction === "PAYOUT"
+                  ? "Gross amount"
+                  : "Reinvestment amount"}
+              </label>
               <input
                 id="payout-amount"
                 className={styles.input}
@@ -485,42 +747,97 @@ export default function UserPayoutsClient() {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="100"
-                disabled={busy || !requestsEnabled}
+                disabled={
+                  busy || (walletAction === "PAYOUT" && !requestsEnabled)
+                }
               />
+              {walletAction === "REINVESTMENT" ? (
+                <span className={styles.help}>
+                  Package choices below are filtered automatically by this exact
+                  amount.
+                </span>
+              ) : null}
             </div>
 
-            <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
-              <label htmlFor="payout-address">Public destination address</label>
-              <input
-                id="payout-address"
-                className={`${styles.input} ${styles.mono}`}
-                value={destinationAddress}
-                onChange={(event) => setDestinationAddress(event.target.value)}
-                placeholder={
-                  activePolicy?.validationProfile === "TRON"
-                    ? "TRON / TRC20 public address"
-                    : "Public network address"
-                }
-                disabled={busy || !requestsEnabled}
-                autoComplete="off"
-              />
-              <span className={styles.help}>
-                Address validation follows the published network profile.
-              </span>
-            </div>
+            {walletAction === "REINVESTMENT" ? (
+              <div className={styles.field}>
+                <label htmlFor="reinvestment-package">Eligible package</label>
+                <select
+                  id="reinvestment-package"
+                  className={styles.select}
+                  value={selectedPackage?.id ?? ""}
+                  onChange={(event) =>
+                    setSelectedPackagePlanItemId(event.target.value)
+                  }
+                  disabled={busy || eligiblePackages.length === 0}
+                >
+                  {eligiblePackages.length === 0 ? (
+                    <option value="">
+                      {amount.trim()
+                        ? "No package matches this amount"
+                        : "Enter an amount first"}
+                    </option>
+                  ) : (
+                    eligiblePackages.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.displayName} · {investmentRangeLabel(item)}{" "}
+                        {item.currency} · {item.durationDays} days
+                      </option>
+                    ))
+                  )}
+                </select>
+                <span className={styles.help}>
+                  Only AVAILABLE packages whose published investment range
+                  contains the entered amount are shown.
+                </span>
+              </div>
+            ) : null}
+
+            {walletAction === "PAYOUT" ? (
+              <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                <label htmlFor="payout-address">Public destination address</label>
+                <input
+                  id="payout-address"
+                  className={`${styles.input} ${styles.mono}`}
+                  value={destinationAddress}
+                  onChange={(event) => setDestinationAddress(event.target.value)}
+                  placeholder={
+                    activePolicy?.validationProfile === "TRON"
+                      ? "TRON / TRC20 public address"
+                      : "Public network address"
+                  }
+                  disabled={busy || !requestsEnabled}
+                  autoComplete="off"
+                />
+                <span className={styles.help}>
+                  Address validation follows the published network profile.
+                </span>
+              </div>
+            ) : (
+              <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
+                <span className={styles.help}>
+                  Reinvestment uses the full entered amount as package principal.
+                  No withdrawal fee, public address, or blockchain transfer is
+                  created.
+                </span>
+              </div>
+            )}
 
             <div className={styles.actions} style={{ gridColumn: "1 / -1" }}>
               <button
                 type="submit"
                 className={styles.button}
                 disabled={
-                  busy ||
-                  !requestsEnabled ||
-                  !sourceBucketEnabled ||
-                  enabledBuckets.length === 0
+                  walletAction === "PAYOUT"
+                    ? payoutSubmitDisabled
+                    : reinvestmentSubmitDisabled
                 }
               >
-                {busy ? "Submitting…" : "Reserve funds & request payout"}
+                {busy
+                  ? "Submitting…"
+                  : walletAction === "PAYOUT"
+                    ? "Reserve funds & request withdrawal"
+                    : "Reinvest & activate package"}
               </button>
             </div>
           </form>
@@ -530,7 +847,7 @@ export default function UserPayoutsClient() {
           <div className={styles.cardHeader}>
             <div>
               <p className={styles.eyebrow}>Immutable Workflow</p>
-              <h2>My payout history</h2>
+              <h2>My withdrawal history</h2>
             </div>
             <button
               type="button"
@@ -542,8 +859,10 @@ export default function UserPayoutsClient() {
             </button>
           </div>
 
-          {payoutRows.length === 0 ? (
-            <div className={styles.empty}>No payout requests yet.</div>
+          {payoutRows.length === 0 && reinvestmentSubscriptions.length === 0 ? (
+            <div className={styles.empty}>
+              No withdrawal or reinvestment activity yet.
+            </div>
           ) : (
             <div className={styles.list}>
               {payoutRows.map((payout) => {
@@ -556,7 +875,8 @@ export default function UserPayoutsClient() {
                           {compactPayoutDecimal(payout.grossAmount)} {payout.asset}
                         </strong>
                         <span className={styles.meta}>
-                          {payoutBucketLabel(payout.sourceBucket)} · {payout.networkCode} · {formatPayoutDate(payout.createdAt)}
+                          {payoutBucketLabel(payout.sourceBucket)} ·{" "}
+                          {payout.networkCode} · {formatPayoutDate(payout.createdAt)}
                         </span>
                       </div>
                       <span
@@ -575,7 +895,7 @@ export default function UserPayoutsClient() {
                         </strong>
                       </div>
                       <div className={styles.metric}>
-                        <small>Net payout</small>
+                        <small>Net withdrawal</small>
                         <strong>
                           {compactPayoutDecimal(payout.netAmount)} {payout.asset}
                         </strong>
@@ -591,17 +911,69 @@ export default function UserPayoutsClient() {
                     </div>
 
                     <p>
-                      Destination: <span className={styles.mono}>{payout.destinationAddress}</span>
+                      Destination:{" "}
+                      <span className={styles.mono}>
+                        {payout.destinationAddress}
+                      </span>
                     </p>
                     {payout.externalTxid ? (
                       <p>
-                        External TXID: <span className={styles.mono}>{payout.externalTxid}</span>
+                        External TXID:{" "}
+                        <span className={styles.mono}>{payout.externalTxid}</span>
                       </p>
                     ) : null}
-                    {payout.reviewNote ? <p>Review note: {payout.reviewNote}</p> : null}
+                    {payout.reviewNote ? (
+                      <p>Review note: {payout.reviewNote}</p>
+                    ) : null}
                   </article>
                 );
               })}
+
+              {reinvestmentSubscriptions.map((item) => (
+                <article className={styles.row} key={`reinvestment-${item.id}`}>
+                  <div className={styles.rowTop}>
+                    <div>
+                      <strong>
+                        {compactDecimal(item.price)} {item.currency} · {item.packageDisplayName}
+                      </strong>
+                      <span className={styles.meta}>
+                        Total Wallet · {formatPayoutDate(item.activatedAt)}
+                      </span>
+                    </div>
+                    <span className={styles.badge} data-tone="success">
+                      REINVESTMENT
+                    </span>
+                  </div>
+
+                  <div className={styles.metrics}>
+                    <div className={styles.metric}>
+                      <small>Package</small>
+                      <strong>{item.packageCode}</strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Principal</small>
+                      <strong>
+                        {compactDecimal(item.price)} {item.currency}
+                      </strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Status</small>
+                      <strong>{item.status}</strong>
+                    </div>
+                    <div className={styles.metric}>
+                      <small>Scheduled end</small>
+                      <strong>{formatPayoutDate(item.scheduledEndAt)}</strong>
+                    </div>
+                  </div>
+
+                  <p>
+                    Source reinvestment:{" "}
+                    <span className={styles.mono}>
+                      {item.fundingLedgerTransactionId}
+                    </span>
+                  </p>
+                </article>
+              ))}
             </div>
           )}
         </section>

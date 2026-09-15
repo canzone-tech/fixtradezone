@@ -23,6 +23,9 @@ export const PERMISSIONS = {
   COMMISSIONS_RECONCILE: 'commissions.reconcile',
   REWARDS_READ: 'rewards.read',
   REWARDS_RECONCILE: 'rewards.reconcile',
+  AWARD_REWARDS_READ: 'award_rewards.read',
+  AWARD_REWARDS_MANAGE: 'award_rewards.manage',
+  AWARD_REWARDS_RECONCILE: 'award_rewards.reconcile',
   SIMULATED_ACTIVITY_READ: 'simulated_activity.read',
   SIMULATED_ACTIVITY_RECONCILE: 'simulated_activity.reconcile',
   INTERNAL_TRADING_READ: 'internal_trading.read',
@@ -32,6 +35,12 @@ export const PERMISSIONS = {
   PAYOUTS_POLICY_MANAGE: 'payouts.policy.manage',
   NOTIFICATIONS_READ: 'notifications.read',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
+  SUPPORT_TICKETS_READ: 'support.tickets.read',
+  SUPPORT_TICKETS_REPLY: 'support.tickets.reply',
+  SUPPORT_TICKETS_ASSIGN: 'support.tickets.assign',
+  SUPPORT_TICKETS_STATUS_MANAGE: 'support.tickets.status.manage',
+  SUPPORT_TICKETS_NOTES_MANAGE: 'support.tickets.notes.manage',
+  SUPPORT_CATEGORIES_MANAGE: 'support.categories.manage',
   REPORTS_READ: 'reports.read',
   AUDIT_LOGS_READ: 'audit_logs.read',
   CONTENT_READ: 'content.read',
@@ -46,14 +55,8 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.DASHBOARD_READ,
     description: 'View administration dashboard and operational data',
   },
-  {
-    code: PERMISSIONS.USERS_READ,
-    description: 'View users and user details',
-  },
-  {
-    code: PERMISSIONS.USERS_CREATE,
-    description: 'Create platform users',
-  },
+  { code: PERMISSIONS.USERS_READ, description: 'View users and user details' },
+  { code: PERMISSIONS.USERS_CREATE, description: 'Create platform users' },
   {
     code: PERMISSIONS.USERS_STATUS_MANAGE,
     description: 'Activate, suspend, block, and unblock users',
@@ -145,6 +148,21 @@ export const SYSTEM_PERMISSIONS = [
       'Reconcile due package rewards through the authoritative reward engine',
   },
   {
+    code: PERMISSIONS.AWARD_REWARDS_READ,
+    description:
+      'View Award & Reward policies, team-business progress and award history',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_MANAGE,
+    description:
+      'Create, edit and publish versioned package-based Award & Reward policies',
+  },
+  {
+    code: PERMISSIONS.AWARD_REWARDS_RECONCILE,
+    description:
+      'Run idempotent sequential Team Business Award & Reward reconciliation',
+  },
+  {
     code: PERMISSIONS.SIMULATED_ACTIVITY_READ,
     description:
       'View simulated trade activity policies, events and generator health',
@@ -184,6 +202,30 @@ export const SYSTEM_PERMISSIONS = [
     description: 'Create targeted or broadcast in-app user notifications',
   },
   {
+    code: PERMISSIONS.SUPPORT_TICKETS_READ,
+    description: 'View the support ticket queue and ticket details',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_REPLY,
+    description: 'Reply to support tickets as staff',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_ASSIGN,
+    description: 'Assign and unassign support tickets',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_STATUS_MANAGE,
+    description: 'Change support ticket lifecycle status',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_TICKETS_NOTES_MANAGE,
+    description: 'Create staff-only internal support ticket notes',
+  },
+  {
+    code: PERMISSIONS.SUPPORT_CATEGORIES_MANAGE,
+    description: 'Create and manage support ticket categories',
+  },
+  {
     code: PERMISSIONS.REPORTS_READ,
     description:
       'View read-only administration operational and financial reports',
@@ -204,10 +246,7 @@ export const SYSTEM_PERMISSIONS = [
     code: PERMISSIONS.CONTENT_PUBLISH,
     description: 'Publish approved landing and email-template revisions',
   },
-  {
-    code: PERMISSIONS.RBAC_READ,
-    description: 'View roles and permissions',
-  },
+  { code: PERMISSIONS.RBAC_READ, description: 'View roles and permissions' },
   {
     code: PERMISSIONS.RBAC_MANAGE,
     description: 'Manage roles and role permissions',

@@ -7,6 +7,10 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 }
 
+type InstallPromptWindow = Window & {
+  __ftzPwaInstallPrompt?: BeforeInstallPromptEvent | null;
+};
+
 function isStandaloneMode(): boolean {
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
@@ -52,11 +56,19 @@ async function registerFullAppServiceWorker(): Promise<void> {
 
 export default function AppPwa() {
   const [installPrompt, setInstallPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+    useState<BeforeInstallPromptEvent | null>(() => {
+      if (typeof window === "undefined") {
+        return null;
+      }
+
+      return (window as InstallPromptWindow).__ftzPwaInstallPrompt ?? null;
+    });
   const [shouldRequireInstall, setShouldRequireInstall] = useState(false);
   const [ios, setIos] = useState(false);
 
   useEffect(() => {
+    const installWindow = window as InstallPromptWindow;
+
     if ("serviceWorker" in navigator) {
       void registerFullAppServiceWorker().catch((error: unknown) => {
         if (process.env.NODE_ENV !== "production") {
@@ -76,10 +88,13 @@ export default function AppPwa() {
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
-      setInstallPrompt(event as BeforeInstallPromptEvent);
+      const promptEvent = event as BeforeInstallPromptEvent;
+      installWindow.__ftzPwaInstallPrompt = promptEvent;
+      setInstallPrompt(promptEvent);
     };
 
     const handleInstalled = () => {
+      installWindow.__ftzPwaInstallPrompt = null;
       setInstallPrompt(null);
       setShouldRequireInstall(false);
     };
@@ -98,15 +113,21 @@ export default function AppPwa() {
   }, []);
 
   async function installApp() {
-    if (!installPrompt) {
+    const installWindow = window as InstallPromptWindow;
+    const promptEvent = installPrompt ?? installWindow.__ftzPwaInstallPrompt;
+
+    if (!promptEvent) {
       return;
     }
 
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+
+    installWindow.__ftzPwaInstallPrompt = null;
+    setInstallPrompt(null);
 
     if (choice.outcome === "accepted") {
-      setInstallPrompt(null);
+      setShouldRequireInstall(false);
     }
   }
 

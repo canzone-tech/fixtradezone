@@ -1,11 +1,28 @@
-export const PAYOUT_BUCKETS = [
+export const PAYOUT_WALLET_BUCKETS = [
   'MAIN',
   'PACKAGE_EARNINGS',
   'REFERRAL_COMMISSION',
   'REWARDS',
 ] as const;
 
+export type PayoutWalletBucket = (typeof PAYOUT_WALLET_BUCKETS)[number];
+
+export const PAYOUT_BUCKETS = [
+  ...PAYOUT_WALLET_BUCKETS,
+  'TOTAL_WALLET',
+] as const;
+
 export type PayoutBucket = (typeof PAYOUT_BUCKETS)[number];
+
+// Global payout invariant: every NEW USER payout consumes Total Wallet only.
+// Legacy component bucket values remain valid immutable payout snapshots.
+export const PAYOUT_SPENDABLE_BUCKETS = ['TOTAL_WALLET'] as const;
+
+export function isPayoutWalletBucket(
+  value: PayoutBucket,
+): value is PayoutWalletBucket {
+  return PAYOUT_WALLET_BUCKETS.includes(value as PayoutWalletBucket);
+}
 
 export const PAYOUT_STATUSES = [
   'PENDING_REVIEW',
@@ -30,7 +47,11 @@ export const PAYOUT_LEDGER_KINDS = {
   SETTLEMENT: 'PAYOUT_SETTLEMENT',
 } as const;
 
+// The existing internal bucket name is retained for migration compatibility.
+// It is now the shared balanced-ledger control for authoritative Total Wallet
+// spends (payouts and package purchases); it is never a USER component bucket.
 export const PAYOUT_SYSTEM_BUCKETS = {
+  TOTAL_WALLET_CONTROL: 'PAYOUT_TOTAL_WALLET_CONTROL',
   RESERVE: 'PAYOUT_RESERVE',
   SETTLEMENT: 'PAYOUT_SETTLEMENT',
   FEE_REVENUE: 'PAYOUT_FEE_REVENUE',
@@ -62,6 +83,17 @@ export function payoutSettlementSourceKey(payoutId: string): string {
   return `PAYOUT:${payoutId}:SETTLEMENT`;
 }
 
+export function payoutTotalWalletEventKey(
+  payoutId: string,
+  operation: 'RESERVE' | 'RELEASE',
+): string {
+  return `PAYOUT:${payoutId}:TOTAL_WALLET:${operation}`;
+}
+
+export function payoutTotalWalletControlAccountKey(currency: string): string {
+  return `SYSTEM:PAYOUT_TOTAL_WALLET_CONTROL:${currency}`;
+}
+
 export function payoutReserveAccountKey(currency: string): string {
   return `SYSTEM:PAYOUT_RESERVE:${currency}`;
 }
@@ -76,7 +108,7 @@ export function payoutFeeRevenueAccountKey(currency: string): string {
 
 export function payoutUserAccountKey(
   userId: string,
-  bucket: PayoutBucket,
+  bucket: PayoutWalletBucket,
   currency: string,
 ): string {
   return `USER:${userId}:${bucket}:${currency}`;

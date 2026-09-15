@@ -134,6 +134,12 @@
   letter-spacing: 0.3px;
 }
 
+.badges .levelBadge {
+  color: #8fc8ff;
+  background: rgba(72, 167, 255, 0.1);
+  border-color: rgba(72, 167, 255, 0.28);
+}
+
 .badges .activePackage {
   color: #8ef0d8;
   background: rgba(105, 223, 194, 0.1);
@@ -258,9 +264,80 @@
   .treeHeader {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+    padding: 16px;
   }
 
   .tree {
     padding: 12px;
+    overflow-x: hidden;
+  }
+
+  .branch {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .node {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    margin-left: 0 !important;
+    padding: 12px;
+    box-sizing: border-box;
+  }
+
+  .node::before {
+    display: none;
+  }
+
+  .badges {
+    gap: 6px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .actions small {
+    max-width: calc(100% - 110px);
+  }
+
+  .actions button,
+  .leaf {
+    margin-left: auto;
+  }
+
+  .children {
+    padding-left: 8px;
+  }
+
+  .children::before {
+    left: 0;
+  }
+
+  .loadMore {
+    margin: 0 0 12px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .treeHeader {
+    padding: 14px;
+  }
+
+  .tree {
+    padding: 10px;
+  }
+
+  .node {
+    padding: 11px;
+  }
+
+  .actions small {
+    flex: 1 1 120px;
+    max-width: none;
   }
 }

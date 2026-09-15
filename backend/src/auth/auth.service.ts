@@ -61,20 +61,12 @@ export class AuthService {
         ? 'EMAIL'
         : 'USERNAME';
 
-    if (multipleAccountsEnabled && identifierType !== 'USERNAME') {
-      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
-    }
-
     const methodEnabled =
       identifierType === 'USERNAME'
         ? (authConfig?.loginWithUsername ?? true)
         : identifierType === 'EMAIL'
           ? (authConfig?.loginWithEmail ?? true)
           : (authConfig?.loginWithMobile ?? true);
-
-    if (!methodEnabled) {
-      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
-    }
 
     const normalizedIdentifier =
       identifierType === 'EMAIL' || identifierType === 'USERNAME'
@@ -85,6 +77,7 @@ export class AuthService {
       ...AUTH_USER_SELECT,
       passwordHash: true,
       mustChangePassword: true,
+      emailVerifiedAt: true,
     } as const;
 
     const identifierMatches =
@@ -120,7 +113,25 @@ export class AuthService {
       dto.password,
     );
 
-    if (!user || !passwordMatches || user.status !== 'ACTIVE') {
+    if (!user || !passwordMatches) {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    if (
+      user.status === 'PENDING' &&
+      user.email !== null &&
+      user.emailVerifiedAt === null
+    ) {
+      throw new UnauthorizedException(
+        'Email verification pending. Please verify your email before signing in.',
+      );
+    }
+
+    if (multipleAccountsEnabled && identifierType !== 'USERNAME') {
+      throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
+    }
+
+    if (!methodEnabled || user.status !== 'ACTIVE') {
       throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
     }
 

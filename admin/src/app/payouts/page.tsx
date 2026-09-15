@@ -6,7 +6,7 @@ import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import PayoutsClient from "./payouts-client";
 
 export const metadata: Metadata = {
-  title: "Payouts | FixTradeZone",
+  title: "Withdrawal | FixTradeZone",
 };
 
 export default async function PayoutsPage() {

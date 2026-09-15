@@ -21,6 +21,26 @@ import {
   readJson,
 } from "@/lib/payouts";
 
+interface AdminReinvestmentSubscription {
+  id: string;
+  userId: string;
+  username?: string;
+  email?: string | null;
+  sourceDepositId: string | null;
+  fundingLedgerTransactionId: string;
+  packageCode: string;
+  packageDisplayName: string;
+  price: string;
+  currency: string;
+  status: string;
+  activatedAt: string;
+  scheduledEndAt: string;
+}
+
+interface AdminSubscriptionsResponse extends ApiMessagePayload {
+  subscriptions?: AdminReinvestmentSubscription[];
+}
+
 class AdminPayoutAccessError extends Error {
   constructor(message: string, readonly status: number) {
     super(message);
@@ -51,20 +71,27 @@ async function checkedAdminJson<T extends ApiMessagePayload>(
 async function fetchWorkspace(): Promise<{
   payouts: AdminPayoutsResponse;
   policies: PayoutPoliciesResponse;
+  subscriptions: AdminSubscriptionsResponse;
 }> {
-  const [payoutsResponse, policiesResponse] = await Promise.all([
-    fetch("/api/admin/payouts?limit=100", { cache: "no-store" }),
-    fetch("/api/admin/payout-policies?limit=50", { cache: "no-store" }),
-  ]);
+  const [payoutsResponse, policiesResponse, subscriptionsResponse] =
+    await Promise.all([
+      fetch("/api/admin/payouts?limit=100", { cache: "no-store" }),
+      fetch("/api/admin/payout-policies?limit=50", { cache: "no-store" }),
+      fetch("/api/admin/subscriptions?limit=100", { cache: "no-store" }),
+    ]);
 
   const payouts = await checkedAdminJson<
     AdminPayoutsResponse & ApiMessagePayload
-  >(payoutsResponse, "Could not load payout requests.");
+  >(payoutsResponse, "Could not load withdrawal requests.");
   const policies = await checkedAdminJson<
     PayoutPoliciesResponse & ApiMessagePayload
-  >(policiesResponse, "Could not load payout policies.");
+  >(policiesResponse, "Could not load withdrawal policies.");
+  const subscriptions = await checkedAdminJson<AdminSubscriptionsResponse>(
+    subscriptionsResponse,
+    "Could not load reinvestment history.",
+  );
 
-  return { payouts, policies };
+  return { payouts, policies, subscriptions };
 }
 
 function findDraft(policies: PayoutPoliciesResponse): PayoutPolicy | null {
@@ -75,6 +102,9 @@ export default function PayoutsClient() {
   const router = useRouter();
   const [payouts, setPayouts] = useState<AdminPayoutsResponse | null>(null);
   const [policies, setPolicies] = useState<PayoutPoliciesResponse | null>(null);
+  const [reinvestments, setReinvestments] = useState<
+    AdminReinvestmentSubscription[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +156,11 @@ export default function PayoutsClient() {
       const workspace = await fetchWorkspace();
       setPayouts(workspace.payouts);
       setPolicies(workspace.policies);
+      setReinvestments(
+        (workspace.subscriptions.subscriptions ?? []).filter(
+          (item) => item.sourceDepositId === null,
+        ),
+      );
       hydrateDraftForm(findDraft(workspace.policies));
     } catch (caught) {
       if (caught instanceof AdminPayoutAccessError && caught.status === 401) {
@@ -136,7 +171,7 @@ export default function PayoutsClient() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not load payout workspace.",
+          : "Could not load withdrawal workspace.",
       );
     } finally {
       setLoading(false);
@@ -155,6 +190,11 @@ export default function PayoutsClient() {
 
         setPayouts(workspace.payouts);
         setPolicies(workspace.policies);
+        setReinvestments(
+          (workspace.subscriptions.subscriptions ?? []).filter(
+            (item) => item.sourceDepositId === null,
+          ),
+        );
 
         if (initialDraft) {
           setRequestsEnabled(initialDraft.requestsEnabled);
@@ -178,7 +218,7 @@ export default function PayoutsClient() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Could not load payout workspace.",
+            : "Could not load withdrawal workspace.",
         );
       } finally {
         if (mounted) setLoading(false);
@@ -233,8 +273,8 @@ export default function PayoutsClient() {
     await runMutation(
       "/api/admin/payout-policies",
       { method: "POST" },
-      "Could not create payout policy draft.",
-      "Fail-closed payout policy draft created.",
+      "Could not create withdrawal policy draft.",
+      "Fail-closed withdrawal policy draft created.",
     );
   }
 
@@ -259,8 +299,8 @@ export default function PayoutsClient() {
           enabledBuckets,
         }),
       },
-      "Could not save payout policy draft.",
-      "Payout policy draft saved.",
+      "Could not save withdrawal policy draft.",
+      "Withdrawal policy draft saved.",
     );
   }
 
@@ -284,13 +324,16 @@ export default function PayoutsClient() {
           reason: reason.trim() || undefined,
         }),
       },
-      "Could not publish payout policy.",
-      "Payout policy published.",
+      "Could not publish withdrawal policy.",
+      "Withdrawal policy published.",
     );
   }
 
   async function approve(payout: AdminPayoutRequest) {
-    const note = window.prompt("Optional approval note:", "Approved for payout");
+    const note = window.prompt(
+      "Optional approval note:",
+      "Approved for withdrawal",
+    );
     if (note === null) return;
 
     await runMutation(
@@ -300,15 +343,15 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: note.trim() || undefined }),
       },
-      "Could not approve payout.",
-      `Payout ${payout.id} approved.`,
+      "Could not approve withdrawal.",
+      `Withdrawal ${payout.id} approved.`,
     );
   }
 
   async function rejectPayout(payout: AdminPayoutRequest) {
     const note = window.prompt(
       "Rejection note (reserved funds will be released):",
-      "Rejected by payout operations",
+      "Rejected by withdrawal operations",
     );
     if (note === null) return;
 
@@ -319,8 +362,8 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note: note.trim() || undefined }),
       },
-      "Could not reject payout.",
-      `Payout ${payout.id} rejected and reserve released.`,
+      "Could not reject withdrawal.",
+      `Withdrawal ${payout.id} rejected and reserve released.`,
     );
   }
 
@@ -337,22 +380,22 @@ export default function PayoutsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txid: txid.trim() }),
       },
-      "Could not record payout transaction ID.",
-      `External TXID recorded for payout ${payout.id}.`,
+      "Could not record withdrawal transaction ID.",
+      `External TXID recorded for withdrawal ${payout.id}.`,
     );
   }
 
   async function complete(payout: AdminPayoutRequest) {
     const confirmed = window.confirm(
-      `Mark payout ${payout.id} COMPLETED and settle its reserved accounting value?\n\nThis does not perform blockchain signing. Confirm only after payout operations has independently completed the external transfer.`,
+      `Mark withdrawal ${payout.id} COMPLETED and settle its reserved accounting value?\n\nThis does not perform blockchain signing. Confirm only after withdrawal operations has independently completed the external transfer.`,
     );
     if (!confirmed) return;
 
     await runMutation(
       `/api/admin/payouts/${encodeURIComponent(payout.id)}/complete`,
       { method: "POST" },
-      "Could not complete payout.",
-      `Payout ${payout.id} completed and reserve settled.`,
+      "Could not complete withdrawal.",
+      `Withdrawal ${payout.id} completed and reserve settled.`,
     );
   }
 
@@ -378,11 +421,11 @@ export default function PayoutsClient() {
 
       <section className={styles.hero}>
         <p className={styles.eyebrow}>PAYOUT-01 / OPERATIONS</p>
-        <h1>Withdrawal & Payouts</h1>
+        <h1>Withdrawal</h1>
         <p>
-          Configure versioned payout policy, review reserve-backed requests,
+          Configure versioned withdrawal policy, review reserve-backed requests,
           record the public external transaction reference, and settle accounting
-          only after manual payout operations confirms completion.
+          only after manual withdrawal operations confirms completion.
         </p>
       </section>
 
@@ -396,7 +439,7 @@ export default function PayoutsClient() {
         <div className={styles.cardHeader}>
           <div>
             <p className={styles.eyebrow}>Versioned Configuration</p>
-            <h2>Payout policy</h2>
+            <h2>Withdrawal policy</h2>
           </div>
           <div className={styles.actions}>
             {!draft ? (
@@ -484,7 +527,7 @@ export default function PayoutsClient() {
                     onChange={(event) => setRequestsEnabled(event.target.checked)}
                     disabled={busy}
                   />
-                  Enable USER payout requests
+                  Enable USER withdrawal requests
                 </label>
 
                 <div className={styles.field}>
@@ -578,7 +621,7 @@ export default function PayoutsClient() {
         ) : (
           <div className={styles.notice}>
             No editable draft exists. Published policies remain immutable; create
-            a new version to change payout terms.
+            a new version to change withdrawal terms.
           </div>
         )}
 
@@ -624,15 +667,15 @@ export default function PayoutsClient() {
         <div className={styles.cardHeader}>
           <div>
             <p className={styles.eyebrow}>Reserve-backed Queue</p>
-            <h2>Payout requests</h2>
+            <h2>Withdrawal requests</h2>
           </div>
           <span className={styles.badge}>{payouts?.total ?? 0} total</span>
         </div>
 
         {loading ? (
-          <div className={styles.empty}>Loading payout requests…</div>
+          <div className={styles.empty}>Loading withdrawal requests…</div>
         ) : payoutRows.length === 0 ? (
-          <div className={styles.empty}>No payout requests found.</div>
+          <div className={styles.empty}>No withdrawal requests found.</div>
         ) : (
           <div className={styles.list}>
             {payoutRows.map((payout) => {
@@ -742,6 +785,68 @@ export default function PayoutsClient() {
                 </article>
               );
             })}
+          </div>
+        )}
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.cardHeader}>
+          <div>
+            <p className={styles.eyebrow}>Total Wallet Activity</p>
+            <h2>Reinvestment history</h2>
+          </div>
+          <span className={styles.badge}>{reinvestments.length} total</span>
+        </div>
+
+        {loading ? (
+          <div className={styles.empty}>Loading reinvestment history…</div>
+        ) : reinvestments.length === 0 ? (
+          <div className={styles.empty}>No reinvestment activity found.</div>
+        ) : (
+          <div className={styles.list}>
+            {reinvestments.map((item) => (
+              <article className={styles.row} key={`reinvestment-${item.id}`}>
+                <div className={styles.rowTop}>
+                  <div>
+                    <strong>
+                      {compactPayoutDecimal(item.price)} {item.currency} · {item.username ?? item.userId}
+                    </strong>
+                    <span className={styles.meta}>
+                      {item.packageDisplayName} · Total Wallet · {formatPayoutDate(item.activatedAt)}
+                    </span>
+                  </div>
+                  <span className={styles.badge} data-tone="success">
+                    REINVESTMENT
+                  </span>
+                </div>
+
+                <div className={styles.metrics}>
+                  <div className={styles.metric}>
+                    <small>Package</small>
+                    <strong>{item.packageCode}</strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>Principal</small>
+                    <strong>
+                      {compactPayoutDecimal(item.price)} {item.currency}
+                    </strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>Status</small>
+                    <strong>{item.status}</strong>
+                  </div>
+                  <div className={styles.metric}>
+                    <small>User</small>
+                    <strong>{item.email || item.username || item.userId}</strong>
+                  </div>
+                </div>
+
+                <p>
+                  Source reinvestment: <span className={styles.mono}>{item.fundingLedgerTransactionId}</span>
+                </p>
+                <p>Scheduled end: {formatPayoutDate(item.scheduledEndAt)}</p>
+              </article>
+            ))}
           </div>
         )}
       </section>

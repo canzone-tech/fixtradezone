@@ -13,21 +13,39 @@ import type { Request } from 'express';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { DepositSubmissionOrchestratorService } from './deposit-submission-orchestrator.service';
 import {
-  CreateDepositDto,
   DepositPaymentRailQueryDto,
   SubmitDepositTxidDto,
+  SubmitPackageDepositDto,
 } from './dto/deposit.dto';
 import { DepositsService } from './deposits.service';
+import { PackageDepositFlowService } from './package-deposit-flow.service';
 
 @Controller('deposits')
 export class DepositsController {
-  constructor(private readonly depositsService: DepositsService) {}
+  constructor(
+    private readonly depositsService: DepositsService,
+    private readonly packageDepositFlowService: PackageDepositFlowService,
+    private readonly depositSubmissionOrchestrator: DepositSubmissionOrchestratorService,
+  ) {}
 
   @Get('payment-rails')
   @Header('Cache-Control', 'no-store')
   listAvailablePaymentRails(@Query() query: DepositPaymentRailQueryDto) {
     return this.depositsService.listAvailableDepositPaymentRails(query);
+  }
+
+  @Get('context/:packagePlanItemId')
+  @Header('Cache-Control', 'no-store')
+  getPackageDepositContext(
+    @Param('packagePlanItemId', new ParseUUIDPipe()) packagePlanItemId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.packageDepositFlowService.getPackageDepositContext(
+      packagePlanItemId,
+      actor,
+    );
   }
 
   @Get('me')
@@ -36,14 +54,14 @@ export class DepositsController {
     return this.depositsService.getMyDeposits(actor);
   }
 
-  @Post()
+  @Post('submit')
   @Header('Cache-Control', 'no-store')
-  createDeposit(
-    @Body() dto: CreateDepositDto,
+  submitPackageDeposit(
+    @Body() dto: SubmitPackageDepositDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
-    return this.depositsService.createDeposit(
+  ): Promise<unknown> {
+    return this.depositSubmissionOrchestrator.submitPackageDeposit(
       dto,
       actor,
       getRequestContext(request),

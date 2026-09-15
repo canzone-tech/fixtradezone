@@ -1,13 +1,15 @@
 import { formatPlatformDateTime } from "@/lib/platform-time";
 
-export const PAYOUT_BUCKETS = [
-  "MAIN",
-  "PACKAGE_EARNINGS",
-  "REFERRAL_COMMISSION",
-  "REWARDS",
-] as const;
+export type PayoutBucket =
+  | "MAIN"
+  | "PACKAGE_EARNINGS"
+  | "REFERRAL_COMMISSION"
+  | "REWARDS"
+  | "TOTAL_WALLET";
 
-export type PayoutBucket = (typeof PAYOUT_BUCKETS)[number];
+// New payout policies expose one authoritative spendable source. Legacy bucket
+// values remain in the union so immutable historical payout rows still render.
+export const PAYOUT_BUCKETS: readonly PayoutBucket[] = ["TOTAL_WALLET"];
 
 export type PayoutStatus =
   | "PENDING_REVIEW"
@@ -145,6 +147,7 @@ export function formatPayoutDate(value: string | null): string {
 }
 
 export function payoutBucketLabel(bucket: PayoutBucket): string {
+  if (bucket === "TOTAL_WALLET") return "Total Wallet";
   if (bucket === "MAIN") return "Main / Deposit";
   if (bucket === "PACKAGE_EARNINGS") return "Package Earnings";
   if (bucket === "REFERRAL_COMMISSION") return "Referral Commission";

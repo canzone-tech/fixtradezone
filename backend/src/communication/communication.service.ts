@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { EmailTemplateContent } from '../content/content.defaults';
 import { EmailTransportService } from './email-transport.service';
 import type { EmailDeliveryResult, EmailMessage } from './communication.types';
 import { ManagedEmailTemplateService } from './managed-email-template.service';
@@ -15,14 +16,25 @@ export class CommunicationService {
     return this.emailTransport.send(effectiveMessage);
   }
 
-  getEmailConfigurationStatus(): {
-    mode: 'CONSOLE' | 'HTTP' | 'SMTP';
-    configured: boolean;
-  } {
-    const status = this.emailTransport.getConfigurationStatus();
-    return {
-      mode: status.mode,
-      configured: status.configured,
-    };
+  async sendControlledTemplateTest(input: {
+    contentKey: string;
+    content: EmailTemplateContent;
+    to: string;
+    actorUsername: string;
+  }): Promise<EmailDeliveryResult> {
+    const message = this.managedTemplates.renderControlledTest(
+      input.contentKey,
+      input.content,
+      input.to,
+      input.actorUsername,
+    );
+    return this.emailTransport.send(message);
+  }
+
+  getEmailConfigurationStatus() {
+    // EmailTransportService intentionally returns only non-secret transport
+    // metadata. Credentials remain server-side while SUPER_ADMIN can verify
+    // sender, endpoint and TLS readiness from the Email Delivery screen.
+    return this.emailTransport.getConfigurationStatus();
   }
 }

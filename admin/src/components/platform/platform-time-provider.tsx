@@ -14,7 +14,6 @@ import {
   DEFAULT_PLATFORM_TIMEZONE,
   formatPlatformDate,
   formatPlatformDateTime,
-  isValidTimeZone,
   setRuntimePlatformTimezone,
 } from "@/lib/platform-time";
 
@@ -46,9 +45,8 @@ async function fetchPlatformTimezone(): Promise<string | null> {
       platformTimezone?: unknown;
     };
 
-    return typeof payload.platformTimezone === "string" &&
-      isValidTimeZone(payload.platformTimezone)
-      ? payload.platformTimezone
+    return payload.platformTimezone === DEFAULT_PLATFORM_TIMEZONE
+      ? DEFAULT_PLATFORM_TIMEZONE
       : null;
   } catch {
     return null;
@@ -68,28 +66,29 @@ export default function PlatformTimeProvider({
   const [timeZone, setTimeZone] = useState(DEFAULT_PLATFORM_TIMEZONE);
   const [loaded, setLoaded] = useState(false);
 
-  const refresh = useCallback(async () => {
-    const resolved = await fetchPlatformTimezone();
-    if (!resolved) return;
-    setRuntimePlatformTimezone(resolved);
-    setTimeZone(resolved);
+  const applyUtc = useCallback(() => {
+    setRuntimePlatformTimezone(DEFAULT_PLATFORM_TIMEZONE);
+    setTimeZone(DEFAULT_PLATFORM_TIMEZONE);
     setLoaded(true);
   }, []);
+
+  const refresh = useCallback(async () => {
+    await fetchPlatformTimezone();
+    applyUtc();
+  }, [applyUtc]);
 
   useEffect(() => {
     let active = true;
 
-    void fetchPlatformTimezone().then((resolved) => {
-      if (!active || !resolved) return;
-      setRuntimePlatformTimezone(resolved);
-      setTimeZone(resolved);
-      setLoaded(true);
+    void fetchPlatformTimezone().then(() => {
+      if (!active) return;
+      applyUtc();
     });
 
     return () => {
       active = false;
     };
-  }, [pathname]);
+  }, [pathname, applyUtc]);
 
   useEffect(() => {
     const listener = () => void refresh();

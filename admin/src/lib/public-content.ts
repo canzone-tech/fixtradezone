@@ -24,6 +24,26 @@ export interface LandingContent {
   seoDescription: string;
 }
 
+export interface PublicPackageSummary {
+  displayName: string;
+  slug: string;
+  sortOrder: number;
+  availability: string;
+  price: string;
+  minimumInvestment: string;
+  maximumInvestment: string | null;
+  rangeConfigured: boolean;
+  durationDays: number;
+  currency: string;
+  networkCode: string | null;
+  dailyRateLabel: string | null;
+}
+
+export interface PublicPackageCatalogue {
+  catalogueAvailable: boolean;
+  items: PublicPackageSummary[];
+}
+
 interface PublicLandingPayload {
   templateKey: string;
   content: LandingContent;
@@ -32,41 +52,46 @@ interface PublicLandingPayload {
 
 export const FALLBACK_LANDING_CONTENT: LandingContent = {
   brandName: "FixTradeZone",
-  badge: "SECURE DIGITAL ASSET PLATFORM",
-  heroTitle: "Operate your account with",
-  heroAccent: "clarity and control.",
+  badge: "DIGITAL ASSET PLATFORM",
+  heroTitle: "Build your journey with",
+  heroAccent: "FixTradeZone.",
   heroDescription:
-    "A secure workspace for packages, deposits, referral activity, rewards, payouts and clearly labelled simulated activity.",
-  primaryCtaLabel: "Sign in",
-  primaryCtaHref: "/login",
-  secondaryCtaLabel: "Create account",
-  secondaryCtaHref: "/register",
+    "Choose a package, manage your account, grow your network and track your progress from one simple workspace.",
+  primaryCtaLabel: "Get started",
+  primaryCtaHref: "/register",
+  secondaryCtaLabel: "Sign in",
+  secondaryCtaHref: "/login",
   features: [
     {
-      title: "Account operations",
+      title: "Choose a package",
       description:
-        "Manage package, deposit, wallet and payout workflows from one protected account.",
+        "Explore the available packages and select the option that fits your plan.",
     },
     {
-      title: "Referral visibility",
+      title: "Activate your account",
       description:
-        "Review direct referrals, genealogy and eligible package-based commission activity.",
+        "Complete the required account steps and follow your package status from your dashboard.",
     },
     {
-      title: "Transparent activity",
+      title: "Build your network",
       description:
-        "Simulated results are clearly disclosed and remain separate from real wallet and ledger accounting.",
+        "Invite your team, track referrals and follow eligible team business from one place.",
     },
   ],
-  trustTitle: "Security-first account boundary",
+  trustTitle: "Grow with clear team visibility",
   trustDescription:
-    "Protected authentication, role-based access controls, session security and immutable accounting records support platform operations.",
+    "Use your referral link, follow your direct network and genealogy, and track eligible package-based team activity from your account.",
   disclosure:
     "SIMULATED RESULTS ARE NOT REAL TRADING. Displayed simulated activity does not represent exchange execution or guaranteed, realized or withdrawable trading profit.",
-  footerText: "FixTradeZone — secure platform operations.",
-  seoTitle: "FixTradeZone | Secure Platform Operations",
+  footerText: "FixTradeZone — simple, secure account access.",
+  seoTitle: "FixTradeZone | Packages, Team Business & Account Access",
   seoDescription:
-    "Secure FixTradeZone access for packages, deposits, referrals, rewards, payouts and clearly disclosed simulated activity.",
+    "Explore FixTradeZone packages, manage your account, follow referrals and team activity, and access wallet and payout features from one protected workspace.",
+};
+
+const EMPTY_PACKAGE_CATALOGUE: PublicPackageCatalogue = {
+  catalogueAvailable: false,
+  items: [],
 };
 
 function isStringWithin(value: unknown, maxLength: number): value is string {
@@ -133,6 +158,33 @@ function isLandingContent(value: unknown): value is LandingContent {
   );
 }
 
+function isPublicPackageSummary(value: unknown): value is PublicPackageSummary {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const item = value as Partial<PublicPackageSummary>;
+
+  return (
+    isStringWithin(item.displayName, 120) &&
+    isStringWithin(item.slug, 160) &&
+    typeof item.sortOrder === "number" &&
+    Number.isFinite(item.sortOrder) &&
+    isStringWithin(item.availability, 40) &&
+    isStringWithin(item.price, 40) &&
+    isStringWithin(item.minimumInvestment, 40) &&
+    (item.maximumInvestment === null ||
+      isStringWithin(item.maximumInvestment, 40)) &&
+    typeof item.rangeConfigured === "boolean" &&
+    typeof item.durationDays === "number" &&
+    Number.isFinite(item.durationDays) &&
+    item.durationDays > 0 &&
+    isStringWithin(item.currency, 16) &&
+    (item.networkCode === null || isStringWithin(item.networkCode, 40)) &&
+    (item.dailyRateLabel === null || isStringWithin(item.dailyRateLabel, 40))
+  );
+}
+
 export async function getPublicLandingContent(): Promise<LandingContent> {
   try {
     const response = await backendFetch("/public/content/landing", {
@@ -150,4 +202,32 @@ export async function getPublicLandingContent(): Promise<LandingContent> {
   }
 
   return FALLBACK_LANDING_CONTENT;
+}
+
+export async function getPublicPackageCatalogue(): Promise<PublicPackageCatalogue> {
+  try {
+    const response = await backendFetch("/public/packages", {
+      method: "GET",
+    });
+    const payload = (await readJson(response)) as
+      | Partial<PublicPackageCatalogue>
+      | null;
+
+    if (
+      response.ok &&
+      payload &&
+      typeof payload.catalogueAvailable === "boolean" &&
+      Array.isArray(payload.items) &&
+      payload.items.every(isPublicPackageSummary)
+    ) {
+      return {
+        catalogueAvailable: payload.catalogueAvailable,
+        items: [...payload.items].sort((a, b) => a.sortOrder - b.sortOrder),
+      };
+    }
+  } catch {
+    // Public landing remains usable when catalogue data is temporarily unavailable.
+  }
+
+  return EMPTY_PACKAGE_CATALOGUE;
 }

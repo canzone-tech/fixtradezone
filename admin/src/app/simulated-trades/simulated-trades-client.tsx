@@ -575,7 +575,7 @@ export default function SimulatedTradesClient() {
             wallet or ledger mutation path.
           </p>
         </div>
-        <span className={styles.disclosurePill}>SYSTEM-GENERATED</span>
+        <span className={styles.disclosurePill}>SIMULATED</span>
       </section>
 
       {error ? (
@@ -1034,14 +1034,15 @@ export default function SimulatedTradesClient() {
       <section className={styles.disclosure}>
         <i className="iconoir-warning-triangle" />
         <div>
-          <strong>SYSTEM-GENERATED TRADE ACTIVITY</strong>
+          <strong>SIMULATED TRADE ACTIVITY</strong>
           <p>
             {presentedPolicy?.disclosure ??
-              "Trade activity does not represent external market execution."}
+              "Trade activity is simulated according to your active package rules and does not represent external market execution."}
           </p>
           <p>
-            This module has no direct wallet, ledger, reward, cap or commission
-            mutation path and does not expose arbitrary manual trade outcomes.
+            This workspace does not itself change Main Wallet, Package Earnings,
+            Referral Commission, Rewards, package caps or accounting ledger
+            balances, and it exposes no Buy, Sell or Close controls.
           </p>
         </div>
       </section>

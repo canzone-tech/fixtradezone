@@ -13,6 +13,7 @@ import {
   formatWalletDate,
   messageFrom,
   readJson,
+  walletActivityBucketLabel,
 } from "@/lib/wallet";
 
 interface UserApiMessagePayload extends ApiMessagePayload {
@@ -257,7 +258,7 @@ export default function UserWalletClient() {
                       <strong>{activity.description}</strong>
                       <span className={styles.meta}>
                         {formatWalletDate(activity.postedAt)} ·{" "}
-                        {activity.bucket}
+                        {walletActivityBucketLabel(activity.bucket)}
                       </span>
                     </div>
                     <span

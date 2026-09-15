@@ -9,12 +9,15 @@ import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import type { OperationsMode } from './update-operations-config.dto';
-import { UpdateOperationsConfigDto } from './update-operations-config.dto';
+import {
+  PLATFORM_TIMEZONE,
+  UpdateOperationsConfigDto,
+} from './update-operations-config.dto';
 
 const CONFIG_ID = 1;
 // These values are bootstrap/fail-safe fallbacks only. Migration 0015 seeds the
-// singleton row and normal runtime behavior reads the persisted configuration.
-export const DEFAULT_PLATFORM_TIMEZONE = 'Asia/Kolkata';
+// singleton row and migration 0038 locks its persisted timezone to UTC.
+export const DEFAULT_PLATFORM_TIMEZONE = PLATFORM_TIMEZONE;
 export const DEFAULT_OPERATIONS_MODE: OperationsMode = 'AUTOMATIC';
 
 interface OperationsConfigRow {
@@ -60,7 +63,7 @@ export class OperationsConfigService {
     context: RequestContext = {},
   ) {
     this.assertSuperAdmin(actor);
-    this.assertValidTimezone(settings.platformTimezone);
+    this.assertUtcTimezone(settings.platformTimezone);
 
     return this.prisma.$transaction(
       async (transaction) => {
@@ -80,7 +83,7 @@ export class OperationsConfigService {
             updatedAt
           ) VALUES (
             ${CONFIG_ID},
-            ${settings.platformTimezone},
+            ${PLATFORM_TIMEZONE},
             ${settings.operationsMode},
             ${actor.id},
             UTC_TIMESTAMP(3),
@@ -124,7 +127,7 @@ export class OperationsConfigService {
             entityType: 'SystemOperationsConfig',
             entityId: String(CONFIG_ID),
             description:
-              'SUPER_ADMIN updated platform timezone and operations automation mode.',
+              'SUPER_ADMIN updated operations automation mode under the UTC platform-time standard.',
             metadata: {
               source: 'ADMIN_OPERATIONS_CONFIG',
               previous: {
@@ -169,12 +172,10 @@ export class OperationsConfigService {
     };
   }
 
-  private assertValidTimezone(timezone: string): void {
-    try {
-      new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format();
-    } catch {
+  private assertUtcTimezone(timezone: string): void {
+    if (timezone !== PLATFORM_TIMEZONE) {
       throw new BadRequestException(
-        'platformTimezone must be a valid IANA timezone.',
+        'platformTimezone is locked to UTC for FixTradeZone.',
       );
     }
   }

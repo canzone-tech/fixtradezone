@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { formatPlatformDate } from "@/lib/platform-time";
 import type { UserPortalSession } from "@/lib/user-session";
 import styles from "../../internal-trading/internal-trading.module.css";
 
@@ -42,6 +43,7 @@ interface TradeEvent {
   localTradeDate: string;
   tradeDayNumber: number;
   slotNumber: number;
+  scheduledAt: string;
   assetSymbol: string;
   outcome: "WIN" | "LOSS";
   eventType: "NORMAL" | "TARGET_RECONCILIATION";
@@ -85,6 +87,14 @@ function money(value: string, currency: string) {
   return `${Number(value).toLocaleString(undefined, {
     maximumFractionDigits: 8,
   })} ${currency}`;
+}
+
+function utcTime(value: string) {
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) return "—";
+
+  return parsed.toISOString().slice(11, 19);
 }
 
 function percentage(progress: string, target: string) {
@@ -266,8 +276,8 @@ export default function UserTradingClient() {
             <p className={styles.eyebrow}>MY INTERNAL TRADING</p>
             <h2>Trading</h2>
             <p>
-              Track the independent trading progress, earnings and trade history
-              for every active package.
+              Track the independent trading progress, credited earnings and trade
+              history for every active package.
             </p>
           </div>
 
@@ -292,7 +302,7 @@ export default function UserTradingClient() {
           </div>
 
           <div className={styles.stat}>
-            <small>Total earned</small>
+            <small>Total credited earnings</small>
             <strong>
               {totalEarned.toLocaleString(undefined, {
                 maximumFractionDigits: 8,
@@ -366,7 +376,7 @@ export default function UserTradingClient() {
                   </div>
 
                   <div>
-                    <small>My earnings</small>
+                    <small>Credited earnings</small>
                     <strong className={styles.moneyPositive}>
                       {money(item.userCreditedAmount, item.currency)}
                     </strong>
@@ -461,11 +471,6 @@ export default function UserTradingClient() {
                   <dt>Total trades</dt>
                   <dd>{selected.settledTradeCount}</dd>
                 </div>
-
-                <div>
-                  <dt>Trading timezone</dt>
-                  <dd>{selected.timezoneSnapshot}</dd>
-                </div>
               </dl>
             </div>
           </section>
@@ -476,8 +481,10 @@ export default function UserTradingClient() {
             <div>
               <h3>Trade History</h3>
               <p className={styles.muted}>
-                Package-by-package trading results with WIN earnings credited to
-                your wallet.
+                Trade result shows package performance. Package Earnings credit
+                shows only the amount actually posted for that trade. A positive
+                result can have no additional credit once the applicable earning
+                target has already been satisfied.
               </p>
             </div>
 
@@ -490,48 +497,60 @@ export default function UserTradingClient() {
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>UTC Date</th>
+                  <th>Time (UTC)</th>
                   <th>Day / Slot</th>
                   <th>Asset</th>
                   <th>Result</th>
                   <th>%</th>
                   <th>Gross result</th>
                   <th>Progress</th>
-                  <th>My earning</th>
+                  <th>Package Earnings credit</th>
                 </tr>
               </thead>
 
               <tbody>
-                {events.map((event) => (
-                  <tr key={event.id}>
-                    <td>{event.localTradeDate}</td>
-                    <td>
-                      D{event.tradeDayNumber} / {event.slotNumber}
-                    </td>
-                    <td>{event.assetSymbol}</td>
-                    <td>
-                      <span
-                        className={
-                          event.outcome === "WIN" ? styles.win : styles.loss
-                        }
-                      >
-                        {event.eventType === "TARGET_RECONCILIATION"
-                          ? "TARGET CLOSE"
-                          : event.outcome}
-                      </span>
-                    </td>
-                    <td>{event.resultPercent}%</td>
-                    <td>{event.grossResultAmount}</td>
-                    <td>{event.grossProgressAfter}</td>
-                    <td className={styles.moneyPositive}>
-                      {event.userShareAmount}
-                    </td>
-                  </tr>
-                ))}
+                {events.map((event) => {
+                  const hasAdditionalCredit = Number(event.userShareAmount) > 0;
+
+                  return (
+                    <tr key={event.id}>
+                      <td>{formatPlatformDate(event.scheduledAt)}</td>
+                      <td>{utcTime(event.scheduledAt)}</td>
+                      <td>
+                        D{event.tradeDayNumber} / {event.slotNumber}
+                      </td>
+                      <td>{event.assetSymbol}</td>
+                      <td>
+                        <span
+                          className={
+                            event.outcome === "WIN" ? styles.win : styles.loss
+                          }
+                        >
+                          {event.eventType === "TARGET_RECONCILIATION"
+                            ? "TARGET CLOSE"
+                            : event.outcome}
+                        </span>
+                      </td>
+                      <td>{event.resultPercent}%</td>
+                      <td>{event.grossResultAmount}</td>
+                      <td>{event.grossProgressAfter}</td>
+                      <td className={styles.moneyPositive}>
+                        {event.userShareAmount}
+                        {!hasAdditionalCredit && Number(event.grossResultAmount) > 0 ? (
+                          <>
+                            <br />
+                            <span className={styles.muted}>No additional credit</span>
+                          </>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {!events.length ? (
                   <tr>
-                    <td colSpan={8} className={styles.empty}>
+                    <td colSpan={9} className={styles.empty}>
                       No trade history for this package yet.
                     </td>
                   </tr>

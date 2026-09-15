@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 import { AdminPayoutPoliciesController } from './admin-payout-policies.controller';
 import { AdminPayoutsController } from './admin-payouts.controller';
 import { PayoutAccountingService } from './payout-accounting.service';
@@ -7,6 +8,7 @@ import { PayoutsController } from './payouts.controller';
 import { PayoutsService } from './payouts.service';
 
 @Module({
+  imports: [SubscriptionsModule],
   controllers: [
     PayoutsController,
     AdminPayoutsController,

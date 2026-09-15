@@ -91,8 +91,15 @@ const sections: Array<{
         enabled: true,
       },
       {
+        href: "/award-rewards",
+        label: "Team Business Awards",
+        icon: "iconoir-trophy",
+        permission: "award_rewards.read",
+        enabled: true,
+      },
+      {
         href: "/payouts",
-        label: "Payouts",
+        label: "Withdrawal",
         icon: "iconoir-coins-swap",
         permission: "payouts.read",
         enabled: true,
@@ -130,6 +137,13 @@ const sections: Array<{
   {
     label: "PLATFORM",
     items: [
+      {
+        href: "/support",
+        label: "Support Queue",
+        icon: "iconoir-help-circle",
+        permission: "support.tickets.read",
+        enabled: true,
+      },
       {
         href: "/notifications",
         label: "Notifications",
