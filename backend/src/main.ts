@@ -10,6 +10,9 @@ import {
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
+import { ManualOperationGuard } from './platform-config/manual-operation.guard';
+import { SiteModeAccessGuard } from './platform-config/site-mode-access.guard';
+import { SiteModeService } from './platform-config/site-mode.service';
 import { SecurityConfigService } from './security-config/security-config.service';
 
 function applySecurityHeaders(
@@ -76,9 +79,12 @@ async function bootstrap() {
 
   const reflector = app.get(Reflector);
   const securityConfigService = app.get(SecurityConfigService);
+  const siteModeService = app.get(SiteModeService);
 
   app.useGlobalGuards(
     new JwtAuthGuard(reflector, securityConfigService),
+    new SiteModeAccessGuard(reflector, siteModeService),
+    new ManualOperationGuard(reflector, siteModeService),
     new PermissionsGuard(reflector),
   );
 

@@ -17,6 +17,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { ManualOperation } from '../platform-config/manual-operation.decorator';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import { AwardRewardsService } from './award-rewards.service';
@@ -127,6 +128,7 @@ export class AdminAwardRewardsController {
   }
 
   @Post('reconcile')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.AWARD_REWARDS_RECONCILE)

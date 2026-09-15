@@ -22,20 +22,8 @@ function actor(roles: string[]): AuthenticatedUser {
 }
 
 describe('OperationsConfigService', () => {
-  const transaction = {
-    $queryRaw: jest.fn(),
-    $executeRaw: jest.fn(),
-    auditLog: {
-      create: jest.fn(),
-    },
-  };
-
   const prisma = {
     $queryRaw: jest.fn(),
-    $transaction: jest.fn(
-      async (operation: (client: typeof transaction) => Promise<unknown>) =>
-        operation(transaction),
-    ),
   };
 
   let service: OperationsConfigService;
@@ -65,8 +53,6 @@ describe('OperationsConfigService', () => {
         actor(['SUPER_ADMIN']),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
-
-    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('rejects operations mutation outside SUPER_ADMIN', async () => {
@@ -79,31 +65,9 @@ describe('OperationsConfigService', () => {
         actor(['ADMIN']),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
-
-    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('atomically updates operations in UTC and synchronizes legacy accounting mode', async () => {
-    const previousUpdatedAt = new Date('2026-08-28T01:00:00.000Z');
-    const currentUpdatedAt = new Date('2026-08-28T01:05:00.000Z');
-
-    transaction.$queryRaw
-      .mockResolvedValueOnce([
-        {
-          platformTimezone: 'Asia/Kolkata',
-          operationsMode: 'AUTOMATIC',
-          updatedAt: previousUpdatedAt,
-        },
-      ])
-      .mockResolvedValueOnce([
-        {
-          platformTimezone: 'UTC',
-          operationsMode: 'CONTROLLED_MANUAL',
-          updatedAt: currentUpdatedAt,
-        },
-      ]);
-    transaction.$executeRaw.mockResolvedValue(1);
-
+  it('makes Platform Mode the only mutation path for automation state', async () => {
     await expect(
       service.updateOperations(
         {
@@ -111,38 +75,11 @@ describe('OperationsConfigService', () => {
           operationsMode: 'CONTROLLED_MANUAL',
         },
         actor(['SUPER_ADMIN']),
-        { ipAddress: '127.0.0.1', userAgent: 'jest' },
       ),
-    ).resolves.toEqual({
-      message: 'Operations configuration updated.',
-      platformTimezone: 'UTC',
-      operationsMode: 'CONTROLLED_MANUAL',
-      updatedAt: currentUpdatedAt,
-    });
-
-    expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
-    expect(transaction.auditLog.create).toHaveBeenCalledWith({
-      data: {
-        actorUserId: SUPER_ADMIN_ID,
-        action: 'UPDATE',
-        entityType: 'SystemOperationsConfig',
-        entityId: '1',
-        description:
-          'SUPER_ADMIN updated operations automation mode under the UTC platform-time standard.',
-        metadata: {
-          source: 'ADMIN_OPERATIONS_CONFIG',
-          previous: {
-            platformTimezone: 'Asia/Kolkata',
-            operationsMode: 'AUTOMATIC',
-          },
-          current: {
-            platformTimezone: 'UTC',
-            operationsMode: 'CONTROLLED_MANUAL',
-          },
-          synchronizedDepositPostingMode: 'MANUAL_RECONCILIATION',
-        },
-        ipAddress: '127.0.0.1',
-        userAgent: 'jest',
+    ).rejects.toMatchObject({
+      response: {
+        message:
+          'Operations mode is controlled by Platform Mode. Use /admin/settings/site-mode.',
       },
     });
   });

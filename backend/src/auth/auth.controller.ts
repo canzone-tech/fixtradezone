@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { CaptchaGuard } from '../captcha/captcha.guard';
 import { RequireCaptcha } from '../captcha/require-captcha.decorator';
 import { CaptchaPurpose } from '../captcha/captcha.types';
+import { SiteModeService } from '../platform-config/site-mode.service';
 import { AuthService } from './auth.service';
 import type { AuthenticatedUser } from './auth-user';
 import { ChangePasswordService } from './change-password.service';
@@ -51,6 +52,7 @@ export class AuthController {
     private readonly passwordResetService: PasswordResetService,
     private readonly changePasswordService: ChangePasswordService,
     private readonly ownProfileService: OwnProfileService,
+    private readonly siteModeService: SiteModeService,
   ) {}
 
   @Public()
@@ -72,7 +74,8 @@ export class AuthController {
   @RequireCaptcha(CaptchaPurpose.REGISTRATION)
   @Header('Cache-Control', 'no-store')
   @Post('register')
-  register(@Body() dto: RegisterDto, @Req() request: Request) {
+  async register(@Body() dto: RegisterDto, @Req() request: Request) {
+    await this.siteModeService.assertRegistrationAllowed();
     return this.authService.register(dto, getRequestContext(request));
   }
 
@@ -168,8 +171,27 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('login')
-  login(@Body() dto: LoginDto, @Req() request: Request) {
-    return this.authService.login(dto, getRequestContext(request));
+  async login(@Body() dto: LoginDto, @Req() request: Request) {
+    const context = getRequestContext(request);
+    const result = await this.authService.login(dto, context);
+
+    // A temporary-password challenge is not an authenticated application
+    // session. Access is checked on the next successful login after the
+    // password change. Normal session responses are gated immediately.
+    if ('roles' in result.user) {
+      try {
+        await this.siteModeService.assertAuthenticatedAccess(result.user);
+      } catch (error) {
+        if ('refreshToken' in result) {
+          await this.authService
+            .logout({ refreshToken: result.refreshToken }, context)
+            .catch(() => undefined);
+        }
+        throw error;
+      }
+    }
+
+    return result;
   }
 
   @Public()
@@ -196,8 +218,18 @@ export class AuthController {
   @Header('Cache-Control', 'no-store')
   @HttpCode(200)
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
-    return this.authService.refresh(dto, getRequestContext(request));
+  async refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
+    const context = getRequestContext(request);
+    const result = await this.authService.refresh(dto, context);
+    try {
+      await this.siteModeService.assertAuthenticatedAccess(result.user);
+    } catch (error) {
+      await this.authService
+        .logout({ refreshToken: result.refreshToken }, context)
+        .catch(() => undefined);
+      throw error;
+    }
+    return result;
   }
 
   @Public()

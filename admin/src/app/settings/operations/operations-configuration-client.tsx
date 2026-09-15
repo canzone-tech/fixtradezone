@@ -1,336 +1,697 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  notifyPlatformTimezoneChanged,
-  usePlatformTime,
-} from "@/components/platform/platform-time-provider";
-import FlashMessage from "@/components/ui/flash-message";
 import type { AdminUser } from "@/lib/auth";
 import {
-  DEFAULT_PLATFORM_TIMEZONE,
   formatPlatformDateTime,
+  platformIsoToLocalDateTimeInput,
+  platformLocalDateTimeToIso,
 } from "@/lib/platform-time";
+import {
+  notifySiteModeChanged,
+  type AdminSiteModeStatus,
+  type SiteMode,
+  type SiteModeTester,
+} from "@/lib/site-mode";
 import PlatformSettingsNav from "../platform-settings-nav";
-import styles from "../platform-configuration.module.css";
-
-type OperationsMode = "AUTOMATIC" | "CONTROLLED_MANUAL";
-
-interface OperationsConfiguration {
-  platformTimezone: string;
-  operationsMode: OperationsMode;
-  updatedAt: string | null;
-  message?: string;
-}
+import styles from "./site-mode-control.module.css";
 
 interface ApiError {
   message?: string | string[];
 }
 
-function apiErrorMessage(payload: ApiError, fallback: string): string {
-  if (typeof payload.message === "string") return payload.message;
-  if (Array.isArray(payload.message)) return payload.message[0] ?? fallback;
+const MODE_OPTIONS: Array<{
+  mode: SiteMode;
+  description: string;
+  consequence: string;
+  icon: string;
+}> = [
+  {
+    mode: "LIVE",
+    description: "Public application live with normal account access.",
+    consequence: "Operations AUTOMATIC · normal manual recovery locked.",
+    icon: "iconoir-flash",
+  },
+  {
+    mode: "TESTING",
+    description: "Pre-launch access for approved testers and SUPER_ADMIN.",
+    consequence: "Operations CONTROLLED_MANUAL · automatic processing paused.",
+    icon: "iconoir-flask",
+  },
+  {
+    mode: "MAINTENANCE",
+    description: "Public and normal user access paused for maintenance.",
+    consequence: "Operations CONTROLLED_MANUAL · automatic processing paused.",
+    icon: "iconoir-tools",
+  },
+];
+
+function apiErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== "object" || !("message" in payload)) {
+    return fallback;
+  }
+
+  const message = (payload as ApiError).message;
+  if (typeof message === "string") return message;
+  if (Array.isArray(message)) return message[0] ?? fallback;
   return fallback;
+}
+
+async function readPayload(response: Response): Promise<unknown> {
+  return response.json().catch(() => ({}));
 }
 
 export default function OperationsConfigurationClient() {
   const router = useRouter();
-  const { timeZone } = usePlatformTime();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<OperationsConfiguration | null>(null);
-  const [operationsMode, setOperationsMode] =
-    useState<OperationsMode>("AUTOMATIC");
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<AdminSiteModeStatus | null>(null);
+  const [testers, setTesters] = useState<SiteModeTester[]>([]);
+  const [reason, setReason] = useState(
+    "Platform mode change approved from SITE-MODE control.",
+  );
+  const [modeMessage, setModeMessage] = useState("");
+  const [launchAt, setLaunchAt] = useState("");
+  const [testerIdentifier, setTesterIdentifier] = useState("");
+  const [testerNote, setTesterNote] = useState("");
+  const [recoveryReason, setRecoveryReason] = useState(
+    "Temporary emergency recovery approved by SUPER_ADMIN.",
+  );
+  const [recoveryMinutes, setRecoveryMinutes] = useState("15");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      try {
-        const sessionResponse = await fetch("/api/auth/session", {
-          cache: "no-store",
-        });
-        const session = (await sessionResponse.json().catch(() => ({}))) as {
-          user?: AdminUser;
-        };
-
-        if (!sessionResponse.ok || !session.user) {
-          router.replace("/login");
-          return;
-        }
-        if (!session.user.roles.includes("SUPER_ADMIN")) {
-          router.replace("/dashboard");
-          return;
-        }
-
-        const response = await fetch("/api/admin/settings/operations", {
-          cache: "no-store",
-        });
-        const payload = (await response.json().catch(() => ({}))) as
-          OperationsConfiguration | ApiError;
-
-        if (response.status === 401) {
-          router.replace("/login");
-          return;
-        }
-        if (response.status === 403) {
-          router.replace("/dashboard");
-          return;
-        }
-        if (!response.ok) {
-          throw new Error(
-            apiErrorMessage(
-              payload as ApiError,
-              "Unable to load operations configuration.",
-            ),
-          );
-        }
-
-        if (!mounted) return;
-        const config = payload as OperationsConfiguration;
-        setSaved(config);
-        setOperationsMode(config.operationsMode);
-      } catch (caught) {
-        if (mounted) {
-          setError(
-            caught instanceof Error
-              ? caught.message
-              : "Unable to load operations configuration.",
-          );
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-
-  async function save() {
-    setError(null);
-    setSuccess(null);
-    setSaving(true);
-
+  const loadData = useCallback(async () => {
     try {
-      const response = await fetch("/api/admin/settings/operations", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          platformTimezone: DEFAULT_PLATFORM_TIMEZONE,
-          operationsMode,
-        }),
+      const sessionResponse = await fetch("/api/auth/session", {
+        cache: "no-store",
       });
-      const payload = (await response.json().catch(() => ({}))) as
-        OperationsConfiguration | ApiError;
+      const session = (await readPayload(sessionResponse)) as {
+        user?: AdminUser;
+      };
 
-      if (response.status === 401) {
+      if (!sessionResponse.ok || !session.user) {
         router.replace("/login");
         return;
       }
-      if (response.status === 403) {
+      if (!session.user.roles.includes("SUPER_ADMIN")) {
         router.replace("/dashboard");
         return;
       }
-      if (!response.ok) {
+
+      const [statusResponse, testersResponse] = await Promise.all([
+        fetch("/api/admin/settings/site-mode", { cache: "no-store" }),
+        fetch("/api/admin/settings/site-mode/testers", { cache: "no-store" }),
+      ]);
+
+      if (statusResponse.status === 401 || testersResponse.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (statusResponse.status === 403 || testersResponse.status === 403) {
+        router.replace("/dashboard");
+        return;
+      }
+
+      const statusPayload = await readPayload(statusResponse);
+      const testersPayload = await readPayload(testersResponse);
+
+      if (!statusResponse.ok) {
         throw new Error(
-          apiErrorMessage(
-            payload as ApiError,
-            "Unable to save operations configuration.",
-          ),
+          apiErrorMessage(statusPayload, "Unable to load Platform Mode."),
+        );
+      }
+      if (!testersResponse.ok) {
+        throw new Error(
+          apiErrorMessage(testersPayload, "Unable to load testing access."),
         );
       }
 
-      const config = payload as OperationsConfiguration;
-      setSaved(config);
-      setOperationsMode(config.operationsMode);
-      setSuccess(config.message ?? "Operations configuration updated.");
-      notifyPlatformTimezoneChanged();
+      const nextStatus = statusPayload as AdminSiteModeStatus;
+      setStatus(nextStatus);
+      setTesters(
+        Array.isArray(testersPayload)
+          ? (testersPayload as SiteModeTester[])
+          : [],
+      );
+      setModeMessage(nextStatus.modeMessage ?? "");
+      setLaunchAt(platformIsoToLocalDateTimeInput(nextStatus.launchAt));
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to save operations configuration.",
+          : "Unable to load Platform Mode.",
       );
     } finally {
-      setSaving(false);
+      setLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(initialLoad);
+  }, [loadData]);
+
+  const currentOption = useMemo(
+    () => MODE_OPTIONS.find((item) => item.mode === status?.siteMode),
+    [status?.siteMode],
+  );
+
+  async function refreshAfterMutation(message: string) {
+    notifySiteModeChanged();
+    setSuccess(message);
+    await loadData();
+  }
+
+  async function switchMode(nextMode: SiteMode) {
+    if (!status || nextMode === status.siteMode) return;
+
+    const auditReason = reason.trim();
+    if (auditReason.length < 3) {
+      setError("Enter an audit reason of at least 3 characters.");
+      return;
+    }
+
+    const publicMessage = modeMessage.trim();
+    if (publicMessage && publicMessage.length < 3) {
+      setError("Public mode message must be at least 3 characters or blank.");
+      return;
+    }
+
+    let launchAtIso: string | null = null;
+    if (nextMode !== "LIVE" && launchAt.trim()) {
+      launchAtIso = platformLocalDateTimeToIso(launchAt);
+      if (!launchAtIso) {
+        setError("Enter a valid future launch time in platform UTC.");
+        return;
+      }
+    }
+
+    const option = MODE_OPTIONS.find((item) => item.mode === nextMode);
+    if (
+      !window.confirm(
+        `Switch Platform Mode from ${status.siteMode} to ${nextMode}?\n\n${
+          option?.consequence ?? ""
+        }`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/admin/settings/site-mode", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          siteMode: nextMode,
+          reason: auditReason,
+          message: publicMessage || null,
+          launchAt: nextMode === "LIVE" ? null : launchAtIso,
+        }),
+      });
+      const payload = await readPayload(response);
+
+      if (!response.ok) {
+        throw new Error(
+          apiErrorMessage(payload, "Unable to change Platform Mode."),
+        );
+      }
+
+      await refreshAfterMutation(
+        apiErrorMessage(payload, `Platform Mode changed to ${nextMode}.`),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to change Platform Mode.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addTester() {
+    const identifier = testerIdentifier.trim();
+    const note = testerNote.trim();
+
+    if (identifier.length < 2) {
+      setError("Enter a tester username or email.");
+      return;
+    }
+    if (note && note.length < 3) {
+      setError("Tester note must be at least 3 characters or blank.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/admin/settings/site-mode/testers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, note: note || null }),
+      });
+      const payload = await readPayload(response);
+
+      if (!response.ok) {
+        throw new Error(
+          apiErrorMessage(payload, "Unable to save testing access."),
+        );
+      }
+
+      setTesterIdentifier("");
+      setTesterNote("");
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Testing access saved."),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to save testing access.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeTester(tester: SiteModeTester) {
+    if (!window.confirm(`Remove testing access for ${tester.username}?`)) return;
+
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/settings/site-mode/testers/${encodeURIComponent(
+          tester.userId,
+        )}`,
+        { method: "DELETE" },
+      );
+      const payload = await readPayload(response);
+
+      if (!response.ok) {
+        throw new Error(
+          apiErrorMessage(payload, "Unable to remove testing access."),
+        );
+      }
+
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Testing access removed."),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to remove testing access.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlockRecovery() {
+    const recoveryAuditReason = recoveryReason.trim();
+    const durationMinutes = Number(recoveryMinutes);
+
+    if (recoveryAuditReason.length < 3) {
+      setError("Enter an emergency recovery reason.");
+      return;
+    }
+    if (
+      !Number.isInteger(durationMinutes) ||
+      durationMinutes < 5 ||
+      durationMinutes > 60
+    ) {
+      setError("Emergency recovery duration must be between 5 and 60 minutes.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Unlock emergency recovery for ${durationMinutes} minutes?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        "/api/admin/settings/site-mode/emergency-recovery/unlock",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reason: recoveryAuditReason,
+            durationMinutes,
+          }),
+        },
+      );
+      const payload = await readPayload(response);
+
+      if (!response.ok) {
+        throw new Error(
+          apiErrorMessage(payload, "Unable to unlock emergency recovery."),
+        );
+      }
+
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Emergency recovery temporarily unlocked."),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to unlock emergency recovery.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function lockRecovery() {
+    const recoveryAuditReason = recoveryReason.trim();
+    if (recoveryAuditReason.length < 3) {
+      setError("Enter an emergency recovery reason.");
+      return;
+    }
+    if (!window.confirm("Lock emergency recovery now?")) return;
+
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch(
+        "/api/admin/settings/site-mode/emergency-recovery/lock",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: recoveryAuditReason }),
+        },
+      );
+      const payload = await readPayload(response);
+
+      if (!response.ok) {
+        throw new Error(
+          apiErrorMessage(payload, "Unable to lock emergency recovery."),
+        );
+      }
+
+      await refreshAfterMutation(
+        apiErrorMessage(payload, "Emergency recovery locked."),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to lock emergency recovery.",
+      );
+    } finally {
+      setBusy(false);
     }
   }
 
   if (loading) {
-    return (
-      <section className={styles.page}>
-        <div className={styles.loading}>
-          <span className={styles.iconBox}>
-            <i className="iconoir-settings" />
-          </span>
-          <div>
-            <strong>Loading operations configuration</strong>
-            <p>Reading the automation mode and UTC platform-time standard.</p>
-          </div>
-        </div>
-      </section>
-    );
+    return <section className={styles.loading}>Loading Platform Mode…</section>;
   }
-
-  const isAutomatic = operationsMode === "AUTOMATIC";
 
   return (
     <section className={styles.page}>
-      {error ? (
-        <FlashMessage
-          message={error}
-          type="error"
-          onClose={() => setError(null)}
-        />
-      ) : null}
-      {success ? (
-        <FlashMessage
-          message={success}
-          type="success"
-          onClose={() => setSuccess(null)}
-          autoDismissMs={5000}
-        />
-      ) : null}
+      {error ? <div className={styles.flashError}>{error}</div> : null}
+      {success ? <div className={styles.flashSuccess}>{success}</div> : null}
 
       <header className={styles.hero}>
         <div>
           <div className={styles.eyebrow}>
             <i className="iconoir-settings" />
-            SUPER ADMIN OPERATIONS
+            SUPER ADMIN · SITE-MODE-01
           </div>
-          <h2>Platform Operations</h2>
+          <h2>Platform Mode Control</h2>
           <p>
-            Keep normal operation simple: one approval can post accounting,
-            activate an eligible package, process referral commission, and
-            initialize its reward lifecycle. Manual actions remain recovery
-            tools, not the everyday workflow.
+            One authoritative switch controls public availability and the master
+            operations profile. LIVE is automatic; TESTING and MAINTENANCE are
+            controlled manual.
           </p>
         </div>
-
-        <div className={isAutomatic ? styles.fullBadge : styles.limitedBadge}>
-          <i className={isAutomatic ? "iconoir-flash" : "iconoir-tools"} />
-          {isAutomatic ? "AUTOMATIC" : "CONTROLLED MANUAL"}
+        <div className={styles.statusBadge}>
+          <i className={currentOption?.icon ?? "iconoir-settings"} />
+          {status?.siteMode ?? "UNKNOWN"} · {status?.operationsMode ?? "—"}
         </div>
       </header>
 
       <PlatformSettingsNav active="operations" />
 
-      <div className={styles.grid}>
-        <article className={styles.card}>
-          <div className={styles.cardTitle}>
-            <span className={styles.iconBox}>
-              <i className="iconoir-clock" />
-            </span>
-            <div>
-              <h3>Platform timezone</h3>
-              <p>
-                FixTradeZone operational timestamps and future platform
-                scheduling use UTC. Historical financial and trading timezone
-                snapshots remain immutable for auditability.
-              </p>
-            </div>
-          </div>
-
-          <label className={styles.field}>
-            <span>Platform timezone</span>
-            <input
-              className={styles.textInput}
-              value="UTC — Coordinated Universal Time"
-              readOnly
-              aria-readonly="true"
-            />
-            <small className={styles.fieldHelp}>
-              UTC is the locked platform standard. Current display setting:{" "}
-              {timeZone}.
-            </small>
-          </label>
-        </article>
-
-        <article className={styles.card}>
-          <div className={styles.cardTitle}>
-            <span className={styles.iconBox}>
-              <i className="iconoir-flash" />
-            </span>
-            <div>
-              <h3>Operations mode</h3>
-              <p>
-                One high-level switch controls the normal deposit-to-earnings
-                happy path. Package-specific business rules are still respected.
-              </p>
-            </div>
-          </div>
-
-          <label className={styles.field}>
-            <span>Mode</span>
-            <select
-              className={styles.select}
-              value={operationsMode}
-              onChange={(event) => {
-                setOperationsMode(event.target.value as OperationsMode);
-                setError(null);
-                setSuccess(null);
-              }}
+      <div className={styles.modeGrid}>
+        {MODE_OPTIONS.map((option) => {
+          const active = status?.siteMode === option.mode;
+          return (
+            <article
+              key={option.mode}
+              className={`${styles.modeCard} ${
+                active ? styles.modeCardActive : ""
+              }`}
             >
-              <option value="AUTOMATIC">Automatic — recommended</option>
-              <option value="CONTROLLED_MANUAL">
-                Controlled Manual — recovery / QA
-              </option>
-            </select>
-            <small className={styles.fieldHelp}>
-              {isAutomatic
-                ? "Approve deposit once → ledger posting → eligible package activation → referral commission processing → reward lifecycle initialization. Daily rewards remain scheduled for their due boundary."
-                : "Approval stops after review. Authorized recovery actions handle accounting and package activation deliberately; scheduled automatic reward processing is paused."}
+              <div className={styles.modeBadge}>
+                <i className={option.icon} />
+                {option.mode}
+              </div>
+              <h3>{option.description}</h3>
+              <p>{option.consequence}</p>
+              <button
+                type="button"
+                disabled={busy || active}
+                onClick={() => void switchMode(option.mode)}
+              >
+                {active ? "Current mode" : `Switch to ${option.mode}`}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className={styles.twoColumn}>
+        <article className={styles.card}>
+          <div className={styles.sectionEyebrow}>CHANGE CONTEXT</div>
+          <h3>Confirmation & public message</h3>
+          <p>
+            Every mode change is audited. The public message and UTC launch time
+            are used by Coming Soon / Maintenance when configured.
+          </p>
+
+          <label className={styles.field}>
+            <span>Audit reason</span>
+            <input
+              value={reason}
+              maxLength={500}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span>Public mode message · optional</span>
+            <textarea
+              value={modeMessage}
+              maxLength={500}
+              onChange={(event) => setModeMessage(event.target.value)}
+            />
+          </label>
+
+          <label className={styles.field}>
+            <span>Launch / return time · UTC · optional</span>
+            <input
+              type="datetime-local"
+              value={launchAt}
+              onChange={(event) => setLaunchAt(event.target.value)}
+            />
+            <small className={styles.help}>
+              Ignored when switching to LIVE. Public countdown appears while a
+              future TESTING or MAINTENANCE launch time is present.
             </small>
           </label>
         </article>
 
-        <article className={styles.card} style={{ gridColumn: "1 / -1" }}>
-          <div className={styles.cardTitle}>
-            <span className={styles.iconBox}>
-              <i className="iconoir-shield-check" />
+        <aside className={styles.preview}>
+          <div className={styles.sectionEyebrow}>PUBLIC PREVIEW</div>
+          <h3>
+            {status?.siteMode === "LIVE"
+              ? "FixTradeZone is live"
+              : status?.siteMode === "MAINTENANCE"
+                ? "Maintenance page"
+                : "Coming Soon page"}
+          </h3>
+          <p>
+            {status?.modeMessage ||
+              (status?.siteMode === "MAINTENANCE"
+                ? "FixTradeZone is undergoing scheduled platform maintenance."
+                : status?.siteMode === "TESTING"
+                  ? "FixTradeZone is currently in controlled pre-launch testing."
+                  : "The normal public application is available.")}
+          </p>
+          <div className={styles.previewMeta}>
+            <span>
+              Login: {status?.siteMode === "LIVE"
+                ? "PUBLIC"
+                : status?.siteMode === "TESTING"
+                  ? "TESTERS + SUPER_ADMIN"
+                  : "SUPER_ADMIN ONLY"}
             </span>
-            <div>
-              <h3>Safety boundaries</h3>
-              <p>
-                Automation never bypasses package activation rules, immutable
-                subscription snapshots, idempotent ledger posting, cap rules,
-                commission-plan eligibility, or reward-policy eligibility.
-              </p>
-            </div>
+            <span>
+              Registration: {status?.siteMode === "LIVE" ? "ENABLED" : "DISABLED"}
+            </span>
+            <span>Launch: {formatPlatformDateTime(status?.launchAt)}</span>
           </div>
-          <div className={styles.warningNote}>
-            <i className="iconoir-shield-check" />
-            <div>
-              Manual package plans remain manual even in Automatic mode. Daily
-              reward is not paid immediately on deposit approval. Failed
-              downstream stages stay recoverable without undoing a successful
-              prior stage. Existing financial and trading history is never
-              rewritten by a settings change.
-            </div>
-          </div>
-        </article>
+        </aside>
       </div>
+
+      <article className={styles.card}>
+        <div className={styles.sectionEyebrow}>TESTER ACCESS</div>
+        <h3>Approved testing users · {testers.length}</h3>
+        <p>
+          TESTING mode permits these ACTIVE users plus SUPER_ADMIN. Normal users
+          remain blocked by the backend access policy.
+        </p>
+
+        <div className={styles.testerForm}>
+          <input
+            aria-label="Tester username or email"
+            placeholder="Username or email"
+            value={testerIdentifier}
+            onChange={(event) => setTesterIdentifier(event.target.value)}
+          />
+          <input
+            aria-label="Tester note"
+            placeholder="Optional audit note"
+            value={testerNote}
+            maxLength={500}
+            onChange={(event) => setTesterNote(event.target.value)}
+          />
+          <button
+            className={styles.primary}
+            type="button"
+            disabled={busy}
+            onClick={() => void addTester()}
+          >
+            Add tester
+          </button>
+        </div>
+
+        <div className={styles.testerList}>
+          {testers.length === 0 ? (
+            <p>No approved testing users yet.</p>
+          ) : (
+            testers.map((tester) => (
+              <div className={styles.testerRow} key={tester.userId}>
+                <div className={styles.testerIdentity}>
+                  <strong>{tester.username}</strong>
+                  <span>{tester.email ?? "No email"}</span>
+                  <small>{tester.note ?? "No note"}</small>
+                </div>
+                <button
+                  className={styles.danger}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void removeTester(tester)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </article>
+
+      <article className={styles.card}>
+        <div className={styles.sectionEyebrow}>EMERGENCY RECOVERY</div>
+        <h3>Temporary manual recovery while LIVE</h3>
+        <p>
+          LIVE keeps ordinary manual processing locked. SUPER_ADMIN can open a
+          short audited recovery window without changing the platform out of LIVE.
+        </p>
+
+        <div className={styles.twoColumn}>
+          <label className={styles.field}>
+            <span>Recovery reason</span>
+            <input
+              value={recoveryReason}
+              maxLength={500}
+              onChange={(event) => setRecoveryReason(event.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            <span>Duration · 5–60 minutes</span>
+            <input
+              type="number"
+              min={5}
+              max={60}
+              value={recoveryMinutes}
+              onChange={(event) => setRecoveryMinutes(event.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className={styles.inlineMeta}>
+          <span>Recovery active: {status?.recoveryActive ? "YES" : "NO"}</span>
+          <span>
+            Until: {formatPlatformDateTime(status?.recoveryUnlockedUntil)}
+          </span>
+          <span>Reason: {status?.recoveryReason ?? "—"}</span>
+        </div>
+
+        <div className={styles.recoveryActions}>
+          <span className={styles.help}>
+            {status?.siteMode === "LIVE"
+              ? "Available only to SUPER_ADMIN and always audited."
+              : "Recovery unlock is only used while Platform Mode is LIVE."}
+          </span>
+          <div className={styles.recoveryActions}>
+            <button
+              className={styles.secondary}
+              type="button"
+              disabled={
+                busy || status?.siteMode !== "LIVE" || status?.recoveryActive
+              }
+              onClick={() => void unlockRecovery()}
+            >
+              Unlock recovery
+            </button>
+            <button
+              className={styles.danger}
+              type="button"
+              disabled={busy || !status?.recoveryActive}
+              onClick={() => void lockRecovery()}
+            >
+              Lock now
+            </button>
+          </div>
+        </div>
+      </article>
 
       <footer className={styles.footer}>
         <div>
-          <strong>SUPER_ADMIN only · audited</strong>
-          <p>Last update: {formatPlatformDateTime(saved?.updatedAt)}</p>
+          <strong>UTC platform standard · SUPER_ADMIN only · audited</strong>
+          <p>
+            Last mode update: {formatPlatformDateTime(status?.updatedAt)} · Tester
+            count: {status?.testerCount ?? testers.length}
+          </p>
         </div>
-        <button
-          type="button"
-          className={styles.primary}
-          onClick={() => void save()}
-          disabled={saving}
-        >
-          <i className={saving ? "iconoir-refresh-double" : "iconoir-check"} />
-          {saving ? "Saving…" : "Save operations"}
-        </button>
+        <Link href="/audit-logs">Open Audit Logs →</Link>
       </footer>
     </section>
   );

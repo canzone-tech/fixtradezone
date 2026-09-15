@@ -46,7 +46,7 @@ const sections: Array<{
   {
     key: "operations",
     href: "/settings/operations",
-    label: "Operations",
+    label: "Platform Mode",
     icon: "iconoir-settings",
   },
 ];

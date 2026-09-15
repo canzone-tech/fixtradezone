@@ -14,6 +14,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
 import { getRequestContext } from '../auth/request-context';
+import { ManualOperation } from '../platform-config/manual-operation.decorator';
 import { PERMISSIONS } from '../rbac/rbac.constants';
 import {
   InternalTradingEventQueryDto,
@@ -57,6 +58,7 @@ export class AdminInternalTradingTradeController {
   }
 
   @Post('subscriptions/:subscriptionId/reconcile-trades')
+  @ManualOperation()
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   @RequirePermissions(PERMISSIONS.INTERNAL_TRADING_RECONCILE)
