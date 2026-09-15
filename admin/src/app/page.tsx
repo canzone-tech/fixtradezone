@@ -40,6 +40,12 @@ function investmentLabel(item: PublicPackageSummary): string {
   return `${minimum} ${item.currency}`;
 }
 
+function currencyNetworkLabel(item: PublicPackageSummary): string {
+  return item.networkCode
+    ? `${item.currency} (${item.networkCode})`
+    : item.currency;
+}
+
 export default async function Home() {
   const [content, catalogue] = await Promise.all([
     getPublicLandingContent(),
@@ -178,7 +184,7 @@ export default async function Home() {
                   </span>
                   <span>
                     <small>Currency</small>
-                    <strong>{item.currency}</strong>
+                    <strong>{currencyNetworkLabel(item)}</strong>
                   </span>
                 </div>
                 <a className={styles.packageAction} href={content.primaryCtaHref}>
