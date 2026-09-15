@@ -41,8 +41,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install exact dependencies
-        run: npm ci
+      - name: Install exact build dependencies
+        run: npm ci --include=dev
 
       - name: Generate Prisma client
         run: npm run prisma:generate
@@ -113,8 +113,8 @@ jobs:
           cache: npm
           cache-dependency-path: admin/package-lock.json
 
-      - name: Install exact dependencies
-        run: npm ci
+      - name: Install exact build dependencies
+        run: npm ci --include=dev
 
       - name: Build standalone admin
         run: npm run build
