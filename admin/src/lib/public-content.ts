@@ -35,6 +35,7 @@ export interface PublicPackageSummary {
   rangeConfigured: boolean;
   durationDays: number;
   currency: string;
+  networkCode: string | null;
   dailyRateLabel: string | null;
 }
 
@@ -179,6 +180,7 @@ function isPublicPackageSummary(value: unknown): value is PublicPackageSummary {
     Number.isFinite(item.durationDays) &&
     item.durationDays > 0 &&
     isStringWithin(item.currency, 16) &&
+    (item.networkCode === null || isStringWithin(item.networkCode, 40)) &&
     (item.dailyRateLabel === null || isStringWithin(item.dailyRateLabel, 40))
   );
 }
