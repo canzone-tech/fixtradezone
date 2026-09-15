@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feature/production-cutover-readiness
+      - 'fix/**'
     paths:
       - 'backend/**'
       - 'admin/**'
@@ -244,10 +245,23 @@ jobs:
           : "${DATABASE_URL:?DATABASE_URL must be set for the target database}"
 
           echo "===== PRISMA MIGRATION STATUS ====="
+          set +e
           ./node_modules/.bin/prisma migrate status --config ./prisma.config.js
+          STATUS_RC=$?
+          set -e
+
+          if [ "$STATUS_RC" -ne 0 ] && [ "$STATUS_RC" -ne 1 ]; then
+            echo "Migration status failed unexpectedly with exit code $STATUS_RC."
+            exit "$STATUS_RC"
+          fi
 
           if [ "${1:-}" != "--deploy" ]; then
-            echo "Read-only status complete. Re-run as ./run-migrate.sh --deploy only after the target database is confirmed."
+            if [ "$STATUS_RC" -eq 1 ]; then
+              echo "Read-only status complete: pending migrations detected."
+            else
+              echo "Read-only status complete: database schema is up to date."
+            fi
+            echo "Re-run as ./run-migrate.sh --deploy only after the target database is confirmed."
             exit 0
           fi
 
@@ -276,6 +290,9 @@ jobs:
           test -x "$RELEASE_DIR/run-migrate.sh"
           test ! -d "$RELEASE_DIR/src"
           test ! -d "$RELEASE_DIR/.git"
+
+          grep -q 'STATUS_RC=\$?' "$RELEASE_DIR/run-migrate.sh"
+          grep -q '\[ "$STATUS_RC" -ne 0 \] && \[ "$STATUS_RC" -ne 1 \]' "$RELEASE_DIR/run-migrate.sh"
 
           if find "$RELEASE_DIR" -path "$RELEASE_DIR/node_modules" -prune -o -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
             echo "Application source-like files detected in migration artifact."
