@@ -12,7 +12,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/src/main.js",
     "lint": "eslint \"{src,apps,libs,test,scripts}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
     "prisma:generate": "prisma generate",
@@ -28,7 +28,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts"
+    "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
+    "super-admin:bootstrap:prod": "node dist/scripts/bootstrap-super-admin.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -58,7 +59,7 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
-    "@types/passport-jwt": "^4.0.1",
+    "@types/passport-jwt": "^11.0.1",
     "@types/supertest": "^7.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
