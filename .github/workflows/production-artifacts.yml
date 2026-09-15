@@ -1,0 +1,165 @@
+name: Production Runtime Artifacts
+
+on:
+  push:
+    branches:
+      - main
+      - feature/production-cutover-readiness
+    paths:
+      - 'backend/**'
+      - 'admin/**'
+      - '.github/workflows/production-artifacts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-runtime:
+    name: Backend compiled runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: production
+      DATABASE_URL: mysql://artifact_user:artifact_password@127.0.0.1:3306/fixtradezone_artifact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev
+
+      - name: Package compiled runtime only
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-backend"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-backend-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+
+          find dist -type f -name '*.map' -delete
+          cp -a dist node_modules package.json package-lock.json "$RELEASE_DIR/"
+
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "backend",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "sourceIncluded": false
+          }
+          EOF
+
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+
+      - name: Upload backend runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-backend-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  admin-runtime:
+    name: Admin standalone runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: admin
+    env:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: '1'
+      API_BASE_URL: http://127.0.0.1:3000
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Build standalone admin
+        run: npm run build
+
+      - name: Package standalone runtime only
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-admin"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-admin-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+
+          test -f .next/standalone/server.js
+          cp -a .next/standalone/. "$RELEASE_DIR/"
+          mkdir -p "$RELEASE_DIR/.next"
+          cp -a .next/static "$RELEASE_DIR/.next/static"
+          if [ -d public ]; then
+            cp -a public "$RELEASE_DIR/public"
+          fi
+
+          find "$RELEASE_DIR" -type f -name '*.map' -delete
+          rm -rf "$RELEASE_DIR/src" "$RELEASE_DIR/.git"
+
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "admin",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "sourceIncluded": false
+          }
+          EOF
+
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+
+      - name: Upload admin runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-admin-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-admin-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-admin-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
