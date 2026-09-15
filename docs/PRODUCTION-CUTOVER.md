@@ -143,8 +143,8 @@ Git or stored in business tables.
 Production topology currently targeted:
 
 ```text
-fixtradezone.com      -> Apache -> Next.js standalone on 127.0.0.1:3001
-api.fixtradezone.com  -> Apache -> NestJS backend on 127.0.0.1:3000
+fixtradezone.com      -> Apache -> Next.js standalone on 127.0.0.1:3101
+api.fixtradezone.com  -> Apache -> NestJS backend on 127.0.0.1:3100
 MySQL                 -> 127.0.0.1:3306
 Redis                 -> private/local endpoint after final Redis gate
 ```

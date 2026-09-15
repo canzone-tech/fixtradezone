@@ -55,6 +55,7 @@ jobs:
         run: |
           test -f dist/src/main.js
           test -f dist/scripts/bootstrap-super-admin.js
+          grep -q "127.0.0.1" dist/src/main.js
 
       - name: Remove development dependencies
         run: npm prune --omit=dev
@@ -115,7 +116,7 @@ jobs:
     env:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: '1'
-      API_BASE_URL: http://127.0.0.1:3000
+      API_BASE_URL: http://127.0.0.1:3100
 
     steps:
       - name: Check out repository
