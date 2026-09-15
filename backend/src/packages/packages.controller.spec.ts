@@ -64,15 +64,29 @@ describe('PublicPackagesController', () => {
   const packagesService = {
     getEffectiveCatalogue: jest.fn(),
   };
+  const prisma = {
+    $queryRaw: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     packagesService.getEffectiveCatalogue.mockResolvedValue(catalogue);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        packageDefinitionId: ACTIVE_DEFINITION_ID,
+        networkCode: 'BEP20',
+      },
+      {
+        packageDefinitionId: AVAILABLE_DEFINITION_ID,
+        networkCode: 'TRC20',
+      },
+    ]);
   });
 
-  it('returns only landing-safe package fields with package-specific rate labels', async () => {
+  it('returns only landing-safe package fields with configured rate and network labels', async () => {
     const controller = new PublicPackagesController(
       packagesService as unknown as PackagesService,
+      prisma as unknown as PrismaService,
     );
 
     const result = await controller.getCatalogue();
@@ -89,14 +103,28 @@ describe('PublicPackagesController', () => {
       rangeConfigured: true,
       durationDays: 30,
       currency: 'USDT',
+      networkCode: 'BEP20',
       dailyRateLabel: '1%',
     });
     expect(result.items[1].dailyRateLabel).toBe('0.4–0.6%');
+    expect(result.items[1].networkCode).toBe('TRC20');
     expect(result.items[0]).not.toHaveProperty('rewardRateMode');
     expect(result.items[0]).not.toHaveProperty('fixedRewardRate');
     expect(result.items[0]).not.toHaveProperty('minimumRewardRate');
     expect(result.items[0]).not.toHaveProperty('maximumRewardRate');
     expect(result.items[0]).not.toHaveProperty('packageDefinitionId');
+  });
+
+  it('returns a null network when no active package receiving route is configured', async () => {
+    prisma.$queryRaw.mockResolvedValue([]);
+    const controller = new PublicPackagesController(
+      packagesService as unknown as PackagesService,
+      prisma as unknown as PrismaService,
+    );
+
+    const result = await controller.getCatalogue();
+
+    expect(result.items.every((item) => item.networkCode === null)).toBe(true);
   });
 });
 
