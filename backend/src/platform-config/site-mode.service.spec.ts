@@ -25,8 +25,7 @@ function user(roles: string[] = ['USER']): AuthenticatedUser {
 function row(siteMode: 'LIVE' | 'TESTING' | 'MAINTENANCE') {
   return {
     platformTimezone: 'UTC',
-    operationsMode:
-      siteMode === 'LIVE' ? 'AUTOMATIC' : 'CONTROLLED_MANUAL',
+    operationsMode: siteMode === 'LIVE' ? 'AUTOMATIC' : 'CONTROLLED_MANUAL',
     siteMode,
     modeMessage: null,
     launchAt: null,
@@ -84,9 +83,9 @@ describe('SiteModeService access policy', () => {
       .mockResolvedValueOnce([row('MAINTENANCE')])
       .mockResolvedValueOnce([row('MAINTENANCE')]);
 
-    await expect(service.assertAuthenticatedAccess(user())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(
+      service.assertAuthenticatedAccess(user()),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     await expect(
       service.assertAuthenticatedAccess(user(['SUPER_ADMIN'])),
     ).resolves.toBe(undefined);

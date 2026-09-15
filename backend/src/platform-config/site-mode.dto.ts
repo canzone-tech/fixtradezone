@@ -24,13 +24,17 @@ export class UpdateSiteModeDto {
   reason!: string;
 
   @Transform(trimString)
-  @ValidateIf((_object, value: unknown) => value !== undefined && value !== null)
+  @ValidateIf(
+    (_object, value: unknown) => value !== undefined && value !== null,
+  )
   @IsString()
   @Length(3, 500)
   message?: string | null;
 
   @Transform(trimString)
-  @ValidateIf((_object, value: unknown) => value !== undefined && value !== null)
+  @ValidateIf(
+    (_object, value: unknown) => value !== undefined && value !== null,
+  )
   @IsString()
   @IsISO8601({ strict: true, strictSeparator: true })
   launchAt?: string | null;
@@ -43,7 +47,9 @@ export class AddSiteModeTesterDto {
   identifier!: string;
 
   @Transform(trimString)
-  @ValidateIf((_object, value: unknown) => value !== undefined && value !== null)
+  @ValidateIf(
+    (_object, value: unknown) => value !== undefined && value !== null,
+  )
   @IsString()
   @Length(3, 500)
   note?: string | null;

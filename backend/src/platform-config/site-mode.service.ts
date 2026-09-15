@@ -94,8 +94,8 @@ export class SiteModeService {
         current.recoveryUnlockedUntil?.toISOString() ?? null,
       recoveryActive: Boolean(
         current.siteMode === 'LIVE' &&
-          current.recoveryUnlockedUntil &&
-          current.recoveryUnlockedUntil > now,
+        current.recoveryUnlockedUntil &&
+        current.recoveryUnlockedUntil > now,
       ),
       testerCount: Number(testerCount[0]?.count ?? 0),
     };
@@ -463,7 +463,7 @@ export class SiteModeService {
 
     const recoveryActive = Boolean(
       current.recoveryUnlockedUntil &&
-        current.recoveryUnlockedUntil > new Date(),
+      current.recoveryUnlockedUntil > new Date(),
     );
     if (this.isSuperAdmin(user) && recoveryActive) return;
 
@@ -598,8 +598,8 @@ export class SiteModeService {
         snapshot.recoveryUnlockedUntil?.toISOString() ?? null,
       recoveryActive: Boolean(
         snapshot.siteMode === 'LIVE' &&
-          snapshot.recoveryUnlockedUntil &&
-          snapshot.recoveryUnlockedUntil > now,
+        snapshot.recoveryUnlockedUntil &&
+        snapshot.recoveryUnlockedUntil > now,
       ),
     };
   }
