@@ -185,3 +185,118 @@ jobs:
             ${{ runner.temp }}/fixtradezone-admin-${{ github.sha }}.tar.gz.sha256
           retention-days: 7
           if-no-files-found: error
+
+  migration-bundle:
+    name: Temporary Prisma migration bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: mysql://artifact_user:artifact_password@127.0.0.1:3306/fixtradezone_artifact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact migration tooling
+        run: npm ci --include=dev
+
+      - name: Package temporary migration bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-migrations"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-migrations-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR/prisma"
+
+          cp -a prisma/migrations "$RELEASE_DIR/prisma/"
+          cp prisma/schema.prisma "$RELEASE_DIR/prisma/schema.prisma"
+          cp -a node_modules "$RELEASE_DIR/node_modules"
+
+          cat > "$RELEASE_DIR/prisma.config.js" <<'EOF'
+          const { defineConfig } = require('prisma/config');
+
+          module.exports = defineConfig({
+            schema: 'prisma/schema.prisma',
+            migrations: {
+              path: 'prisma/migrations',
+            },
+            datasource: {
+              url: process.env.DATABASE_URL,
+            },
+          });
+          EOF
+
+          cat > "$RELEASE_DIR/run-migrate.sh" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          : "${DATABASE_URL:?DATABASE_URL must be set for the target database}"
+
+          echo "===== PRISMA MIGRATION STATUS ====="
+          ./node_modules/.bin/prisma migrate status --config ./prisma.config.js
+
+          if [ "${1:-}" != "--deploy" ]; then
+            echo "Read-only status complete. Re-run as ./run-migrate.sh --deploy only after the target database is confirmed."
+            exit 0
+          fi
+
+          echo "===== PRISMA MIGRATE DEPLOY ====="
+          ./node_modules/.bin/prisma migrate deploy --config ./prisma.config.js
+
+          echo "===== PRISMA MIGRATION STATUS AFTER DEPLOY ====="
+          ./node_modules/.bin/prisma migrate status --config ./prisma.config.js
+          EOF
+          chmod 750 "$RELEASE_DIR/run-migrate.sh"
+
+          MIGRATION_COUNT="$(find "$RELEASE_DIR/prisma/migrations" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "migrations",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "migrationCount": ${MIGRATION_COUNT},
+            "temporary": true,
+            "sourceIncluded": false
+          }
+          EOF
+
+          test -f "$RELEASE_DIR/prisma/schema.prisma"
+          test -x "$RELEASE_DIR/run-migrate.sh"
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR" -path "$RELEASE_DIR/node_modules" -prune -o -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Application source-like files detected in migration artifact."
+            exit 1
+          fi
+
+          (
+            cd "$RELEASE_DIR"
+            ./node_modules/.bin/prisma validate --config ./prisma.config.js
+          )
+
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
+
+      - name: Upload migration artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-migrations-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-migrations-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-migrations-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
