@@ -50,6 +50,11 @@ jobs:
       - name: Build backend
         run: npm run build
 
+      - name: Verify compiled production entrypoints
+        run: |
+          test -f dist/src/main.js
+          test -f dist/scripts/bootstrap-super-admin.js
+
       - name: Remove development dependencies
         run: npm prune --omit=dev
 
@@ -62,7 +67,7 @@ jobs:
           rm -rf "$RELEASE_DIR"
           mkdir -p "$RELEASE_DIR"
 
-          find dist -type f -name '*.map' -delete
+          find dist -type f \( -name '*.map' -o -name '*.d.ts' \) -delete
           cp -a dist node_modules package.json package-lock.json "$RELEASE_DIR/"
 
           cat > "$RELEASE_DIR/RELEASE.json" <<EOF
@@ -75,10 +80,19 @@ jobs:
           }
           EOF
 
+          test -f "$RELEASE_DIR/dist/src/main.js"
+          test -f "$RELEASE_DIR/dist/scripts/bootstrap-super-admin.js"
           test ! -d "$RELEASE_DIR/src"
           test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR/dist" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Source-like backend build files detected in runtime artifact."
+            exit 1
+          fi
+
           tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
-          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
 
       - name: Upload backend runtime artifact
         uses: actions/upload-artifact@v4
@@ -149,10 +163,18 @@ jobs:
           }
           EOF
 
+          test -f "$RELEASE_DIR/server.js"
           test ! -d "$RELEASE_DIR/src"
           test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR" -path "$RELEASE_DIR/node_modules" -prune -o -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Source-like admin build files detected in runtime artifact."
+            exit 1
+          fi
+
           tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
-          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
 
       - name: Upload admin runtime artifact
         uses: actions/upload-artifact@v4
