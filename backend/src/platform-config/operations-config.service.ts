@@ -61,14 +61,15 @@ export class OperationsConfigService {
     context: RequestContext = {},
   ): Promise<never> {
     void context;
-    this.assertSuperAdmin(actor);
-    this.assertUtcTimezone(settings.platformTimezone);
 
-    return Promise.reject(
-      new BadRequestException(
+    return Promise.resolve().then(() => {
+      this.assertSuperAdmin(actor);
+      this.assertUtcTimezone(settings.platformTimezone);
+
+      throw new BadRequestException(
         'Operations mode is controlled by Platform Mode. Use /admin/settings/site-mode.',
-      ),
-    );
+      );
+    });
   }
 
   private async getOperationsWithClient(
