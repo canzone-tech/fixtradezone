@@ -4,7 +4,17 @@ import type { NextRequest } from "next/server";
 const DEFAULT_API_BASE_URL = "http://127.0.0.1:3000";
 
 function getApiBaseUrl(): string {
-  return (process.env.API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(/\/$/, "");
+  const configuredApiBaseUrl = process.env.API_BASE_URL?.trim();
+
+  if (configuredApiBaseUrl) {
+    return configuredApiBaseUrl.replace(/\/$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("API_BASE_URL is required in production");
+  }
+
+  return DEFAULT_API_BASE_URL;
 }
 
 function firstValidClientIp(request: NextRequest): string | null {
