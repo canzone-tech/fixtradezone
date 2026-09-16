@@ -149,6 +149,16 @@ MySQL                 -> 127.0.0.1:3306
 Redis                 -> private/local endpoint after final Redis gate
 ```
 
+The Admin production runtime must explicitly provide:
+
+\`\`\`text
+API_BASE_URL=http://127.0.0.1:3100
+\`\`\`
+
+Production Admin must fail closed when \`API_BASE_URL\` is missing rather than
+silently falling back to the local-development backend port. The development
+fallback remains \`http://127.0.0.1:3000\`.
+
 The public Apache vhosts currently serve bootstrap/launch-preparation content only;
 they must not proxy to the application until the controlled application gate is
 explicitly opened.
