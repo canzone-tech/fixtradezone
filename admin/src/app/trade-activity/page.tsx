@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import AdminShell from "@/components/admin/admin-shell";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth";
 import SimulatedTradesClient from "../simulated-trades/simulated-trades-client";
+import InitialPolicyDraftAction from "./initial-policy-draft-action";
 
 export const metadata: Metadata = {
   title: "Trade Activity | FixTradeZone",
@@ -18,6 +19,7 @@ export default async function TradeActivityPage() {
 
   return (
     <AdminShell>
+      <InitialPolicyDraftAction />
       <SimulatedTradesClient />
     </AdminShell>
   );
