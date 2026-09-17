@@ -50,13 +50,16 @@ export default function InitialPolicyDraftAction() {
         const session = await readPayload<SessionPayload>(sessionResponse);
         const policies = await readPayload<PoliciesPayload>(policiesResponse);
         if (!active) return;
-        const isSuperAdmin = session?.user?.roles?.includes("SUPER_ADMIN") === true;
+
+        const isSuperAdmin =
+          session?.user?.roles?.includes("SUPER_ADMIN") === true;
+        const policyRows = policies?.policies;
         setVisible(
           sessionResponse.ok &&
             policiesResponse.ok &&
             isSuperAdmin &&
-            Array.isArray(policies?.policies) &&
-            policies.policies.length === 0,
+            Array.isArray(policyRows) &&
+            policyRows.length === 0,
         );
       } catch {
         if (active) setVisible(false);
@@ -81,17 +84,22 @@ export default function InitialPolicyDraftAction() {
     setError("");
     try {
       const response = await fetch(
-        "/api/admin/simulated-activity/policies/drafts",
+        "/api/admin/simulated-activity/policies/drafts/initial",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reason: reason.trim() }),
         },
       );
-      const payload = await readPayload<PoliciesPayload>(response);
+      const payload = await readPayload<{ message?: string | string[] }>(
+        response,
+      );
       if (!response.ok) {
         throw new Error(
-          messageFrom(payload, "Unable to create the initial Trade Activity policy draft."),
+          messageFrom(
+            payload,
+            "Unable to create the initial Trade Activity policy draft.",
+          ),
         );
       }
       window.location.reload();
