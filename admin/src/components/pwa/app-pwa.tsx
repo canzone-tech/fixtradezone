@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -55,6 +56,7 @@ async function registerFullAppServiceWorker(): Promise<void> {
 }
 
 export default function AppPwa() {
+  const pathname = usePathname();
   const [installPrompt, setInstallPrompt] =
     useState<BeforeInstallPromptEvent | null>(() => {
       if (typeof window === "undefined") {
@@ -65,6 +67,7 @@ export default function AppPwa() {
     });
   const [shouldRequireInstall, setShouldRequireInstall] = useState(false);
   const [ios, setIos] = useState(false);
+  const [installAccepted, setInstallAccepted] = useState(false);
 
   useEffect(() => {
     const installWindow = window as InstallPromptWindow;
@@ -81,9 +84,10 @@ export default function AppPwa() {
     }
 
     const deviceStateFrame = window.requestAnimationFrame(() => {
-      const standalone = isStandaloneMode();
       setIos(isIosDevice());
-      setShouldRequireInstall(isMobileLikeDevice() && !standalone);
+      setShouldRequireInstall(
+        isMobileLikeDevice() && !isStandaloneMode(),
+      );
     });
 
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -96,7 +100,7 @@ export default function AppPwa() {
     const handleInstalled = () => {
       installWindow.__ftzPwaInstallPrompt = null;
       setInstallPrompt(null);
-      setShouldRequireInstall(false);
+      setInstallAccepted(true);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
@@ -127,11 +131,13 @@ export default function AppPwa() {
     setInstallPrompt(null);
 
     if (choice.outcome === "accepted") {
-      setShouldRequireInstall(false);
+      setInstallAccepted(true);
     }
   }
 
-  if (!shouldRequireInstall) {
+  const authInstallPage = pathname === "/login" || pathname === "/register";
+
+  if (!authInstallPage || !shouldRequireInstall) {
     return null;
   }
 
@@ -190,16 +196,18 @@ export default function AppPwa() {
           id="ftz-pwa-install-title"
           style={{ margin: "0 0 12px", fontSize: 28, lineHeight: 1.15 }}
         >
-          Install FixTradeZone to continue
+          {installAccepted
+            ? "Open FixTradeZone from your Home Screen"
+            : "Install FixTradeZone to continue"}
         </h1>
 
         <p style={{ margin: "0 0 22px", color: "#a7b8d4", lineHeight: 1.6 }}>
-          The mobile experience runs as the secure FixTradeZone installed app.
-          Your account and business data remain network-authoritative and are
-          not stored as offline financial state.
+          {installAccepted
+            ? "Installation is complete. Launch the installed FixTradeZone app to sign in or create your account."
+            : "You can browse the public landing page in your browser. On mobile, sign in and registration continue inside the installed FixTradeZone app."}
         </p>
 
-        {installPrompt ? (
+        {!installAccepted && installPrompt ? (
           <button
             type="button"
             onClick={() => void installApp()}
@@ -216,7 +224,7 @@ export default function AppPwa() {
           >
             Install FixTradeZone
           </button>
-        ) : (
+        ) : !installAccepted ? (
           <div
             style={{
               borderRadius: 14,
@@ -229,6 +237,18 @@ export default function AppPwa() {
             {ios
               ? "On iPhone/iPad: open the Share menu, choose Add to Home Screen, then launch FixTradeZone from the Home Screen."
               : "Open your browser menu and choose Install app or Add to Home screen, then launch FixTradeZone from the installed icon."}
+          </div>
+        ) : (
+          <div
+            style={{
+              borderRadius: 14,
+              padding: 16,
+              background: "rgba(255,255,255,.05)",
+              color: "#d8e4f6",
+              lineHeight: 1.55,
+            }}
+          >
+            Return to your Home Screen and open the FixTradeZone icon.
           </div>
         )}
       </section>

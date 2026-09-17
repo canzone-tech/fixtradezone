@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
+import {
+  formatAssetSymbol,
+  formatAssetSymbols,
+  normalizeAssetSymbol,
+} from "@/lib/asset-symbol";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import styles from "./simulated-trades.module.css";
 
@@ -127,7 +132,7 @@ const EMPTY_FORM: FormState = {
   enabled: true,
   activitiesPerDay: "5",
   minimumGapMinutes: "240",
-  assetSymbols: "BTCUSDT, ETHUSDT, SOLUSDT",
+  assetSymbols: "BTC/USDT, ETH/USDT, SOL/USDT",
   winWeight: "3",
   lossWeight: "2",
   winMinimumPercent: "0.500000",
@@ -163,7 +168,7 @@ function formFor(policy: Policy): FormState {
     enabled: policy.enabled,
     activitiesPerDay: String(policy.activitiesPerDay),
     minimumGapMinutes: String(policy.minimumGapMinutes),
-    assetSymbols: policy.assetSymbols.join(", "),
+    assetSymbols: formatAssetSymbols(policy.assetSymbols).join(", "),
     winWeight: String(policy.winWeight),
     lossWeight: String(policy.lossWeight),
     winMinimumPercent: policy.winMinimumPercent,
@@ -180,7 +185,7 @@ function formFor(policy: Policy): FormState {
 function parseAssets(value: string): string[] {
   return value
     .split(/[\n,]+/)
-    .map((asset) => asset.trim().toUpperCase())
+    .map(normalizeAssetSymbol)
     .filter(Boolean);
 }
 
@@ -828,7 +833,9 @@ export default function SimulatedTradesClient() {
                 </div>
                 <div>
                   <dt>Assets</dt>
-                  <dd>{latestPublished.assetSymbols.join(", ")}</dd>
+                  <dd>
+                    {formatAssetSymbols(latestPublished.assetSymbols).join(", ")}
+                  </dd>
                 </div>
                 <div>
                   <dt>WIN / LOSS weight</dt>
@@ -1003,7 +1010,9 @@ export default function SimulatedTradesClient() {
                         {event.timezoneSnapshot}
                       </span>
                     </td>
-                    <td className={styles.mono}>{event.assetSymbol}</td>
+                    <td className={styles.mono}>
+                      {formatAssetSymbol(event.assetSymbol)}
+                    </td>
                     <td
                       className={
                         event.outcome === "WIN" ? styles.win : styles.loss
