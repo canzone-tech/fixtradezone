@@ -97,11 +97,17 @@ class AuditedSimulationPolicyRevisionDto {
 
 export class CreateSimulatedActivityPolicyDraftDto {
   @Transform(trimString)
-  @IsOptional()
   @IsString()
   @IsUUID()
-  sourcePolicyVersionId?: string;
+  sourcePolicyVersionId!: string;
 
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
+export class CreateInitialSimulatedActivityPolicyDraftDto {
   @Transform(trimString)
   @IsString()
   @Length(3, 500)
