@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AdminUser } from "@/lib/auth";
 import {
+  formatAssetSymbol,
+  formatAssetSymbols,
+  normalizeAssetSymbol,
+} from "@/lib/asset-symbol";
+import {
   formatPlatformDate,
   formatPlatformDateTime,
   formatPlatformTime,
@@ -125,7 +130,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   enabled: true,
   activitiesPerDay: "5",
-  assetSymbols: "BTCUSDT, ETHUSDT, SOLUSDT",
+  assetSymbols: "BTC/USDT, ETH/USDT, SOL/USDT",
   winWeight: "3",
   lossWeight: "2",
   winMinimumPercent: "0.500000",
@@ -182,7 +187,7 @@ function formFor(policy: Policy): FormState {
   return {
     enabled: policy.enabled,
     activitiesPerDay: String(policy.activitiesPerDay),
-    assetSymbols: policy.assetSymbols.join(", "),
+    assetSymbols: formatAssetSymbols(policy.assetSymbols).join(", "),
     winWeight: String(policy.winWeight),
     lossWeight: String(policy.lossWeight),
     winMinimumPercent: policy.winMinimumPercent,
@@ -332,9 +337,10 @@ export default function InternalTradingAdminClient() {
       policyPayload.policies.find((policy) => policy.status === "PUBLISHED") ??
       null;
 
-    setForm(
-      formFor(activeDraft ?? currentPublished ?? policyPayload.policies[0]),
-    );
+    const formPolicy =
+      activeDraft ?? currentPublished ?? policyPayload.policies[0] ?? null;
+
+    setForm(formPolicy ? formFor(formPolicy) : EMPTY_FORM);
 
     if (!selectedId && workspacePayload.states[0]) {
       const firstId = workspacePayload.states[0].subscriptionId;
@@ -442,7 +448,7 @@ export default function InternalTradingAdminClient() {
             activitiesPerDay: Number(form.activitiesPerDay),
             assetSymbols: form.assetSymbols
               .split(/[,\n]+/)
-              .map((asset) => asset.trim().toUpperCase())
+              .map(normalizeAssetSymbol)
               .filter(Boolean),
             winWeight: Number(form.winWeight),
             lossWeight: Number(form.lossWeight),
@@ -818,7 +824,7 @@ export default function InternalTradingAdminClient() {
               </div>
               <div>
                 <dt>Assets</dt>
-                <dd>{published.assetSymbols.join(", ")}</dd>
+                <dd>{formatAssetSymbols(published.assetSymbols).join(", ")}</dd>
               </div>
               <div>
                 <dt>Effective (UTC)</dt>
@@ -1087,7 +1093,7 @@ export default function InternalTradingAdminClient() {
                   <td>
                     D{event.tradeDayNumber} / {event.slotNumber}
                   </td>
-                  <td>{event.assetSymbol}</td>
+                  <td>{formatAssetSymbol(event.assetSymbol)}</td>
                   <td>
                     <span
                       className={
