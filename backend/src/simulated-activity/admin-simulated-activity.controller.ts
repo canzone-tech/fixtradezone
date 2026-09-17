@@ -26,12 +26,16 @@ import {
   PublishSimulatedActivityPolicyDto,
   UpdateSimulatedActivityPolicyDto,
 } from './dto/simulated-activity.dto';
+import { SimulatedActivityInitialDraftService } from './simulated-activity-initial-draft.service';
 import { SimulatedActivityService } from './simulated-activity.service';
 import { SimulatedActivityWorkerService } from './simulated-activity.worker.service';
 
 @Controller('admin/simulated-activity/policies')
 export class AdminSimulatedActivityPoliciesController {
-  constructor(private readonly service: SimulatedActivityService) {}
+  constructor(
+    private readonly service: SimulatedActivityService,
+    private readonly initialDraftService: SimulatedActivityInitialDraftService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -48,11 +52,15 @@ export class AdminSimulatedActivityPoliciesController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    return this.service.createPolicyDraft(
-      dto,
-      actor,
-      getRequestContext(request),
-    );
+    const context = getRequestContext(request);
+    if (!dto.sourcePolicyVersionId) {
+      return this.initialDraftService.createInitialDraft(
+        dto.reason,
+        actor,
+        context,
+      );
+    }
+    return this.service.createPolicyDraft(dto, actor, context);
   }
 
   @Get(':policyVersionId')
