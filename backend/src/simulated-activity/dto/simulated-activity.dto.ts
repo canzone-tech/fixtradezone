@@ -107,6 +107,13 @@ export class CreateSimulatedActivityPolicyDraftDto {
   reason!: string;
 }
 
+export class CreateInitialSimulatedActivityPolicyDraftDto {
+  @Transform(trimString)
+  @IsString()
+  @Length(3, 500)
+  reason!: string;
+}
+
 export class UpdateSimulatedActivityPolicyDto extends AuditedSimulationPolicyRevisionDto {
   @IsOptional()
   @IsBoolean()

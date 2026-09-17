@@ -22,16 +22,21 @@ import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import {
   AdminSimulatedActivityEventQueryDto,
+  CreateInitialSimulatedActivityPolicyDraftDto,
   CreateSimulatedActivityPolicyDraftDto,
   PublishSimulatedActivityPolicyDto,
   UpdateSimulatedActivityPolicyDto,
 } from './dto/simulated-activity.dto';
+import { SimulatedActivityInitialDraftService } from './simulated-activity-initial-draft.service';
 import { SimulatedActivityService } from './simulated-activity.service';
 import { SimulatedActivityWorkerService } from './simulated-activity.worker.service';
 
 @Controller('admin/simulated-activity/policies')
 export class AdminSimulatedActivityPoliciesController {
-  constructor(private readonly service: SimulatedActivityService) {}
+  constructor(
+    private readonly service: SimulatedActivityService,
+    private readonly initialDraftService: SimulatedActivityInitialDraftService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -50,6 +55,21 @@ export class AdminSimulatedActivityPoliciesController {
   ) {
     return this.service.createPolicyDraft(
       dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Post('drafts/initial')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(SuperAdminOnlyGuard)
+  createInitialDraft(
+    @Body() dto: CreateInitialSimulatedActivityPolicyDraftDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.initialDraftService.createInitialDraft(
+      dto.reason,
       actor,
       getRequestContext(request),
     );
