@@ -35,13 +35,15 @@ export class SimulatedActivityInitialDraftService {
   ) {
     return this.prisma.$transaction(
       async (transaction) => {
-        const existing = await transaction.$queryRaw<{ id: string }[]>(Prisma.sql`
-          SELECT id
-          FROM simulated_activity_policy_versions
-          ORDER BY versionNumber ASC
-          LIMIT 1
-          FOR UPDATE
-        `);
+        const existing = await transaction.$queryRaw<{ id: string }[]>(
+          Prisma.sql`
+            SELECT id
+            FROM simulated_activity_policy_versions
+            ORDER BY versionNumber ASC
+            LIMIT 1
+            FOR UPDATE
+          `,
+        );
         if (existing.length > 0) {
           throw new ConflictException(
             'An initial simulated activity policy draft can only be created when no policy exists.',
@@ -97,7 +99,9 @@ export class SimulatedActivityInitialDraftService {
           },
         });
 
-        const timestamps = await transaction.$queryRaw<InitialDraftTimestamps[]>(Prisma.sql`
+        const timestamps = await transaction.$queryRaw<
+          InitialDraftTimestamps[]
+        >(Prisma.sql`
           SELECT createdAt, updatedAt
           FROM simulated_activity_policy_versions
           WHERE id = ${id}
