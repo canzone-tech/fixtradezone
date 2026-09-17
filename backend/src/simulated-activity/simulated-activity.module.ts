@@ -6,6 +6,7 @@ import {
   AdminSubscriptionSimulatedActivityController,
 } from './admin-simulated-activity.controller';
 import { SimulatedActivityController } from './simulated-activity.controller';
+import { SimulatedActivityInitialDraftService } from './simulated-activity-initial-draft.service';
 import { SimulatedActivityService } from './simulated-activity.service';
 import { SimulatedActivityWorkerService } from './simulated-activity.worker.service';
 
@@ -17,7 +18,11 @@ import { SimulatedActivityWorkerService } from './simulated-activity.worker.serv
     AdminSimulatedActivityController,
     AdminSubscriptionSimulatedActivityController,
   ],
-  providers: [SimulatedActivityService, SimulatedActivityWorkerService],
+  providers: [
+    SimulatedActivityService,
+    SimulatedActivityInitialDraftService,
+    SimulatedActivityWorkerService,
+  ],
   exports: [SimulatedActivityService],
 })
 export class SimulatedActivityModule {}
