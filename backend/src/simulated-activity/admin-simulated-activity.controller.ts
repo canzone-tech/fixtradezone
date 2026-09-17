@@ -22,6 +22,7 @@ import { PERMISSIONS } from '../rbac/rbac.constants';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import {
   AdminSimulatedActivityEventQueryDto,
+  CreateInitialSimulatedActivityPolicyDraftDto,
   CreateSimulatedActivityPolicyDraftDto,
   PublishSimulatedActivityPolicyDto,
   UpdateSimulatedActivityPolicyDto,
@@ -52,15 +53,26 @@ export class AdminSimulatedActivityPoliciesController {
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
   ) {
-    const context = getRequestContext(request);
-    if (!dto.sourcePolicyVersionId) {
-      return this.initialDraftService.createInitialDraft(
-        dto.reason,
-        actor,
-        context,
-      );
-    }
-    return this.service.createPolicyDraft(dto, actor, context);
+    return this.service.createPolicyDraft(
+      dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Post('drafts/initial')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(SuperAdminOnlyGuard)
+  createInitialDraft(
+    @Body() dto: CreateInitialSimulatedActivityPolicyDraftDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.initialDraftService.createInitialDraft(
+      dto.reason,
+      actor,
+      getRequestContext(request),
+    );
   }
 
   @Get(':policyVersionId')
