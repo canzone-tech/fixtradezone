@@ -96,6 +96,16 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+function formatAssetSymbol(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase();
+
+  if (normalized.endsWith("USDT") && normalized.length > 4) {
+    return `${normalized.slice(0, -4)}/USDT`;
+  }
+
+  return normalized;
+}
+
 async function fetchWorkspace(): Promise<{
   session: UserDirectSession;
   activity: ActivityPayload;
@@ -279,7 +289,9 @@ export default function UserSimulatedActivityClient() {
                           {event.timezoneSnapshot}
                         </span>
                       </td>
-                      <td className={styles.mono}>{event.assetSymbol}</td>
+                      <td className={styles.mono}>
+                        {formatAssetSymbol(event.assetSymbol)}
+                      </td>
                       <td
                         className={
                           event.outcome === "WIN" ? styles.win : styles.loss
