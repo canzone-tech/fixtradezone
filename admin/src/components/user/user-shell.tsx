@@ -75,7 +75,7 @@ export default function UserShell({
 
   const lockScope = session
     ? impersonated
-      ? `impersonation:${session.impersonation.actor.id}`
+      ? `impersonation:${session.impersonation.id}:${session.user.id}`
       : `user:${session.user.id}`
     : null;
   const showPlatformPromise = pathname === "/user/dashboard";
@@ -88,6 +88,7 @@ export default function UserShell({
         <IdleLock
           idleLockMinutes={session.sessionPolicy.idleLockMinutes}
           scopeKey={lockScope}
+          identityLabel={session.user.email}
         />
       ) : null}
 
