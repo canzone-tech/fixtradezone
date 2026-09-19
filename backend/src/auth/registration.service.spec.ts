@@ -122,7 +122,7 @@ describe('RegistrationService', () => {
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.user.create.mockImplementation(
-      async ({ data }: { data: { username: string } }) => ({
+      ({ data }: { data: { username: string } }) => ({
         ...createdUser,
         username: data.username,
       }),
@@ -262,9 +262,7 @@ describe('RegistrationService', () => {
       publicUsernameUtil,
       'createRandomPublicUsername',
     );
-    generator
-      .mockReturnValueOnce('a1b2c3d4')
-      .mockReturnValueOnce('z9y8x7w6');
+    generator.mockReturnValueOnce('a1b2c3d4').mockReturnValueOnce('z9y8x7w6');
     transaction.user.findUnique
       .mockResolvedValueOnce({ id: 'collision-user-id' })
       .mockResolvedValueOnce(null);
@@ -274,11 +272,6 @@ describe('RegistrationService', () => {
       username: undefined,
     });
 
-    expect(transaction.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ username: 'z9y8x7w6' }),
-      }),
-    );
     expect(result.user.username).toBe('z9y8x7w6');
   });
 
@@ -414,7 +407,7 @@ describe('RegistrationService', () => {
   });
 
   it('preserves dashboard username behavior for SUPER_ADMIN-created users', async () => {
-    await service.registerDashboard(
+    const result = await service.registerDashboard(
       {
         email: publicDto.email,
         username: publicDto.username,
@@ -424,11 +417,7 @@ describe('RegistrationService', () => {
       superAdminActor,
     );
 
-    expect(transaction.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ username: 'trader.one' }),
-      }),
-    );
+    expect(result.user.username).toBe('trader.one');
     expect(emailVerificationService.sendInitial).not.toHaveBeenCalled();
   });
 

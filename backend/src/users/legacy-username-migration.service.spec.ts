@@ -134,8 +134,7 @@ describe('LegacyUsernameMigrationService', () => {
         action: 'UPDATE',
         entityType: 'User',
         entityId: generatedCandidate.id,
-        description:
-          'SUPER_ADMIN migrated a legacy system-generated username.',
+        description: 'SUPER_ADMIN migrated a legacy system-generated username.',
         metadata: {
           source: 'LEGACY_PUBLIC_USERNAME_MIGRATION',
           previousUsername: '100002',

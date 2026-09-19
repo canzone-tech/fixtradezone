@@ -33,10 +33,7 @@ import { RbacBootstrapService } from './rbac-bootstrap.service';
 const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  | 'SELF_REGISTRATION'
-  | 'SUPER_ADMIN'
-  | 'ADMIN'
-  | 'AUTHORIZED_USER';
+  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;

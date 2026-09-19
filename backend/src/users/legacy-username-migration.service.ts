@@ -1,8 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import {
-  ADMIN_ROLE_NAME,
-  SUPER_ADMIN_ROLE_NAME,
-} from '../auth/auth.constants';
+import { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import {
