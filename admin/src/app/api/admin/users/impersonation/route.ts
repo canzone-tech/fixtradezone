@@ -3,6 +3,7 @@ import { proxyAdminRequest } from "@/lib/admin-backend";
 import {
   clearImpersonationCookies,
   getImpersonationContext,
+  IMPERSONATION_TOKEN_COOKIE,
 } from "@/lib/admin-impersonation";
 import { ACCESS_COOKIE, isCrossSiteRequest, REFRESH_COOKIE } from "@/lib/auth";
 
@@ -29,11 +30,18 @@ export function GET(request: NextRequest) {
   }
 
   const impersonation = getImpersonationContext(request);
+  const hasImpersonationToken = request.cookies.has(IMPERSONATION_TOKEN_COOKIE);
+  const expiresAt = impersonation ? Date.parse(impersonation.expiresAt) : NaN;
+  const active =
+    impersonation !== null &&
+    hasImpersonationToken &&
+    Number.isFinite(expiresAt) &&
+    expiresAt > Date.now();
 
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
-      active: impersonation !== null,
-      impersonation,
+      active,
+      impersonation: active ? impersonation : null,
     },
     {
       headers: {
@@ -41,6 +49,12 @@ export function GET(request: NextRequest) {
       },
     },
   );
+
+  if (!active && (impersonation !== null || hasImpersonationToken)) {
+    clearImpersonationCookies(response);
+  }
+
+  return response;
 }
 
 export async function DELETE(request: NextRequest) {
@@ -52,7 +66,7 @@ export async function DELETE(request: NextRequest) {
     },
   );
 
-  if (response.ok) {
+  if (response.ok || response.status === 401 || response.status === 404) {
     clearImpersonationCookies(response);
   }
 
