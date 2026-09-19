@@ -82,7 +82,7 @@ export const FALLBACK_LANDING_CONTENT: LandingContent = {
   trustDescription:
     "Use your referral link, follow your direct network and genealogy, and track eligible package-based team activity from your account.",
   disclosure:
-    "SIMULATED RESULTS ARE NOT REAL TRADING. Displayed simulated activity does not represent exchange execution or guaranteed, realized or withdrawable trading profit.",
+    "System-generated trade activity based on package rules.",
   footerText: "FixTradeZone — simple, secure account access.",
   seoTitle: "FixTradeZone | Packages, Team Business & Account Access",
   seoDescription:

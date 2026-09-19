@@ -396,9 +396,11 @@ export default function DashboardClient() {
                   <span>Ledger-backed</span>
                 </div>
                 <div>
-                  <small>Simulated Activity</small>
-                  <strong>SIMULATED ONLY</strong>
-                  <span className="orange">Never real trading</span>
+                  <small>Trade Activity</small>
+                  <strong>ALGORITHM-GENERATED</strong>
+                  <span className="orange">
+                    System-generated trade activity based on package rules.
+                  </span>
                 </div>
               </div>
             </article>

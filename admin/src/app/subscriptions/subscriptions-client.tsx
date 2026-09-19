@@ -316,7 +316,7 @@ export default function SubscriptionsClient() {
             <h2>Package subscriptions</h2>
           </div>
           <small>
-            No commission, reward, cap, or simulated-trade value is created by
+            No commission, reward, cap, or trade-activity value is created by
             SUB-01.
           </small>
         </div>
