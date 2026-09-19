@@ -14,25 +14,104 @@ const routeHeadings: Array<{
   title: string;
   subtitle: string;
 }> = [
-  { path: "/deposits", title: "Deposits", subtitle: "Payment rails, receiving accounts and deposit review" },
-  { path: "/wallets", title: "Wallets & Ledger", subtitle: "Wallet buckets, immutable ledger and accounting reconciliation" },
-  { path: "/subscriptions", title: "Subscriptions", subtitle: "Package activation queue and immutable lifecycle history" },
-  { path: "/commissions", title: "Referral Commissions", subtitle: "Versioned matching rules and immutable commission accounting" },
-  { path: "/rewards", title: "Rewards, Caps & Lifecycle", subtitle: "Daily package settlement, cap progress and lifecycle controls" },
-  { path: "/payouts", title: "Withdrawal", subtitle: "Withdrawal policy, request review and settlement operations" },
-  { path: "/internal-trading", title: "Internal Trading", subtitle: "Automatic package trading, financial settlement and recovery controls" },
-  { path: "/trade-activity", title: "Trade Activity", subtitle: "System-generated daily trade activity for active package subscriptions" },
-  { path: "/simulated-trades", title: "Trade Activity", subtitle: "System-generated daily trade activity for active package subscriptions" },
-  { path: "/packages", title: "Package Plans", subtitle: "Versioned catalogue and publication controls" },
-  { path: "/referrals", title: "Referral Management", subtitle: "Enrollment and audited sponsor controls" },
-  { path: "/users", title: "Users", subtitle: "Accounts, roles and access status" },
-  { path: "/rbac", title: "Roles & Permissions", subtitle: "Backend-authoritative access management" },
-  { path: "/notifications", title: "Notifications", subtitle: "Targeted and broadcast in-app user communication" },
-  { path: "/reports", title: "Reports", subtitle: "Read-only operational and financial reporting" },
-  { path: "/templates", title: "Templates / CMS", subtitle: "Versioned landing content and managed email templates" },
-  { path: "/audit-logs", title: "Audit Logs", subtitle: "Immutable administration activity and security history" },
-  { path: "/settings/email", title: "Email Delivery", subtitle: "Safe transport status and controlled delivery testing" },
-  { path: "/settings", title: "Settings", subtitle: "Platform and security configuration" },
+  {
+    path: "/deposits",
+    title: "Deposits",
+    subtitle: "Payment rails, receiving accounts and deposit review",
+  },
+  {
+    path: "/wallets",
+    title: "Wallets & Ledger",
+    subtitle: "Wallet buckets, immutable ledger and accounting reconciliation",
+  },
+  {
+    path: "/subscriptions",
+    title: "Subscriptions",
+    subtitle: "Package activation queue and immutable lifecycle history",
+  },
+  {
+    path: "/commissions",
+    title: "Referral Commissions",
+    subtitle: "Versioned matching rules and immutable commission accounting",
+  },
+  {
+    path: "/rewards",
+    title: "Rewards, Caps & Lifecycle",
+    subtitle: "Daily package settlement, cap progress and lifecycle controls",
+  },
+  {
+    path: "/payouts",
+    title: "Withdrawal",
+    subtitle: "Withdrawal policy, request review and settlement operations",
+  },
+  {
+    path: "/internal-trading",
+    title: "Internal Trading",
+    subtitle:
+      "Automatic package trading, financial settlement and recovery controls",
+  },
+  {
+    path: "/trade-activity",
+    title: "Trade Activity",
+    subtitle:
+      "System-generated daily trade activity for active package subscriptions",
+  },
+  {
+    path: "/simulated-trades",
+    title: "Trade Activity",
+    subtitle:
+      "System-generated daily trade activity for active package subscriptions",
+  },
+  {
+    path: "/packages",
+    title: "Package Plans",
+    subtitle: "Versioned catalogue and publication controls",
+  },
+  {
+    path: "/referrals",
+    title: "Referral Management",
+    subtitle: "Enrollment and audited sponsor controls",
+  },
+  {
+    path: "/users",
+    title: "Users",
+    subtitle: "Accounts, roles and access status",
+  },
+  {
+    path: "/rbac",
+    title: "Roles & Permissions",
+    subtitle: "Backend-authoritative access management",
+  },
+  {
+    path: "/notifications",
+    title: "Notifications",
+    subtitle: "Targeted and broadcast in-app user communication",
+  },
+  {
+    path: "/reports",
+    title: "Reports",
+    subtitle: "Read-only operational and financial reporting",
+  },
+  {
+    path: "/templates",
+    title: "Templates / CMS",
+    subtitle: "Versioned landing content and managed email templates",
+  },
+  {
+    path: "/audit-logs",
+    title: "Audit Logs",
+    subtitle: "Immutable administration activity and security history",
+  },
+  {
+    path: "/settings/email",
+    title: "Email Delivery",
+    subtitle: "Safe transport status and controlled delivery testing",
+  },
+  {
+    path: "/settings",
+    title: "Settings",
+    subtitle: "Platform and security configuration",
+  },
 ];
 
 export default function Topbar() {
@@ -54,6 +133,7 @@ export default function Topbar() {
     }
 
     void loadSession();
+
     return () => {
       mounted = false;
     };
