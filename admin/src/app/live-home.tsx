@@ -33,6 +33,10 @@ function investmentLabel(item: PublicPackageSummary): string {
     ? formatNumber(item.maximumInvestment)
     : null;
 
+  if (!item.maximumInvestment && item.minimumInvestment) {
+    return `${minimum} ${item.currency} & Above`;
+  }
+
   if (maximum && maximum !== minimum) {
     return `${minimum} – ${maximum} ${item.currency}`;
   }
