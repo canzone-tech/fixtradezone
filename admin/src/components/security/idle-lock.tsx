@@ -1,12 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { sessionLockStorageKeys } from "@/lib/session-lock-client";
 import styles from "./idle-lock.module.css";
 
 interface IdleLockProps {
   idleLockMinutes: number;
   enabled?: boolean;
   scopeKey: string;
+  identityLabel?: string;
 }
 
 interface ApiMessage {
@@ -25,79 +27,90 @@ export default function IdleLock({
   idleLockMinutes,
   enabled = true,
   scopeKey,
+  identityLabel,
 }: IdleLockProps) {
   const [locked, setLocked] = useState(false);
-
   const [password, setPassword] = useState("");
-
   const [error, setError] = useState("");
-
   const [unlocking, setUnlocking] = useState(false);
-
   const lastActivityRef = useRef<number | null>(null);
-
   const passwordRef = useRef<HTMLInputElement>(null);
-
-  const storageKey = `ftz:last-activity:${scopeKey}`;
-
+  const { activityKey, lockKey } = sessionLockStorageKeys(scopeKey);
   const timeoutMs = Math.max(1, idleLockMinutes) * 60 * 1000;
 
   useEffect(() => {
-    if (!enabled) {
-      return;
-    }
+    if (!enabled) return;
+
+    const persistLocked = () => {
+      try {
+        window.localStorage.setItem(lockKey, "1");
+      } catch {
+        // Browser storage is optional.
+      }
+      setLocked(true);
+    };
 
     const now = Date.now();
 
     try {
-      const stored = Number(window.localStorage.getItem(storageKey));
+      const storedLock = window.localStorage.getItem(lockKey);
+      const storedActivity = Number(window.localStorage.getItem(activityKey));
 
-      if (Number.isFinite(stored) && stored > 0 && now - stored < timeoutMs) {
-        lastActivityRef.current = stored;
+      if (storedLock === "1") {
+        lastActivityRef.current =
+          Number.isFinite(storedActivity) && storedActivity > 0
+            ? storedActivity
+            : null;
+        setLocked(true);
+      } else if (Number.isFinite(storedActivity) && storedActivity > 0) {
+        lastActivityRef.current = storedActivity;
+
+        if (now - storedActivity >= timeoutMs) {
+          persistLocked();
+        }
       } else {
         lastActivityRef.current = now;
-
-        window.localStorage.setItem(storageKey, String(now));
+        window.localStorage.setItem(activityKey, String(now));
       }
     } catch {
       lastActivityRef.current = now;
     }
 
     const recordActivity = () => {
-      if (locked) {
-        return;
-      }
+      if (locked) return;
 
       const activityAt = Date.now();
-
       lastActivityRef.current = activityAt;
 
       try {
-        window.localStorage.setItem(storageKey, String(activityAt));
+        window.localStorage.setItem(activityKey, String(activityAt));
       } catch {
-        // Storage is optional.
+        // Browser storage is optional.
       }
     };
 
     const evaluateIdleState = () => {
-      if (locked) {
-        return;
-      }
+      if (locked) return;
 
       const lastActivity = lastActivityRef.current;
-
       if (lastActivity !== null && Date.now() - lastActivity >= timeoutMs) {
-        setLocked(true);
+        persistLocked();
       }
     };
 
     const onStorage = (event: StorageEvent) => {
-      if (event.key !== storageKey || !event.newValue) {
+      if (event.key === lockKey) {
+        if (event.newValue === "1") {
+          setLocked(true);
+        } else if (event.newValue === null) {
+          setLocked(false);
+        }
         return;
       }
 
-      const timestamp = Number(event.newValue);
+      if (event.key !== activityKey || !event.newValue) return;
 
+      const timestamp = Number(event.newValue);
       if (Number.isFinite(timestamp) && timestamp > 0) {
         lastActivityRef.current = timestamp;
       }
@@ -110,13 +123,9 @@ export default function IdleLock({
     };
 
     for (const eventName of ACTIVITY_EVENTS) {
-      window.addEventListener(eventName, recordActivity, {
-        passive: true,
-      });
+      window.addEventListener(eventName, recordActivity, { passive: true });
     }
-
     window.addEventListener("storage", onStorage);
-
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     const interval = window.setInterval(evaluateIdleState, 1000);
@@ -125,22 +134,16 @@ export default function IdleLock({
       for (const eventName of ACTIVITY_EVENTS) {
         window.removeEventListener(eventName, recordActivity);
       }
-
       window.removeEventListener("storage", onStorage);
-
       document.removeEventListener("visibilitychange", onVisibilityChange);
-
       window.clearInterval(interval);
     };
-  }, [enabled, locked, storageKey, timeoutMs]);
+  }, [activityKey, enabled, lockKey, locked, timeoutMs]);
 
   useEffect(() => {
-    if (!locked) {
-      return;
-    }
+    if (!locked) return;
 
     const previousOverflow = document.body.style.overflow;
-
     document.body.style.overflow = "hidden";
 
     window.setTimeout(() => {
@@ -166,12 +169,8 @@ export default function IdleLock({
     try {
       const response = await fetch("/api/auth/reauthenticate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
 
       const payload = (await response.json().catch(() => ({}))) as ApiMessage;
@@ -181,7 +180,6 @@ export default function IdleLock({
           window.location.replace("/login");
           return;
         }
-
         throw new Error(payload.message || "Password verification failed.");
       }
 
@@ -190,13 +188,13 @@ export default function IdleLock({
       }
 
       const now = Date.now();
-
       lastActivityRef.current = now;
 
       try {
-        window.localStorage.setItem(storageKey, String(now));
+        window.localStorage.setItem(activityKey, String(now));
+        window.localStorage.removeItem(lockKey);
       } catch {
-        // Storage is optional.
+        // Browser storage is optional.
       }
 
       setPassword("");
@@ -204,11 +202,9 @@ export default function IdleLock({
       setLocked(false);
     } catch (caught) {
       setPassword("");
-
       setError(
         caught instanceof Error ? caught.message : "Unable to unlock session.",
       );
-
       window.setTimeout(() => {
         passwordRef.current?.focus();
       }, 0);
@@ -217,9 +213,7 @@ export default function IdleLock({
     }
   }
 
-  if (!enabled || !locked) {
-    return null;
-  }
+  if (!enabled || !locked) return null;
 
   return (
     <div
@@ -235,22 +229,19 @@ export default function IdleLock({
 
         <div className={styles.heading}>
           <span>SECURE SESSION LOCK</span>
-
           <h2 id="ftz-lock-title">Session Locked</h2>
-
           <p>
             Your session was locked after {idleLockMinutes} minute
             {idleLockMinutes === 1 ? "" : "s"} of inactivity.
           </p>
+          {identityLabel ? <p>Signed in as {identityLabel}</p> : null}
         </div>
 
         <form className={styles.form} onSubmit={unlock}>
           <label>
             <span>Password</span>
-
             <div className={styles.passwordField}>
               <i className="iconoir-key" />
-
               <input
                 ref={passwordRef}
                 type="password"
@@ -260,10 +251,7 @@ export default function IdleLock({
                 placeholder="Enter password"
                 onChange={(event) => {
                   setPassword(event.target.value);
-
-                  if (error) {
-                    setError("");
-                  }
+                  if (error) setError("");
                 }}
               />
             </div>
@@ -278,14 +266,12 @@ export default function IdleLock({
 
           <button type="submit" disabled={unlocking}>
             <i className="iconoir-unlock" />
-
             {unlocking ? "Verifying..." : "Unlock Session"}
           </button>
         </form>
 
         <div className={styles.securityNote}>
           <i className="iconoir-shield-check" />
-
           <span>Your current page and state are preserved.</span>
         </div>
       </div>
