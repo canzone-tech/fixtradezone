@@ -61,7 +61,9 @@ export default function IdleLock({
           Number.isFinite(storedActivity) && storedActivity > 0
             ? storedActivity
             : null;
-        setLocked(true);
+        window.setTimeout(() => {
+          setLocked(true);
+        }, 0);
       } else if (Number.isFinite(storedActivity) && storedActivity > 0) {
         lastActivityRef.current = storedActivity;
 
