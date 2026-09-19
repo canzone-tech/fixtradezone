@@ -89,6 +89,16 @@ function money(value: string, currency: string) {
   })} ${currency}`;
 }
 
+function formatAssetSymbol(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase();
+
+  if (normalized.endsWith("USDT") && normalized.length > 4) {
+    return `${normalized.slice(0, -4)}/USDT`;
+  }
+
+  return normalized;
+}
+
 function utcTime(value: string) {
   const parsed = new Date(value);
 
@@ -520,7 +530,7 @@ export default function UserTradingClient() {
                       <td>
                         D{event.tradeDayNumber} / {event.slotNumber}
                       </td>
-                      <td>{event.assetSymbol}</td>
+                      <td>{formatAssetSymbol(event.assetSymbol)}</td>
                       <td>
                         <span
                           className={
