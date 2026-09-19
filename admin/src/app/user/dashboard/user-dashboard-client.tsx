@@ -475,8 +475,8 @@ export default function UserDashboardClient() {
                   </div>
 
                   <div>
-                    <small>Simulated Results</small>
-                    <strong>SIMULATED ONLY</strong>
+                    <small>Algorithm-Generated Results</small>
+                    <strong>ALGORITHM-GENERATED</strong>
                   </div>
                 </div>
               </article>
@@ -673,8 +673,8 @@ export default function UserDashboardClient() {
 
                 <p>
                   Exact financial values remain currency-specific and are never
-                  aggregated across currencies here. Simulated activity will always
-                  be explicitly labelled as simulated.
+                  aggregated across currencies here. System-generated trade activity
+                  is based on package rules.
                 </p>
               </div>
             </article>
