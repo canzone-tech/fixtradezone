@@ -2,11 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { ReferralsService } from '../referrals/referrals.service';
 import { AUTH_USER_SELECT, type AuthenticatedUser } from './auth-user';
 import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
+import * as publicUsernameUtil from './public-username.util';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 import { RegistrationService } from './registration.service';
 
@@ -14,7 +17,7 @@ describe('RegistrationService', () => {
   const createdUser = {
     id: 'new-user-id',
     email: 'user@example.com',
-    username: 'trader.one',
+    username: 'a1b2c3d4',
     phone: '+919876543210',
     firstName: 'Prashant',
     lastName: 'Shukla',
@@ -47,11 +50,6 @@ describe('RegistrationService', () => {
     auditLog: {
       create: jest.fn(),
     },
-    systemSequence: {
-      upsert: jest.fn(),
-      update: jest.fn(),
-    },
-    $queryRaw: jest.fn(),
   };
 
   const prisma = {
@@ -71,6 +69,10 @@ describe('RegistrationService', () => {
 
   const rbacBootstrapService = {
     ensureDefaultUserRole: jest.fn(),
+  };
+
+  const referralsService = {
+    enrollRegisteredUser: jest.fn(),
   };
 
   const emailVerificationService = {
@@ -110,38 +112,44 @@ describe('RegistrationService', () => {
   let service: RegistrationService;
 
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
+
+    jest
+      .spyOn(publicUsernameUtil, 'createRandomPublicUsername')
+      .mockReturnValue('a1b2c3d4');
 
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
     transaction.systemRegistrationConfig.findUnique.mockResolvedValue(null);
-    transaction.user.create.mockResolvedValue(createdUser);
+    transaction.user.create.mockImplementation(
+      async ({ data }: { data: { username: string } }) => ({
+        ...createdUser,
+        username: data.username,
+      }),
+    );
     transaction.user.findFirst.mockResolvedValue(null);
     transaction.user.findUnique.mockResolvedValue(null);
     transaction.userIdentifierClaim.create.mockResolvedValue({
       id: 'claim-id',
     });
     transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
-    transaction.systemSequence.upsert.mockResolvedValue({
-      key: 'username',
-      nextValue: 100001n,
-    });
-    transaction.systemSequence.update.mockResolvedValue({
-      key: 'username',
-      nextValue: 100002n,
-    });
-    transaction.$queryRaw.mockResolvedValue([{ nextValue: 100001n }]);
     passwordService.hash.mockResolvedValue('argon2-hash');
     passwordService.generateTemporaryPassword.mockReturnValue(
       'generated-temporary-password',
     );
     rbacBootstrapService.ensureDefaultUserRole.mockResolvedValue(defaultRole);
+    referralsService.enrollRegisteredUser.mockResolvedValue({
+      referralCode: 'FTZABC123',
+      sponsorUserId: 'sponsor-user-id',
+      source: 'DEFAULT_SPONSOR',
+    });
     emailVerificationService.sendInitial.mockResolvedValue({ sent: true });
 
     service = new RegistrationService(
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
       rbacBootstrapService as unknown as RbacBootstrapService,
-      undefined,
+      referralsService as unknown as ReferralsService,
       emailVerificationService as unknown as EmailVerificationService,
     );
   });
@@ -172,7 +180,7 @@ describe('RegistrationService', () => {
     });
   });
 
-  it('registers public user pending verification and issues verification email after commit', async () => {
+  it('registers a public user with an 8-character generated username and ignores a supplied username', async () => {
     const result = await service.registerPublic(publicDto, {
       ipAddress: '127.0.0.1',
       userAgent: 'Jest',
@@ -185,7 +193,7 @@ describe('RegistrationService', () => {
     expect(transaction.user.create).toHaveBeenCalledWith({
       data: {
         email: publicDto.email,
-        username: 'trader.one',
+        username: 'a1b2c3d4',
         phone: publicDto.phone,
         passwordHash: 'argon2-hash',
         mustChangePassword: false,
@@ -202,13 +210,11 @@ describe('RegistrationService', () => {
       },
       select: AUTH_USER_SELECT,
     });
-    expect(transaction.userIdentifierClaim.create).toHaveBeenCalledWith({
-      data: {
-        userId: createdUser.id,
-        type: 'EMAIL',
-        normalizedValue: 'user@example.com',
-      },
-    });
+    expect(referralsService.enrollRegisteredUser).toHaveBeenCalledWith(
+      transaction,
+      { id: createdUser.id, username: 'a1b2c3d4' },
+      undefined,
+    );
     expect(transaction.auditLog.create).toHaveBeenCalledWith({
       data: {
         actorUserId: createdUser.id,
@@ -219,7 +225,7 @@ describe('RegistrationService', () => {
         metadata: {
           source: 'SELF_REGISTRATION',
           createdByUserId: null,
-          generatedUsername: false,
+          generatedUsername: true,
           generatedPassword: false,
           declarationPolicyVersion: 'CLIENT_REVISION_2026_09_V1',
           age18Declared: true,
@@ -242,9 +248,65 @@ describe('RegistrationService', () => {
       duplicateAccountAction: 'ALLOWED',
       user: {
         id: createdUser.id,
+        username: 'a1b2c3d4',
         status: 'PENDING',
       },
+      referral: {
+        sponsorUserId: 'sponsor-user-id',
+      },
     });
+  });
+
+  it('retries random username allocation after a collision', async () => {
+    const generator = jest.spyOn(
+      publicUsernameUtil,
+      'createRandomPublicUsername',
+    );
+    generator
+      .mockReturnValueOnce('a1b2c3d4')
+      .mockReturnValueOnce('z9y8x7w6');
+    transaction.user.findUnique
+      .mockResolvedValueOnce({ id: 'collision-user-id' })
+      .mockResolvedValueOnce(null);
+
+    const result = await service.registerPublic({
+      ...publicDto,
+      username: undefined,
+    });
+
+    expect(transaction.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ username: 'z9y8x7w6' }),
+      }),
+    );
+    expect(result.user.username).toBe('z9y8x7w6');
+  });
+
+  it('fails closed when referral enrollment is disabled or unavailable', async () => {
+    referralsService.enrollRegisteredUser.mockResolvedValue(null);
+
+    await expect(service.registerPublic(publicDto)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+    expect(emailVerificationService.sendInitial).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the referral service is unavailable', async () => {
+    const serviceWithoutReferrals = new RegistrationService(
+      prisma as unknown as PrismaService,
+      passwordService as unknown as PasswordService,
+      rbacBootstrapService as unknown as RbacBootstrapService,
+      undefined,
+      emailVerificationService as unknown as EmailVerificationService,
+    );
+
+    await expect(
+      serviceWithoutReferrals.registerPublic(publicDto),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(transaction.user.create).not.toHaveBeenCalled();
   });
 
   it('does not roll back registration when initial email delivery fails', async () => {
@@ -351,7 +413,7 @@ describe('RegistrationService', () => {
     expect(transaction.user.create).not.toHaveBeenCalled();
   });
 
-  it('does not require public declarations for SUPER_ADMIN-created users', async () => {
+  it('preserves dashboard username behavior for SUPER_ADMIN-created users', async () => {
     await service.registerDashboard(
       {
         email: publicDto.email,
@@ -362,31 +424,12 @@ describe('RegistrationService', () => {
       superAdminActor,
     );
 
-    expect(transaction.user.create).toHaveBeenCalledTimes(1);
+    expect(transaction.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ username: 'trader.one' }),
+      }),
+    );
     expect(emailVerificationService.sendInitial).not.toHaveBeenCalled();
-  });
-
-  it('supports generated usernames without changing the existing sequence contract', async () => {
-    transaction.systemRegistrationConfig.findUnique.mockResolvedValue({
-      usernameMode: 'AUTO',
-      usernamePrefixEnabled: true,
-      usernamePrefix: 'FTZ',
-    });
-    transaction.user.create.mockResolvedValue({
-      ...createdUser,
-      username: 'ftz100001',
-    });
-
-    const result = await service.registerPublic({
-      ...publicDto,
-      username: undefined,
-    });
-
-    expect(transaction.systemSequence.update).toHaveBeenCalledWith({
-      where: { key: 'username' },
-      data: { nextValue: 100002n },
-    });
-    expect(result.user.username).toBe('ftz100001');
   });
 
   it('maps Prisma uniqueness failures to the safe conflict response', async () => {
