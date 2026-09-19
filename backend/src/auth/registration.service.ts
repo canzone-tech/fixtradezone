@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Optional,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import {
@@ -23,15 +24,19 @@ import type { RequestContext } from './auth.types';
 import type { RegisterDto } from './dto/register.dto';
 import { EmailVerificationService } from './email-verification.service';
 import { PasswordService } from './password.service';
+import {
+  createRandomPublicUsername,
+  PUBLIC_USERNAME_MAX_ATTEMPTS,
+} from './public-username.util';
 import { RbacBootstrapService } from './rbac-bootstrap.service';
 
-const USERNAME_SEQUENCE_KEY = 'username';
-const USERNAME_SEQUENCE_START = 100001n;
-const AUTO_USERNAME_ATTEMPTS = 100;
 const REGISTRATION_DECLARATION_POLICY_VERSION = 'CLIENT_REVISION_2026_09_V1';
 
 type RegistrationSource =
-  'SELF_REGISTRATION' | 'SUPER_ADMIN' | 'ADMIN' | 'AUTHORIZED_USER';
+  | 'SELF_REGISTRATION'
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'AUTHORIZED_USER';
 
 interface RegistrationConfig {
   publicRegistrationEnabled: boolean;
@@ -175,6 +180,12 @@ export class RegistrationService {
           this.assertRequiredIdentifiers(dto, policy, source);
           this.assertPublicDeclarations(dto, source);
 
+          if (source === 'SELF_REGISTRATION' && !this.referralsService) {
+            throw new ServiceUnavailableException(
+              'Referral enrollment is temporarily unavailable. Please retry registration.',
+            );
+          }
+
           if (source === 'SELF_REGISTRATION' && dto.email) {
             const existingEmailUser = await transaction.user.findFirst({
               where: {
@@ -194,7 +205,12 @@ export class RegistrationService {
           const passwordHash = await this.passwordService.hash(
             passwordResult.password,
           );
-          const username = await this.resolveUsername(transaction, dto, policy);
+          const username = await this.resolveUsername(
+            transaction,
+            dto,
+            policy,
+            source,
+          );
           const defaultRole =
             await this.rbacBootstrapService.ensureDefaultUserRole(transaction);
 
@@ -257,6 +273,15 @@ export class RegistrationService {
 
           if (
             source === 'SELF_REGISTRATION' &&
+            !referralEnrollment?.sponsorUserId
+          ) {
+            throw new ServiceUnavailableException(
+              'Referral enrollment is unavailable. Please retry registration.',
+            );
+          }
+
+          if (
+            source === 'SELF_REGISTRATION' &&
             duplicateDecision &&
             this.duplicateAccountService
           ) {
@@ -283,7 +308,9 @@ export class RegistrationService {
                 source,
                 createdByUserId: actor?.id ?? null,
                 generatedUsername:
-                  !dto.username || policy.usernameMode === 'AUTO',
+                  source === 'SELF_REGISTRATION' ||
+                  !dto.username ||
+                  policy.usernameMode === 'AUTO',
                 generatedPassword: passwordResult.generated,
                 ...(source === 'SELF_REGISTRATION'
                   ? {
@@ -454,7 +481,12 @@ export class RegistrationService {
     transaction: Prisma.TransactionClient,
     dto: RegisterDto,
     config: RegistrationConfig,
+    source: RegistrationSource,
   ): Promise<string> {
+    if (source === 'SELF_REGISTRATION') {
+      return this.generateUsername(transaction);
+    }
+
     const suppliedUsername = dto.username?.trim().toLowerCase();
 
     if (config.usernameMode === 'MANUAL') {
@@ -472,66 +504,31 @@ export class RegistrationService {
           'Manual username entry is disabled by the current registration policy.',
         );
       }
-      return this.generateUsername(transaction, config);
+      return this.generateUsername(transaction);
     }
 
     if (suppliedUsername) {
       return suppliedUsername;
     }
-    return this.generateUsername(transaction, config);
+
+    return this.generateUsername(transaction);
   }
 
   private async generateUsername(
     transaction: Prisma.TransactionClient,
-    config: RegistrationConfig,
   ): Promise<string> {
-    await transaction.systemSequence.upsert({
-      where: { key: USERNAME_SEQUENCE_KEY },
-      create: {
-        key: USERNAME_SEQUENCE_KEY,
-        nextValue: USERNAME_SEQUENCE_START,
-      },
-      update: {},
-    });
-
-    const rows = await transaction.$queryRaw<Array<{ nextValue: bigint }>>`
-      SELECT \`nextValue\`
-      FROM \`system_sequences\`
-      WHERE \`key\` = ${USERNAME_SEQUENCE_KEY}
-      FOR UPDATE
-    `;
-
-    if (rows.length !== 1) {
-      throw new Error('Username sequence is unavailable.');
-    }
-
-    let nextValue = BigInt(rows[0].nextValue);
-    const prefix = config.usernamePrefixEnabled
-      ? (config.usernamePrefix ?? '').trim().toLowerCase()
-      : '';
-
-    if (config.usernamePrefixEnabled && !/^[a-z0-9_-]{1,20}$/.test(prefix)) {
-      throw new Error('Configured username prefix is invalid.');
-    }
-
-    for (let attempt = 0; attempt < AUTO_USERNAME_ATTEMPTS; attempt += 1) {
-      const candidate = `${prefix}${nextValue.toString()}`;
-      nextValue += 1n;
-
-      if (candidate.length > 100) {
-        throw new Error('Generated username exceeds the supported length.');
-      }
-
+    for (
+      let attempt = 0;
+      attempt < PUBLIC_USERNAME_MAX_ATTEMPTS;
+      attempt += 1
+    ) {
+      const candidate = createRandomPublicUsername();
       const existing = await transaction.user.findUnique({
         where: { username: candidate },
         select: { id: true },
       });
 
       if (!existing) {
-        await transaction.systemSequence.update({
-          where: { key: USERNAME_SEQUENCE_KEY },
-          data: { nextValue },
-        });
         return candidate;
       }
     }
