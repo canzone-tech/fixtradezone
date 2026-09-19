@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
 import { clearAdminSessionCache } from "@/lib/admin-session-client";
 import { formatPlatformDateTime } from "@/lib/platform-time";
@@ -31,7 +30,6 @@ function getMessage(payload: unknown, fallback: string): string {
 }
 
 export default function ImpersonationClient() {
-  const router = useRouter();
   const [session, setSession] = useState<UserImpersonationSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(false);
@@ -91,7 +89,7 @@ export default function ImpersonationClient() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, []);
 
   async function returnToAdmin() {
     setReturning(true);
