@@ -1,9 +1,11 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RewardPageQueryDto } from './dto/reward.dto';
 import { RewardsService } from './rewards.service';
 
+@AllowUserImpersonation()
 @Controller('rewards')
 export class RewardsController {
   constructor(private readonly rewardsService: RewardsService) {}

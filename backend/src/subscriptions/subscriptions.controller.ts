@@ -1,9 +1,11 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SubscriptionPageQueryDto } from './dto/subscription.dto';
 import { SubscriptionsService } from './subscriptions.service';
 
+@AllowUserImpersonation()
 @Controller('subscriptions')
 export class SubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}

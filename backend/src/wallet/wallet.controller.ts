@@ -1,9 +1,11 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { WalletPageQueryDto } from './dto/wallet.dto';
 import { WalletLedgerService } from './wallet-ledger.service';
 
+@AllowUserImpersonation()
 @Controller('wallet')
 export class WalletController {
   constructor(private readonly walletLedgerService: WalletLedgerService) {}
