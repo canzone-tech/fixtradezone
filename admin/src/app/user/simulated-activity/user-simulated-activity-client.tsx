@@ -96,6 +96,16 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
+function formatAssetSymbol(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase();
+
+  if (normalized.endsWith("USDT") && normalized.length > 4) {
+    return `${normalized.slice(0, -4)}/USDT`;
+  }
+
+  return normalized;
+}
+
 async function fetchWorkspace(): Promise<{
   session: UserDirectSession;
   activity: ActivityPayload;
@@ -194,13 +204,9 @@ export default function UserSimulatedActivityClient() {
           <div>
             <p className={styles.eyebrow}>TRADE ACTIVITY / ACTIVE PACKAGES</p>
             <h2>Daily Trades</h2>
-            <p>
-              Each ACTIVE package subscription receives its own deterministic
-              daily trade schedule. Trade activity is simulated according to
-              package rules and does not represent external market execution.
-            </p>
+            <p>System-generated trade activity based on package rules.</p>
           </div>
-          <span className={styles.disclosurePill}>SIMULATED</span>
+          <span className={styles.disclosurePill}>ALGORITHM-GENERATED</span>
         </section>
 
         {error ? (
@@ -225,8 +231,8 @@ export default function UserSimulatedActivityClient() {
             </strong>
           </article>
           <article className={styles.stat}>
-            <small>External execution</small>
-            <strong>NONE</strong>
+            <small>Activity source</small>
+            <strong>ALGORITHM</strong>
           </article>
         </section>
 
@@ -279,7 +285,9 @@ export default function UserSimulatedActivityClient() {
                           {event.timezoneSnapshot}
                         </span>
                       </td>
-                      <td className={styles.mono}>{event.assetSymbol}</td>
+                      <td className={styles.mono}>
+                        {formatAssetSymbol(event.assetSymbol)}
+                      </td>
                       <td
                         className={
                           event.outcome === "WIN" ? styles.win : styles.loss
@@ -309,16 +317,8 @@ export default function UserSimulatedActivityClient() {
         <section className={styles.disclosure}>
           <i className="iconoir-warning-triangle" />
           <div>
-            <strong>SIMULATED TRADE ACTIVITY</strong>
-            <p>
-              {activity?.disclosure ??
-                "Trade activity is simulated according to your active package rules and does not represent external market execution."}
-            </p>
-            <p>
-              This workspace does not itself change Main Wallet, Package
-              Earnings, Referral Commission, Rewards, package caps or accounting
-              ledger balances, and it exposes no Buy, Sell or Close controls.
-            </p>
+            <strong>ALGORITHM-GENERATED TRADE ACTIVITY</strong>
+            <p>System-generated trade activity based on package rules.</p>
           </div>
         </section>
       </div>

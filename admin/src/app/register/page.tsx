@@ -131,7 +131,6 @@ export default function RegisterPage() {
   );
   const referralCode = referralCodeOverride ?? inviteReferralCode;
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
@@ -238,9 +237,6 @@ export default function RegisterPage() {
       body.referralCode = referralCode.trim().toUpperCase();
     }
     if (email.trim()) body.email = email.trim();
-    if (currentPolicy.usernameMode !== "AUTO" && username.trim()) {
-      body.username = username.trim().toLowerCase();
-    }
     if (currentPolicy.passwordMode !== "AUTO" && password) {
       body.password = password;
     }
@@ -476,50 +472,6 @@ export default function RegisterPage() {
                   placeholder="name@example.com"
                 />
               </div>
-
-              {policy.usernameMode !== "AUTO" ? (
-                <>
-                  <div className="ftz-auth-label-row">
-                    <label htmlFor="register-username">
-                      Username {policy.usernameMode === "MANUAL" ? "*" : ""}
-                    </label>
-                    <small>
-                      {policy.usernameMode === "MANUAL"
-                        ? "Required"
-                        : "Optional — leave blank for auto"}
-                    </small>
-                  </div>
-                  <div className="ftz-auth-input">
-                    <i className="iconoir-user" />
-                    <input
-                      id="register-username"
-                      type="text"
-                      value={username}
-                      onChange={(event) =>
-                        setUsername(event.target.value.toLowerCase())
-                      }
-                      required={policy.usernameMode === "MANUAL"}
-                      minLength={3}
-                      maxLength={30}
-                      autoComplete="username"
-                      placeholder="your.username"
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className={styles.policyMessage}>
-                  <i className="iconoir-magic-wand" aria-hidden="true" />
-                  <div>
-                    <strong>Username</strong>
-                    <span>
-                      Generated automatically
-                      {policy.usernamePrefixEnabled && policy.usernamePrefix
-                        ? ` using prefix “${policy.usernamePrefix}”.`
-                        : "."}
-                    </span>
-                  </div>
-                </div>
-              )}
 
               {policy.passwordMode !== "AUTO" ? (
                 <>

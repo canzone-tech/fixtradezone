@@ -73,6 +73,9 @@ describe('DepositSubmissionOrchestratorService', () => {
       actor,
       {},
     );
+    expect(result.message).toBe(
+      'Deposit submitted successfully. Payment verification is being processed.',
+    );
     expect(result.blockchainVerification).toMatchObject({
       required: true,
       attempted: true,
@@ -98,6 +101,7 @@ describe('DepositSubmissionOrchestratorService', () => {
     )) as Record<string, any>;
 
     expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
+    expect(result.message).toBe('Deposit submitted successfully.');
     expect(result.blockchainVerification).toMatchObject({
       required: false,
       attempted: false,
@@ -118,6 +122,9 @@ describe('DepositSubmissionOrchestratorService', () => {
       actor,
     )) as Record<string, any>;
 
+    expect(result.message).toBe(
+      'Deposit submitted successfully. Payment verification could not complete yet.',
+    );
     expect(result.deposit).toMatchObject({
       id: DEPOSIT_ID,
       status: 'PENDING_REVIEW',

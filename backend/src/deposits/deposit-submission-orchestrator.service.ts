@@ -36,6 +36,7 @@ export class DepositSubmissionOrchestratorService {
     if (!state.required) {
       return {
         ...submission,
+        message: 'Deposit submitted successfully.',
         blockchainVerification: {
           required: false,
           attempted: false,
@@ -53,6 +54,8 @@ export class DepositSubmissionOrchestratorService {
 
       return {
         ...submission,
+        message:
+          'Deposit submitted successfully. Payment verification is being processed.',
         blockchainVerification: {
           required: true,
           attempted: true,
@@ -67,6 +70,8 @@ export class DepositSubmissionOrchestratorService {
 
       return {
         ...submission,
+        message:
+          'Deposit submitted successfully. Payment verification could not complete yet.',
         blockchainVerification: {
           required: true,
           attempted: true,
