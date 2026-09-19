@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AdminUser } from "@/lib/auth";
+import { resolveAdminSession } from "@/lib/admin-session-client";
 import IdleLock from "./idle-lock";
 
 interface SessionPolicy {
@@ -13,9 +15,17 @@ export default function AdminIdleLock() {
   const [idleLockMinutes, setIdleLockMinutes] = useState(
     DEFAULT_IDLE_LOCK_MINUTES,
   );
+  const [user, setUser] = useState<AdminUser | null>(null);
 
   useEffect(() => {
     let mounted = true;
+
+    async function refreshIdentity() {
+      const session = await resolveAdminSession();
+      if (mounted) {
+        setUser(session.user);
+      }
+    }
 
     async function refreshPolicy() {
       try {
@@ -23,9 +33,7 @@ export default function AdminIdleLock() {
           cache: "no-store",
         });
 
-        if (!response.ok) {
-          return;
-        }
+        if (!response.ok) return;
 
         const payload = (await response.json()) as SessionPolicy;
 
@@ -43,6 +51,7 @@ export default function AdminIdleLock() {
       }
     }
 
+    void refreshIdentity();
     void refreshPolicy();
 
     const interval = window.setInterval(() => {
@@ -55,5 +64,13 @@ export default function AdminIdleLock() {
     };
   }, []);
 
-  return <IdleLock idleLockMinutes={idleLockMinutes} scopeKey="admin-actor" />;
+  if (!user) return null;
+
+  return (
+    <IdleLock
+      idleLockMinutes={idleLockMinutes}
+      scopeKey={`admin:${user.id}`}
+      identityLabel={user.email}
+    />
+  );
 }
