@@ -73,7 +73,7 @@ function permissionGroup(code: string): string {
     payouts: "Payouts",
     referrals: "Referrals",
     trades: "Trade Activity",
-    simulation: "Simulated Activity",
+    simulation: "Algorithm-Generated Trade Activity",
     settings: "Settings",
     audit: "Audit",
     cms: "CMS / Templates",

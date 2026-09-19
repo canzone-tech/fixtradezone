@@ -159,10 +159,10 @@ export default function UserWalletClient() {
           <p className={styles.eyebrow}>WAL-01 / ACCOUNTING WALLET</p>
           <h1>My Wallet</h1>
           <p>
-            Total Wallet is derived from immutable accounting buckets. Simulated
-            activity is never counted as wallet money; package earnings and
-            referral commission appear only after their approved ledger-backed
-            settlement engines post immutable entries.
+            Total Wallet is derived from immutable accounting buckets.
+            Algorithm-generated trade activity is never counted as wallet money;
+            package earnings and referral commission appear only after their
+            approved ledger-backed settlement engines post immutable entries.
           </p>
         </section>
 

@@ -580,7 +580,7 @@ export default function SimulatedTradesClient() {
             wallet or ledger mutation path.
           </p>
         </div>
-        <span className={styles.disclosurePill}>SIMULATED</span>
+        <span className={styles.disclosurePill}>ALGORITHM-GENERATED</span>
       </section>
 
       {error ? (
@@ -1043,10 +1043,10 @@ export default function SimulatedTradesClient() {
       <section className={styles.disclosure}>
         <i className="iconoir-warning-triangle" />
         <div>
-          <strong>SIMULATED TRADE ACTIVITY</strong>
+          <strong>ALGORITHM-GENERATED TRADE ACTIVITY</strong>
           <p>
             {presentedPolicy?.disclosure ??
-              "Trade activity is simulated according to your active package rules and does not represent external market execution."}
+              "System-generated trade activity based on package rules."}
           </p>
           <p>
             This workspace does not itself change Main Wallet, Package Earnings,
