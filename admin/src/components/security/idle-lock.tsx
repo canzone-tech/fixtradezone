@@ -8,7 +8,7 @@ interface IdleLockProps {
   idleLockMinutes: number;
   enabled?: boolean;
   scopeKey: string;
-  identityLabel?: string;
+  identityLabel?: string | null;
 }
 
 interface ApiMessage {
