@@ -1,4 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Public } from '../auth/public.decorator';
@@ -105,6 +106,7 @@ export class PublicPackagesController {
   }
 }
 
+@AllowUserImpersonation()
 @Controller('packages')
 export class PackagesController {
   constructor(
