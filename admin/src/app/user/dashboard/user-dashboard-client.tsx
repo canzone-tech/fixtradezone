@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReferralShareActions from "@/app/user/referrals/referral-share-actions";
 import LiveActivityChart, {
   type LiveActivityPoint,
 } from "@/components/ui/live-activity-chart";
@@ -120,9 +121,6 @@ export default function UserDashboardClient() {
 
     async function loadSession() {
       try {
-        // Session validation/refresh runs first. Dashboard data requests start only
-        // after it completes so a rotating refresh token cannot be consumed by
-        // concurrent BFF requests when an access token has expired.
         const response = await fetch("/api/user/session", {
           method: "GET",
           cache: "no-store",
@@ -342,6 +340,13 @@ export default function UserDashboardClient() {
                     <i className="iconoir-copy" />
                     {inviteCopied ? "Copied" : "Copy invite link"}
                   </button>
+
+                  <div className={styles.heroReferralShare}>
+                    <ReferralShareActions
+                      referralCode={referralProfile?.referralCode ?? null}
+                      compact
+                    />
+                  </div>
                 </div>
 
                 <div className="ftz-hero-meta">
