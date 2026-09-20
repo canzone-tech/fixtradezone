@@ -169,6 +169,41 @@
   color: #aacbff;
 }
 
+.networkWarning {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 18px 0;
+  padding: 15px 16px;
+  border: 1px solid rgba(255, 171, 64, 0.38);
+  border-radius: 13px;
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 171, 64, 0.12), transparent 42%),
+    rgba(45, 26, 6, 0.72);
+  color: #ffd18a;
+}
+
+.networkWarning > i {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #ffbd5b;
+  font-size: 22px;
+}
+
+.networkWarning strong {
+  display: block;
+  color: #ffe1a7;
+  font-size: 12px;
+}
+
+.networkWarning p {
+  margin: 5px 0 0;
+  color: #d7b881;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
 .error,
 .success {
   position: fixed;
