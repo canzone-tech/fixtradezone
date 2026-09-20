@@ -26,10 +26,6 @@ const MAX_RECONCILE_DAYS = 1500;
 
 type DecimalValue = Prisma.Decimal | number | string;
 
-interface CountRow {
-  total: bigint | number | string;
-}
-
 interface LegacyProbeRow {
   localTradeDate: string | Date;
   total: bigint | number | string;
@@ -122,30 +118,69 @@ interface BalanceSideRow {
 }
 
 /**
- * Forward-only canonical reconciliation.
+ * Forward-only canonical reconciliation facade.
  *
- * Daily Trade (simulated_trade_activity_events) owns trade identity, schedule,
- * asset, WIN/LOSS and raw result percentage.  This service only applies the
- * package financial interpretation and immutable ledger settlement.
- *
- * A partially-created legacy financial day is deliberately finished by the
- * legacy service so deployment never mixes two scheduling models inside one
- * day.  The first untouched day automatically switches to canonical mode.
+ * Daily Trade owns schedule, asset, WIN/LOSS and raw result percentage.
+ * Internal Trading consumes that immutable event and only applies the package
+ * financial interpretation.  Existing read/admin APIs delegate to the proven
+ * legacy service; only reconciliation is replaced.
  */
 @Injectable()
-export class CanonicalInternalTradingTradeService extends InternalTradingTradeService {
+export class CanonicalInternalTradingTradeService {
+  private readonly legacyTradeService: InternalTradingTradeService;
+
   constructor(private readonly canonicalPrisma: PrismaService) {
-    super(canonicalPrisma);
+    this.legacyTradeService = new InternalTradingTradeService(canonicalPrisma);
   }
 
-  override async reconcileSubscription(
+  listAdminWorkspace(
+    ...args: Parameters<InternalTradingTradeService['listAdminWorkspace']>
+  ) {
+    return this.legacyTradeService.listAdminWorkspace(...args);
+  }
+
+  getAdminState(
+    ...args: Parameters<InternalTradingTradeService['getAdminState']>
+  ) {
+    return this.legacyTradeService.getAdminState(...args);
+  }
+
+  getMyPackages(
+    ...args: Parameters<InternalTradingTradeService['getMyPackages']>
+  ) {
+    return this.legacyTradeService.getMyPackages(...args);
+  }
+
+  getMyPackage(...args: Parameters<InternalTradingTradeService['getMyPackage']>) {
+    return this.legacyTradeService.getMyPackage(...args);
+  }
+
+  listAdminEvents(
+    ...args: Parameters<InternalTradingTradeService['listAdminEvents']>
+  ) {
+    return this.legacyTradeService.listAdminEvents(...args);
+  }
+
+  listMyEvents(
+    ...args: Parameters<InternalTradingTradeService['listMyEvents']>
+  ) {
+    return this.legacyTradeService.listMyEvents(...args);
+  }
+
+  listWorkerCandidates(
+    ...args: Parameters<InternalTradingTradeService['listWorkerCandidates']>
+  ) {
+    return this.legacyTradeService.listWorkerCandidates(...args);
+  }
+
+  async reconcileSubscription(
     subscriptionId: string,
     actor: AuthenticatedUser | null,
     context: RequestContext = {},
     generationSource: 'WORKER' | 'RECONCILIATION' = 'RECONCILIATION',
   ) {
     if (await this.requiresLegacyContinuation(subscriptionId)) {
-      return super.reconcileSubscription(
+      return this.legacyTradeService.reconcileSubscription(
         subscriptionId,
         actor,
         context,
@@ -187,13 +222,8 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
     const total = this.countNumber(row.total);
     const linked = this.countNumber(row.linked ?? 0);
 
-    if (total === 0 || linked === total) {
-      return false;
-    }
-
-    if (linked === 0) {
-      return true;
-    }
+    if (total === 0 || linked === total) return false;
+    if (linked === 0) return true;
 
     throw new ServiceUnavailableException(
       `Internal trading day ${this.localDateString(
@@ -336,9 +366,7 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
             FOR SHARE
           `);
 
-        if (canonicalEvents.length === 0) {
-          break;
-        }
+        if (canonicalEvents.length === 0) break;
 
         const activitiesPerDay = canonicalEvents[0].activitiesPerDay;
         if (!Number.isInteger(activitiesPerDay) || activitiesPerDay < 1) {
@@ -366,7 +394,6 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
             'Canonical Daily Trade count exceeds its effective daily policy.',
           );
         }
-
         if (existingSlots.length > canonicalEvents.length) {
           throw new ServiceUnavailableException(
             'Internal Trading contains more slots than the canonical Daily Trade source.',
@@ -508,9 +535,7 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
               )
             : null;
 
-          if (ledgerTransactionId) {
-            createdSettlements += 1;
-          }
+          if (ledgerTransactionId) createdSettlements += 1;
 
           await transaction.$executeRaw(Prisma.sql`
             INSERT INTO internal_trade_events (
@@ -643,19 +668,13 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
             completedDay = true;
             break;
           }
-
           completedDay =
             slotNumber === activitiesPerDay &&
             canonicalEvents.length === activitiesPerDay;
         }
 
-        if (state.status === 'COMPLETED') {
-          break;
-        }
-
-        if (!completedDay) {
-          break;
-        }
+        if (state.status === 'COMPLETED') break;
+        if (!completedDay) break;
 
         const tomorrow = this.addLocalDays(localTradeDate, 1);
         const advanced = await transaction.$executeRaw(Prisma.sql`
@@ -883,17 +902,8 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
 
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_transactions (
-        id,
-        kind,
-        sourceKey,
-        sourceType,
-        sourceId,
-        currency,
-        postedByUserId,
-        description,
-        metadata,
-        postedAt,
-        createdAt
+        id, kind, sourceKey, sourceType, sourceId, currency,
+        postedByUserId, description, metadata, postedAt, createdAt
       ) VALUES (
         ${ledgerTransactionId},
         'INTERNAL_TRADING_SETTLEMENT',
@@ -1035,37 +1045,18 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
 
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_accounts (
-        id,
-        accountKey,
-        ownerType,
-        ownerUserId,
-        bucket,
-        currency,
-        normalSide,
-        createdAt
+        id, accountKey, ownerType, ownerUserId, bucket, currency,
+        normalSide, createdAt
       ) VALUES (
-        ${id},
-        ${input.accountKey},
-        ${input.ownerType},
-        ${input.ownerUserId},
-        ${input.bucket},
-        ${input.currency},
-        ${input.normalSide},
+        ${id}, ${input.accountKey}, ${input.ownerType}, ${input.ownerUserId},
+        ${input.bucket}, ${input.currency}, ${input.normalSide},
         CURRENT_TIMESTAMP(3)
       )
-      ON DUPLICATE KEY UPDATE
-        accountKey = VALUES(accountKey)
+      ON DUPLICATE KEY UPDATE accountKey = VALUES(accountKey)
     `);
 
     const rows = await transaction.$queryRaw<AccountRow[]>(Prisma.sql`
-      SELECT
-        id,
-        accountKey,
-        ownerType,
-        ownerUserId,
-        bucket,
-        currency,
-        normalSide
+      SELECT id, accountKey, ownerType, ownerUserId, bucket, currency, normalSide
       FROM ledger_accounts
       WHERE accountKey = ${input.accountKey}
       LIMIT 1
@@ -1092,18 +1083,11 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
 
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_account_balances (
-        accountId,
-        balance,
-        revision,
-        updatedAt
+        accountId, balance, revision, updatedAt
       ) VALUES (
-        ${account.id},
-        0.00000000,
-        0,
-        CURRENT_TIMESTAMP(3)
+        ${account.id}, 0.00000000, 0, CURRENT_TIMESTAMP(3)
       )
-      ON DUPLICATE KEY UPDATE
-        accountId = VALUES(accountId)
+      ON DUPLICATE KEY UPDATE accountId = VALUES(accountId)
     `);
     return account;
   }
@@ -1123,21 +1107,10 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
     }
     await transaction.$executeRaw(Prisma.sql`
       INSERT INTO ledger_entries (
-        id,
-        transactionId,
-        accountId,
-        side,
-        amount,
-        memo,
-        createdAt
+        id, transactionId, accountId, side, amount, memo, createdAt
       ) VALUES (
-        ${randomUUID()},
-        ${transactionId},
-        ${accountId},
-        ${side},
-        ${amount},
-        ${memo},
-        CURRENT_TIMESTAMP(3)
+        ${randomUUID()}, ${transactionId}, ${accountId}, ${side}, ${amount},
+        ${memo}, CURRENT_TIMESTAMP(3)
       )
     `);
   }
@@ -1152,15 +1125,11 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
     const updated = await transaction.$executeRaw(Prisma.sql`
       UPDATE ledger_account_balances
       SET
-        balance = balance + (
-          ${direction} * CAST(${amount} AS DECIMAL(20, 8))
-        ),
+        balance = balance + (${direction} * CAST(${amount} AS DECIMAL(20, 8))),
         revision = revision + 1,
         updatedAt = CURRENT_TIMESTAMP(3)
       WHERE accountId = ${account.id}
-        AND balance + (
-          ${direction} * CAST(${amount} AS DECIMAL(20, 8))
-        ) >= 0
+        AND balance + (${direction} * CAST(${amount} AS DECIMAL(20, 8))) >= 0
     `);
 
     if (updated !== 1) {
@@ -1279,9 +1248,7 @@ export class CanonicalInternalTradingTradeService extends InternalTradingTradeSe
         const retryable =
           error instanceof Prisma.PrismaClientKnownRequestError &&
           error.code === 'P2034';
-        if (!retryable || attempt === MAX_SERIALIZABLE_ATTEMPTS) {
-          throw error;
-        }
+        if (!retryable || attempt === MAX_SERIALIZABLE_ATTEMPTS) throw error;
       }
     }
     throw lastError;
