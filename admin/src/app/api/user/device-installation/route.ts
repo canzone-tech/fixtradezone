@@ -5,7 +5,11 @@ import {
   clearAuthCookies,
   isCrossSiteRequest,
 } from "@/lib/auth";
-import { backendFetch, readJson } from "@/lib/backend";
+import {
+  backendFetch,
+  forwardedBackendHeaders,
+  readJson,
+} from "@/lib/backend";
 
 export async function POST(request: NextRequest) {
   if (isCrossSiteRequest(request)) {
@@ -31,10 +35,10 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const response = await backendFetch("/auth/device-installation", {
       method: "POST",
-      headers: {
+      headers: forwardedBackendHeaders(request, {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
-      },
+      }),
       body,
     });
     const payload = await readJson(response);
