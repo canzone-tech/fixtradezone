@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';

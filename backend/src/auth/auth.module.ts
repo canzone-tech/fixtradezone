@@ -38,11 +38,7 @@ import { TokenService } from './token.service';
     SecurityConfigModule,
     JwtModule.register({}),
   ],
-  controllers: [
-    AuthController,
-    ImpersonationController,
-    OwnProfileController,
-  ],
+  controllers: [AuthController, ImpersonationController, OwnProfileController],
   providers: [
     AuthService,
     ChangePasswordService,
