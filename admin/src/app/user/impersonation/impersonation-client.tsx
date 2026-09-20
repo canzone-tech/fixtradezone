@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import { clearAdminSessionCache } from "@/lib/admin-session-client";
 import { formatPlatformDateTime } from "@/lib/platform-time";
+import { clearSessionLockStorage } from "@/lib/session-lock-client";
 import type { UserImpersonationSession } from "@/lib/user-session";
 import styles from "./impersonation.module.css";
 
@@ -29,8 +30,6 @@ function getMessage(payload: unknown, fallback: string): string {
 }
 
 export default function ImpersonationClient() {
-  const router = useRouter();
-
   const [session, setSession] = useState<UserImpersonationSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [returning, setReturning] = useState(false);
@@ -50,8 +49,9 @@ export default function ImpersonationClient() {
         >(response);
 
         if (response.status === 401) {
-          router.replace("/users");
-          router.refresh();
+          clearAdminSessionCache();
+          clearSessionLockStorage();
+          window.location.replace("/users");
           return;
         }
 
@@ -64,6 +64,11 @@ export default function ImpersonationClient() {
             payload.impersonation.accessMode !== "LIMITED")
         ) {
           throw new Error(getMessage(payload, "Unable to load user session."));
+        }
+
+        if (payload.impersonation.accessMode === "FULL") {
+          window.location.replace("/user/dashboard");
+          return;
         }
 
         if (mounted) {
@@ -89,7 +94,7 @@ export default function ImpersonationClient() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, []);
 
   async function returnToAdmin() {
     setReturning(true);
@@ -108,15 +113,15 @@ export default function ImpersonationClient() {
         );
       }
 
-      router.replace("/users");
-      router.refresh();
+      clearAdminSessionCache();
+      clearSessionLockStorage();
+      window.location.replace("/users");
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : "Unable to return to administrator account.",
       );
-    } finally {
       setReturning(false);
     }
   }
@@ -166,18 +171,14 @@ export default function ImpersonationClient() {
 
         <section className={styles.hero}>
           <span className={styles.eyebrow}>USER ACCOUNT OVERVIEW</span>
-
           <h2>{displayName}</h2>
-
           <p>{user.email}</p>
 
           <div className={styles.badges}>
             <span>{user.status}</span>
-
             {user.roles.map((role) => (
               <span key={role}>{role}</span>
             ))}
-
             <span>{session.impersonation.accessMode} ACCESS</span>
           </div>
         </section>
@@ -187,17 +188,14 @@ export default function ImpersonationClient() {
             <span className={styles.label}>Username</span>
             <strong>{user.username ? `@${user.username}` : "Not set"}</strong>
           </div>
-
           <div>
             <span className={styles.label}>Phone</span>
             <strong>{user.phone || "Not set"}</strong>
           </div>
-
           <div>
             <span className={styles.label}>Account created</span>
             <strong>{formatPlatformDateTime(user.createdAt)}</strong>
           </div>
-
           <div>
             <span className={styles.label}>Last login</span>
             <strong>
@@ -213,7 +211,6 @@ export default function ImpersonationClient() {
             <span className={styles.noticeIcon}>
               <i className="iconoir-shield-check" />
             </span>
-
             <div>
               <strong>Real USER session active</strong>
               <small>
@@ -233,7 +230,6 @@ export default function ImpersonationClient() {
               <i className="iconoir-timer" />
               Idle lock: {session.sessionPolicy.idleLockMinutes} min
             </span>
-
             <span>
               <i className="iconoir-clock" />
               Expires: {formatPlatformDateTime(session.impersonation.expiresAt)}

@@ -35,7 +35,17 @@ async function requestSession(): Promise<AdminSessionResult> {
 }
 
 export function resolveAdminSession(): Promise<AdminSessionResult> {
-  sessionRequest ??= requestSession();
+  if (!sessionRequest) {
+    const request = requestSession();
+    sessionRequest = request;
+
+    void request.finally(() => {
+      if (sessionRequest === request) {
+        sessionRequest = null;
+      }
+    });
+  }
+
   return sessionRequest;
 }
 

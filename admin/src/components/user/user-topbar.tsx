@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { clearAdminSessionCache } from "@/lib/admin-session-client";
+import { clearSessionLockStorage } from "@/lib/session-lock-client";
 import {
   isImpersonationSession,
   type UserPortalSession,
@@ -22,6 +24,7 @@ export default function UserTopbar({
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [returningHere, setReturningHere] = useState(false);
 
   const toggleSidebar = () => {
     document.body.classList.toggle("ftz-nav-open");
@@ -45,6 +48,7 @@ export default function UserTopbar({
 
   const impersonated = session !== null && isImpersonationSession(session);
   const idleMinutes = session?.sessionPolicy.idleLockMinutes;
+  const isReturning = returning || returningHere;
 
   const heading = pathname.startsWith("/user/packages")
     ? {
@@ -114,6 +118,44 @@ export default function UserTopbar({
                               subtitle: "Overview of your FixTradeZone account",
                             };
 
+  async function returnToAdmin() {
+    if (isReturning) return;
+
+    if (onReturnToAdmin) {
+      onReturnToAdmin();
+      return;
+    }
+
+    setReturningHere(true);
+
+    try {
+      const response = await fetch("/api/admin/users/impersonation", {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as {
+          message?: string;
+        };
+
+        throw new Error(
+          payload.message || "Unable to return to administrator account.",
+        );
+      }
+
+      clearAdminSessionCache();
+      clearSessionLockStorage();
+      window.location.replace("/users");
+    } catch (caught) {
+      setReturningHere(false);
+      window.alert(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to return to administrator account.",
+      );
+    }
+  }
+
   async function logout() {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -128,8 +170,9 @@ export default function UserTopbar({
         return;
       }
 
-      router.replace("/login");
-      router.refresh();
+      clearAdminSessionCache();
+      clearSessionLockStorage();
+      window.location.replace("/login");
     } catch {
       setLoggingOut(false);
     }
@@ -188,16 +231,16 @@ export default function UserTopbar({
               </div>
             </div>
 
-            {impersonated && onReturnToAdmin ? (
+            {impersonated ? (
               <button
                 type="button"
                 className={styles.returnButton}
-                disabled={returning}
-                onClick={onReturnToAdmin}
+                disabled={isReturning}
+                onClick={() => void returnToAdmin()}
                 title="Return to Admin"
               >
                 <i className="iconoir-log-out" />
-                <span>{returning ? "Returning..." : "Return to Admin"}</span>
+                <span>{isReturning ? "Returning..." : "Return to Admin"}</span>
               </button>
             ) : (
               <>

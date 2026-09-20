@@ -8,6 +8,7 @@
 
 :root {
   --ftz-shell-gutter: 16px;
+  --ftz-dashboard-max-width: 1460px;
   --ftz-box-pad: clamp(16px, 1.15vw, 20px);
   --ftz-tile-pad: clamp(13px, 0.9vw, 15px);
   --ftz-control-height: 42px;
@@ -23,14 +24,26 @@
   padding-inline: var(--ftz-shell-gutter) !important;
 }
 
-/* The shared platform promise is itself a bordered surface, so it needs an
- * outer gutter rather than the generic direct-child inner padding. Keep a
- * matching bottom gap so the following dashboard hero never touches it. */
+/* Keep the shared intelligence banner on the exact dashboard content rails.
+ * This is shared by SUPER_ADMIN, ADMIN and USER dashboards. */
 .ftz-page-frame > .ftz-platform-promise {
-  width: auto !important;
+  width: min(
+    calc(100% - (var(--ftz-shell-gutter) + var(--ftz-shell-gutter))),
+    var(--ftz-dashboard-max-width)
+  ) !important;
+  max-width: var(--ftz-dashboard-max-width);
   min-width: 0;
-  margin: var(--ftz-page-gap) var(--ftz-shell-gutter) var(--ftz-page-gap) !important;
+  margin: var(--ftz-page-gap) auto var(--ftz-page-gap) !important;
   padding: var(--ftz-box-pad) !important;
+}
+
+/* The ADMIN / SUPER_ADMIN live-module ribbon used to bleed to the dashboard
+ * edges. Keep it on the same centered rails as the hero, cards and market
+ * overview so all protected dashboards share one left/right alignment line. */
+.ftz-page-frame > .ftz-dashboard > .ftz-market-ticker {
+  width: 100%;
+  max-width: var(--ftz-dashboard-max-width);
+  margin: 0 auto 14px !important;
 }
 
 /* Shared primary-surface padding. Page modules retain layout/grid geometry, but

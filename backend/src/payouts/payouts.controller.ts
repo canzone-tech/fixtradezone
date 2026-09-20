@@ -8,6 +8,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
@@ -29,12 +30,14 @@ export class PayoutsController {
   ) {}
 
   @Get('policy')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   getCurrentPolicy() {
     return this.payoutPolicyService.getCurrentPolicy();
   }
 
   @Get('me')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   getMyPayouts(
     @CurrentUser() actor: AuthenticatedUser,

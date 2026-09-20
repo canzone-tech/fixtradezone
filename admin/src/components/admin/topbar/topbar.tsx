@@ -7,6 +7,7 @@ import {
   clearAdminSessionCache,
   resolveAdminSession,
 } from "@/lib/admin-session-client";
+import { clearSessionLockStorage } from "@/lib/session-lock-client";
 
 const routeHeadings: Array<{
   path: string;
@@ -52,12 +53,14 @@ const routeHeadings: Array<{
   {
     path: "/trade-activity",
     title: "Trade Activity",
-    subtitle: "System-generated daily trade activity for active package subscriptions",
+    subtitle:
+      "System-generated daily trade activity for active package subscriptions",
   },
   {
     path: "/simulated-trades",
     title: "Trade Activity",
-    subtitle: "System-generated daily trade activity for active package subscriptions",
+    subtitle:
+      "System-generated daily trade activity for active package subscriptions",
   },
   {
     path: "/packages",
@@ -172,8 +175,8 @@ export default function Topbar() {
     setLoggingOut(true);
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     clearAdminSessionCache();
-    router.replace("/login");
-    router.refresh();
+    clearSessionLockStorage();
+    window.location.replace("/login");
   }
 
   return (

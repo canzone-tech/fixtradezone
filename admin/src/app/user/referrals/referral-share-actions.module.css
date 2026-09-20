@@ -1,0 +1,99 @@
+.wrap {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(31, 255, 240, 0.28);
+  border-radius: 10px;
+  color: #dffefd;
+  background: rgba(5, 37, 59, 0.78);
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.actions button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(31, 255, 240, 0.55);
+  background: rgba(7, 62, 77, 0.78);
+}
+
+.actions button:focus-visible {
+  outline: 2px solid #1ffff0;
+  outline-offset: 2px;
+}
+
+.actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.brandIcon {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.compact {
+  margin-top: 0;
+}
+
+.compact .actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.compact .actions button {
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.compact .brandIcon {
+  width: 15px;
+  height: 15px;
+  flex-basis: 15px;
+}
+
+.status {
+  color: #9fb2cf;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.compact .status {
+  font-size: 10px;
+}
+
+@media (max-width: 640px) {
+  .actions,
+  .compact .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+}

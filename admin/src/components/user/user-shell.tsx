@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import PlatformPromise from "@/components/brand/platform-promise";
 import SiteModeBanner from "@/components/platform/site-mode-banner";
 import IdleLock from "@/components/security/idle-lock";
+import LiveMarketOverview from "@/components/ui/live-market-overview";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
   isImpersonationSession,
@@ -75,10 +76,13 @@ export default function UserShell({
 
   const lockScope = session
     ? impersonated
-      ? `impersonation:${session.impersonation.actor.id}`
+      ? `impersonation:${session.impersonation.id}:${session.user.id}`
       : `user:${session.user.id}`
     : null;
+  const adminActivityMirrorScope =
+    session && impersonated ? `admin:${session.impersonation.actor.id}` : null;
   const showPlatformPromise = pathname === "/user/dashboard";
+  const showMarketOverview = showPlatformPromise && session !== null;
 
   return (
     <div className="ftz-admin-app">
@@ -88,6 +92,8 @@ export default function UserShell({
         <IdleLock
           idleLockMinutes={session.sessionPolicy.idleLockMinutes}
           scopeKey={lockScope}
+          activityMirrorScopeKey={adminActivityMirrorScope}
+          identityLabel={session.user.email}
         />
       ) : null}
 
@@ -126,6 +132,21 @@ export default function UserShell({
         <div className={`ftz-page-frame ${styles.content}`}>
           {showPlatformPromise ? <PlatformPromise /> : null}
           {children}
+          {showMarketOverview ? (
+            <div
+              className="ftz-dashboard"
+              style={{ minHeight: 0, background: "transparent" }}
+            >
+              <div className="ftz-dashboard-layout">
+                <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                  <LiveMarketOverview
+                    overviewUrl="/api/user/market"
+                    historyUrl="/api/user/market/history"
+                  />
+                </section>
+              </div>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

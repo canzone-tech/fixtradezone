@@ -24,6 +24,11 @@ export default function UserSidebar({ session }: UserSidebarProps) {
     session !== null
       ? isImpersonationSession(session)
       : pathname.startsWith("/user/impersonation");
+  const fullUserExperience =
+    !impersonated ||
+    (session !== null &&
+      isImpersonationSession(session) &&
+      session.impersonation.accessMode === "FULL");
 
   const user = session?.user;
 
@@ -47,7 +52,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
     <>
       <aside className="ftz-sidebar" aria-label="User navigation">
         <Link
-          href={impersonated ? "/user/impersonation" : "/user/dashboard"}
+          href={fullUserExperience ? "/user/dashboard" : "/user/impersonation"}
           className="ftz-logo"
           onClick={close}
         >
@@ -61,38 +66,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
           <div className="ftz-nav-section">
             <div className="ftz-nav-label">MAIN MENU</div>
 
-            {impersonated ? (
-              <>
-                <Link
-                  href="/user/impersonation"
-                  className={`ftz-nav-link ${
-                    isActive("/user/impersonation") ? "is-active" : ""
-                  }`}
-                  onClick={close}
-                >
-                  <i className="iconoir-home-simple" />
-                  <span>Overview</span>
-                </Link>
-
-                <Link
-                  href="/user/impersonation#account-details"
-                  className="ftz-nav-link"
-                  onClick={close}
-                >
-                  <i className="iconoir-user" />
-                  <span>Account Details</span>
-                </Link>
-
-                <Link
-                  href="/user/impersonation#session-status"
-                  className="ftz-nav-link"
-                  onClick={close}
-                >
-                  <i className="iconoir-shield-check" />
-                  <span>Session Status</span>
-                </Link>
-              </>
-            ) : (
+            {fullUserExperience ? (
               <>
                 <Link
                   href="/user/dashboard"
@@ -136,6 +110,37 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 >
                   <i className="iconoir-help-circle" />
                   <span>Support</span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/user/impersonation"
+                  className={`ftz-nav-link ${
+                    isActive("/user/impersonation") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-home-simple" />
+                  <span>Overview</span>
+                </Link>
+
+                <Link
+                  href="/user/impersonation#account-details"
+                  className="ftz-nav-link"
+                  onClick={close}
+                >
+                  <i className="iconoir-user" />
+                  <span>Account Details</span>
+                </Link>
+
+                <Link
+                  href="/user/impersonation#session-status"
+                  className="ftz-nav-link"
+                  onClick={close}
+                >
+                  <i className="iconoir-shield-check" />
+                  <span>Session Status</span>
                 </Link>
               </>
             )}
@@ -199,7 +204,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Referrals</span>
             </Link>
 
-            {!impersonated ? (
+            {fullUserExperience ? (
               <Link
                 href="/user/genealogy"
                 className={`ftz-nav-link ${
@@ -234,7 +239,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Rewards & Caps</span>
             </Link>
 
-            {!impersonated ? (
+            {fullUserExperience ? (
               <Link
                 href="/user/award-rewards"
                 className={`ftz-nav-link ${
@@ -269,7 +274,7 @@ export default function UserSidebar({ session }: UserSidebarProps) {
               <span>Daily Trades</span>
             </Link>
 
-            {!impersonated ? (
+            {fullUserExperience ? (
               <Link
                 href="/user/payouts"
                 className={`ftz-nav-link ${

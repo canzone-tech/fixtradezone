@@ -10,6 +10,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { NotificationPageQueryDto } from './dto/notification.dto';
@@ -20,6 +21,7 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   listMine(
     @CurrentUser() actor: AuthenticatedUser,

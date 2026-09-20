@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
@@ -25,12 +26,14 @@ export class SupportController {
   constructor(private readonly supportService: SupportService) {}
 
   @Get('categories')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   listCategories() {
     return this.supportService.listActiveCategories();
   }
 
   @Get('tickets')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   listMine(
     @CurrentUser() actor: AuthenticatedUser,
@@ -54,6 +57,7 @@ export class SupportController {
   }
 
   @Get('tickets/:ticketId')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   getMine(
     @Param('ticketId', new ParseUUIDPipe()) ticketId: string,

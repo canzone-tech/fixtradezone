@@ -9,6 +9,7 @@ import {
   formatPlatformDateTime,
 } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
+import ReferralShareActions from "./referral-share-actions";
 import styles from "./user-referrals.module.css";
 
 interface ReferralProfile {
@@ -280,6 +281,7 @@ export default function UserReferralsClient() {
               <i className="iconoir-copy" />
               {copied ? "Invite link copied" : "Copy invite link"}
             </button>
+            <ReferralShareActions referralCode={profile.referralCode} />
           </article>
 
           <article className={styles.infoCard}>

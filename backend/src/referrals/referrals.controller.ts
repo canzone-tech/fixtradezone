@@ -1,9 +1,11 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ListDirectReferralsQueryDto } from './dto/list-direct-referrals-query.dto';
 import { ReferralsService } from './referrals.service';
 
+@AllowUserImpersonation()
 @Controller('referrals')
 export class ReferralsController {
   constructor(private readonly referralsService: ReferralsService) {}

@@ -8,6 +8,7 @@ import {
 import { SimulatedActivityController } from './simulated-activity.controller';
 import { SimulatedActivityInitialDraftService } from './simulated-activity-initial-draft.service';
 import { SimulatedActivityService } from './simulated-activity.service';
+import { SimulatedActivityUserViewService } from './simulated-activity-user-view.service';
 import { SimulatedActivityWorkerService } from './simulated-activity.worker.service';
 
 @Module({
@@ -21,6 +22,7 @@ import { SimulatedActivityWorkerService } from './simulated-activity.worker.serv
   providers: [
     SimulatedActivityService,
     SimulatedActivityInitialDraftService,
+    SimulatedActivityUserViewService,
     SimulatedActivityWorkerService,
   ],
   exports: [SimulatedActivityService],

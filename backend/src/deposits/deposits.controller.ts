@@ -10,6 +10,7 @@ import {
   Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { getRequestContext } from '../auth/request-context';
@@ -30,12 +31,14 @@ export class DepositsController {
     private readonly depositSubmissionOrchestrator: DepositSubmissionOrchestratorService,
   ) {}
 
+  @AllowUserImpersonation()
   @Get('payment-rails')
   @Header('Cache-Control', 'no-store')
   listAvailablePaymentRails(@Query() query: DepositPaymentRailQueryDto) {
     return this.depositsService.listAvailableDepositPaymentRails(query);
   }
 
+  @AllowUserImpersonation()
   @Get('context/:packagePlanItemId')
   @Header('Cache-Control', 'no-store')
   getPackageDepositContext(
@@ -48,6 +51,7 @@ export class DepositsController {
     );
   }
 
+  @AllowUserImpersonation()
   @Get('me')
   @Header('Cache-Control', 'no-store')
   getMyDeposits(@CurrentUser() actor: AuthenticatedUser) {

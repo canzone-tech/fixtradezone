@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { RequirePermissions } from '../auth/require-permissions.decorator';
@@ -68,6 +69,7 @@ export class SupportAttachmentController {
   constructor(private readonly attachments: SupportAttachmentService) {}
 
   @Get(':ticketId/attachments')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   list(
     @Param('ticketId', new ParseUUIDPipe()) ticketId: string,
@@ -94,6 +96,7 @@ export class SupportAttachmentController {
   }
 
   @Get(':ticketId/attachments/:attachmentId')
+  @AllowUserImpersonation()
   async download(
     @Param('ticketId', new ParseUUIDPipe()) ticketId: string,
     @Param('attachmentId', new ParseUUIDPipe()) attachmentId: string,
