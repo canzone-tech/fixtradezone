@@ -168,10 +168,17 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 12000;
+  z-index: 9000;
   display: grid;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
   place-items: center;
   padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
   background: rgba(1, 6, 16, 0.78);
   backdrop-filter: blur(10px);
 }
