@@ -9,10 +9,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('market')
-  @Header(
-    'Cache-Control',
-    'no-store, no-cache, must-revalidate, max-age=0',
-  )
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   @Header('Pragma', 'no-cache')
   @RequirePermissions(PERMISSIONS.DASHBOARD_READ)
   getMarketOverview() {
@@ -20,10 +17,7 @@ export class DashboardController {
   }
 
   @Get('market/history')
-  @Header(
-    'Cache-Control',
-    'no-store, no-cache, must-revalidate, max-age=0',
-  )
+  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   @Header('Pragma', 'no-cache')
   @RequirePermissions(PERMISSIONS.DASHBOARD_READ)
   getMarketHistory(@Query() query: MarketHistoryQueryDto) {
