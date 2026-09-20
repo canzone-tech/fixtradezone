@@ -226,6 +226,21 @@ describe('OwnProfileService', () => {
   });
 
   it('saves the first BEP-20 withdrawal address with a 30-day lock', async () => {
+    transaction.user.findUnique
+      .mockResolvedValueOnce({
+        id: activeUser.id,
+        status: 'ACTIVE',
+        firstName: null,
+        lastName: null,
+        phone: null,
+        emailVerifiedAt: new Date('2026-09-03T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        ...authRecord,
+        firstName: null,
+        lastName: null,
+        phone: null,
+      });
     transaction.$queryRawUnsafe
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([withdrawalRow]);
