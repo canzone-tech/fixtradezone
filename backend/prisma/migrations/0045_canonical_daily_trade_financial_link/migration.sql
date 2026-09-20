@@ -86,9 +86,8 @@ ALTER TABLE `internal_trade_events`
     )
   );
 
-ALTER TABLE `internal_trade_events`
-  ADD CONSTRAINT `internal_trade_canonical_adjustment_check`
-  CHECK (
-    `simulatedActivityEventId` IS NOT NULL
-    OR `financialAdjustmentAmount` = 0
-  );
+-- MySQL does not permit a CHECK constraint to reference a column that also
+-- participates in an FK referential action.  The canonical adjustment invariant
+-- (legacy/unlinked rows must keep financialAdjustmentAmount = 0) is therefore
+-- enforced by the canonical reconciliation write path, while the FK + UNIQUE
+-- constraint above remains the database-level 1:1 integrity boundary.
