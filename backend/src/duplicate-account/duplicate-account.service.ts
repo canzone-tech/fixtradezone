@@ -26,6 +26,11 @@ const DEVICE_ID_PATTERN =
 type DuplicateAccountRiskAction =
   'ALLOWED' | 'MONITORED' | 'RESTRICTED' | 'BLOCKED' | 'BYPASSED';
 
+type DuplicateAccountRiskReason =
+  | 'DEVICE_INSTALLATION_ALREADY_LINKED'
+  | 'DEVICE_INSTALLATION_SIGNAL_MISSING'
+  | 'SUPER_ADMIN_EXEMPTION';
+
 export interface ConfigSnapshot {
   enforcementMode: DuplicateAccountEnforcementMode;
   deviceSignalEnabled: boolean;
@@ -42,6 +47,17 @@ export interface RegistrationDuplicateDecision {
   matchedUserIds: string[];
   deviceInstallationId: string | null;
   ipAddress: string | null;
+}
+
+export interface LoginDuplicateDecision {
+  enforcementMode: DuplicateAccountEnforcementMode;
+  action: DuplicateAccountRiskAction;
+  blockLogin: boolean;
+  bindDevice: boolean;
+  matchedUserIds: string[];
+  deviceInstallationId: string | null;
+  ipAddress: string | null;
+  reason: DuplicateAccountRiskReason | null;
 }
 
 @Injectable()
@@ -269,6 +285,49 @@ export class DuplicateAccountService {
       };
     }
 
+    if (
+      config.deviceSignalEnabled &&
+      !deviceInstallationId &&
+      config.enforcementMode !== 'OFF'
+    ) {
+      if (config.enforcementMode === 'MONITOR') {
+        return {
+          enforcementMode: config.enforcementMode,
+          action: 'MONITORED',
+          blockRegistration: false,
+          restrictAccount: false,
+          bypassType: null,
+          matchedUserIds: [],
+          deviceInstallationId,
+          ipAddress,
+        };
+      }
+
+      if (config.enforcementMode === 'RESTRICT') {
+        return {
+          enforcementMode: config.enforcementMode,
+          action: 'RESTRICTED',
+          blockRegistration: false,
+          restrictAccount: true,
+          bypassType: null,
+          matchedUserIds: [],
+          deviceInstallationId,
+          ipAddress,
+        };
+      }
+
+      return {
+        enforcementMode: config.enforcementMode,
+        action: 'BLOCKED',
+        blockRegistration: true,
+        restrictAccount: false,
+        bypassType: null,
+        matchedUserIds: [],
+        deviceInstallationId,
+        ipAddress,
+      };
+    }
+
     const matchedUserIds =
       config.deviceSignalEnabled && deviceInstallationId
         ? await this.findUsersForDevice(deviceInstallationId)
@@ -325,6 +384,120 @@ export class DuplicateAccountService {
     };
   }
 
+  async evaluateLogin(input: {
+    userId: string;
+    isSuperAdmin: boolean;
+    deviceInstallationId?: string;
+    context?: RequestContext;
+  }): Promise<LoginDuplicateDecision> {
+    const context = input.context ?? {};
+    const deviceInstallationId = input.deviceInstallationId
+      ? this.normalizeDeviceId(input.deviceInstallationId)
+      : null;
+    const ipAddress = this.normalizeIp(context.ipAddress);
+    const config = this.toConfigSnapshot(
+      await this.prisma.systemDuplicateAccountConfig.findUnique({
+        where: { id: CONFIG_ID },
+      }),
+    );
+    const matchedUserIds = deviceInstallationId
+      ? await this.findUsersForDevice(deviceInstallationId)
+      : [];
+    const otherUserIds = matchedUserIds.filter((id) => id !== input.userId);
+
+    if (input.isSuperAdmin) {
+      const exempt = !deviceInstallationId || otherUserIds.length > 0;
+      return {
+        enforcementMode: config.enforcementMode,
+        action: exempt ? 'BYPASSED' : 'ALLOWED',
+        blockLogin: false,
+        bindDevice: Boolean(deviceInstallationId) && otherUserIds.length === 0,
+        matchedUserIds: otherUserIds,
+        deviceInstallationId,
+        ipAddress,
+        reason: exempt ? 'SUPER_ADMIN_EXEMPTION' : null,
+      };
+    }
+
+    if (config.enforcementMode === 'OFF' || !config.deviceSignalEnabled) {
+      return {
+        enforcementMode: config.enforcementMode,
+        action: 'ALLOWED',
+        blockLogin: false,
+        bindDevice: Boolean(deviceInstallationId),
+        matchedUserIds: otherUserIds,
+        deviceInstallationId,
+        ipAddress,
+        reason: null,
+      };
+    }
+
+    if (!deviceInstallationId) {
+      if (config.enforcementMode === 'MONITOR') {
+        return {
+          enforcementMode: config.enforcementMode,
+          action: 'MONITORED',
+          blockLogin: false,
+          bindDevice: false,
+          matchedUserIds: [],
+          deviceInstallationId,
+          ipAddress,
+          reason: 'DEVICE_INSTALLATION_SIGNAL_MISSING',
+        };
+      }
+
+      return {
+        enforcementMode: config.enforcementMode,
+        action:
+          config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
+        blockLogin: true,
+        bindDevice: false,
+        matchedUserIds: [],
+        deviceInstallationId,
+        ipAddress,
+        reason: 'DEVICE_INSTALLATION_SIGNAL_MISSING',
+      };
+    }
+
+    if (otherUserIds.length === 0) {
+      return {
+        enforcementMode: config.enforcementMode,
+        action: 'ALLOWED',
+        blockLogin: false,
+        bindDevice: true,
+        matchedUserIds: [],
+        deviceInstallationId,
+        ipAddress,
+        reason: null,
+      };
+    }
+
+    if (config.enforcementMode === 'MONITOR') {
+      return {
+        enforcementMode: config.enforcementMode,
+        action: 'MONITORED',
+        blockLogin: false,
+        bindDevice: true,
+        matchedUserIds: otherUserIds,
+        deviceInstallationId,
+        ipAddress,
+        reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+      };
+    }
+
+    return {
+      enforcementMode: config.enforcementMode,
+      action:
+        config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      matchedUserIds: otherUserIds,
+      deviceInstallationId,
+      ipAddress,
+      reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+    };
+  }
+
   async recordBlockedRegistration(
     decision: RegistrationDuplicateDecision,
     email: string | undefined,
@@ -342,7 +515,85 @@ export class DuplicateAccountService {
         matchedUserIds: decision.matchedUserIds,
         metadata: {
           source: 'SELF_REGISTRATION',
-          reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+          reason: decision.deviceInstallationId
+            ? 'DEVICE_INSTALLATION_ALREADY_LINKED'
+            : 'DEVICE_INSTALLATION_SIGNAL_MISSING',
+          userAgent: context.userAgent ?? null,
+        },
+      },
+    });
+  }
+
+  async recordBlockedLogin(
+    decision: LoginDuplicateDecision,
+    user: Pick<AuthenticatedUser, 'id' | 'email'>,
+    context: RequestContext = {},
+  ): Promise<void> {
+    await this.prisma.duplicateAccountRiskEvent.create({
+      data: {
+        userId: user.id,
+        attemptedEmail: user.email,
+        installationId: decision.deviceInstallationId,
+        ipAddress: decision.ipAddress,
+        enforcementMode: decision.enforcementMode,
+        action: decision.action,
+        bypassType: null,
+        matchedUserIds: decision.matchedUserIds,
+        metadata: {
+          source: 'LOGIN',
+          reason: decision.reason,
+          deviceSignalPresent: Boolean(decision.deviceInstallationId),
+          ipSignalPresent: Boolean(decision.ipAddress),
+          userAgent: context.userAgent ?? null,
+        },
+      },
+    });
+  }
+
+  async recordSuccessfulLogin(
+    transaction: Prisma.TransactionClient,
+    decision: LoginDuplicateDecision,
+    user: Pick<AuthenticatedUser, 'id' | 'email'>,
+    context: RequestContext = {},
+  ): Promise<void> {
+    if (decision.bindDevice && decision.deviceInstallationId) {
+      await transaction.userDeviceInstallation.upsert({
+        where: {
+          userId_installationId: {
+            userId: user.id,
+            installationId: decision.deviceInstallationId,
+          },
+        },
+        create: {
+          userId: user.id,
+          installationId: decision.deviceInstallationId,
+          firstSeenIp: decision.ipAddress,
+          lastSeenIp: decision.ipAddress,
+        },
+        update: {
+          lastSeenIp: decision.ipAddress,
+          lastSeenAt: new Date(),
+        },
+      });
+    }
+
+    if (decision.action === 'ALLOWED') return;
+
+    await transaction.duplicateAccountRiskEvent.create({
+      data: {
+        userId: user.id,
+        attemptedEmail: user.email,
+        installationId: decision.deviceInstallationId,
+        ipAddress: decision.ipAddress,
+        enforcementMode: decision.enforcementMode,
+        action: decision.action,
+        bypassType: null,
+        matchedUserIds: decision.matchedUserIds,
+        metadata: {
+          source: 'LOGIN',
+          reason: decision.reason,
+          deviceSignalPresent: Boolean(decision.deviceInstallationId),
+          ipSignalPresent: Boolean(decision.ipAddress),
           userAgent: context.userAgent ?? null,
         },
       },
