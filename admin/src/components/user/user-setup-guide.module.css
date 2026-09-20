@@ -48,6 +48,38 @@
   background: rgba(8, 121, 121, 0.12);
 }
 
+.dashboardGuideLink {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.dashboardGuideLink a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid rgba(72, 228, 214, 0.24);
+  border-radius: 9px;
+  color: #48e4d6;
+  background: rgba(8, 121, 121, 0.12);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.dashboardGuideLink a:hover {
+  border-color: rgba(72, 228, 214, 0.46);
+  background: rgba(8, 121, 121, 0.2);
+}
+
+.dashboardGuideLink a:focus-visible {
+  outline: 2px solid #48e4d6;
+  outline-offset: 2px;
+}
+
 .progressCard {
   margin-bottom: 18px;
   padding: 18px;
@@ -256,6 +288,14 @@
 
   .profileBanner > a {
     text-align: center;
+  }
+
+  .dashboardGuideLink {
+    justify-content: stretch;
+  }
+
+  .dashboardGuideLink a {
+    width: 100%;
   }
 
   .itemGrid {
