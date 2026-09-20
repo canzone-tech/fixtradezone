@@ -133,13 +133,18 @@ export default function UserShell({
           {showPlatformPromise ? <PlatformPromise /> : null}
           {children}
           {showMarketOverview ? (
-            <div className="ftz-dashboard-layout">
-              <section className="ftz-dashboard-primary">
-                <LiveMarketOverview
-                  overviewUrl="/api/user/market"
-                  historyUrl="/api/user/market/history"
-                />
-              </section>
+            <div
+              className="ftz-dashboard"
+              style={{ minHeight: 0, background: "transparent" }}
+            >
+              <div className="ftz-dashboard-layout">
+                <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                  <LiveMarketOverview
+                    overviewUrl="/api/user/market"
+                    historyUrl="/api/user/market/history"
+                  />
+                </section>
+              </div>
             </div>
           ) : null}
         </div>
