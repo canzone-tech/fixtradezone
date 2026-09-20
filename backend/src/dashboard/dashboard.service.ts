@@ -54,18 +54,14 @@ function isBinanceTicker(value: unknown): value is BinanceTicker {
 export class DashboardService {
   private readonly baseUrl = 'https://data-api.binance.vision';
 
-  private marketCache:
-    | {
-        expiresAt: number;
-        value: MarketOverview;
-      }
-    | undefined;
-
   private async fetchJson(url: string): Promise<unknown> {
     try {
       const response = await fetch(url, {
+        cache: 'no-store',
         headers: {
           Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
         },
         signal: AbortSignal.timeout(5000),
       });
@@ -83,12 +79,6 @@ export class DashboardService {
   }
 
   async getMarketOverview(): Promise<MarketOverview> {
-    const now = Date.now();
-
-    if (this.marketCache && this.marketCache.expiresAt > now) {
-      return this.marketCache.value;
-    }
-
     const results = await Promise.allSettled(
       MARKET_SYMBOLS.map(async (symbol) => {
         const payload = await this.fetchJson(
@@ -131,20 +121,13 @@ export class DashboardService {
       );
     }
 
-    const value: MarketOverview = {
+    return {
       source: 'BINANCE_SPOT_PUBLIC_MARKET_DATA',
       quoteAsset: 'USDT',
       asOf: new Date().toISOString(),
       markets,
       unavailableSymbols,
     };
-
-    this.marketCache = {
-      value,
-      expiresAt: now + 10_000,
-    };
-
-    return value;
   }
 
   async getMarketHistory(query: MarketHistoryQueryDto) {

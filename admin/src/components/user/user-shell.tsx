@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import PlatformPromise from "@/components/brand/platform-promise";
 import SiteModeBanner from "@/components/platform/site-mode-banner";
 import IdleLock from "@/components/security/idle-lock";
+import LiveMarketOverview from "@/components/ui/live-market-overview";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
   isImpersonationSession,
@@ -81,6 +82,7 @@ export default function UserShell({
   const adminActivityMirrorScope =
     session && impersonated ? `admin:${session.impersonation.actor.id}` : null;
   const showPlatformPromise = pathname === "/user/dashboard";
+  const showMarketOverview = showPlatformPromise && session !== null;
 
   return (
     <div className="ftz-admin-app">
@@ -130,6 +132,12 @@ export default function UserShell({
         <div className={`ftz-page-frame ${styles.content}`}>
           {showPlatformPromise ? <PlatformPromise /> : null}
           {children}
+          {showMarketOverview ? (
+            <LiveMarketOverview
+              overviewUrl="/api/user/market"
+              historyUrl="/api/user/market/history"
+            />
+          ) : null}
         </div>
       </main>
     </div>

@@ -1,25 +1,23 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
-import { RequirePermissions } from '../auth/require-permissions.decorator';
-import { PERMISSIONS } from '../rbac/rbac.constants';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import { DashboardService } from './dashboard.service';
 import { MarketHistoryQueryDto } from './dto/market-history-query.dto';
 
-@Controller('admin/dashboard')
-export class DashboardController {
+@AllowUserImpersonation()
+@Controller('market-data')
+export class MarketDataController {
   constructor(private readonly dashboardService: DashboardService) {}
 
-  @Get('market')
+  @Get()
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   @Header('Pragma', 'no-cache')
-  @RequirePermissions(PERMISSIONS.DASHBOARD_READ)
   getMarketOverview() {
     return this.dashboardService.getMarketOverview();
   }
 
-  @Get('market/history')
+  @Get('history')
   @Header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
   @Header('Pragma', 'no-cache')
-  @RequirePermissions(PERMISSIONS.DASHBOARD_READ)
   getMarketHistory(@Query() query: MarketHistoryQueryDto) {
     return this.dashboardService.getMarketHistory(query);
   }
