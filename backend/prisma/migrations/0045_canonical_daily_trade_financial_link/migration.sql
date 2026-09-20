@@ -17,7 +17,7 @@ ALTER TABLE `internal_trade_events`
     FOREIGN KEY (`simulatedActivityEventId`)
     REFERENCES `simulated_trade_activity_events`(`id`)
     ON DELETE RESTRICT
-    ON UPDATE CASCADE;
+    ON UPDATE RESTRICT;
 
 -- Raw trade fields always retain the canonical WIN/LOSS sign.  The separate
 -- financialAdjustmentAmount may cap or reconcile the amount applied by the
