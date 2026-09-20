@@ -44,10 +44,43 @@
   cursor: default;
 }
 
+.brandIcon {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+}
+
+.compact {
+  margin-top: 0;
+}
+
+.compact .actions {
+  gap: 7px;
+}
+
+.compact .actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.compact .brandIcon {
+  width: 15px;
+  height: 15px;
+  flex-basis: 15px;
+}
+
 .status {
   color: #9fb2cf;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.compact .status {
+  font-size: 10px;
 }
 
 @media (max-width: 640px) {
