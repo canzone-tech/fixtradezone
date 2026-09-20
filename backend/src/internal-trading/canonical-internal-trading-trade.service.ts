@@ -151,7 +151,9 @@ export class CanonicalInternalTradingTradeService {
     return this.legacyTradeService.getMyPackages(...args);
   }
 
-  getMyPackage(...args: Parameters<InternalTradingTradeService['getMyPackage']>) {
+  getMyPackage(
+    ...args: Parameters<InternalTradingTradeService['getMyPackage']>
+  ) {
     return this.legacyTradeService.getMyPackage(...args);
   }
 
@@ -337,8 +339,9 @@ export class CanonicalInternalTradingTradeService {
           }
         });
 
-        const canonicalEvents =
-          await transaction.$queryRaw<CanonicalDailyTradeRow[]>(Prisma.sql`
+        const canonicalEvents = await transaction.$queryRaw<
+          CanonicalDailyTradeRow[]
+        >(Prisma.sql`
             SELECT
               e.id,
               e.sourceKey,
