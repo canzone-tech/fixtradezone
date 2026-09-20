@@ -1,9 +1,12 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { DuplicateAccountService } from '../duplicate-account/duplicate-account.service';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
+
+const DEVICE_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('Required password change flow', () => {
   const fixedNow = new Date('2026-08-22T12:00:00.000Z');
@@ -76,6 +79,12 @@ describe('Required password change flow', () => {
     verifyPasswordChangeToken: jest.fn(),
   };
 
+  const duplicateAccountService = {
+    evaluateLogin: jest.fn(),
+    recordBlockedLogin: jest.fn(),
+    recordSuccessfulLogin: jest.fn(),
+  };
+
   let service: AuthService;
 
   beforeEach(() => {
@@ -98,12 +107,23 @@ describe('Required password change flow', () => {
     });
 
     passwordService.hash.mockResolvedValue('new-password-hash');
+    duplicateAccountService.evaluateLogin.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      matchedUserIds: [],
+      deviceInstallationId: DEVICE_ID,
+      ipAddress: null,
+      reason: null,
+    });
 
     service = new AuthService(
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
       registrationService as unknown as RegistrationService,
       tokenService as unknown as TokenService,
+      duplicateAccountService as unknown as DuplicateAccountService,
     );
   });
 
@@ -126,6 +146,7 @@ describe('Required password change flow', () => {
       service.login({
         identifier: user.username,
         password: 'TemporaryPassword123!',
+        deviceInstallationId: DEVICE_ID,
       }),
     ).resolves.toEqual({
       message: 'Password change required.',
@@ -137,6 +158,20 @@ describe('Required password change flow', () => {
         username: user.username,
       },
     });
+
+    expect(duplicateAccountService.evaluateLogin).toHaveBeenCalledWith({
+      userId: user.id,
+      isSuperAdmin: false,
+      deviceInstallationId: DEVICE_ID,
+      context: {},
+    });
+
+    expect(duplicateAccountService.recordSuccessfulLogin).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({ blockLogin: false }),
+      expect.objectContaining({ id: user.id }),
+      {},
+    );
 
     expect(tokenService.issuePasswordChangeToken).toHaveBeenCalledWith(user);
 
