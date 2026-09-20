@@ -165,10 +165,9 @@ export default function HowItWorksClient() {
           <div>
             <strong>Product truth</strong>
             <p>
-              Daily Trade results are generated/displayed by the platform and are
-              not represented as exchange execution. Financial credits, package
-              progress and withdrawal history remain separately ledger-backed and
-              auditable.
+              Daily Trade results are generated/displayed by the platform.
+              Financial credits, package progress and withdrawal history remain
+              separately ledger-backed and auditable.
             </p>
           </div>
         </section>
