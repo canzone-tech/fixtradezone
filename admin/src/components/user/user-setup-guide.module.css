@@ -19,13 +19,13 @@
 
 .profileBanner strong {
   color: #ffe0a0;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .profileBanner span {
   max-width: 780px;
   color: #aa9876;
-  font-size: 10px;
+  font-size: 13px;
   line-height: 1.55;
 }
 
@@ -35,7 +35,7 @@
 .modalList a,
 .modalActions a {
   color: #48e4d6;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
   text-decoration: none;
 }
@@ -68,7 +68,7 @@
 .progressHeader span,
 .modalEyebrow {
   color: #27e6db;
-  font-size: 8px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.14em;
 }
@@ -76,7 +76,7 @@
 .progressHeader h2 {
   margin: 6px 0 0;
   color: #eff8ff;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .progressTrack {
@@ -113,7 +113,7 @@
   border-radius: 10px;
   color: #7d91aa;
   background: rgba(3, 11, 27, 0.4);
-  font-size: 9px;
+  font-size: 13px;
 }
 
 .setupItem[data-complete="true"] {
@@ -166,7 +166,7 @@
   max-width: 540px;
   margin: 0;
   color: #7d91aa;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.65;
 }
 
@@ -211,12 +211,12 @@
 
 .modalList span {
   color: #d4e0ee;
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .modalList strong {
   color: #7890a9;
-  font-size: 9px;
+  font-size: 13px;
   text-transform: uppercase;
 }
 
@@ -236,7 +236,7 @@
   color: #fff;
   background: linear-gradient(90deg, #078a88, #0bbb8e 52%, #0fc997);
   cursor: pointer;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
 }
 
