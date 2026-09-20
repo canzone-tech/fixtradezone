@@ -235,10 +235,9 @@
 }
 
 .walletFieldHeader > div > span {
-  color: #e8f5ff;
-  font-size: 14px;
+  color: #9eb1c8;
+  font-size: 8px;
   font-weight: 800;
-  line-height: 1.4;
 }
 
 .walletFieldHeader > div > strong {

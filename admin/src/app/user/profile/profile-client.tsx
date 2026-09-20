@@ -512,7 +512,8 @@ export default function UserProfileClient() {
               <div className={styles.walletField}>
                 <div className={styles.walletFieldHeader}>
                   <div>
-                    <span>USDT (BEP20) Withdrawal Wallet Address</span>
+                    <span>USDT Withdrawal Wallet Address *</span>
+                    <strong>BNB Smart Chain (BEP-20)</strong>
                   </div>
                   {savedWithdrawalAddress ? (
                     <span
