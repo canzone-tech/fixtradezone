@@ -101,10 +101,11 @@ describe('Auth DTOs', () => {
     expect(resend.dto.email).toBe('user@example.com');
   });
 
-  it('trims login identifier without applying registration password policy', async () => {
+  it('trims login identifier and normalizes a valid device installation id', async () => {
     const dto = plainToInstance(LoginDto, {
       identifier: ' USER@EXAMPLE.COM ',
       password: 'x',
+      deviceInstallationId: ' 11111111-1111-4111-8111-111111111111 ',
     });
 
     const errors = await validate(dto, {
@@ -115,6 +116,21 @@ describe('Auth DTOs', () => {
     expect(errors).toHaveLength(0);
     expect(dto.identifier).toBe('USER@EXAMPLE.COM');
     expect(dto.password).toBe('x');
+    expect(dto.deviceInstallationId).toBe(
+      '11111111-1111-4111-8111-111111111111',
+    );
+  });
+
+  it('rejects an invalid login device installation id', async () => {
+    const { errors } = await validatePayload(LoginDto, {
+      identifier: 'user@example.com',
+      password: 'x',
+      deviceInstallationId: 'not-a-device-id',
+    });
+
+    expect(
+      errors.some((error) => error.property === 'deviceInstallationId'),
+    ).toBe(true);
   });
 
   it('accepts JWT-shaped refresh and logout tokens', async () => {
