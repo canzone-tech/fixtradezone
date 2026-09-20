@@ -33,20 +33,17 @@ export default function UserSetupGuide({
   session: UserDirectSession;
 }) {
   const pathname = usePathname();
-  const [approvedDeposit, setApprovedDeposit] = useState(false);
-  const [activePackage, setActivePackage] = useState(false);
-  const [progressLoaded, setProgressLoaded] = useState(false);
-  const [modalDismissed, setModalDismissed] = useState(true);
-
   const profile = session.profileCompletion;
   const modalKey = `ftz:onboarding-dismissed:${session.user.id}:${
     session.user.lastLoginAt ?? session.user.createdAt
   }`;
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setModalDismissed(window.sessionStorage.getItem(modalKey) === "1");
-  }, [modalKey]);
+  const [approvedDeposit, setApprovedDeposit] = useState(false);
+  const [activePackage, setActivePackage] = useState(false);
+  const [progressLoaded, setProgressLoaded] = useState(false);
+  const [modalDismissed, setModalDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.sessionStorage.getItem(modalKey) === "1";
+  });
 
   useEffect(() => {
     let cancelled = false;
