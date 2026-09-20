@@ -487,8 +487,7 @@ export class DuplicateAccountService {
 
     return {
       enforcementMode: config.enforcementMode,
-      action:
-        config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
+      action: config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
       blockLogin: true,
       bindDevice: false,
       matchedUserIds: otherUserIds,

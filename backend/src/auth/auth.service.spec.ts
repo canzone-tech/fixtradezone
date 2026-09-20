@@ -276,7 +276,9 @@ describe('AuthService', () => {
     );
     expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
     expect(transaction.authSession.create).not.toHaveBeenCalled();
-    expect(duplicateAccountService.recordSuccessfulLogin).not.toHaveBeenCalled();
+    expect(
+      duplicateAccountService.recordSuccessfulLogin,
+    ).not.toHaveBeenCalled();
   });
 
   it('passes SUPER_ADMIN exemption context to duplicate-account enforcement', async () => {
