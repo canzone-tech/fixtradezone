@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { platformIsoToLocalDateTimeInput } from "@/lib/platform-time";
 import styles from "./live-market-overview.module.css";
 
 export type LiveMarketSymbol =
@@ -91,6 +92,21 @@ const INTERVALS: Array<{ value: LiveMarketInterval; label: string }> = [
   { value: "1d", label: "1d" },
 ];
 
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
 async function readJson<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -129,25 +145,18 @@ function utcClock(value: string | null | undefined): string {
 }
 
 function axisTime(value: string, interval: LiveMarketInterval): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
+  const platformValue = platformIsoToLocalDateTimeInput(value);
+  if (!platformValue) return "";
+
+  const [datePart, timePart] = platformValue.split("T");
+  const [, month, day] = datePart.split("-");
+  const monthLabel = MONTH_LABELS[Number(month) - 1] ?? month;
 
   if (interval === "1d") {
-    return date.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      timeZone: "UTC",
-    });
+    return `${day} ${monthLabel}`;
   }
 
-  return date.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  });
+  return `${day} ${monthLabel}, ${timePart}`;
 }
 
 function parseCandles(candles: MarketCandle[]): ParsedCandle[] {
@@ -193,11 +202,14 @@ function CandlestickChart({
     const volumeBottom = 420;
     const plotWidth = width - left - right;
     const priceHeight = priceBottom - top;
-    const volumeHeight = volumeBottom - volumeTop;
 
     const rawLow = Math.min(...parsed.map((candle) => candle.lowValue));
     const rawHigh = Math.max(...parsed.map((candle) => candle.highValue));
-    const rawRange = Math.max(rawHigh - rawLow, Math.abs(rawHigh) * 0.0001, 1e-8);
+    const rawRange = Math.max(
+      rawHigh - rawLow,
+      Math.abs(rawHigh) * 0.0001,
+      1e-8,
+    );
     const priceLow = rawLow - rawRange * 0.06;
     const priceHigh = rawHigh + rawRange * 0.06;
     const priceRange = priceHigh - priceLow;
@@ -525,7 +537,9 @@ export default function LiveMarketOverview({
             >
               <span>{option.short}</span>
               <strong>{ticker ? `${compactPrice(ticker.price)} USDT` : "—"}</strong>
-              <small className={optionPositive ? styles.positive : styles.negative}>
+              <small
+                className={optionPositive ? styles.positive : styles.negative}
+              >
                 {ticker
                   ? `${optionPositive ? "+" : ""}${compact(ticker.change24hPercent, 2)}%`
                   : "loading"}
