@@ -81,6 +81,27 @@ describe('DuplicateAccountService', () => {
     },
   );
 
+  it('fails registration closed in BLOCK mode when device identity is missing', async () => {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.evaluateRegistration({
+        context: { ipAddress: '49.37.178.233' },
+      }),
+    ).resolves.toMatchObject({
+      action: 'BLOCKED',
+      blockRegistration: true,
+      restrictAccount: false,
+      deviceInstallationId: null,
+      matchedUserIds: [],
+    });
+  });
+
   it('never treats IP alone as conclusive duplicate identity', async () => {
     prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
       enforcementMode: 'BLOCK',
@@ -103,7 +124,7 @@ describe('DuplicateAccountService', () => {
     });
   });
 
-  it('bypasses enforcement for an allowlisted device installation', async () => {
+  it('bypasses registration enforcement for an allowlisted device installation', async () => {
     prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
       enforcementMode: 'BLOCK',
       deviceSignalEnabled: true,
@@ -131,7 +152,7 @@ describe('DuplicateAccountService', () => {
     expect(prisma.userDeviceInstallation.findMany).not.toHaveBeenCalled();
   });
 
-  it('bypasses enforcement for an allowlisted IP without making IP an identity signal', async () => {
+  it('bypasses registration enforcement for an allowlisted IP without making IP an identity signal', async () => {
     prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
       enforcementMode: 'BLOCK',
       deviceSignalEnabled: true,
@@ -158,6 +179,107 @@ describe('DuplicateAccountService', () => {
     });
 
     expect(prisma.userDeviceInstallation.findMany).not.toHaveBeenCalled();
+  });
+
+  it('blocks a non-super-admin login when the device is linked to another account', async () => {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+    prisma.userDeviceInstallation.findMany.mockResolvedValue([
+      { userId: 'other-user-id' },
+    ]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: DEVICE_ID,
+        context: { ipAddress: '49.37.178.233' },
+      }),
+    ).resolves.toMatchObject({
+      enforcementMode: 'BLOCK',
+      action: 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      matchedUserIds: ['other-user-id'],
+      reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+    });
+  });
+
+  it('allows login when the device is linked only to the same user', async () => {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+    prisma.userDeviceInstallation.findMany.mockResolvedValue([
+      { userId: 'current-user-id' },
+    ]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      matchedUserIds: [],
+    });
+  });
+
+  it('fails non-super-admin login closed in BLOCK mode when device identity is missing', async () => {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        context: { ipAddress: '49.37.178.233' },
+      }),
+    ).resolves.toMatchObject({
+      action: 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      reason: 'DEVICE_INSTALLATION_SIGNAL_MISSING',
+    });
+  });
+
+  it('allows SUPER_ADMIN login on a conflicting device but marks the exemption for audit', async () => {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+    prisma.userDeviceInstallation.findMany.mockResolvedValue([
+      { userId: 'other-user-id' },
+    ]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'founder-id',
+        isSuperAdmin: true,
+        deviceInstallationId: DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'BYPASSED',
+      blockLogin: false,
+      bindDevice: false,
+      matchedUserIds: ['other-user-id'],
+      reason: 'SUPER_ADMIN_EXEMPTION',
+    });
   });
 
   it('normalizes IPv4-mapped request addresses for risk readback', async () => {
