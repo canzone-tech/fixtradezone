@@ -1,117 +1,122 @@
 # FixTradeZone — Current State
 
-## Canonical Checkpoint — 2026-09-15
+## Canonical Checkpoint — 2026-09-20
 
-Repository state plus completed local/runtime acceptance are the delivery
-authority. Source code and CI alone are not treated as complete runtime
-acceptance.
+Repository code plus `/docs` are the permanent source of truth. Do not rely on an older chat summary when repository state differs.
 
-## Mainline Checkpoint
+## Mainline checkpoint
 
-`main` contains the merged SITE-MODE-01 milestone through PR #20.
-
-Accepted main checkpoint before starting PROD-01:
+`main` remains at:
 
 ```text
-3bc1233f443ae459e8002e93a36a4631186a6cf4  Merge pull request #20 — SITE-MODE-01
+4c748968c5553dae42415010a9757f1589cc2883
 ```
 
-SITE-MODE-01 is closed and merged. Its accepted final runtime state was:
+This is the merged PR #29 checkpoint:
 
-```text
-siteMode: LIVE
-operationsMode: AUTOMATIC
-recoveryActive: false
-testerCount: 0
-```
+`fix(portal): complete session, impersonation, referral and live market UX`
 
-Passed SITE-MODE Postman/browser acceptance must not be repeated unless a later
-failure requires a targeted diagnostic retest.
+Production was previously confirmed green at that main checkpoint.
 
-## Active Development Branch
+## Active development branch
 
-`feature/production-cutover-readiness`
+`feature/canonical-trades-profile-onboarding`
 
-## Current Milestone — PROD-01 Production Cutover Readiness
+The current feature contains the canonical Daily Trade -> Internal Trading cutover plus required profile/withdrawal-wallet/onboarding UX work.
 
-Status: **STARTED — REPO/RELEASE DISCOVERY ONLY**.
+Full handoff and locked rules:
 
-Canonical milestone documentation:
+- `docs/CANONICAL-TRADES-PROFILE-ONBOARDING-CHECKPOINT.md`
 
-- `docs/PRODUCTION-CUTOVER.md`
-- `docs/SITE-MODE-CONTROL.md`
+## Current scope status
 
-PROD-01 prepares the first production deployment without importing local/QA
-acceptance data into production and without weakening the locked database,
-security, accounting, or Site Mode architecture.
+### Canonical trading
 
-### Production database decision — LOCKED
+Status: **IMPLEMENTATION COMPLETE IN FEATURE BRANCH; LOCAL ACCEPTANCE PENDING**.
 
-- Keep the accepted local/QA MySQL database intact as test/acceptance evidence.
-- Production uses a separate, fresh MySQL database.
-- Do not copy local synthetic/test business or financial rows into production.
-- Apply production schema only through repository forward migrations with
-  `prisma migrate deploy`.
-- Never use `prisma migrate dev` or `prisma migrate reset`.
-- Never blank/reset a populated live production database after go-live.
-- After LIVE, preserve production history and use audited/forward-only changes.
+Locked architecture:
 
-### First go-live order — LOCKED
+`Daily Trade = immutable source identity/result -> Internal Trading = financial interpretation/settlement`
 
-1. complete repo/release discovery;
-2. provision production infrastructure and secrets;
-3. provision fresh production MySQL;
-4. deploy accepted `main` code;
-5. apply and verify migrations;
-6. perform minimum reviewed production bootstrap;
-7. start public state in `MAINTENANCE` or controlled `TESTING`;
-8. run production smoke/readback checks;
-9. verify tester/recovery baseline;
-10. switch Platform Mode to `LIVE` only as the final release action.
+New canonical normal Internal Trading cannot independently generate schedule, asset, outcome or raw result. It consumes the already-existing Daily Trade and preserves canonical identity. Legacy history remains forward-only and immutable. `TARGET_RECONCILIATION` remains an explicit financial closure path.
 
-No production infrastructure/database mutation is authorized during the current
-repo/discovery phase.
+Migration:
 
-## Current Database / Delivery Facts
+- `0045_canonical_daily_trade_financial_link`
 
-- MySQL is the single relational/business/accounting source of truth.
-- Local accepted schema currently contains 44 Prisma migrations and is up to
-  date.
-- Applied migrations are immutable; corrections are forward-only.
-- Financial/accounting historical facts are never silently rewritten/deleted.
-- UTC remains the locked platform-time standard.
-- FixTradeZone does not use MongoDB.
+### Required profile + BEP-20 withdrawal wallet
 
-## Permanent Delivery Locks
+Status: **IMPLEMENTED IN FEATURE BRANCH; LOCAL ACCEPTANCE PENDING**.
 
-- Repo + `/docs` are the permanent source of truth.
-- Never introduce MongoDB into FixTradeZone.
-- Never use `prisma migrate dev` for delivery.
-- Never reset the application database to bypass a migration/deployment problem.
-- Forward migrations only with `prisma migrate deploy` when a reviewed migration
-  is actually required.
-- `backups/` must never be touched, added, deleted or stashed.
-- `postman/__pycache__/` must never be touched, added, deleted or stashed.
-- Never touch/pop/drop local stashes without explicit approval.
-- Backend remains authoritative for security, financial and business rules;
-  frontend behavior mirrors those rules for UX but cannot replace server
-  enforcement.
-- Complete one module/stage at a time.
-- Repo-first implementation remains locked: feature-branch change -> repository
-  CI/checks -> local fast-forward pull -> local Postman/API acceptance when
-  needed -> browser acceptance -> financial SQL/ledger/readback proof when
-  needed -> PR.
-- Production cutover also proceeds one stage at a time with readback before the
-  next stage.
-- Do not repeat completed modules/tests unless a new failure requires a targeted
-  retest.
+Required profile fields are first name, last name, E.164 mobile and a saved USDT BNB Smart Chain (BEP-20) withdrawal address.
 
-## Product Scope — LOCKED
+The first saved withdrawal address starts a 30-day server-enforced lock. Every later allowed change restarts the 30-day lock. No silent admin bypass exists in this scope.
 
-FixTradeZone does not execute real trades in v1. Any trade-like presentation is
-limited to explicitly labelled simulated activity and must not silently mutate
-real wallet/ledger balances.
+Migration:
 
-Production/live release is the current priority. The first production cutover
-remains HOLD until PROD-01 discovery, infrastructure, migration, bootstrap and
-controlled smoke gates are explicitly completed.
+- `0046_user_withdrawal_profile`
+
+### Payout binding
+
+Status: **IMPLEMENTED IN FEATURE BRANCH; LOCAL ACCEPTANCE PENDING**.
+
+USER payout creation is server-bound to the currently saved profile withdrawal address. Payout history preserves the immutable destination snapshot used when the request was created.
+
+### USER UX
+
+Status: **IMPLEMENTED IN FEATURE BRANCH; BROWSER ACCEPTANCE PENDING**.
+
+Includes:
+
+- exact BEP-20 deposit warning near address/QR;
+- required My Profile withdrawal-address flow with lock status;
+- withdrawal page using saved profile address;
+- permanent `How FixTradeZone Works` page/sidebar link;
+- first-login onboarding checklist;
+- persistent incomplete-profile reminder;
+- dashboard `Getting Started — x/5 completed` using real state.
+
+The existing protected-portal layout/design is locked. Do not redesign global layout, dashboard columns, sidebar dimensions or global typography merely for this feature.
+
+## Project-specific delivery order — LOCKED
+
+For FixTradeZone, use this sequence for every module/API slice:
+
+1. verify branch / HEAD / git status / migration status;
+2. backend + matching frontend/BFF implementation together;
+3. repository CI/build/lint/typecheck/tests;
+4. pull the green checkpoint locally;
+5. apply reviewed forward migrations with `prisma migrate deploy` only;
+6. local Postman/API acceptance first;
+7. browser/UI acceptance after API acceptance;
+8. SQL/ledger/readback proof for financial modules;
+9. docs + commit + push;
+10. PR to `main` only after all local gates are green and Founder approval is explicit.
+
+Do not repeat completed modules/tests unless a new failure requires targeted diagnosis.
+
+## Permanent technical locks
+
+- MySQL only; never MongoDB.
+- Never `prisma migrate dev`.
+- Never reset the application database to bypass migration problems.
+- Applied migrations are immutable; fixes are forward-only.
+- `backups/` must never be touched, added, deleted, stashed or committed.
+- Backend is authoritative for security, business and financial rules.
+- Browser code uses same-origin BFF/HttpOnly session transport; do not expose NestJS bearer/refresh tokens to browser JavaScript.
+- Financial/accounting history is immutable and auditable.
+- UTC remains the operational platform-time standard unless a stored business timezone snapshot is part of the contract.
+- Do not run `pm2 save` unless explicitly approved.
+
+## Next session starting point
+
+Do not reopen trading design work by default; the requested trading implementation changes are done. Start from repository/CI verification, then prepare one local pull checkpoint.
+
+After pull, test in this order:
+
+1. migration status and `0045`/`0046` deployment if required;
+2. Postman: Daily Trade first -> matching canonical Internal Trade -> no duplicate settlement;
+3. Postman: profile required fields, first BEP-20 address save, 30-day lock/change rejection, payout bound to saved address;
+4. browser: profile, deposit warning, withdrawal, onboarding, How It Works, Getting Started;
+5. SQL/ledger/readback proof;
+6. final milestone gate and PR preparation only when green.
