@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import type { DepositsResponse } from "@/lib/deposits";
 import type { UserDirectSession } from "@/lib/user-session";
@@ -34,6 +35,7 @@ export default function UserSetupGuide({
 }) {
   const pathname = usePathname();
   const profile = session.profileCompletion;
+  const modalPortalRootRef = useRef<HTMLElement | null>(null);
   const modalKey = `ftz:onboarding-dismissed:${session.user.id}:${
     session.user.lastLoginAt ?? session.user.createdAt
   }`;
@@ -44,6 +46,14 @@ export default function UserSetupGuide({
     if (typeof window === "undefined") return true;
     return window.sessionStorage.getItem(modalKey) === "1";
   });
+
+  useEffect(() => {
+    modalPortalRootRef.current = document.body;
+
+    return () => {
+      modalPortalRootRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,60 +210,65 @@ export default function UserSetupGuide({
         </section>
       ) : null}
 
-      {showModal ? (
-        <div className={styles.modalBackdrop} role="presentation">
-          <section
-            className={styles.modal}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ftz-onboarding-title"
-          >
-            <button
-              className={styles.modalClose}
-              type="button"
-              aria-label="Dismiss onboarding"
-              onClick={dismissModal}
-            >
-              ×
-            </button>
-            <span className={styles.modalEyebrow}>FIRST-LOGIN ONBOARDING</span>
-            <h2 id="ftz-onboarding-title">Welcome to FixTradeZone</h2>
-            <p>
-              Finish these setup steps so deposits, packages, Daily Trades,
-              wallet activity and withdrawals are ready to use.
-            </p>
+      {showModal && modalPortalRootRef.current
+        ? createPortal(
+            <div className={styles.modalBackdrop} role="presentation">
+              <section
+                className={styles.modal}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="ftz-onboarding-title"
+              >
+                <button
+                  className={styles.modalClose}
+                  type="button"
+                  aria-label="Dismiss onboarding"
+                  onClick={dismissModal}
+                >
+                  ×
+                </button>
+                <span className={styles.modalEyebrow}>FIRST-LOGIN ONBOARDING</span>
+                <h2 id="ftz-onboarding-title">Welcome to FixTradeZone</h2>
+                <p>
+                  Finish these setup steps so deposits, packages, Daily Trades,
+                  wallet activity and withdrawals are ready to use.
+                </p>
 
-            <div className={styles.modalList}>
-              {items.map((item) => (
-                <div key={`modal-${item.key}`}>
-                  <i
-                    className={
-                      item.complete ? "iconoir-check-circle" : "iconoir-circle"
-                    }
-                  />
-                  <span>{item.label}</span>
-                  {!item.complete && item.href ? (
-                    <Link href={item.href} onClick={dismissModal}>
-                      Continue
-                    </Link>
-                  ) : (
-                    <strong>{item.complete ? "Done" : "Pending"}</strong>
-                  )}
+                <div className={styles.modalList}>
+                  {items.map((item) => (
+                    <div key={`modal-${item.key}`}>
+                      <i
+                        className={
+                          item.complete
+                            ? "iconoir-check-circle"
+                            : "iconoir-circle"
+                        }
+                      />
+                      <span>{item.label}</span>
+                      {!item.complete && item.href ? (
+                        <Link href={item.href} onClick={dismissModal}>
+                          Continue
+                        </Link>
+                      ) : (
+                        <strong>{item.complete ? "Done" : "Pending"}</strong>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <div className={styles.modalActions}>
-              <Link href="/user/how-it-works" onClick={dismissModal}>
-                How it works
-              </Link>
-              <button type="button" onClick={dismissModal}>
-                Continue to dashboard
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+                <div className={styles.modalActions}>
+                  <Link href="/user/how-it-works" onClick={dismissModal}>
+                    How it works
+                  </Link>
+                  <button type="button" onClick={dismissModal}>
+                    Continue to dashboard
+                  </button>
+                </div>
+              </section>
+            </div>,
+            modalPortalRootRef.current,
+          )
+        : null}
     </>
   );
 }
