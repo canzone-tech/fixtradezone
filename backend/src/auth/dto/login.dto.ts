@@ -1,5 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { trimString } from './string.transformers';
 
 export class LoginDto {
@@ -13,6 +19,14 @@ export class LoginDto {
   @IsNotEmpty()
   @MaxLength(128)
   password!: string;
+
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @IsOptional()
+  @IsUUID('4')
+  deviceInstallationId?: string;
+
   @Transform(trimString)
   @IsOptional()
   @IsString()
