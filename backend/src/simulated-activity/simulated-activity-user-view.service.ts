@@ -75,7 +75,10 @@ export class SimulatedActivityUserViewService {
     return {
       ...activity,
       events,
-      total: Math.max(0, activity.total - this.countNumber(hiddenRows[0]?.total)),
+      total: Math.max(
+        0,
+        activity.total - this.countNumber(hiddenRows[0]?.total),
+      ),
     };
   }
 
