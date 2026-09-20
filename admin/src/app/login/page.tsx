@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import { clearSessionLockStorage } from "@/lib/session-lock-client";
 
 interface ErrorPayload {
@@ -167,6 +168,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      const deviceInstallationId = await getOrCreateDeviceInstallationId();
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -175,6 +177,7 @@ export default function LoginPage() {
         body: JSON.stringify({
           identifier: identifier.trim(),
           password,
+          deviceInstallationId,
           ...(captcha
             ? {
                 captchaId: captcha.challengeId,
