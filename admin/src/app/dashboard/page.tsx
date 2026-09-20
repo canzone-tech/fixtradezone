@@ -20,11 +20,14 @@ export default async function DashboardPage() {
       <>
         <DashboardClient />
         <div
-          style={{
-            padding: "0 clamp(22px, 4vw, 48px) 52px",
-          }}
+          className="ftz-dashboard"
+          style={{ minHeight: 0, background: "transparent" }}
         >
-          <DashboardMarketPanel />
+          <div className="ftz-dashboard-layout">
+            <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+              <DashboardMarketPanel />
+            </section>
+          </div>
         </div>
       </>
     </AdminShell>
