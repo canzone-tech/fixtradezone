@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
 import { formatPlatformDateTime } from "@/lib/platform-time";
-import type { UserDirectSession } from "@/lib/user-session";
+import type {
+  UserDirectSession,
+  UserProfileCompletion,
+} from "@/lib/user-session";
 import styles from "./profile.module.css";
 
 interface ErrorPayload {
@@ -14,6 +17,7 @@ interface ErrorPayload {
 
 interface ProfileUpdatePayload extends ErrorPayload {
   user?: UserDirectSession["user"];
+  profileCompletion?: UserProfileCompletion | null;
 }
 
 interface CountryDialOption {
@@ -115,6 +119,10 @@ function combinedPhone(countryCode: string, mobileNumber: string) {
   return digits ? `${countryCode}${digits}` : "";
 }
 
+function isEvmAddress(value: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(value.trim());
+}
+
 export default function UserProfileClient() {
   const router = useRouter();
 
@@ -123,6 +131,8 @@ export default function UserProfileClient() {
   const [lastName, setLastName] = useState("");
   const [countryCode, setCountryCode] = useState("+91");
   const [mobileNumber, setMobileNumber] = useState("");
+  const [withdrawalAddress, setWithdrawalAddress] = useState("");
+  const [confirmAddressChange, setConfirmAddressChange] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -169,6 +179,9 @@ export default function UserProfileClient() {
           setLastName(payload.user.lastName ?? "");
           setCountryCode(parsedPhone.countryCode);
           setMobileNumber(parsedPhone.mobileNumber);
+          setWithdrawalAddress(
+            payload.profileCompletion?.withdrawal.address ?? "",
+          );
         }
       } catch (caught) {
         if (mounted) {
@@ -207,22 +220,66 @@ export default function UserProfileClient() {
     );
   }, [session]);
 
+  const profile = session?.profileCompletion ?? null;
+  const savedWithdrawalAddress = profile?.withdrawal.address ?? null;
+  const addressLocked = Boolean(savedWithdrawalAddress && !profile?.withdrawal.canChange);
+  const addressChanging = Boolean(
+    savedWithdrawalAddress &&
+      profile?.withdrawal.canChange &&
+      withdrawalAddress.trim() !== savedWithdrawalAddress,
+  );
+
   async function saveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) return;
 
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
     const normalizedMobile = mobileNumber.replace(/\D/g, "");
+    const normalizedAddress = withdrawalAddress.trim();
 
-    if (normalizedMobile && !countryCode) {
-      setSaveError("Select a country code for the mobile number.");
+    if (!normalizedFirstName || !normalizedLastName) {
+      setSaveError("First name and last name are required.");
+      setSaveMessage("");
+      return;
+    }
+
+    if (!countryCode || !normalizedMobile) {
+      setSaveError("Country code and mobile number are required.");
       setSaveMessage("");
       return;
     }
 
     const phone = combinedPhone(countryCode, normalizedMobile);
 
-    if (phone && phone.replace(/\D/g, "").length > 15) {
+    if (phone.replace(/\D/g, "").length > 15) {
       setSaveError("Mobile number must fit the E.164 limit of 15 digits.");
+      setSaveMessage("");
+      return;
+    }
+
+    if (!isEvmAddress(normalizedAddress)) {
+      setSaveError(
+        "Enter a valid USDT BNB Smart Chain (BEP-20) address (0x + 40 hexadecimal characters).",
+      );
+      setSaveMessage("");
+      return;
+    }
+
+    if (addressLocked && normalizedAddress !== savedWithdrawalAddress) {
+      setSaveError(
+        `Withdrawal address is locked until ${formatPlatformDateTime(
+          profile?.withdrawal.lockedUntil ?? null,
+        )}.`,
+      );
+      setSaveMessage("");
+      return;
+    }
+
+    if (addressChanging && !confirmAddressChange) {
+      setSaveError(
+        "Confirm the withdrawal address change. A successful change starts a new 30-day lock.",
+      );
       setSaveMessage("");
       return;
     }
@@ -236,9 +293,10 @@ export default function UserProfileClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          firstName,
-          lastName,
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
           phone,
+          withdrawalAddress: normalizedAddress,
         }),
       });
       const payload = await readPayload<ProfileUpdatePayload>(response);
@@ -260,6 +318,8 @@ export default function UserProfileClient() {
           ? {
               ...current,
               user: payload.user as UserDirectSession["user"],
+              profileCompletion:
+                payload.profileCompletion ?? current.profileCompletion,
             }
           : current,
       );
@@ -267,6 +327,10 @@ export default function UserProfileClient() {
       setLastName(payload.user.lastName ?? "");
       setCountryCode(parsedPhone.countryCode);
       setMobileNumber(parsedPhone.mobileNumber);
+      setWithdrawalAddress(
+        payload.profileCompletion?.withdrawal.address ?? normalizedAddress,
+      );
+      setConfirmAddressChange(false);
       setSaveMessage(payload.message ?? "Profile updated successfully.");
     } catch (caught) {
       setSaveError(
@@ -310,8 +374,8 @@ export default function UserProfileClient() {
             <span className={styles.eyebrow}>ACCOUNT & SECURITY</span>
             <h2>{displayName}</h2>
             <p>
-              Your registration identity is intentionally minimal. First name,
-              last name and mobile are optional and can be maintained here.
+              Complete the required identity details and save the USDT withdrawal
+              address that FixTradeZone must use for future withdrawals.
             </p>
 
             <div className={styles.badges}>
@@ -319,12 +383,10 @@ export default function UserProfileClient() {
                 <i className="iconoir-shield-check" />
                 {user.status}
               </span>
-              {user.roles.map((role) => (
-                <span key={role}>
-                  <i className="iconoir-user" />
-                  {role}
-                </span>
-              ))}
+              <span data-complete={profile?.complete ? "true" : "false"}>
+                <i className={profile?.complete ? "iconoir-check-circle" : "iconoir-warning-triangle"} />
+                {profile?.complete ? "PROFILE COMPLETE" : "PROFILE INCOMPLETE"}
+              </span>
             </div>
           </div>
 
@@ -339,35 +401,35 @@ export default function UserProfileClient() {
               <i className="iconoir-user" />
             </span>
             <div>
-              <small>ACCOUNT STATUS</small>
-              <strong>{user.status}</strong>
+              <small>PROFILE STATUS</small>
+              <strong>{profile?.complete ? "COMPLETE" : "ACTION REQUIRED"}</strong>
             </div>
           </article>
           <article>
             <span>
-              <i className="iconoir-key" />
+              <i className="iconoir-mail" />
             </span>
             <div>
-              <small>ACCESS ROLE</small>
-              <strong>USER</strong>
+              <small>EMAIL</small>
+              <strong>{profile?.emailVerified ? "VERIFIED" : "NOT VERIFIED"}</strong>
             </div>
           </article>
           <article>
             <span>
-              <i className="iconoir-clock" />
+              <i className="iconoir-wallet" />
             </span>
             <div>
-              <small>LAST LOGIN</small>
-              <strong>{formatDate(user.lastLoginAt)}</strong>
+              <small>WITHDRAWAL NETWORK</small>
+              <strong>USDT · BEP-20</strong>
             </div>
           </article>
           <article>
             <span>
-              <i className="iconoir-timer" />
+              <i className="iconoir-lock" />
             </span>
             <div>
-              <small>IDLE SECURITY</small>
-              <strong>{session.sessionPolicy.idleLockMinutes} MIN</strong>
+              <small>ADDRESS CHANGE LOCK</small>
+              <strong>{savedWithdrawalAddress ? "30 DAYS" : "STARTS ON SAVE"}</strong>
             </div>
           </article>
         </section>
@@ -376,7 +438,7 @@ export default function UserProfileClient() {
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
               <div>
-                <span>OPTIONAL PROFILE</span>
+                <span>REQUIRED PROFILE</span>
                 <h3>Personal Details</h3>
               </div>
               <i className="iconoir-edit-pencil" />
@@ -385,27 +447,27 @@ export default function UserProfileClient() {
             <form className={styles.profileForm} onSubmit={saveProfile}>
               <div className={styles.formGrid}>
                 <label>
-                  <span>First name</span>
+                  <span>First name *</span>
                   <input
                     type="text"
                     value={firstName}
                     onChange={(event) => setFirstName(event.target.value)}
                     maxLength={100}
                     autoComplete="given-name"
-                    placeholder="Optional"
+                    placeholder="Required"
                     disabled={saving}
                   />
                 </label>
 
                 <label>
-                  <span>Last name</span>
+                  <span>Last name *</span>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(event) => setLastName(event.target.value)}
                     maxLength={100}
                     autoComplete="family-name"
-                    placeholder="Optional"
+                    placeholder="Required"
                     disabled={saving}
                   />
                 </label>
@@ -413,23 +475,13 @@ export default function UserProfileClient() {
 
               <div className={styles.formGrid}>
                 <label>
-                  <span>Country code</span>
+                  <span>Country code *</span>
                   <select
                     value={countryCode}
                     onChange={(event) => setCountryCode(event.target.value)}
                     autoComplete="tel-country-code"
                     disabled={saving}
-                    style={{
-                      width: "100%",
-                      height: 42,
-                      padding: "0 12px",
-                      border: "1px solid rgba(83, 119, 176, 0.28)",
-                      borderRadius: 9,
-                      outline: 0,
-                      color: "#eaf2ff",
-                      background: "rgba(2, 11, 27, 0.96)",
-                      fontSize: 10,
-                    }}
+                    className={styles.select}
                   >
                     <option value="">Select country code</option>
                     {COUNTRY_DIAL_OPTIONS.map((option) => (
@@ -441,7 +493,7 @@ export default function UserProfileClient() {
                 </label>
 
                 <label>
-                  <span>Mobile number</span>
+                  <span>Mobile number *</span>
                   <input
                     type="tel"
                     inputMode="numeric"
@@ -451,17 +503,82 @@ export default function UserProfileClient() {
                     }
                     maxLength={15}
                     autoComplete="tel-national"
-                    placeholder="Optional · number only"
+                    placeholder="Required · number only"
                     disabled={saving}
                   />
                 </label>
               </div>
 
+              <div className={styles.walletField}>
+                <div className={styles.walletFieldHeader}>
+                  <div>
+                    <span>USDT Withdrawal Wallet Address *</span>
+                    <strong>BNB Smart Chain (BEP-20)</strong>
+                  </div>
+                  {savedWithdrawalAddress ? (
+                    <span
+                      className={styles.lockBadge}
+                      data-locked={addressLocked ? "true" : "false"}
+                    >
+                      <i className={addressLocked ? "iconoir-lock" : "iconoir-unlock"} />
+                      {addressLocked ? "LOCKED" : "CHANGE AVAILABLE"}
+                    </span>
+                  ) : null}
+                </div>
+
+                <input
+                  className={styles.monoInput}
+                  type="text"
+                  value={withdrawalAddress}
+                  onChange={(event) => {
+                    setWithdrawalAddress(event.target.value.trim());
+                    setConfirmAddressChange(false);
+                  }}
+                  maxLength={191}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  placeholder="0x…"
+                  disabled={saving || addressLocked}
+                />
+
+                {savedWithdrawalAddress && profile?.withdrawal.lockedUntil ? (
+                  <p className={styles.lockText}>
+                    {addressLocked
+                      ? `Withdrawal address locked until ${formatPlatformDateTime(
+                          profile.withdrawal.lockedUntil,
+                        )}.`
+                      : "The previous 30-day lock has ended. Changing the address starts a new 30-day lock."}
+                  </p>
+                ) : (
+                  <p className={styles.lockText}>
+                    The first successful save immediately starts a 30-day address
+                    change lock. Withdrawals always use the currently saved address.
+                  </p>
+                )}
+
+                {addressChanging ? (
+                  <label className={styles.securityConfirm}>
+                    <input
+                      type="checkbox"
+                      checked={confirmAddressChange}
+                      onChange={(event) =>
+                        setConfirmAddressChange(event.target.checked)
+                      }
+                      disabled={saving}
+                    />
+                    <span>
+                      I confirm this new BEP-20 address is correct and understand
+                      that saving it starts a new 30-day change lock.
+                    </span>
+                  </label>
+                ) : null}
+              </div>
+
               <p className={styles.formHint}>
-                Mobile is saved in E.164 format by combining the selected country
-                code with the number. Leave the mobile number blank and save to
-                clear it. Email and username remain account identifiers and are not
-                changed here.
+                Mobile is stored in E.164 format. Email and username remain account
+                identifiers and are not changed here. Withdrawal-address saves and
+                changes are validated server-side and written to the audit log.
               </p>
 
               {saveError ? (
@@ -474,7 +591,7 @@ export default function UserProfileClient() {
               ) : null}
 
               <button type="submit" disabled={saving}>
-                <span>{saving ? "Saving…" : "Save optional details"}</span>
+                <span>{saving ? "Saving…" : "Save required profile"}</span>
                 <i className="iconoir-check" />
               </button>
             </form>
@@ -484,7 +601,7 @@ export default function UserProfileClient() {
             <div className={styles.panelHeader}>
               <div>
                 <span>ACCOUNT</span>
-                <h3>Identity Details</h3>
+                <h3>Identity & Withdrawal Details</h3>
               </div>
               <i className="iconoir-profile-circle" />
             </div>
@@ -504,7 +621,25 @@ export default function UserProfileClient() {
               </div>
               <div>
                 <dt>Mobile</dt>
-                <dd>{user.phone || "Not set"}</dd>
+                <dd>{user.phone || "Required"}</dd>
+              </div>
+              <div className={styles.detailWide}>
+                <dt>Saved withdrawal address</dt>
+                <dd className={styles.monoText}>
+                  {savedWithdrawalAddress || "Required"}
+                </dd>
+              </div>
+              <div>
+                <dt>Network</dt>
+                <dd>{profile?.withdrawal.networkDisplayName ?? "BNB Smart Chain (BEP-20)"}</dd>
+              </div>
+              <div>
+                <dt>Address saved</dt>
+                <dd>
+                  {profile?.withdrawal.savedAt
+                    ? formatPlatformDateTime(profile.withdrawal.savedAt)
+                    : "Not saved"}
+                </dd>
               </div>
               <div>
                 <dt>Created</dt>
@@ -523,11 +658,11 @@ export default function UserProfileClient() {
             <i className="iconoir-shield-check" />
           </span>
           <div>
-            <strong>Protected account boundary</strong>
+            <strong>Protected withdrawal boundary</strong>
             <p>
-              Optional profile updates are authenticated, validated server-side
-              and audited. Profile changes are disabled during administrator
-              impersonation.
+              The Withdrawal page cannot substitute an arbitrary destination. It
+              uses this saved profile address, while each payout request keeps an
+              immutable address snapshot for history and review.
             </p>
           </div>
         </section>
