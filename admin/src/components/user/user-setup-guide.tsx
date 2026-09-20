@@ -67,7 +67,11 @@ export default function UserSetupGuide({
         setApprovedDeposit(
           Boolean(deposits?.deposits.some((item) => item.status === "APPROVED")),
         );
-        setActivePackage(Boolean(subscriptions?.active?.length));
+        setActivePackage(
+          Boolean(
+            subscriptions?.active?.length || subscriptions?.history?.length,
+          ),
+        );
       } finally {
         if (!cancelled) setProgressLoaded(true);
       }
