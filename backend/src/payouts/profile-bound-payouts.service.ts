@@ -17,6 +17,9 @@ interface WithdrawalProfileRow {
   asset: string;
   networkCode: string;
   validationProfile: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
 }
 
 /**
@@ -41,15 +44,28 @@ export class ProfileBoundPayoutsService extends PayoutsService {
   ) {
     const rows = await this.profilePrisma.$queryRaw<WithdrawalProfileRow[]>(
       Prisma.sql`
-        SELECT destinationAddress, asset, networkCode, validationProfile
-        FROM user_withdrawal_profiles
-        WHERE userId = ${actor.id}
+        SELECT
+          p.destinationAddress,
+          p.asset,
+          p.networkCode,
+          p.validationProfile,
+          u.firstName,
+          u.lastName,
+          u.phone
+        FROM user_withdrawal_profiles p
+        INNER JOIN users u ON u.id = p.userId
+        WHERE p.userId = ${actor.id}
         LIMIT 1
       `,
     );
     const profile = rows[0];
 
-    if (!profile) {
+    if (
+      !profile ||
+      !profile.firstName?.trim() ||
+      !profile.lastName?.trim() ||
+      !profile.phone?.trim()
+    ) {
       throw new ConflictException(
         'Complete your profile and save a USDT BEP-20 withdrawal address before requesting a withdrawal.',
       );
