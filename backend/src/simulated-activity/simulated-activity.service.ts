@@ -86,6 +86,8 @@ interface SubscriptionRow {
   status: 'ACTIVE' | 'COMPLETED' | 'SUPERSEDED' | 'CANCELLED';
   activatedAt: Date;
   scheduledEndAt: Date;
+  settlementTimezone: string;
+  rewardStartMode: string;
 }
 
 interface EventRow {
@@ -927,9 +929,10 @@ export class SimulatedActivityService {
         subscriptionId,
         true,
       );
+      const activityStartAt = this.activityStartAt(subscription);
       if (
         subscription.status !== 'ACTIVE' ||
-        subscription.activatedAt > asOf ||
+        activityStartAt > asOf ||
         subscription.scheduledEndAt <= asOf
       ) {
         return {
@@ -948,8 +951,8 @@ export class SimulatedActivityService {
         policy.timezoneSnapshot,
       );
       const anchor =
-        subscription.activatedAt > policy.effectiveFrom
-          ? subscription.activatedAt
+        activityStartAt > policy.effectiveFrom
+          ? activityStartAt
           : policy.effectiveFrom;
 
       let createdEvents = 0;
@@ -1107,7 +1110,8 @@ export class SimulatedActivityService {
     const rows = await client.$queryRaw<SubscriptionRow[]>(Prisma.sql`
       SELECT
         id, userId, packagePlanVersionId, packagePlanItemId,
-        packageCode, packageDisplayName, status, activatedAt, scheduledEndAt
+        packageCode, packageDisplayName, status, activatedAt, scheduledEndAt,
+        settlementTimezone, rewardStartMode
       FROM user_package_subscriptions
       WHERE id = ${subscriptionId}
       LIMIT 1
@@ -1117,6 +1121,18 @@ export class SimulatedActivityService {
       throw new NotFoundException('Package subscription was not found.');
     }
     return rows[0];
+  }
+
+  private activityStartAt(subscription: SubscriptionRow): Date {
+    if (subscription.rewardStartMode === 'NEXT_CALENDAR_DAY') {
+      validateIanaTimezone(subscription.settlementTimezone);
+      return nextLocalDateStartUtc(
+        subscription.activatedAt,
+        subscription.settlementTimezone,
+      );
+    }
+
+    return subscription.activatedAt;
   }
 
   private normalizedPolicyConfig(row: PolicyRow): NormalizedPolicyConfig {
