@@ -127,8 +127,8 @@ export default function UserSetupGuide({
 
   const completed = items.filter((item) => item.complete).length;
   const setupComplete = completed === items.length;
-  const showDashboardGuide =
-    pathname === "/user/dashboard" && progressLoaded && !setupComplete;
+  const onDashboard = pathname === "/user/dashboard";
+  const showDashboardGuide = onDashboard && progressLoaded && !setupComplete;
   const showModal = showDashboardGuide && !modalDismissed;
 
   function dismissModal() {
@@ -154,6 +154,15 @@ export default function UserSetupGuide({
         </div>
       ) : null}
 
+      {onDashboard ? (
+        <div className={styles.dashboardGuideLink}>
+          <Link href="/user/how-it-works">
+            <i className="iconoir-book" />
+            <span>How FixTradeZone Works</span>
+          </Link>
+        </div>
+      ) : null}
+
       {showDashboardGuide ? (
         <section className={styles.progressCard} aria-label="Getting Started">
           <div className={styles.progressHeader}>
@@ -163,7 +172,6 @@ export default function UserSetupGuide({
                 Getting Started — {completed}/{items.length} completed
               </h2>
             </div>
-            <Link href="/user/how-it-works">How FixTradeZone Works</Link>
           </div>
 
           <div className={styles.progressTrack}>
