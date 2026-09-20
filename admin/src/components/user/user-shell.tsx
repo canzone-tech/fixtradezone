@@ -132,8 +132,25 @@ export default function UserShell({
 
         <div className={`ftz-page-frame ${styles.content}`}>
           {showPlatformPromise ? <PlatformPromise /> : null}
-          {session && !isImpersonationSession(session) ? (
-            <UserSetupGuide session={session} />
+          {session && !impersonated ? (
+            showPlatformPromise ? (
+              <div
+                className="ftz-dashboard"
+                style={{
+                  minHeight: 0,
+                  paddingBottom: 0,
+                  background: "transparent",
+                }}
+              >
+                <div className="ftz-dashboard-layout">
+                  <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                    <UserSetupGuide session={session} />
+                  </section>
+                </div>
+              </div>
+            ) : (
+              <UserSetupGuide session={session} />
+            )
           ) : null}
           {children}
           {showMarketOverview ? (
