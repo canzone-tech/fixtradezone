@@ -1,0 +1,321 @@
+.profileBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 184, 76, 0.28);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 184, 76, 0.08), transparent 42%),
+    rgba(25, 19, 8, 0.72);
+}
+
+.profileBanner div {
+  display: grid;
+  gap: 4px;
+}
+
+.profileBanner strong {
+  color: #ffe0a0;
+  font-size: 14px;
+}
+
+.profileBanner span {
+  max-width: 780px;
+  color: #aa9876;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.profileBanner a,
+.progressHeader a,
+.setupItem a,
+.modalList a,
+.modalActions a {
+  color: #48e4d6;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.profileBanner > a {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid rgba(72, 228, 214, 0.24);
+  border-radius: 9px;
+  background: rgba(8, 121, 121, 0.12);
+}
+
+.dashboardGuideLink {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.dashboardGuideLink a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid rgba(72, 228, 214, 0.24);
+  border-radius: 9px;
+  color: #48e4d6;
+  background: rgba(8, 121, 121, 0.12);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.dashboardGuideLink a:hover {
+  border-color: rgba(72, 228, 214, 0.46);
+  background: rgba(8, 121, 121, 0.2);
+}
+
+.dashboardGuideLink a:focus-visible {
+  outline: 2px solid #48e4d6;
+  outline-offset: 2px;
+}
+
+.progressCard {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid rgba(42, 211, 236, 0.14);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(24, 224, 203, 0.08), transparent 34%),
+    rgba(5, 18, 39, 0.82);
+}
+
+.progressHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.progressHeader span,
+.modalEyebrow {
+  color: #27e6db;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.progressHeader h2 {
+  margin: 6px 0 0;
+  color: #eff8ff;
+  font-size: 18px;
+}
+
+.progressTrack {
+  height: 6px;
+  margin-top: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0a8f94, #18d4a5);
+  transition: width 0.25s ease;
+}
+
+.itemGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.setupItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(97, 133, 177, 0.12);
+  border-radius: 10px;
+  color: #7d91aa;
+  background: rgba(3, 11, 27, 0.4);
+  font-size: 13px;
+}
+
+.setupItem[data-complete="true"] {
+  border-color: rgba(25, 219, 163, 0.16);
+  color: #8ee5c7;
+  background: rgba(8, 97, 68, 0.08);
+}
+
+.setupItem i {
+  color: #33daca;
+  font-size: 15px;
+}
+
+.setupItem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  place-items: center;
+  padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: rgba(1, 6, 16, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.modal {
+  position: relative;
+  width: min(620px, 100%);
+  padding: 26px;
+  border: 1px solid rgba(42, 211, 236, 0.2);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 92% 8%, rgba(20, 224, 191, 0.1), transparent 30%),
+    #061326;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+}
+
+.modal h2 {
+  margin: 8px 0 8px;
+  color: #f4f9ff;
+  font-size: 24px;
+}
+
+.modal > p {
+  max-width: 540px;
+  margin: 0;
+  color: #7d91aa;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.modalClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(115, 145, 183, 0.2);
+  border-radius: 9px;
+  color: #adc1d9;
+  background: rgba(3, 12, 29, 0.72);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.modalList {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.modalList > div {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(93, 131, 174, 0.12);
+  border-radius: 10px;
+  background: rgba(2, 11, 27, 0.44);
+}
+
+.modalList i {
+  color: #30d8cb;
+  font-size: 17px;
+}
+
+.modalList span {
+  color: #d4e0ee;
+  font-size: 14px;
+}
+
+.modalList strong {
+  color: #7890a9;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.modalActions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(90deg, #078a88, #0bbb8e 52%, #0fc997);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .itemGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .profileBanner,
+  .progressHeader,
+  .modalActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profileBanner > a {
+    text-align: center;
+  }
+
+  .dashboardGuideLink {
+    justify-content: stretch;
+  }
+
+  .dashboardGuideLink a {
+    width: 100%;
+  }
+
+  .itemGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    padding: 22px 18px;
+  }
+
+  .modalActions button,
+  .modalActions a {
+    width: 100%;
+    text-align: center;
+  }
+}

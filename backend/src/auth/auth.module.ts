@@ -16,6 +16,7 @@ import { ImpersonationAuthGuard } from './impersonation-auth.guard';
 import { ImpersonationController } from './impersonation.controller';
 import { ImpersonationStrategy } from './impersonation.strategy';
 import { JwtStrategy } from './jwt.strategy';
+import { OwnProfileController } from './own-profile.controller';
 import { OwnProfileService } from './own-profile.service';
 import { PasswordResetService } from './password-reset.service';
 import { PasswordService } from './password.service';
@@ -37,7 +38,7 @@ import { TokenService } from './token.service';
     SecurityConfigModule,
     JwtModule.register({}),
   ],
-  controllers: [AuthController, ImpersonationController],
+  controllers: [AuthController, ImpersonationController, OwnProfileController],
   providers: [
     AuthService,
     ChangePasswordService,

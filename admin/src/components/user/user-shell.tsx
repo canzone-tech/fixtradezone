@@ -11,6 +11,7 @@ import {
   isImpersonationSession,
   type UserPortalSession,
 } from "@/lib/user-session";
+import UserSetupGuide from "./user-setup-guide";
 import UserSidebar from "./user-sidebar";
 import UserTopbar from "./user-topbar";
 import styles from "./user-shell.module.css";
@@ -131,6 +132,26 @@ export default function UserShell({
 
         <div className={`ftz-page-frame ${styles.content}`}>
           {showPlatformPromise ? <PlatformPromise /> : null}
+          {session && !impersonated ? (
+            showPlatformPromise ? (
+              <div
+                className="ftz-dashboard"
+                style={{
+                  minHeight: 0,
+                  paddingBottom: 0,
+                  background: "transparent",
+                }}
+              >
+                <div className="ftz-dashboard-layout">
+                  <section style={{ gridColumn: "1 / -1", minWidth: 0 }}>
+                    <UserSetupGuide session={session} />
+                  </section>
+                </div>
+              </div>
+            ) : (
+              <UserSetupGuide session={session} />
+            )
+          ) : null}
           {children}
           {showMarketOverview ? (
             <div

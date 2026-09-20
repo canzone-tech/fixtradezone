@@ -17,12 +17,14 @@ import {
   setAuthCookies,
 } from "@/lib/auth";
 import { backendFetch, readJson } from "@/lib/backend";
+import type { UserProfileCompletion } from "@/lib/user-session";
 
 const DEFAULT_IDLE_LOCK_MINUTES = 5;
 
 interface ProfilePayload {
   message?: string;
   user?: AdminUser;
+  profileCompletion?: UserProfileCompletion;
 }
 
 function sessionExpired(): NextResponse {
@@ -88,6 +90,29 @@ function readIdleLockMinutes(payload: unknown): number | null {
   return null;
 }
 
+function isProfileCompletion(value: unknown): value is UserProfileCompletion {
+  if (typeof value !== "object" || value === null) return false;
+
+  const profile = value as Record<string, unknown>;
+  const withdrawal = profile.withdrawal;
+
+  return (
+    typeof profile.complete === "boolean" &&
+    typeof profile.emailVerified === "boolean" &&
+    Array.isArray(profile.missingFields) &&
+    profile.missingFields.every((item) => typeof item === "string") &&
+    Array.isArray(profile.requiredFields) &&
+    typeof withdrawal === "object" &&
+    withdrawal !== null &&
+    typeof (withdrawal as Record<string, unknown>).asset === "string" &&
+    typeof (withdrawal as Record<string, unknown>).networkCode === "string" &&
+    ((withdrawal as Record<string, unknown>).address === null ||
+      typeof (withdrawal as Record<string, unknown>).address === "string") &&
+    typeof (withdrawal as Record<string, unknown>).canChange === "boolean" &&
+    typeof (withdrawal as Record<string, unknown>).lockDays === "number"
+  );
+}
+
 async function loadIdleLockMinutes(accessToken: string): Promise<number> {
   try {
     const response = await backendFetch("/auth/session-policy", {
@@ -109,11 +134,37 @@ async function loadIdleLockMinutes(accessToken: string): Promise<number> {
   }
 }
 
+async function loadProfileCompletion(
+  accessToken: string,
+): Promise<UserProfileCompletion | null> {
+  try {
+    const response = await backendFetch("/auth/me/profile", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) return null;
+
+    const payload = await readJson(response);
+    if (typeof payload !== "object" || payload === null) return null;
+
+    const completion = (payload as Record<string, unknown>).profileCompletion;
+    return isProfileCompletion(completion) ? completion : null;
+  } catch {
+    return null;
+  }
+}
+
 async function createUserSessionResponse(
   user: AdminUser,
   accessToken: string,
 ): Promise<NextResponse> {
-  const idleLockMinutes = await loadIdleLockMinutes(accessToken);
+  const [idleLockMinutes, profileCompletion] = await Promise.all([
+    loadIdleLockMinutes(accessToken),
+    loadProfileCompletion(accessToken),
+  ]);
 
   return NextResponse.json(
     {
@@ -121,6 +172,7 @@ async function createUserSessionResponse(
       sessionPolicy: {
         idleLockMinutes,
       },
+      profileCompletion,
     },
     {
       headers: {
@@ -322,6 +374,10 @@ export async function PATCH(request: NextRequest) {
       {
         message: payload.message ?? "Profile updated successfully.",
         user: payload.user,
+        profileCompletion:
+          payload.profileCompletion && isProfileCompletion(payload.profileCompletion)
+            ? payload.profileCompletion
+            : null,
       },
       {
         status: 200,

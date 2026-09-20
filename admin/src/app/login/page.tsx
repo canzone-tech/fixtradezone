@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { clearSessionLockStorage } from "@/lib/session-lock-client";
 
 interface ErrorPayload {
   message?: string;
@@ -26,6 +27,9 @@ interface CaptchaChallenge {
 interface LoginSuccessPayload {
   passwordChangeRequired?: boolean;
   redirectTo?: "/dashboard" | "/user/dashboard";
+  user?: {
+    id?: string;
+  };
 }
 
 async function requestLoginCaptcha(): Promise<
@@ -205,6 +209,19 @@ export default function LoginPage() {
         "redirectTo" in payload && payload.redirectTo === "/user/dashboard"
           ? "/user/dashboard"
           : "/dashboard";
+
+      const authenticatedUserId =
+        "user" in payload &&
+        payload.user &&
+        typeof payload.user.id === "string"
+          ? payload.user.id
+          : null;
+
+      if (authenticatedUserId) {
+        clearSessionLockStorage(
+          `${redirectTo === "/user/dashboard" ? "user" : "admin"}:${authenticatedUserId}`,
+        );
+      }
 
       router.replace(redirectTo);
       router.refresh();

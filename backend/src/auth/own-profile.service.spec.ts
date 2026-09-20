@@ -38,6 +38,19 @@ const authRecord = {
   ],
 };
 
+const withdrawalRow = {
+  userId: activeUser.id,
+  asset: 'USDT',
+  networkCode: 'BEP20',
+  validationProfile: 'EVM',
+  destinationAddress: '0x1111111111111111111111111111111111111111',
+  savedAt: new Date('2026-09-20T00:00:00.000Z'),
+  lockedUntil: new Date('2026-10-20T00:00:00.000Z'),
+  revision: 1,
+  createdAt: new Date('2026-09-20T00:00:00.000Z'),
+  updatedAt: new Date('2026-09-20T00:00:00.000Z'),
+};
+
 describe('OwnProfileService', () => {
   const transaction = {
     user: {
@@ -55,9 +68,15 @@ describe('OwnProfileService', () => {
     auditLog: {
       create: jest.fn(),
     },
+    $queryRawUnsafe: jest.fn(),
+    $executeRaw: jest.fn(),
   };
 
   const prisma = {
+    user: {
+      findUnique: jest.fn(),
+    },
+    $queryRawUnsafe: jest.fn(),
     $transaction: jest.fn(
       async (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -74,6 +93,7 @@ describe('OwnProfileService', () => {
       firstName: null,
       lastName: null,
       phone: null,
+      emailVerifiedAt: new Date('2026-09-03T00:00:00.000Z'),
     });
     transaction.user.findFirst.mockResolvedValue(null);
     transaction.user.update.mockResolvedValue(authRecord);
@@ -85,11 +105,14 @@ describe('OwnProfileService', () => {
       id: 'claim-id',
     });
     transaction.auditLog.create.mockResolvedValue({ id: 'audit-id' });
+    transaction.$queryRawUnsafe.mockResolvedValue([]);
+    transaction.$executeRaw.mockResolvedValue(1);
+    prisma.$queryRawUnsafe.mockResolvedValue([]);
 
     service = new OwnProfileService(prisma as unknown as PrismaService);
   });
 
-  it('updates optional profile fields and creates a mobile uniqueness claim', async () => {
+  it('updates profile fields and creates a mobile uniqueness claim', async () => {
     const result = await service.update(
       activeUser,
       {
@@ -123,10 +146,12 @@ describe('OwnProfileService', () => {
         action: 'UPDATE',
         entityType: 'User',
         entityId: activeUser.id,
-        description: 'User updated optional profile details.',
+        description: 'User updated profile details.',
         metadata: {
           source: 'SELF_PROFILE',
           changedFields: ['firstName', 'lastName', 'phone'],
+          withdrawalNetwork: null,
+          withdrawalAddressLockedUntil: null,
         },
         ipAddress: '127.0.0.1',
         userAgent: 'Jest',
@@ -139,13 +164,14 @@ describe('OwnProfileService', () => {
     });
   });
 
-  it('allows optional profile fields to be cleared', async () => {
+  it('allows profile identity fields to be cleared', async () => {
     transaction.user.findUnique.mockResolvedValue({
       id: activeUser.id,
       status: 'ACTIVE',
       firstName: 'Prashant',
       lastName: 'Shukla',
       phone: '+919876543210',
+      emailVerifiedAt: new Date('2026-09-03T00:00:00.000Z'),
     });
     transaction.user.update.mockResolvedValue({
       ...authRecord,
@@ -197,5 +223,53 @@ describe('OwnProfileService', () => {
     expect(transaction.user.findFirst).not.toHaveBeenCalled();
     expect(transaction.userIdentifierClaim.create).not.toHaveBeenCalled();
     expect(transaction.user.update).toHaveBeenCalled();
+  });
+
+  it('saves the first BEP-20 withdrawal address with a 30-day lock', async () => {
+    transaction.user.findUnique
+      .mockResolvedValueOnce({
+        id: activeUser.id,
+        status: 'ACTIVE',
+        firstName: null,
+        lastName: null,
+        phone: null,
+        emailVerifiedAt: new Date('2026-09-03T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        ...authRecord,
+        firstName: null,
+        lastName: null,
+        phone: null,
+      });
+    transaction.$queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([withdrawalRow]);
+
+    const result = await service.update(activeUser, {
+      withdrawalAddress: withdrawalRow.destinationAddress,
+    });
+
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(transaction.auditLog.create).toHaveBeenCalled();
+    expect(result.profileCompletion).toMatchObject({
+      withdrawal: {
+        asset: 'USDT',
+        networkCode: 'BEP20',
+        address: withdrawalRow.destinationAddress,
+        lockDays: 30,
+      },
+    });
+  });
+
+  it('blocks a withdrawal address change while the 30-day lock is active', async () => {
+    transaction.$queryRawUnsafe.mockResolvedValueOnce([withdrawalRow]);
+
+    await expect(
+      service.update(activeUser, {
+        withdrawalAddress: '0x2222222222222222222222222222222222222222',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(transaction.$executeRaw).not.toHaveBeenCalled();
   });
 });

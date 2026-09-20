@@ -4,6 +4,7 @@ import { RedisModule } from '../redis/redis.module';
 import { AdminInternalTradingLifecycleController } from './admin-internal-trading-lifecycle.controller';
 import { AdminInternalTradingPoliciesController } from './admin-internal-trading.controller';
 import { AdminInternalTradingTradeController } from './admin-internal-trading-trade.controller';
+import { CanonicalInternalTradingTradeService } from './canonical-internal-trading-trade.service';
 import { InternalTradingController } from './internal-trading.controller';
 import { InternalTradingLifecycleService } from './internal-trading-lifecycle.service';
 import { InternalTradingPackageCompletionService } from './internal-trading-package-completion.service';
@@ -23,7 +24,10 @@ import { InternalTradingWorkerService } from './internal-trading-worker.service'
     InternalTradingService,
     InternalTradingLifecycleService,
     InternalTradingPackageCompletionService,
-    InternalTradingTradeService,
+    {
+      provide: InternalTradingTradeService,
+      useClass: CanonicalInternalTradingTradeService,
+    },
     InternalTradingWorkerService,
   ],
   exports: [

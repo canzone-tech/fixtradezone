@@ -93,6 +93,10 @@ async function fetchUserDepositWorkspace(): Promise<UserDepositWorkspace> {
   };
 }
 
+function isBep20Network(network: string): boolean {
+  return /BEP[- ]?20|BNB SMART CHAIN|\bBSC\b/i.test(network);
+}
+
 export default function UserDepositsClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
@@ -289,7 +293,11 @@ export default function UserDepositsClient() {
                   </div>
                   <div>
                     <small>Network</small>
-                    <strong>{openDeposit.assignedNetwork}</strong>
+                    <strong>
+                      {isBep20Network(openDeposit.assignedNetwork)
+                        ? "USDT — BNB Smart Chain (BEP-20)"
+                        : openDeposit.assignedNetwork}
+                    </strong>
                   </div>
                   {openDeposit.packageDurationDays ? (
                     <div>
@@ -317,6 +325,20 @@ export default function UserDepositsClient() {
                 </div>
               </div>
             </div>
+
+            {isBep20Network(openDeposit.assignedNetwork) ? (
+              <div className={styles.networkWarning} role="alert">
+                <i className="iconoir-warning-triangle" />
+                <div>
+                  <strong>USDT — BNB Smart Chain (BEP-20)</strong>
+                  <p>
+                    Send only USDT on BNB Smart Chain (BEP-20) to this address.
+                    Anything sent on another network, or in another token, is lost
+                    and cannot be recovered.
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             {openDeposit.status === "AWAITING_TXID" ? (
               <div className={styles.formGrid}>

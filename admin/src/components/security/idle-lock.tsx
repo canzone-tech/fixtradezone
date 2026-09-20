@@ -33,6 +33,7 @@ export default function IdleLock({
 }: IdleLockProps) {
   const [locked, setLocked] = useState(false);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [unlocking, setUnlocking] = useState(false);
   const lastActivityRef = useRef<number | null>(null);
@@ -220,6 +221,7 @@ export default function IdleLock({
       }
 
       setPassword("");
+      setShowPassword(false);
       setError("");
       setLocked(false);
     } catch (caught) {
@@ -266,7 +268,7 @@ export default function IdleLock({
               <i className="iconoir-key" />
               <input
                 ref={passwordRef}
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 autoComplete="current-password"
                 disabled={unlocking}
@@ -276,6 +278,20 @@ export default function IdleLock({
                   if (error) setError("");
                 }}
               />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                title={showPassword ? "Hide password" : "Show password"}
+                disabled={unlocking}
+                onClick={() => setShowPassword((current) => !current)}
+              >
+                <i
+                  className={
+                    showPassword ? "iconoir-eye-closed" : "iconoir-eye"
+                  }
+                />
+              </button>
             </div>
           </label>
 
@@ -287,7 +303,7 @@ export default function IdleLock({
           ) : null}
 
           <button type="submit" disabled={unlocking}>
-            <i className="iconoir-unlock" />
+            <i className="iconoir-key" />
             {unlocking ? "Verifying..." : "Unlock Session"}
           </button>
         </form>

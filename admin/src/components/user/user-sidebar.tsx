@@ -91,6 +91,17 @@ export default function UserSidebar({ session }: UserSidebarProps) {
                 </Link>
 
                 <Link
+                  href="/user/how-it-works"
+                  className={`ftz-nav-link ${
+                    isActive("/user/how-it-works") ? "is-active" : ""
+                  }`}
+                  onClick={close}
+                >
+                  <i className="iconoir-book" />
+                  <span>How FixTradeZone Works</span>
+                </Link>
+
+                <Link
                   href="/user/notifications"
                   className={`ftz-nav-link ${
                     isActive("/user/notifications") ? "is-active" : ""

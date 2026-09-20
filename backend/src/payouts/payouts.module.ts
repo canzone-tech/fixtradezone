@@ -5,6 +5,7 @@ import { AdminPayoutsController } from './admin-payouts.controller';
 import { PayoutAccountingService } from './payout-accounting.service';
 import { PayoutPolicyService } from './payout-policy.service';
 import { PayoutsController } from './payouts.controller';
+import { ProfileBoundPayoutsService } from './profile-bound-payouts.service';
 import { PayoutsService } from './payouts.service';
 
 @Module({
@@ -14,7 +15,14 @@ import { PayoutsService } from './payouts.service';
     AdminPayoutsController,
     AdminPayoutPoliciesController,
   ],
-  providers: [PayoutsService, PayoutPolicyService, PayoutAccountingService],
+  providers: [
+    {
+      provide: PayoutsService,
+      useClass: ProfileBoundPayoutsService,
+    },
+    PayoutPolicyService,
+    PayoutAccountingService,
+  ],
   exports: [PayoutsService, PayoutPolicyService],
 })
 export class PayoutsModule {}
