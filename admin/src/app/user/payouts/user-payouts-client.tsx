@@ -1,11 +1,7 @@
 "use client";
 
-import {
-  type FormEvent,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import Link from "next/link";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
@@ -230,7 +226,6 @@ export default function UserPayoutsClient() {
   const [sourceBucket, setSourceBucket] =
     useState<PayoutBucket>("TOTAL_WALLET");
   const [amount, setAmount] = useState("");
-  const [destinationAddress, setDestinationAddress] = useState("");
   const [selectedPackagePlanItemId, setSelectedPackagePlanItemId] =
     useState("");
   const [loading, setLoading] = useState(true);
@@ -243,6 +238,9 @@ export default function UserPayoutsClient() {
     Boolean(policy?.available) && Boolean(policy?.requestsEnabled);
   const activePolicy = policy?.policy ?? null;
   const sourceBucketEnabled = enabledBuckets.includes(sourceBucket);
+  const profileComplete = Boolean(session?.profileCompletion?.complete);
+  const savedWithdrawalAddress =
+    session?.profileCompletion?.withdrawal.address?.trim() ?? "";
 
   const payoutRows = useMemo<PayoutRequest[]>(
     () => payouts?.payouts ?? [],
@@ -292,29 +290,32 @@ export default function UserPayoutsClient() {
     );
   }, [activeWallet?.totalWallet, amount]);
 
+  function applyWorkspace(workspace: Awaited<ReturnType<typeof fetchPayoutWorkspace>>) {
+    setSession(workspace.session);
+    setPolicy(workspace.policy);
+    setPayouts(workspace.payouts);
+    setWallet(workspace.wallet);
+    setCatalogue(workspace.catalogue);
+    setReinvestmentSubscriptions(
+      (workspace.subscriptions.history ?? []).filter(
+        (item) => item.sourceDepositId === null,
+      ),
+    );
+
+    if (
+      workspace.policy.enabledBuckets.length > 0 &&
+      !workspace.policy.enabledBuckets.includes(sourceBucket)
+    ) {
+      setSourceBucket(workspace.policy.enabledBuckets[0]);
+    }
+  }
+
   async function reload() {
     setLoading(true);
     setError(null);
 
     try {
-      const workspace = await fetchPayoutWorkspace();
-      setSession(workspace.session);
-      setPolicy(workspace.policy);
-      setPayouts(workspace.payouts);
-      setWallet(workspace.wallet);
-      setCatalogue(workspace.catalogue);
-      setReinvestmentSubscriptions(
-        (workspace.subscriptions.history ?? []).filter(
-          (item) => item.sourceDepositId === null,
-        ),
-      );
-
-      if (
-        workspace.policy.enabledBuckets.length > 0 &&
-        !workspace.policy.enabledBuckets.includes(sourceBucket)
-      ) {
-        setSourceBucket(workspace.policy.enabledBuckets[0]);
-      }
+      applyWorkspace(await fetchPayoutWorkspace());
     } catch (caught) {
       const redirectTo = redirectFor(caught);
       if (redirectTo) {
@@ -339,21 +340,7 @@ export default function UserPayoutsClient() {
       try {
         const workspace = await fetchPayoutWorkspace();
         if (!mounted) return;
-
-        setSession(workspace.session);
-        setPolicy(workspace.policy);
-        setPayouts(workspace.payouts);
-        setWallet(workspace.wallet);
-        setCatalogue(workspace.catalogue);
-        setReinvestmentSubscriptions(
-          (workspace.subscriptions.history ?? []).filter(
-            (item) => item.sourceDepositId === null,
-          ),
-        );
-
-        if (workspace.policy.enabledBuckets.length > 0) {
-          setSourceBucket(workspace.policy.enabledBuckets[0]);
-        }
+        applyWorkspace(workspace);
       } catch (caught) {
         if (!mounted) return;
 
@@ -393,8 +380,13 @@ export default function UserPayoutsClient() {
       if (!sourceBucketEnabled) {
         throw new Error("Total Wallet is not enabled for withdrawals.");
       }
-      if (!amount.trim() || !destinationAddress.trim()) {
-        throw new Error("Amount and destination address are required.");
+      if (!profileComplete || !savedWithdrawalAddress) {
+        throw new Error(
+          "Complete your profile and save a USDT BEP-20 withdrawal address before requesting a withdrawal.",
+        );
+      }
+      if (!amount.trim()) {
+        throw new Error("Withdrawal amount is required.");
       }
 
       const response = await fetch("/api/user/payouts", {
@@ -404,7 +396,7 @@ export default function UserPayoutsClient() {
           requestKey: crypto.randomUUID(),
           sourceBucket,
           amount: amount.trim(),
-          destinationAddress: destinationAddress.trim(),
+          destinationAddress: savedWithdrawalAddress,
         }),
       });
 
@@ -413,7 +405,6 @@ export default function UserPayoutsClient() {
       >(response, "Withdrawal request could not be created.");
 
       setAmount("");
-      setDestinationAddress("");
       setSuccess(
         payload.created
           ? `Withdrawal ${payload.payout.id} created and Total Wallet funds reserved.`
@@ -515,7 +506,9 @@ export default function UserPayoutsClient() {
     busy ||
     !requestsEnabled ||
     !sourceBucketEnabled ||
-    enabledBuckets.length === 0;
+    enabledBuckets.length === 0 ||
+    !profileComplete ||
+    !savedWithdrawalAddress;
   const reinvestmentSubmitDisabled =
     busy || !selectedPackage || !canAffordReinvestment;
 
@@ -542,17 +535,42 @@ export default function UserPayoutsClient() {
           <p className={styles.eyebrow}>PAYOUT-01 / TOTAL WALLET ACTIONS</p>
           <h1>Withdrawal</h1>
           <p>
-            Choose whether to withdraw from Total Wallet or reinvest the entered
-            amount into an eligible published package. The existing Packages →
-            Deposit / TXID flow remains unchanged.
+            External withdrawals are bound to the USDT — BNB Smart Chain
+            (BEP-20) address saved in My Profile. Reinvestment stays inside the
+            platform and does not create a blockchain transfer.
           </p>
         </section>
 
         <section className={styles.warning}>
-          External withdrawal requires only a public destination address.
-          Reinvestment never asks for a blockchain address and does not create a
-          withdrawal fee or external transfer.
+          Withdrawal destination is profile-bound. You cannot enter a different
+          address per request; payout history keeps the immutable address snapshot
+          used when each request was created.
         </section>
+
+        {!loading && (!profileComplete || !savedWithdrawalAddress) ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div>
+                <p className={styles.eyebrow}>Profile Required</p>
+                <h2>Complete your profile before withdrawal</h2>
+              </div>
+              <span className={styles.badge} data-tone="warning">
+                ACTION REQUIRED
+              </span>
+            </div>
+            <div className={styles.empty}>
+              First name, last name, mobile number and a saved USDT BEP-20
+              withdrawal address are required. Address changes are managed only
+              from My Profile and are locked for 30 days after each successful
+              save.
+              <div className={styles.actions} style={{ marginTop: 14 }}>
+                <Link className={styles.button} href="/user/profile">
+                  Complete My Profile
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {loading ? (
           <section className={styles.card}>
@@ -795,22 +813,23 @@ export default function UserPayoutsClient() {
 
             {walletAction === "PAYOUT" ? (
               <div className={styles.field} style={{ gridColumn: "1 / -1" }}>
-                <label htmlFor="payout-address">Public destination address</label>
+                <label htmlFor="payout-address">
+                  Saved USDT withdrawal address · BNB Smart Chain (BEP-20)
+                </label>
                 <input
                   id="payout-address"
                   className={`${styles.input} ${styles.mono}`}
-                  value={destinationAddress}
-                  onChange={(event) => setDestinationAddress(event.target.value)}
-                  placeholder={
-                    activePolicy?.validationProfile === "TRON"
-                      ? "TRON / TRC20 public address"
-                      : "Public network address"
-                  }
-                  disabled={busy || !requestsEnabled}
-                  autoComplete="off"
+                  value={savedWithdrawalAddress || "No saved address"}
+                  readOnly
+                  disabled
                 />
                 <span className={styles.help}>
-                  Address validation follows the published network profile.
+                  This address is controlled from My Profile and cannot be changed
+                  from Withdrawal. {session?.profileCompletion?.withdrawal.lockedUntil
+                    ? `Current lock ends ${formatPayoutDate(
+                        session.profileCompletion.withdrawal.lockedUntil,
+                      )}.`
+                    : "Save an address in My Profile to enable withdrawals."}
                 </span>
               </div>
             ) : (
@@ -839,6 +858,11 @@ export default function UserPayoutsClient() {
                     ? "Reserve funds & request withdrawal"
                     : "Reinvest & activate package"}
               </button>
+              {walletAction === "PAYOUT" ? (
+                <Link className={styles.buttonSecondary} href="/user/profile">
+                  Manage saved address
+                </Link>
+              ) : null}
             </div>
           </form>
         </section>
@@ -911,7 +935,7 @@ export default function UserPayoutsClient() {
                     </div>
 
                     <p>
-                      Destination:{" "}
+                      Destination snapshot:{" "}
                       <span className={styles.mono}>
                         {payout.destinationAddress}
                       </span>
