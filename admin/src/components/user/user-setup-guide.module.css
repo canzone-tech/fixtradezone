@@ -12,12 +12,6 @@
     rgba(25, 19, 8, 0.72);
 }
 
-:global(.ftz-platform-promise) ~ .profileBanner,
-:global(.ftz-platform-promise) ~ .progressCard {
-  margin-left: 4%;
-  margin-right: 4%;
-}
-
 .profileBanner div {
   display: grid;
   gap: 4px;
