@@ -96,6 +96,23 @@ function InstagramMark() {
   );
 }
 
+function TelegramMark() {
+  return (
+    <svg
+      className={styles.brandIcon}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="10" fill="#229ED9" />
+      <path
+        d="M6.55 11.7 16.9 7.7c.48-.18.9.12.74.84l-1.76 8.28c-.13.59-.48.73-.97.45l-2.68-1.98-1.3 1.25c-.14.14-.26.26-.54.26l.2-2.73 4.96-4.48c.22-.19-.05-.3-.33-.11l-6.13 3.86-2.64-.82c-.57-.18-.58-.57.1-.82Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
 export default function ReferralShareActions({
   referralCode,
   compact = false,
@@ -164,6 +181,20 @@ export default function ReferralShareActions({
     openShareTarget("https://www.instagram.com/");
   }
 
+  function shareTelegram() {
+    const invite = inviteDetails();
+    if (!invite) return;
+
+    openShareTarget(
+      `https://t.me/share/url?url=${encodeURIComponent(
+        invite.url,
+      )}&text=${encodeURIComponent(
+        "Join me on FixTradeZone using my referral link.",
+      )}`,
+    );
+    setStatus("Telegram share opened.");
+  }
+
   return (
     <div className={`${styles.wrap} ${compact ? styles.compact : ""}`}>
       <div className={styles.actions} aria-label="Share referral link">
@@ -190,6 +221,14 @@ export default function ReferralShareActions({
         >
           <InstagramMark />
           Instagram
+        </button>
+        <button
+          type="button"
+          onClick={shareTelegram}
+          disabled={!referralCode}
+        >
+          <TelegramMark />
+          Telegram
         </button>
       </div>
       {status ? (
