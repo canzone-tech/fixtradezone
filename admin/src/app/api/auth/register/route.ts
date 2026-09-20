@@ -15,6 +15,7 @@ interface RegisterBody {
   firstName?: string;
   lastName?: string;
   referralCode?: string;
+  deviceInstallationId?: string;
   age18Declared?: boolean;
   kycDeclarationAccepted?: boolean;
   captchaId?: string;
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
       firstName: optionalString(source.firstName, 100),
       lastName: optionalString(source.lastName, 100),
       referralCode: referralCodeFromRequest(request, source),
+      deviceInstallationId: optionalString(source.deviceInstallationId, 36),
       age18Declared: optionalBoolean(source.age18Declared),
       kycDeclarationAccepted: optionalBoolean(source.kycDeclarationAccepted),
       captchaId: optionalString(source.captchaId, 128),

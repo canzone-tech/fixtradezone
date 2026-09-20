@@ -16,9 +16,13 @@ import {
   readJson,
 } from "@/lib/backend";
 
+const DEVICE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 interface LoginBody {
   identifier?: unknown;
   password?: unknown;
+  deviceInstallationId?: unknown;
   captchaId?: unknown;
   captchaAnswer?: unknown;
 }
@@ -54,6 +58,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (
+    body.deviceInstallationId !== undefined &&
+    (typeof body.deviceInstallationId !== "string" ||
+      !DEVICE_ID_PATTERN.test(body.deviceInstallationId.trim()))
+  ) {
+    return NextResponse.json(
+      { message: "Invalid device installation ID." },
+      { status: 400 },
+    );
+  }
+
   if (body.captchaId !== undefined && typeof body.captchaId !== "string") {
     return NextResponse.json(
       { message: "Invalid CAPTCHA challenge." },
@@ -80,6 +95,13 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         identifier: body.identifier,
         password: body.password,
+        ...(typeof body.deviceInstallationId === "string"
+          ? {
+              deviceInstallationId: body.deviceInstallationId
+                .trim()
+                .toLowerCase(),
+            }
+          : {}),
         ...(body.captchaId !== undefined ? { captchaId: body.captchaId } : {}),
         ...(body.captchaAnswer !== undefined
           ? { captchaAnswer: body.captchaAnswer }

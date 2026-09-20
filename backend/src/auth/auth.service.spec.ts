@@ -1,9 +1,16 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { DuplicateAccountService } from '../duplicate-account/duplicate-account.service';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
+
+const DEVICE_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('AuthService', () => {
   const activeUser = {
@@ -79,6 +86,11 @@ describe('AuthService', () => {
     verifyRefreshToken: jest.fn(),
     hashRefreshToken: jest.fn(),
   };
+  const duplicateAccountService = {
+    evaluateLogin: jest.fn(),
+    recordBlockedLogin: jest.fn(),
+    recordSuccessfulLogin: jest.fn(),
+  };
 
   let service: AuthService;
 
@@ -88,12 +100,23 @@ describe('AuthService', () => {
 
     prisma.systemAuthConfig.findUnique.mockResolvedValue(null);
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
+    duplicateAccountService.evaluateLogin.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      matchedUserIds: [],
+      deviceInstallationId: DEVICE_ID,
+      ipAddress: null,
+      reason: null,
+    });
 
     service = new AuthService(
       prisma as unknown as PrismaService,
       passwordService as unknown as PasswordService,
       registrationService as unknown as RegistrationService,
       tokenService as unknown as TokenService,
+      duplicateAccountService as unknown as DuplicateAccountService,
     );
   });
 
@@ -164,8 +187,21 @@ describe('AuthService', () => {
     const result = await service.login({
       identifier: activeUser.username,
       password: 'SecurePassword123!',
+      deviceInstallationId: DEVICE_ID,
     });
 
+    expect(duplicateAccountService.evaluateLogin).toHaveBeenCalledWith({
+      userId: activeUser.id,
+      isSuperAdmin: false,
+      deviceInstallationId: DEVICE_ID,
+      context: {},
+    });
+    expect(duplicateAccountService.recordSuccessfulLogin).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({ blockLogin: false }),
+      expect.objectContaining({ id: activeUser.id }),
+      {},
+    );
     expect(transaction.authSession.create).toHaveBeenCalledWith({
       data: {
         id: issuedTokens.sessionId,
@@ -206,6 +242,75 @@ describe('AuthService', () => {
         roles: ['ADMIN'],
       },
     });
+  });
+
+  it('blocks duplicate-device login before issuing any session token', async () => {
+    prisma.user.findUnique.mockResolvedValue(activeUser);
+    passwordService.verifyForAuthentication.mockResolvedValue(true);
+    duplicateAccountService.evaluateLogin.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      action: 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      matchedUserIds: ['other-user-id'],
+      deviceInstallationId: DEVICE_ID,
+      ipAddress: '49.37.178.233',
+      reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+    });
+
+    await expect(
+      service.login(
+        {
+          identifier: activeUser.username,
+          password: 'SecurePassword123!',
+          deviceInstallationId: DEVICE_ID,
+        },
+        { ipAddress: '49.37.178.233', userAgent: 'Jest' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(duplicateAccountService.recordBlockedLogin).toHaveBeenCalledWith(
+      expect.objectContaining({ blockLogin: true }),
+      expect.objectContaining({ id: activeUser.id }),
+      { ipAddress: '49.37.178.233', userAgent: 'Jest' },
+    );
+    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
+    expect(transaction.authSession.create).not.toHaveBeenCalled();
+    expect(
+      duplicateAccountService.recordSuccessfulLogin,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('passes SUPER_ADMIN exemption context to duplicate-account enforcement', async () => {
+    const superAdmin = {
+      ...activeUser,
+      roles: [
+        {
+          role: {
+            name: 'SUPER_ADMIN',
+            status: 'ACTIVE' as const,
+            permissions: [],
+          },
+        },
+      ],
+    };
+    prisma.user.findUnique.mockResolvedValue(superAdmin);
+    passwordService.verifyForAuthentication.mockResolvedValue(true);
+    tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
+
+    await service.login({
+      identifier: superAdmin.username,
+      password: 'SecurePassword123!',
+      deviceInstallationId: DEVICE_ID,
+    });
+
+    expect(duplicateAccountService.evaluateLogin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: superAdmin.id,
+        isSuperAdmin: true,
+        deviceInstallationId: DEVICE_ID,
+      }),
+    );
   });
 
   it('returns the same generic login error for unknown and inactive users', async () => {
@@ -473,6 +578,7 @@ describe('AuthService', () => {
     await service.login({
       identifier: ` ${activeUser.phone} `,
       password: 'SecurePassword123!',
+      deviceInstallationId: DEVICE_ID,
     });
 
     expect(prisma.user.findMany).toHaveBeenCalledTimes(1);
