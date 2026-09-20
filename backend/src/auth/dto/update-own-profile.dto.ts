@@ -1,5 +1,11 @@
 import { Transform, type TransformFnParams } from 'class-transformer';
-import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
 function trimNullableString({ value }: TransformFnParams): unknown {
   if (value === null || value === undefined) {
@@ -12,6 +18,14 @@ function trimNullableString({ value }: TransformFnParams): unknown {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function trimString({ value }: TransformFnParams): unknown {
+  if (value === undefined || typeof value !== 'string') {
+    return value;
+  }
+
+  return value.trim();
 }
 
 export class UpdateOwnProfileDto {
@@ -34,4 +48,10 @@ export class UpdateOwnProfileDto {
     message: 'phone must be a valid E.164 mobile number',
   })
   phone?: string | null;
+
+  @ValidateIf((_object, value) => value !== undefined)
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(191)
+  withdrawalAddress?: string;
 }
