@@ -119,6 +119,12 @@
   opacity: 0.48;
 }
 
+.heroReferralShare {
+  grid-column: 1 / -1;
+  padding-top: 10px;
+  border-top: 1px solid rgba(22, 229, 224, 0.12);
+}
+
 .usernameChip {
   order: 2;
   align-self: flex-start;
@@ -332,6 +338,10 @@
   .heroReferralButton {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .heroReferralShare {
+    padding-top: 9px;
   }
 
   .heroReferralCopy strong {
