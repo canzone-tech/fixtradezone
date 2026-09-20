@@ -7,6 +7,7 @@ import { SimulatedActivityService } from './simulated-activity.service';
 interface ActivationRow {
   subscriptionId: string;
   activationLocalDate: string | Date;
+  rewardStartMode: string;
 }
 
 interface CountRow {
@@ -24,29 +25,38 @@ export class SimulatedActivityUserViewService {
     const activity = await this.service.getMyActivity(userId, query);
     const activationRows = await this.prisma.$queryRaw<ActivationRow[]>(
       Prisma.sql`
-        SELECT subscriptionId, activationLocalDate
-        FROM internal_trade_subscription_states
-        WHERE userId = ${userId}
+        SELECT
+          s.subscriptionId,
+          s.activationLocalDate,
+          ups.rewardStartMode
+        FROM internal_trade_subscription_states s
+        INNER JOIN user_package_subscriptions ups
+          ON ups.id = s.subscriptionId
+        WHERE s.userId = ${userId}
       `,
     );
 
-    const activationDateBySubscription = new Map(
+    const activationBySubscription = new Map(
       activationRows.map((row) => [
         row.subscriptionId,
-        this.localDateString(row.activationLocalDate),
+        {
+          activationLocalDate: this.localDateString(row.activationLocalDate),
+          rewardStartMode: row.rewardStartMode,
+        },
       ]),
     );
 
     const events = activity.events.filter((event) => {
-      const activationLocalDate = activationDateBySubscription.get(
-        event.subscriptionId,
-      );
+      const activation = activationBySubscription.get(event.subscriptionId);
 
-      if (!activationLocalDate) {
+      if (!activation || activation.rewardStartMode !== 'NEXT_CALENDAR_DAY') {
         return true;
       }
 
-      return this.localDateString(event.localActivityDate) > activationLocalDate;
+      return (
+        this.localDateString(event.localActivityDate) >
+        activation.activationLocalDate
+      );
     });
 
     const hiddenRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
@@ -54,7 +64,10 @@ export class SimulatedActivityUserViewService {
       FROM simulated_trade_activity_events e
       INNER JOIN internal_trade_subscription_states s
         ON s.subscriptionId = e.subscriptionId
+      INNER JOIN user_package_subscriptions ups
+        ON ups.id = e.subscriptionId
       WHERE e.userId = ${userId}
+        AND ups.rewardStartMode = 'NEXT_CALENDAR_DAY'
         AND e.scheduledAt <= UTC_TIMESTAMP(3)
         AND e.localActivityDate <= s.activationLocalDate
     `);
