@@ -1,4 +1,5 @@
 import { Controller, Get, Header } from '@nestjs/common';
+import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AwardRewardsService } from './award-rewards.service';
@@ -8,6 +9,7 @@ export class AwardRewardsController {
   constructor(private readonly awardRewardsService: AwardRewardsService) {}
 
   @Get('me')
+  @AllowUserImpersonation()
   @Header('Cache-Control', 'no-store')
   getMine(@CurrentUser() user: AuthenticatedUser) {
     return this.awardRewardsService.getMyAwards(user.id);

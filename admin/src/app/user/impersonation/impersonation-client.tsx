@@ -66,6 +66,11 @@ export default function ImpersonationClient() {
           throw new Error(getMessage(payload, "Unable to load user session."));
         }
 
+        if (payload.impersonation.accessMode === "FULL") {
+          window.location.replace("/user/dashboard");
+          return;
+        }
+
         if (mounted) {
           setSession(payload);
         }

@@ -8,6 +8,7 @@ interface IdleLockProps {
   idleLockMinutes: number;
   enabled?: boolean;
   scopeKey: string;
+  activityMirrorScopeKey?: string | null;
   identityLabel?: string | null;
 }
 
@@ -27,6 +28,7 @@ export default function IdleLock({
   idleLockMinutes,
   enabled = true,
   scopeKey,
+  activityMirrorScopeKey = null,
   identityLabel,
 }: IdleLockProps) {
   const [locked, setLocked] = useState(false);
@@ -36,10 +38,20 @@ export default function IdleLock({
   const lastActivityRef = useRef<number | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const { activityKey, lockKey } = sessionLockStorageKeys(scopeKey);
+  const mirrorActivityKey = activityMirrorScopeKey
+    ? sessionLockStorageKeys(activityMirrorScopeKey).activityKey
+    : null;
   const timeoutMs = Math.max(1, idleLockMinutes) * 60 * 1000;
 
   useEffect(() => {
     if (!enabled) return;
+
+    const persistActivity = (activityAt: number) => {
+      window.localStorage.setItem(activityKey, String(activityAt));
+      if (mirrorActivityKey) {
+        window.localStorage.setItem(mirrorActivityKey, String(activityAt));
+      }
+    };
 
     const persistLocked = () => {
       try {
@@ -69,10 +81,15 @@ export default function IdleLock({
 
         if (now - storedActivity >= timeoutMs) {
           persistLocked();
+        } else if (mirrorActivityKey) {
+          window.localStorage.setItem(
+            mirrorActivityKey,
+            String(storedActivity),
+          );
         }
       } else {
         lastActivityRef.current = now;
-        window.localStorage.setItem(activityKey, String(now));
+        persistActivity(now);
       }
     } catch {
       lastActivityRef.current = now;
@@ -85,7 +102,7 @@ export default function IdleLock({
       lastActivityRef.current = activityAt;
 
       try {
-        window.localStorage.setItem(activityKey, String(activityAt));
+        persistActivity(activityAt);
       } catch {
         // Browser storage is optional.
       }
@@ -140,7 +157,7 @@ export default function IdleLock({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.clearInterval(interval);
     };
-  }, [activityKey, enabled, lockKey, locked, timeoutMs]);
+  }, [activityKey, enabled, lockKey, locked, mirrorActivityKey, timeoutMs]);
 
   useEffect(() => {
     if (!locked) return;
@@ -194,6 +211,9 @@ export default function IdleLock({
 
       try {
         window.localStorage.setItem(activityKey, String(now));
+        if (mirrorActivityKey) {
+          window.localStorage.setItem(mirrorActivityKey, String(now));
+        }
         window.localStorage.removeItem(lockKey);
       } catch {
         // Browser storage is optional.

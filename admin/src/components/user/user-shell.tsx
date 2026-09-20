@@ -10,6 +10,7 @@ import {
   isImpersonationSession,
   type UserPortalSession,
 } from "@/lib/user-session";
+import DashboardReferralShare from "./dashboard-referral-share";
 import UserSidebar from "./user-sidebar";
 import UserTopbar from "./user-topbar";
 import styles from "./user-shell.module.css";
@@ -78,7 +79,11 @@ export default function UserShell({
       ? `impersonation:${session.impersonation.id}:${session.user.id}`
       : `user:${session.user.id}`
     : null;
+  const adminActivityMirrorScope =
+    session && impersonated ? `admin:${session.impersonation.actor.id}` : null;
   const showPlatformPromise = pathname === "/user/dashboard";
+  const showDashboardReferralShare =
+    pathname === "/user/dashboard" && session !== null;
 
   return (
     <div className="ftz-admin-app">
@@ -88,6 +93,7 @@ export default function UserShell({
         <IdleLock
           idleLockMinutes={session.sessionPolicy.idleLockMinutes}
           scopeKey={lockScope}
+          activityMirrorScopeKey={adminActivityMirrorScope}
           identityLabel={session.user.email}
         />
       ) : null}
@@ -126,6 +132,7 @@ export default function UserShell({
 
         <div className={`ftz-page-frame ${styles.content}`}>
           {showPlatformPromise ? <PlatformPromise /> : null}
+          {showDashboardReferralShare ? <DashboardReferralShare /> : null}
           {children}
         </div>
       </main>
