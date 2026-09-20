@@ -303,7 +303,7 @@ export default function IdleLock({
           ) : null}
 
           <button type="submit" disabled={unlocking}>
-            <i className="iconoir-unlock" />
+            <i className="iconoir-key" />
             {unlocking ? "Verifying..." : "Unlock Session"}
           </button>
         </form>
