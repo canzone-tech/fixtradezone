@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import type { DepositsResponse } from "@/lib/deposits";
@@ -20,6 +20,18 @@ interface SetupItem {
   href: string | null;
 }
 
+function subscribeClientReady() {
+  return () => undefined;
+}
+
+function getClientReady() {
+  return true;
+}
+
+function getServerClientReady() {
+  return false;
+}
+
 async function readJson<T>(response: Response): Promise<T | null> {
   try {
     return (await response.json()) as T;
@@ -35,7 +47,11 @@ export default function UserSetupGuide({
 }) {
   const pathname = usePathname();
   const profile = session.profileCompletion;
-  const modalPortalRootRef = useRef<HTMLElement | null>(null);
+  const clientReady = useSyncExternalStore(
+    subscribeClientReady,
+    getClientReady,
+    getServerClientReady,
+  );
   const modalKey = `ftz:onboarding-dismissed:${session.user.id}:${
     session.user.lastLoginAt ?? session.user.createdAt
   }`;
@@ -46,14 +62,6 @@ export default function UserSetupGuide({
     if (typeof window === "undefined") return true;
     return window.sessionStorage.getItem(modalKey) === "1";
   });
-
-  useEffect(() => {
-    modalPortalRootRef.current = document.body;
-
-    return () => {
-      modalPortalRootRef.current = null;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -210,7 +218,7 @@ export default function UserSetupGuide({
         </section>
       ) : null}
 
-      {showModal && modalPortalRootRef.current
+      {showModal && clientReady
         ? createPortal(
             <div className={styles.modalBackdrop} role="presentation">
               <section
@@ -266,7 +274,7 @@ export default function UserSetupGuide({
                 </div>
               </section>
             </div>,
-            modalPortalRootRef.current,
+            document.body,
           )
         : null}
     </>
