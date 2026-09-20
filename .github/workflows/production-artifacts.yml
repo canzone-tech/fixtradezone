@@ -97,7 +97,7 @@ jobs:
           printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
 
       - name: Upload backend runtime artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fixtradezone-backend-${{ github.sha }}
           path: |
@@ -179,7 +179,7 @@ jobs:
           printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
 
       - name: Upload admin runtime artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fixtradezone-admin-${{ github.sha }}
           path: |
@@ -310,7 +310,7 @@ jobs:
           printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
 
       - name: Upload migration artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fixtradezone-migrations-${{ github.sha }}
           path: |
