@@ -1,15 +1,18 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { DuplicateAccountService } from '../duplicate-account/duplicate-account.service';
 import {
   ACCESS_TOKEN_TTL_SECONDS,
   GENERIC_LOGIN_ERROR,
   GENERIC_PASSWORD_CHANGE_ERROR,
   GENERIC_SESSION_ERROR,
   REFRESH_TOKEN_TTL_SECONDS,
+  SUPER_ADMIN_ROLE_NAME,
 } from './auth.constants';
 import {
   AUTH_USER_SELECT,
@@ -33,6 +36,7 @@ export class AuthService {
     private readonly passwordService: PasswordService,
     private readonly registrationService: RegistrationService,
     private readonly tokenService: TokenService,
+    private readonly duplicateAccountService: DuplicateAccountService,
   ) {}
 
   async register(dto: RegisterDto, context: RequestContext = {}) {
@@ -135,6 +139,25 @@ export class AuthService {
       throw new UnauthorizedException(GENERIC_LOGIN_ERROR);
     }
 
+    const authenticatedUser = toAuthenticatedUser(user);
+    const duplicateDecision = await this.duplicateAccountService.evaluateLogin({
+      userId: user.id,
+      isSuperAdmin: authenticatedUser.roles.includes(SUPER_ADMIN_ROLE_NAME),
+      deviceInstallationId: dto.deviceInstallationId,
+      context,
+    });
+
+    if (duplicateDecision.blockLogin) {
+      await this.duplicateAccountService.recordBlockedLogin(
+        duplicateDecision,
+        authenticatedUser,
+        context,
+      );
+      throw new ForbiddenException(
+        'Login is blocked by the duplicate-account protection policy.',
+      );
+    }
+
     if (user.mustChangePassword) {
       const passwordChange =
         await this.tokenService.issuePasswordChangeToken(user);
@@ -142,6 +165,13 @@ export class AuthService {
       const challengedAt = new Date();
 
       await this.prisma.$transaction(async (transaction) => {
+        await this.duplicateAccountService.recordSuccessfulLogin(
+          transaction,
+          duplicateDecision,
+          authenticatedUser,
+          context,
+        );
+
         await transaction.authSession.updateMany({
           where: {
             userId: user.id,
@@ -188,6 +218,13 @@ export class AuthService {
     const loggedInAt = new Date();
 
     await this.prisma.$transaction(async (transaction) => {
+      await this.duplicateAccountService.recordSuccessfulLogin(
+        transaction,
+        duplicateDecision,
+        authenticatedUser,
+        context,
+      );
+
       await transaction.authSession.create({
         data: {
           id: tokens.sessionId,
@@ -226,7 +263,7 @@ export class AuthService {
     return this.buildAuthResponse(
       tokens,
       {
-        ...toAuthenticatedUser(user),
+        ...authenticatedUser,
         lastLoginAt: loggedInAt,
       },
       'Login successful.',
