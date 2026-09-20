@@ -2,8 +2,7 @@
  * FixTradeZone project-wide readability layer.
  * Imported after the master theme so Admin, User and Auth screens share
  * the same minimum readable sizes and stronger weights.
- * This file intentionally changes typography only, except for a small
- * profile-layout guard needed to keep larger readable text aligned.
+ * This file intentionally changes typography only.
  */
 
 /* Semantic secondary text must remain comfortably readable. */
@@ -29,21 +28,8 @@
 
 :where(label, [class*="label" i]) {
   font-size: 14px !important;
-  font-weight: 700 !important;
+  font-weight: 600 !important;
   line-height: 1.45;
-}
-
-/* Definition lists are used heavily on account, finance and audit screens. */
-:where(dt) {
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  line-height: 1.45;
-}
-
-:where(dd) {
-  font-size: 14px !important;
-  font-weight: 500 !important;
-  line-height: 1.55;
 }
 
 /* Status chips and badges are operational information, not decorative text. */
@@ -79,7 +65,7 @@
 }
 
 /* Protected page body copy should not depend on tiny page-specific values. */
-.ftz-page-frame :where(p, li) {
+.ftz-page-frame :where(p) {
   font-size: 14px !important;
   font-weight: 500 !important;
   line-height: 1.6;
@@ -93,12 +79,6 @@
 ) {
   font-size: 15px !important;
   font-weight: 500 !important;
-}
-
-.ftz-page-frame :where(button) {
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  line-height: 1.4;
 }
 
 /* Sidebar navigation is shared by SUPER_ADMIN, ADMIN and USER workspaces. */
@@ -168,99 +148,4 @@
 :where(.ftz-sidebar-profile strong, .ftz-topbar-profile-copy strong) {
   font-size: 14px !important;
   font-weight: 700 !important;
-}
-
-/*
- * USER Profile alignment guard.
- * Larger readable typography must not make the two profile columns drift or
- * let labels collapse back to legacy 7–10px sizes.
- */
-:where([class*="profile-module"][class*="grid"]) {
-  align-items: stretch;
-}
-
-:where([class*="profile-module"][class*="panel"]) {
-  min-width: 0;
-  height: 100%;
-}
-
-:where([class*="profile-module"][class*="panelHeader"]) {
-  min-height: 48px;
-  align-items: center !important;
-}
-
-:where([class*="profile-module"][class*="panelHeader"] span) {
-  font-size: 13px !important;
-  font-weight: 800 !important;
-  line-height: 1.4;
-}
-
-:where([class*="profile-module"][class*="panelHeader"] h3) {
-  font-size: 18px !important;
-  line-height: 1.35;
-}
-
-:where([class*="profile-module"][class*="profileForm"] label) {
-  min-width: 0;
-  font-size: 14px !important;
-  font-weight: 700 !important;
-  line-height: 1.45;
-}
-
-:where([class*="profile-module"][class*="formGrid"]) {
-  align-items: start;
-}
-
-/* Render the withdrawal label as one clear, bold line without changing layout. */
-:where([class*="profile-module"][class*="walletFieldHeader"]) {
-  align-items: center !important;
-}
-
-:where([class*="profile-module"][class*="walletFieldHeader"]) > div {
-  min-width: 0;
-  display: block !important;
-}
-
-:where([class*="profile-module"][class*="walletFieldHeader"]) > div > span {
-  font-size: 0 !important;
-  line-height: 0 !important;
-}
-
-:where([class*="profile-module"][class*="walletFieldHeader"]) > div > span::after {
-  content: "USDT (BEP20) Withdrawal Wallet Address";
-  display: block;
-  color: #e8f5ff;
-  font-size: 15px !important;
-  font-weight: 800 !important;
-  line-height: 1.4 !important;
-  white-space: nowrap;
-}
-
-:where([class*="profile-module"][class*="walletFieldHeader"]) > div > strong {
-  display: none !important;
-}
-
-:where(
-  [class*="profile-module"][class*="lockText"],
-  [class*="profile-module"][class*="formHint"]
-) {
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  line-height: 1.6 !important;
-}
-
-:where([class*="profile-module"][class*="details"] dt) {
-  font-size: 13px !important;
-  font-weight: 700 !important;
-}
-
-:where([class*="profile-module"][class*="details"] dd) {
-  font-size: 14px !important;
-  font-weight: 500 !important;
-}
-
-@media (max-width: 700px) {
-  :where([class*="profile-module"][class*="walletFieldHeader"]) > div > span::after {
-    white-space: normal;
-  }
 }
