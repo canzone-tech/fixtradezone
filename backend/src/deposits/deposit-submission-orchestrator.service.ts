@@ -3,7 +3,11 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
-import type { SubmitPackageDepositDto } from './dto/deposit.dto';
+import type {
+  SubmitDepositTxidDto,
+  SubmitPackageDepositDto,
+} from './dto/deposit.dto';
+import { DepositsService } from './deposits.service';
 import { PackageDepositFlowService } from './package-deposit-flow.service';
 
 @Injectable()
@@ -14,29 +18,40 @@ export class DepositSubmissionOrchestratorService {
 
   constructor(
     private readonly packageDepositFlowService: PackageDepositFlowService,
+    private readonly depositsService: DepositsService,
     private readonly blockchainVerification: DepositBlockchainVerificationService,
     private readonly blockchainProcessing: DepositBlockchainProcessingService,
   ) {}
 
-  async submitPackageDeposit(
+  submitPackageDeposit(
     dto: SubmitPackageDepositDto,
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ): Promise<unknown> {
-    const submission = await this.packageDepositFlowService.submitDeposit(
+    return this.packageDepositFlowService.submitDeposit(dto, actor, context);
+  }
+
+  async submitDepositTxid(
+    depositId: string,
+    dto: SubmitDepositTxidDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ): Promise<unknown> {
+    const submission = await this.depositsService.submitTxid(
+      depositId,
       dto,
       actor,
       context,
     );
 
     const state = await this.blockchainVerification.getDepositVerification(
-      submission.deposit.id,
+      depositId,
     );
 
     if (!state.required) {
       return {
         ...submission,
-        message: 'Deposit submitted successfully.',
+        message: 'TXID submitted successfully.',
         blockchainVerification: {
           required: false,
           attempted: false,
@@ -47,7 +62,7 @@ export class DepositSubmissionOrchestratorService {
 
     try {
       const verification = await this.blockchainProcessing.verifyAndApplyPolicy(
-        submission.deposit.id,
+        depositId,
         actor,
         context,
       );
@@ -55,7 +70,7 @@ export class DepositSubmissionOrchestratorService {
       return {
         ...submission,
         message:
-          'Deposit submitted successfully. Payment verification is being processed.',
+          'TXID submitted successfully. Payment verification is being processed.',
         blockchainVerification: {
           required: true,
           attempted: true,
@@ -65,18 +80,18 @@ export class DepositSubmissionOrchestratorService {
     } catch (error) {
       const reason = this.errorMessage(error);
       this.logger.warn(
-        `Automatic blockchain verification could not complete for deposit ${submission.deposit.id}: ${reason}`,
+        `Automatic blockchain verification could not complete for deposit ${depositId}: ${reason}`,
       );
 
       return {
         ...submission,
         message:
-          'Deposit submitted successfully. Payment verification could not complete yet.',
+          'TXID submitted successfully. Payment verification could not complete yet.',
         blockchainVerification: {
           required: true,
           attempted: true,
           message:
-            'Deposit was submitted, but automatic blockchain verification could not complete. Approval behavior remains controlled by the configured MANUAL or AUTO_AFTER_BLOCKCHAIN_VERIFIED policy.',
+            'The transaction ID was saved, but automatic blockchain verification could not complete. Approval remains blocked until the configured verification policy is satisfied.',
           verification: null,
         },
       };
