@@ -1,3 +1,4 @@
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
@@ -10,9 +11,12 @@ const DEFINITION_ID = '44444444-4444-4444-8444-444444444444';
 const ACCOUNT_ID = '55555555-5555-4555-8555-555555555555';
 const DEPOSIT_ID = '66666666-6666-4666-8666-666666666666';
 const RAIL_ID = '77777777-7777-4777-8777-777777777777';
+const INTENT_ID = '88888888-8888-4888-8888-888888888888';
 const ADDRESS = 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE';
 const QR = 'data:image/png;base64,aGVsbG8=';
 const TXID = 'a'.repeat(64);
+const CHECKPOINT = new Date('2026-09-21T08:00:00.000Z');
+const EXPIRES = new Date('2099-09-21T08:30:00.000Z');
 
 const actor: AuthenticatedUser = {
   id: USER_ID,
@@ -40,6 +44,21 @@ const route = {
   railDisplayName: 'USDT on TRON (TRC20)',
   validationProfile: 'TRON' as const,
   railIsActive: true,
+};
+
+const paymentIntent = {
+  id: INTENT_ID,
+  userId: USER_ID,
+  packagePlanVersionId: PLAN_ID,
+  packagePlanItemId: ITEM_ID,
+  packageDefinitionId: DEFINITION_ID,
+  depositAccountId: ACCOUNT_ID,
+  paymentRailId: RAIL_ID,
+  asset: 'USDT',
+  network: 'TRC20',
+  walletAddress: ADDRESS,
+  checkpointAt: CHECKPOINT,
+  expiresAt: EXPIRES,
 };
 
 function publishedPlan() {
@@ -90,15 +109,15 @@ function pendingDeposit() {
     assignedValidationProfile: 'TRON' as const,
     assignedQrCodeDataUrl: QR,
     txid: TXID,
-    submittedAt: new Date('2026-09-09T12:00:00.000Z'),
+    submittedAt: new Date('2026-09-21T08:05:00.000Z'),
     readyForApprovalByUserId: null,
     readyForApprovalAt: null,
     readyForApprovalNote: null,
     reviewedByUserId: null,
     reviewedAt: null,
     reviewNote: null,
-    createdAt: new Date('2026-09-09T12:00:00.000Z'),
-    updatedAt: new Date('2026-09-09T12:00:00.000Z'),
+    createdAt: new Date('2026-09-21T08:05:00.000Z'),
+    updatedAt: new Date('2026-09-21T08:05:00.000Z'),
     user: {
       id: USER_ID,
       username: 'user',
@@ -124,16 +143,10 @@ describe('PackageDepositFlowService', () => {
       create: jest.fn(),
     },
     $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
   };
 
   const prismaMock = {
-    packagePlanVersion: {
-      findMany: jest.fn(),
-    },
-    deposit: {
-      findUnique: jest.fn(),
-    },
-    $queryRaw: jest.fn(),
     $transaction: jest.fn(
       (operation: (tx: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -145,13 +158,19 @@ describe('PackageDepositFlowService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    transaction.$executeRaw.mockResolvedValue(1);
+    transaction.auditLog.create.mockResolvedValue({});
     service = new PackageDepositFlowService(prisma);
   });
 
-  it('returns the package-configured receiving account without per-user assignment', async () => {
-    prismaMock.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
-    prismaMock.$queryRaw.mockResolvedValue([route]);
-    prismaMock.deposit.findUnique.mockResolvedValue(null);
+  it('reserves the configured wallet before returning payment instructions', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
 
     const result = await service.getPackageDepositContext(ITEM_ID, actor);
 
@@ -159,35 +178,54 @@ describe('PackageDepositFlowService', () => {
     expect(result.receivingAccount.id).toBe(ACCOUNT_ID);
     expect(result.receivingAccount.walletAddress).toBe(ADDRESS);
     expect(result.receivingAccount.network).toBe('TRC20');
+    expect(result.paymentIntent).not.toBeNull();
+    expect(result.paymentIntent?.checkpointAt).toBeInstanceOf(Date);
+    expect(result.paymentIntent?.expiresAt).toBeInstanceOf(Date);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
-  it('creates PENDING_REVIEW directly using the package-configured account', async () => {
+  it('reuses the same active payment intent for the same user and package', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([paymentIntent]);
+
+    const result = await service.getPackageDepositContext(ITEM_ID, actor);
+
+    expect(result.paymentIntent).toEqual({
+      id: INTENT_ID,
+      checkpointAt: CHECKPOINT,
+      expiresAt: EXPIRES,
+    });
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks context when the configured wallet is reserved by another payment session', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: '99999999-9999-4999-8999-999999999999' }]);
+
+    await expect(
+      service.getPackageDepositContext(ITEM_ID, actor),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('creates PENDING_REVIEW directly and persists the pre-payment checkpoint', async () => {
     transaction.deposit.findUnique.mockResolvedValue(null);
     transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     transaction.$queryRaw
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([route]);
-    transaction.deposit.create.mockImplementation((args: unknown) => {
-      const data = (
-        args as {
-          data: {
-            status: string;
-            assignedDepositAccountId: string;
-            assignedWalletAddress: string;
-            assignedNetwork: string;
-            txid: string | null;
-          };
-        }
-      ).data;
-
-      expect(data.status).toBe('PENDING_REVIEW');
-      expect(data.assignedDepositAccountId).toBe(ACCOUNT_ID);
-      expect(data.assignedWalletAddress).toBe(ADDRESS);
-      expect(data.assignedNetwork).toBe('TRC20');
-      expect(data.txid).toBe(TXID);
-      return Promise.resolve(pendingDeposit());
-    });
-    transaction.auditLog.create.mockResolvedValue({});
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([paymentIntent])
+      .mockResolvedValueOnce([{ id: INTENT_ID }]);
+    transaction.deposit.create.mockResolvedValue(pendingDeposit());
 
     const result = await service.submitDeposit(
       {
@@ -201,5 +239,65 @@ describe('PackageDepositFlowService', () => {
     expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(3);
+    const auditCreateCalls = (
+      transaction.auditLog.create as unknown as {
+        mock: { calls: unknown[][] };
+      }
+    ).mock.calls;
+    const auditCreateArg = auditCreateCalls[0]?.[0];
+    expect(auditCreateArg).toMatchObject({
+      data: {
+        metadata: {
+          paymentIntentId: INTENT_ID,
+          paymentCheckpointAt: CHECKPOINT.toISOString(),
+        },
+      },
+    });
+  });
+
+  it('rejects submission when the user has no active payment intent', async () => {
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      service.submitDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          investmentAmount: '25',
+          txid: TXID,
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(transaction.deposit.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks package submission when the configured wallet is reserved by another open deposit', async () => {
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([{ id: '77777777-7777-4777-8777-777777777778' }]);
+
+    await expect(
+      service.submitDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          investmentAmount: '25',
+          txid: TXID,
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(transaction.deposit.create).not.toHaveBeenCalled();
   });
 });

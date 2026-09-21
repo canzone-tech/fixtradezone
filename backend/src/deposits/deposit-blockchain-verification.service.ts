@@ -67,6 +67,7 @@ interface DepositCandidateRow {
   assignedWalletAddress: string;
   assignedNetwork: string;
   assignedValidationProfile: string;
+  paymentCheckpointAt: Date | null;
   paymentRailId: string;
   railNetworkCode: string;
   railValidationProfile: string;
@@ -97,6 +98,10 @@ interface EvmReceipt {
   status: string;
   blockNumber: string;
   logs: EvmReceiptLog[];
+}
+
+interface EvmBlock {
+  timestamp: string;
 }
 
 interface VerificationResult {
@@ -192,6 +197,20 @@ function parseHexQuantity(value: string): bigint {
   return BigInt(value);
 }
 
+export function isBlockAtOrAfterDepositCheckpoint(
+  blockTimestampHex: string,
+  paymentCheckpointAt: Date,
+): boolean {
+  const checkpointMilliseconds = paymentCheckpointAt.getTime();
+  if (!Number.isFinite(checkpointMilliseconds)) {
+    throw new RpcUnavailableError('Deposit checkpoint timestamp is invalid.');
+  }
+
+  const blockTimestampSeconds = parseHexQuantity(blockTimestampHex);
+  const checkpointSeconds = BigInt(Math.floor(checkpointMilliseconds / 1000));
+  return blockTimestampSeconds >= checkpointSeconds;
+}
+
 function isReceipt(value: unknown): value is EvmReceipt {
   if (!value || typeof value !== 'object') return false;
   const receipt = value as Record<string, unknown>;
@@ -209,6 +228,11 @@ function isReceipt(value: unknown): value is EvmReceipt {
       typeof log.data === 'string'
     );
   });
+}
+
+function isBlock(value: unknown): value is EvmBlock {
+  if (!value || typeof value !== 'object') return false;
+  return typeof (value as Record<string, unknown>).timestamp === 'string';
 }
 
 @Injectable()
@@ -539,6 +563,30 @@ export class DepositBlockchainVerificationService {
         );
       }
 
+      if (candidate.paymentCheckpointAt) {
+        const blockValue = await this.rpc<unknown>('eth_getBlockByNumber', [
+          receiptValue.blockNumber,
+          false,
+        ]);
+        if (!isBlock(blockValue)) {
+          throw new RpcUnavailableError(
+            'Blockchain RPC returned a malformed transaction block.',
+          );
+        }
+        if (
+          !isBlockAtOrAfterDepositCheckpoint(
+            blockValue.timestamp,
+            candidate.paymentCheckpointAt,
+          )
+        ) {
+          return this.failed(
+            'TX_BEFORE_DEPOSIT_CHECKPOINT',
+            'Blockchain transaction predates this payment session checkpoint and cannot be used for this deposit.',
+            receiptValue.blockNumber,
+          );
+        }
+      }
+
       const transferredBaseUnits = sumMatchingErc20Transfers(
         receiptValue.logs,
         tokenContractAddress,
@@ -735,6 +783,8 @@ export class DepositBlockchainVerificationService {
               observedConfirmations: result.observedConfirmations,
               blockNumber: result.blockNumber,
               onChainAmount: result.onChainAmount,
+              depositCheckpointAt:
+                candidate.paymentCheckpointAt?.toISOString() ?? null,
               receivingAddress: normalizeEvmAddress(
                 candidate.assignedWalletAddress,
               ),
@@ -822,6 +872,7 @@ export class DepositBlockchainVerificationService {
         d.assignedWalletAddress AS assignedWalletAddress,
         d.assignedNetwork AS assignedNetwork,
         d.assignedValidationProfile AS assignedValidationProfile,
+        d.paymentCheckpointAt AS paymentCheckpointAt,
         da.paymentRailId AS paymentRailId,
         dpr.networkCode AS railNetworkCode,
         dpr.validationProfile AS railValidationProfile,

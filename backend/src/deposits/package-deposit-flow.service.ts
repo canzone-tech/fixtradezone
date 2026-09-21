@@ -4,6 +4,7 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
@@ -15,6 +16,8 @@ import {
   type DepositStatus,
   type DepositValidationProfile,
 } from './deposits.constants';
+
+const PAYMENT_INTENT_TTL_MS = 30 * 60 * 1000;
 
 const DEPOSIT_INCLUDE = {
   user: {
@@ -56,6 +59,21 @@ interface PackageRouteRow {
   railIsActive: boolean | number;
 }
 
+interface DepositPaymentIntentRow {
+  id: string;
+  userId: string;
+  packagePlanVersionId: string;
+  packagePlanItemId: string;
+  packageDefinitionId: string;
+  depositAccountId: string;
+  paymentRailId: string;
+  asset: string;
+  network: string;
+  walletAddress: string;
+  checkpointAt: Date;
+  expiresAt: Date;
+}
+
 interface ResolvedPackageDepositInput {
   plan: {
     id: string;
@@ -77,6 +95,7 @@ interface ResolvedPackageDepositInput {
   rangeConfigured: boolean;
   investmentAmount: Prisma.Decimal;
   account: PackageRouteRow;
+  paymentIntent: DepositPaymentIntentRow;
 }
 
 @Injectable()
@@ -87,102 +106,130 @@ export class PackageDepositFlowService {
     packagePlanItemId: string,
     actor: AuthenticatedUser,
   ) {
-    const now = new Date();
-    const plans = await this.prisma.packagePlanVersion.findMany({
-      where: {
-        status: 'PUBLISHED',
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-        items: {
-          some: {
-            id: packagePlanItemId,
-            availability: 'AVAILABLE',
+    return this.runSerializable(async (transaction) => {
+      const now = new Date();
+      await this.releaseExpiredPaymentIntents(transaction, now);
+
+      const plans = await transaction.packagePlanVersion.findMany({
+        where: {
+          status: 'PUBLISHED',
+          effectiveFrom: { lte: now },
+          OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+          items: {
+            some: {
+              id: packagePlanItemId,
+              availability: 'AVAILABLE',
+            },
           },
         },
-      },
-      include: {
-        items: {
-          where: { id: packagePlanItemId },
-          include: { packageDefinition: true },
+        include: {
+          items: {
+            where: { id: packagePlanItemId },
+            include: { packageDefinition: true },
+          },
         },
-      },
-      orderBy: [{ effectiveFrom: 'desc' }, { versionNumber: 'desc' }],
-      take: 2,
-    });
+        orderBy: [{ effectiveFrom: 'desc' }, { versionNumber: 'desc' }],
+        take: 2,
+      });
 
-    if (plans.length > 1) {
-      throw new ServiceUnavailableException(
-        'Package catalogue has overlapping effective plan versions.',
+      if (plans.length > 1) {
+        throw new ServiceUnavailableException(
+          'Package catalogue has overlapping effective plan versions.',
+        );
+      }
+
+      const plan = plans[0];
+      const item = plan?.items[0];
+
+      if (!plan || !item) {
+        throw new BadRequestException(
+          'Selected package is not currently available for a new deposit.',
+        );
+      }
+
+      this.assertActivationTrigger(plan.activationTrigger);
+
+      const routeRows = await transaction.$queryRaw<
+        PackageRouteRow[]
+      >(Prisma.sql`
+        SELECT
+          da.id AS depositAccountId,
+          da.label AS accountLabel,
+          da.paymentRailId AS paymentRailId,
+          da.asset AS asset,
+          da.network AS network,
+          da.walletAddress AS walletAddress,
+          da.qrCodeDataUrl AS qrCodeDataUrl,
+          da.isActive AS accountIsActive,
+          dpr.displayName AS railDisplayName,
+          dpr.validationProfile AS validationProfile,
+          dpr.isActive AS railIsActive
+        FROM deposit_package_account_routes dpar
+        INNER JOIN deposit_accounts da
+          ON da.id = dpar.depositAccountId
+        INNER JOIN deposit_payment_rails dpr
+          ON dpr.id = da.paymentRailId
+        WHERE dpar.packageDefinitionId = ${item.packageDefinition.id}
+        LIMIT 1
+        FOR UPDATE
+      `);
+
+      const account = this.assertConfiguredAccount(
+        routeRows[0] ?? null,
+        item.currency,
       );
-    }
 
-    const plan = plans[0];
-    const item = plan?.items[0];
+      const openDeposit = await transaction.deposit.findUnique({
+        where: { openKey: actor.id },
+        select: {
+          id: true,
+          status: true,
+          packagePlanItemId: true,
+          packageDisplayName: true,
+        },
+      });
 
-    if (!plan || !item) {
-      throw new BadRequestException(
-        'Selected package is not currently available for a new deposit.',
-      );
-    }
+      const paymentIntent = openDeposit
+        ? null
+        : await this.ensurePaymentIntent(
+            transaction,
+            {
+              planId: plan.id,
+              itemId: item.id,
+              packageDefinitionId: item.packageDefinition.id,
+              account,
+            },
+            actor,
+            now,
+          );
 
-    this.assertActivationTrigger(plan.activationTrigger);
-
-    const routeRows = await this.prisma.$queryRaw<PackageRouteRow[]>(Prisma.sql`
-      SELECT
-        da.id AS depositAccountId,
-        da.label AS accountLabel,
-        da.paymentRailId AS paymentRailId,
-        da.asset AS asset,
-        da.network AS network,
-        da.walletAddress AS walletAddress,
-        da.qrCodeDataUrl AS qrCodeDataUrl,
-        da.isActive AS accountIsActive,
-        dpr.displayName AS railDisplayName,
-        dpr.validationProfile AS validationProfile,
-        dpr.isActive AS railIsActive
-      FROM deposit_package_account_routes dpar
-      INNER JOIN deposit_accounts da
-        ON da.id = dpar.depositAccountId
-      INNER JOIN deposit_payment_rails dpr
-        ON dpr.id = da.paymentRailId
-      WHERE dpar.packageDefinitionId = ${item.packageDefinition.id}
-      LIMIT 1
-    `);
-
-    const account = this.assertConfiguredAccount(
-      routeRows[0] ?? null,
-      item.currency,
-    );
-
-    const openDeposit = await this.prisma.deposit.findUnique({
-      where: { openKey: actor.id },
-      select: {
-        id: true,
-        status: true,
-        packagePlanItemId: true,
-        packageDisplayName: true,
-      },
+      return {
+        package: {
+          id: item.id,
+          packageDefinitionId: item.packageDefinition.id,
+          packageCode: item.packageDefinition.code,
+          displayName: item.displayName,
+          currency: item.currency,
+          price: this.decimalString(item.price),
+          minimumInvestment: item.minimumInvestment
+            ? this.decimalString(item.minimumInvestment)
+            : null,
+          maximumInvestment: item.maximumInvestment
+            ? this.decimalString(item.maximumInvestment)
+            : null,
+          durationDays: item.durationDays,
+        },
+        receivingAccount: this.accountSnapshot(account),
+        openDeposit,
+        paymentIntent: paymentIntent
+          ? {
+              id: paymentIntent.id,
+              checkpointAt: paymentIntent.checkpointAt,
+              expiresAt: paymentIntent.expiresAt,
+            }
+          : null,
+      };
     });
-
-    return {
-      package: {
-        id: item.id,
-        packageDefinitionId: item.packageDefinition.id,
-        packageCode: item.packageDefinition.code,
-        displayName: item.displayName,
-        currency: item.currency,
-        price: this.decimalString(item.price),
-        minimumInvestment: item.minimumInvestment
-          ? this.decimalString(item.minimumInvestment)
-          : null,
-        maximumInvestment: item.maximumInvestment
-          ? this.decimalString(item.maximumInvestment)
-          : null,
-        durationDays: item.durationDays,
-      },
-      receivingAccount: this.accountSnapshot(account),
-      openDeposit,
-    };
   }
 
   async submitDeposit(
@@ -239,6 +286,35 @@ export class PackageDepositFlowService {
         include: DEPOSIT_INCLUDE,
       });
 
+      const checkpointUpdated = await transaction.$executeRaw(Prisma.sql`
+        UPDATE deposits
+        SET paymentCheckpointAt = ${resolved.paymentIntent.checkpointAt}
+        WHERE id = ${deposit.id}
+          AND paymentCheckpointAt IS NULL
+      `);
+      if (checkpointUpdated !== 1) {
+        throw new ConflictException(
+          'Deposit payment checkpoint could not be persisted safely.',
+        );
+      }
+
+      const consumedIntent = await transaction.$executeRaw(Prisma.sql`
+        UPDATE deposit_payment_intents
+        SET
+          activeUserKey = NULL,
+          activeWalletKey = NULL,
+          consumedAt = ${submittedAt},
+          updatedAt = ${submittedAt}
+        WHERE id = ${resolved.paymentIntent.id}
+          AND activeUserKey = ${actor.id}
+          AND activeWalletKey = ${this.walletReservationKey(resolved.account)}
+      `);
+      if (consumedIntent !== 1) {
+        throw new ConflictException(
+          'Payment session changed concurrently; reload and retry.',
+        );
+      }
+
       await transaction.auditLog.create({
         data: {
           actorUserId: actor.id,
@@ -262,6 +338,11 @@ export class PackageDepositFlowService {
             txid: normalizedTxid,
             submittedAt: submittedAt.toISOString(),
             singleStepSubmission: true,
+            paymentIntentId: resolved.paymentIntent.id,
+            paymentCheckpointAt:
+              resolved.paymentIntent.checkpointAt.toISOString(),
+            paymentIntentExpiresAt:
+              resolved.paymentIntent.expiresAt.toISOString(),
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -280,6 +361,9 @@ export class PackageDepositFlowService {
     dto: SubmitPackageDepositDto,
     actor: AuthenticatedUser,
   ): Promise<ResolvedPackageDepositInput> {
+    const now = new Date();
+    await this.releaseExpiredPaymentIntents(transaction, now);
+
     const existingOpen = await transaction.deposit.findUnique({
       where: { openKey: actor.id },
       select: { id: true, status: true },
@@ -291,7 +375,6 @@ export class PackageDepositFlowService {
       );
     }
 
-    const now = new Date();
     const plans = await transaction.packagePlanVersion.findMany({
       where: {
         status: 'PUBLISHED',
@@ -378,6 +461,72 @@ export class PackageDepositFlowService {
       routeRows[0] ?? null,
       item.currency,
     );
+
+    const reservedRows = await transaction.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT d.id
+        FROM deposits d
+        WHERE d.assignedNetwork = ${account.network}
+          AND d.assignedWalletAddress = ${account.walletAddress}
+          AND d.openKey IS NOT NULL
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
+
+    if (reservedRows.length > 0) {
+      throw new ServiceUnavailableException(
+        'The receiving account configured for this package is currently reserved by another open deposit.',
+      );
+    }
+
+    const paymentIntentRows = await this.loadActivePaymentIntentForUser(
+      transaction,
+      actor.id,
+    );
+    const paymentIntent = paymentIntentRows[0];
+    if (!paymentIntent) {
+      throw new ConflictException(
+        'Payment session is missing or expired. Reload the package deposit page before sending or submitting payment.',
+      );
+    }
+
+    if (
+      paymentIntent.packagePlanVersionId !== plan.id ||
+      paymentIntent.packagePlanItemId !== item.id ||
+      paymentIntent.packageDefinitionId !== item.packageDefinition.id ||
+      paymentIntent.depositAccountId !== account.depositAccountId ||
+      paymentIntent.paymentRailId !== account.paymentRailId ||
+      paymentIntent.network !== account.network ||
+      paymentIntent.walletAddress !== account.walletAddress
+    ) {
+      throw new ConflictException(
+        'Payment session does not match the selected package route. Reload the deposit page.',
+      );
+    }
+
+    if (paymentIntent.expiresAt <= now) {
+      throw new ConflictException(
+        'Payment session expired. Reload the package deposit page before sending or submitting payment.',
+      );
+    }
+
+    const walletKey = this.walletReservationKey(account);
+    const walletIntentRows = await transaction.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT id
+        FROM deposit_payment_intents
+        WHERE activeWalletKey = ${walletKey}
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
+    if (walletIntentRows[0]?.id !== paymentIntent.id) {
+      throw new ConflictException(
+        'Receiving account reservation changed concurrently. Reload the deposit page.',
+      );
+    }
+
     const rangeConfigured = item.minimumInvestment !== null;
     const investmentAmount = this.resolveInvestmentAmount(
       item,
@@ -390,7 +539,206 @@ export class PackageDepositFlowService {
       rangeConfigured,
       investmentAmount,
       account,
+      paymentIntent,
     };
+  }
+
+  private async ensurePaymentIntent(
+    transaction: Prisma.TransactionClient,
+    input: {
+      planId: string;
+      itemId: string;
+      packageDefinitionId: string;
+      account: PackageRouteRow;
+    },
+    actor: AuthenticatedUser,
+    now: Date,
+  ): Promise<DepositPaymentIntentRow> {
+    const activeForUser = await this.loadActivePaymentIntentForUser(
+      transaction,
+      actor.id,
+    );
+    const existing = activeForUser[0];
+    if (existing) {
+      if (
+        existing.packagePlanVersionId === input.planId &&
+        existing.packagePlanItemId === input.itemId &&
+        existing.packageDefinitionId === input.packageDefinitionId &&
+        existing.depositAccountId === input.account.depositAccountId &&
+        existing.paymentRailId === input.account.paymentRailId &&
+        existing.network === input.account.network &&
+        existing.walletAddress === input.account.walletAddress
+      ) {
+        return existing;
+      }
+
+      throw new ConflictException(
+        'Another payment session is already active for this user. Complete it or wait for it to expire before opening another package deposit.',
+      );
+    }
+
+    const reservedDepositRows = await transaction.$queryRaw<
+      Array<{ id: string }>
+    >(Prisma.sql`
+      SELECT d.id
+      FROM deposits d
+      WHERE d.assignedNetwork = ${input.account.network}
+        AND d.assignedWalletAddress = ${input.account.walletAddress}
+        AND d.openKey IS NOT NULL
+      LIMIT 1
+      FOR UPDATE
+    `);
+    if (reservedDepositRows.length > 0) {
+      throw new ServiceUnavailableException(
+        'The receiving account configured for this package is currently reserved by another open deposit.',
+      );
+    }
+
+    const walletKey = this.walletReservationKey(input.account);
+    const activeForWallet = await transaction.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT id
+        FROM deposit_payment_intents
+        WHERE activeWalletKey = ${walletKey}
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
+    if (activeForWallet.length > 0) {
+      throw new ServiceUnavailableException(
+        'The receiving account configured for this package is currently reserved by another payment session.',
+      );
+    }
+
+    const checkpointAt = now;
+    const expiresAt = new Date(now.getTime() + PAYMENT_INTENT_TTL_MS);
+    const id = randomUUID();
+
+    await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO deposit_payment_intents (
+        id,
+        userId,
+        activeUserKey,
+        packagePlanVersionId,
+        packagePlanItemId,
+        packageDefinitionId,
+        depositAccountId,
+        paymentRailId,
+        asset,
+        network,
+        walletAddress,
+        activeWalletKey,
+        checkpointAt,
+        expiresAt,
+        createdAt,
+        updatedAt
+      ) VALUES (
+        ${id},
+        ${actor.id},
+        ${actor.id},
+        ${input.planId},
+        ${input.itemId},
+        ${input.packageDefinitionId},
+        ${input.account.depositAccountId},
+        ${input.account.paymentRailId},
+        ${input.account.asset},
+        ${input.account.network},
+        ${input.account.walletAddress},
+        ${walletKey},
+        ${checkpointAt},
+        ${expiresAt},
+        ${checkpointAt},
+        ${checkpointAt}
+      )
+    `);
+
+    await transaction.auditLog.create({
+      data: {
+        actorUserId: actor.id,
+        action: 'CREATE',
+        entityType: 'DepositPaymentIntent',
+        entityId: id,
+        description:
+          'User payment session reserved the configured package receiving account.',
+        metadata: {
+          source: 'USER_DEPOSIT_PAYMENT_INTENT',
+          packagePlanVersionId: input.planId,
+          packagePlanItemId: input.itemId,
+          packageDefinitionId: input.packageDefinitionId,
+          depositAccountId: input.account.depositAccountId,
+          paymentRailId: input.account.paymentRailId,
+          network: input.account.network,
+          walletAddress: input.account.walletAddress,
+          checkpointAt: checkpointAt.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+        },
+      },
+    });
+
+    return {
+      id,
+      userId: actor.id,
+      packagePlanVersionId: input.planId,
+      packagePlanItemId: input.itemId,
+      packageDefinitionId: input.packageDefinitionId,
+      depositAccountId: input.account.depositAccountId,
+      paymentRailId: input.account.paymentRailId,
+      asset: input.account.asset,
+      network: input.account.network,
+      walletAddress: input.account.walletAddress,
+      checkpointAt,
+      expiresAt,
+    };
+  }
+
+  private loadActivePaymentIntentForUser(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+  ) {
+    return transaction.$queryRaw<DepositPaymentIntentRow[]>(Prisma.sql`
+      SELECT
+        id,
+        userId,
+        packagePlanVersionId,
+        packagePlanItemId,
+        packageDefinitionId,
+        depositAccountId,
+        paymentRailId,
+        asset,
+        network,
+        walletAddress,
+        checkpointAt,
+        expiresAt
+      FROM deposit_payment_intents
+      WHERE activeUserKey = ${userId}
+      LIMIT 1
+      FOR UPDATE
+    `);
+  }
+
+  private async releaseExpiredPaymentIntents(
+    transaction: Prisma.TransactionClient,
+    now: Date,
+  ): Promise<void> {
+    await transaction.$executeRaw(Prisma.sql`
+      UPDATE deposit_payment_intents
+      SET
+        activeUserKey = NULL,
+        activeWalletKey = NULL,
+        releasedAt = COALESCE(releasedAt, ${now}),
+        releaseReason = COALESCE(releaseReason, 'EXPIRED'),
+        updatedAt = ${now}
+      WHERE activeWalletKey IS NOT NULL
+        AND expiresAt <= ${now}
+    `);
+  }
+
+  private walletReservationKey(account: PackageRouteRow): string {
+    const normalizedAddress =
+      account.validationProfile === 'EVM'
+        ? account.walletAddress.trim().toLowerCase()
+        : account.walletAddress.trim();
+    return `${account.network.trim().toUpperCase()}:${normalizedAddress}`;
   }
 
   private resolveInvestmentAmount(

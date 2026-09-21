@@ -59,18 +59,54 @@ describe('DepositBlockchainProcessingService', () => {
     );
   });
 
-  it('records verification but does not auto approve in MANUAL mode', async () => {
+  it('keeps final approval manual after VERIFIED and marks the blockchain gate satisfied', async () => {
     const result = (await service.verifyAndApplyPolicy(DEPOSIT_ID, actor)) as {
-      approvalPolicy: { approvalMode: string };
-      autoApproval: { attempted: boolean; approved: boolean };
+      approvalPolicy: {
+        approvalMode: string;
+        manualApprovalAllowed: boolean;
+      };
+      autoApproval: { attempted: boolean; approved: boolean; message: string };
     };
 
     expect(approvalOrchestrator.approveDeposit).not.toHaveBeenCalled();
-    expect(result.approvalPolicy.approvalMode).toBe('MANUAL');
+    expect(result.approvalPolicy).toMatchObject({
+      approvalMode: 'MANUAL',
+      manualApprovalAllowed: true,
+    });
     expect(result.autoApproval).toMatchObject({
       attempted: false,
       approved: false,
     });
+    expect(result.autoApproval.message).toContain('gate is satisfied');
+  });
+
+  it('states that manual approval remains blocked while VERIFY_ONLY is pending', async () => {
+    verification.verifyDeposit.mockResolvedValue({
+      message: 'Blockchain transaction is pending.',
+      alreadyVerified: false,
+      verification: { status: 'PENDING' },
+    });
+    approvalMode.getDepositApprovalPolicy.mockResolvedValue({
+      depositId: DEPOSIT_ID,
+      approvalMode: 'MANUAL',
+      verificationMode: 'VERIFY_ONLY',
+      verificationStatus: 'PENDING',
+    });
+
+    const result = (await service.verifyAndApplyPolicy(DEPOSIT_ID, actor)) as {
+      message: string;
+      approvalPolicy: { manualApprovalAllowed: boolean };
+      autoApproval: { message: string };
+    };
+
+    expect(approvalOrchestrator.approveDeposit).not.toHaveBeenCalled();
+    expect(result.approvalPolicy.manualApprovalAllowed).toBe(false);
+    expect(result.message).toContain(
+      'blocked until verification reaches VERIFIED',
+    );
+    expect(result.autoApproval.message).toContain(
+      'approval remains blocked until blockchain verification reaches VERIFIED',
+    );
   });
 
   it('waits without approval while AUTO mode verification is not VERIFIED', async () => {

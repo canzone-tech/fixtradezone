@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
+import { Prisma } from '../generated/prisma/client';
 import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import type { SubmitPackageDepositDto } from './dto/deposit.dto';
@@ -23,11 +24,19 @@ export class DepositSubmissionOrchestratorService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ): Promise<unknown> {
-    const submission = await this.packageDepositFlowService.submitDeposit(
-      dto,
-      actor,
-      context,
-    );
+    let submission: Awaited<
+      ReturnType<PackageDepositFlowService['submitDeposit']>
+    >;
+
+    try {
+      submission = await this.packageDepositFlowService.submitDeposit(
+        dto,
+        actor,
+        context,
+      );
+    } catch (error) {
+      this.rethrowSubmissionConflict(error);
+    }
 
     const state = await this.blockchainVerification.getDepositVerification(
       submission.deposit.id,
@@ -76,11 +85,66 @@ export class DepositSubmissionOrchestratorService {
           required: true,
           attempted: true,
           message:
-            'Deposit was submitted, but automatic blockchain verification could not complete. Approval behavior remains controlled by the configured MANUAL or AUTO_AFTER_BLOCKCHAIN_VERIFIED policy.',
+            'The transaction ID was saved, but blockchain verification could not complete. Approval remains blocked until the configured verification requirement reaches VERIFIED.',
           verification: null,
         },
       };
     }
+  }
+
+  private rethrowSubmissionConflict(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const target = this.p2002Target(error.meta);
+
+      if (target.includes('txid')) {
+        throw new ConflictException(
+          'This transaction ID has already been submitted on this network.',
+        );
+      }
+
+      if (target.includes('openKey')) {
+        throw new ConflictException(
+          'An open deposit already exists for this user.',
+        );
+      }
+    }
+
+    throw error;
+  }
+
+  private p2002Target(meta: Record<string, unknown> | undefined): string {
+    const targetMeta = meta?.target;
+    const targets = Array.isArray(targetMeta)
+      ? targetMeta.filter((value): value is string => typeof value === 'string')
+      : typeof targetMeta === 'string'
+        ? [targetMeta]
+        : [];
+
+    const driverAdapterError = meta?.driverAdapterError;
+    if (!driverAdapterError || typeof driverAdapterError !== 'object') {
+      return targets.join(',');
+    }
+
+    const cause =
+      'cause' in driverAdapterError ? driverAdapterError.cause : undefined;
+    if (!cause || typeof cause !== 'object') {
+      return targets.join(',');
+    }
+
+    const constraint = 'constraint' in cause ? cause.constraint : undefined;
+    if (!constraint || typeof constraint !== 'object') {
+      return targets.join(',');
+    }
+
+    const index = 'index' in constraint ? constraint.index : undefined;
+    if (typeof index === 'string') {
+      targets.push(index);
+    }
+
+    return targets.join(',');
   }
 
   private errorMessage(error: unknown): string {

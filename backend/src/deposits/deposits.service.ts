@@ -603,10 +603,26 @@ export class DepositsService {
         );
       }
 
+      await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+        SELECT da.id
+        FROM deposit_accounts da
+        WHERE da.paymentRailId = ${rail.id}
+          AND da.isActive = 1
+        ORDER BY da.id
+        FOR UPDATE
+      `);
+
       const accounts = await transaction.depositAccount.findMany({
         where: {
           paymentRailId: rail.id,
           isActive: true,
+          deposits: {
+            none: {
+              openKey: {
+                not: null,
+              },
+            },
+          },
         },
         select: DEPOSIT_ACCOUNT_SELECT,
         orderBy: { id: 'asc' },
@@ -614,7 +630,7 @@ export class DepositsService {
 
       if (accounts.length === 0) {
         throw new ServiceUnavailableException(
-          `No active receiving account is configured for ${rail.displayName}.`,
+          `No receiving account is currently available for ${rail.displayName}.`,
         );
       }
 
