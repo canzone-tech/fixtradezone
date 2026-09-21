@@ -380,7 +380,12 @@ describe('DepositsService', () => {
       'No receiving account is currently available for USDT on TRON (TRC20).',
     );
 
-    const findManyArgs = transaction.depositAccount.findMany.mock.calls[0]?.[0] as unknown;
+    const findManyCalls = (
+      transaction.depositAccount.findMany as unknown as {
+        mock: { calls: unknown[][] };
+      }
+    ).mock.calls;
+    const findManyArgs = findManyCalls[0]?.[0];
     expect(findManyArgs).toMatchObject({
       where: {
         paymentRailId: RAIL_ID,
