@@ -1,7 +1,4 @@
-import {
-  ConflictException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
@@ -288,9 +285,7 @@ describe('PackageDepositFlowService', () => {
     transaction.$queryRaw
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([route])
-      .mockResolvedValueOnce([
-        { id: '77777777-7777-4777-8777-777777777778' },
-      ]);
+      .mockResolvedValueOnce([{ id: '77777777-7777-4777-8777-777777777778' }]);
 
     await expect(
       service.submitDeposit(
