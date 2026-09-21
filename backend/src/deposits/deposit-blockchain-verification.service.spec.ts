@@ -106,7 +106,28 @@ describe('deposit blockchain verification helpers', () => {
 });
 
 describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
-  it('fails an otherwise genuine receipt when its block predates the deposit request', async () => {
+  function candidate(paymentCheckpointAt: Date | null) {
+    return {
+      depositId: '11111111-1111-4111-8111-111111111111',
+      amount: '5',
+      currency: 'USDT',
+      txid: 'a'.repeat(64),
+      assignedWalletAddress: '0x2222222222222222222222222222222222222222',
+      assignedNetwork: 'BEP20',
+      assignedValidationProfile: 'EVM',
+      paymentCheckpointAt,
+      paymentRailId: '22222222-2222-4222-8222-222222222222',
+      railNetworkCode: 'BEP20',
+      railValidationProfile: 'EVM',
+      verificationMode: 'VERIFY_ONLY',
+      chainId: 56,
+      tokenContractAddress: '0x1111111111111111111111111111111111111111',
+      tokenDecimals: 18,
+      requiredConfirmations: 12,
+    };
+  }
+
+  it('fails an otherwise genuine receipt when its block predates the payment-session checkpoint', async () => {
     const service = new DepositBlockchainVerificationService(
       {} as never,
       {} as never,
@@ -143,24 +164,9 @@ describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
           blockNumber: string | null;
         }>;
       }
-    ).performVerification({
-      depositId: '11111111-1111-4111-8111-111111111111',
-      amount: '5',
-      currency: 'USDT',
-      txid: 'a'.repeat(64),
-      assignedWalletAddress: '0x2222222222222222222222222222222222222222',
-      assignedNetwork: 'BEP20',
-      assignedValidationProfile: 'EVM',
-      createdAt: new Date('2026-09-21T05:30:00.000Z'),
-      paymentRailId: '22222222-2222-4222-8222-222222222222',
-      railNetworkCode: 'BEP20',
-      railValidationProfile: 'EVM',
-      verificationMode: 'VERIFY_ONLY',
-      chainId: 56,
-      tokenContractAddress: '0x1111111111111111111111111111111111111111',
-      tokenDecimals: 18,
-      requiredConfirmations: 12,
-    });
+    ).performVerification(
+      candidate(new Date('2026-09-21T05:30:00.000Z')),
+    );
 
     expect(result).toMatchObject({
       status: 'FAILED',
@@ -168,5 +174,51 @@ describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
       blockNumber: '100',
     });
     expect(rpc).toHaveBeenCalledWith('eth_getBlockByNumber', ['0x64', false]);
+  });
+
+  it('does not apply the new timestamp gate to historical deposits without a checkpoint', async () => {
+    const service = new DepositBlockchainVerificationService(
+      {} as never,
+      {} as never,
+    );
+    const rpc = jest
+      .spyOn(
+        service as unknown as {
+          rpc: (method: string, params: unknown[]) => Promise<unknown>;
+        },
+        'rpc',
+      )
+      .mockImplementation(async (method: string) => {
+        switch (method) {
+          case 'eth_chainId':
+            return '0x38';
+          case 'eth_getTransactionReceipt':
+            return {
+              status: '0x1',
+              blockNumber: '0x64',
+              logs: [],
+            };
+          default:
+            throw new Error(`Unexpected RPC method ${method}`);
+        }
+      });
+
+    const result = await (
+      service as unknown as {
+        performVerification: (candidate: Record<string, unknown>) => Promise<{
+          status: string;
+          failureCode: string | null;
+        }>;
+      }
+    ).performVerification(candidate(null));
+
+    expect(result).toMatchObject({
+      status: 'FAILED',
+      failureCode: 'TRANSFER_NOT_FOUND',
+    });
+    expect(rpc).not.toHaveBeenCalledWith(
+      'eth_getBlockByNumber',
+      expect.any(Array),
+    );
   });
 });
