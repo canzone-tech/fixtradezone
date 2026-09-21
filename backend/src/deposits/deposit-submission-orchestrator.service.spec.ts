@@ -108,7 +108,7 @@ describe('DepositSubmissionOrchestratorService', () => {
     });
   });
 
-  it('keeps a submitted deposit pending review when automatic verification cannot complete', async () => {
+  it('keeps a submitted deposit pending review and states the approval block when verification cannot complete', async () => {
     blockchainProcessing.verifyAndApplyPolicy.mockRejectedValue(
       new Error('RPC configuration incomplete'),
     );
@@ -134,5 +134,8 @@ describe('DepositSubmissionOrchestratorService', () => {
       attempted: true,
       verification: null,
     });
+    expect(result.blockchainVerification.message).toContain(
+      'Approval remains blocked until the configured verification requirement reaches VERIFIED',
+    );
   });
 });
