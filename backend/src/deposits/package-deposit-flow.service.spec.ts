@@ -243,7 +243,12 @@ describe('PackageDepositFlowService', () => {
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(3);
-    const auditCreateArg = transaction.auditLog.create.mock.calls[0]?.[0] as unknown;
+    const auditCreateCalls = (
+      transaction.auditLog.create as unknown as {
+        mock: { calls: unknown[][] };
+      }
+    ).mock.calls;
+    const auditCreateArg = auditCreateCalls[0]?.[0];
     expect(auditCreateArg).toMatchObject({
       data: {
         metadata: {
