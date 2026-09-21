@@ -362,6 +362,41 @@ describe('DepositsService', () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  it('excludes receiving accounts already reserved by an open deposit', async () => {
+    transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
+    transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
+    transaction.depositAccount.findMany.mockResolvedValue([]);
+
+    await expect(
+      service.createDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          paymentRailId: RAIL_ID,
+          investmentAmount: '5',
+        },
+        actor,
+      ),
+    ).rejects.toThrow(
+      'No receiving account is currently available for USDT on TRON (TRC20).',
+    );
+
+    expect(transaction.depositAccount.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          paymentRailId: RAIL_ID,
+          isActive: true,
+          deposits: {
+            none: {
+              openKey: {
+                not: null,
+              },
+            },
+          },
+        }),
+      }),
+    );
+  });
+
   it('snapshots the exact user-selected ranged investment and rail/account', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(packagePlan());
     transaction.depositPaymentRail.findFirst.mockResolvedValue(rail);
