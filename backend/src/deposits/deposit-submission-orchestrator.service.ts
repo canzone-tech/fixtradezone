@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
+import { Prisma } from '../generated/prisma/client';
 import { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import type { SubmitPackageDepositDto } from './dto/deposit.dto';
@@ -23,11 +24,19 @@ export class DepositSubmissionOrchestratorService {
     actor: AuthenticatedUser,
     context: RequestContext = {},
   ): Promise<unknown> {
-    const submission = await this.packageDepositFlowService.submitDeposit(
-      dto,
-      actor,
-      context,
-    );
+    let submission: Awaited<
+      ReturnType<PackageDepositFlowService['submitDeposit']>
+    >;
+
+    try {
+      submission = await this.packageDepositFlowService.submitDeposit(
+        dto,
+        actor,
+        context,
+      );
+    } catch (error) {
+      this.rethrowSubmissionConflict(error);
+    }
 
     const state = await this.blockchainVerification.getDepositVerification(
       submission.deposit.id,
@@ -81,6 +90,29 @@ export class DepositSubmissionOrchestratorService {
         },
       };
     }
+  }
+
+  private rethrowSubmissionConflict(error: unknown): never {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    ) {
+      const metadata = JSON.stringify(error.meta ?? {});
+
+      if (metadata.includes('txid')) {
+        throw new ConflictException(
+          'This transaction ID has already been submitted on this network.',
+        );
+      }
+
+      if (metadata.includes('openKey')) {
+        throw new ConflictException(
+          'An open deposit already exists for this user.',
+        );
+      }
+    }
+
+    throw error;
   }
 
   private errorMessage(error: unknown): string {
