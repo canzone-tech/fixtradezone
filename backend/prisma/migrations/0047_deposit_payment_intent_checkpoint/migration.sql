@@ -1,9 +1,7 @@
-ALTER TABLE `deposits`
-  ADD COLUMN `paymentCheckpointAt` DATETIME(3) NULL AFTER `submittedAt`;
-
 CREATE TABLE `deposit_payment_intents` (
   `id` CHAR(36) NOT NULL,
   `userId` CHAR(36) NOT NULL,
+  `depositId` CHAR(36) NULL,
   `activeUserKey` CHAR(36) NULL,
   `packagePlanVersionId` CHAR(36) NOT NULL,
   `packagePlanItemId` CHAR(36) NOT NULL,
@@ -23,6 +21,7 @@ CREATE TABLE `deposit_payment_intents` (
   `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
 
   PRIMARY KEY (`id`),
+  UNIQUE KEY `deposit_payment_intents_deposit_uq` (`depositId`),
   UNIQUE KEY `deposit_payment_intents_active_user_uq` (`activeUserKey`),
   UNIQUE KEY `deposit_payment_intents_active_wallet_uq` (`activeWalletKey`),
   KEY `deposit_payment_intents_user_idx` (`userId`),
