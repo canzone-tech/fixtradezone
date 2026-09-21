@@ -378,6 +378,25 @@ export class PackageDepositFlowService {
       routeRows[0] ?? null,
       item.currency,
     );
+
+    const reservedRows = await transaction.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`
+        SELECT d.id
+        FROM deposits d
+        WHERE d.assignedNetwork = ${account.network}
+          AND d.assignedWalletAddress = ${account.walletAddress}
+          AND d.openKey IS NOT NULL
+        LIMIT 1
+        FOR UPDATE
+      `,
+    );
+
+    if (reservedRows.length > 0) {
+      throw new ServiceUnavailableException(
+        'The receiving account configured for this package is currently reserved by another open deposit.',
+      );
+    }
+
     const rangeConfigured = item.minimumInvestment !== null;
     const investmentAmount = this.resolveInvestmentAmount(
       item,
