@@ -149,7 +149,9 @@ export class PackageDepositFlowService {
 
       this.assertActivationTrigger(plan.activationTrigger);
 
-      const routeRows = await transaction.$queryRaw<PackageRouteRow[]>(Prisma.sql`
+      const routeRows = await transaction.$queryRaw<
+        PackageRouteRow[]
+      >(Prisma.sql`
         SELECT
           da.id AS depositAccountId,
           da.label AS accountLabel,
