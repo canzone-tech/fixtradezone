@@ -9,7 +9,6 @@ import {
   type ApiMessagePayload,
   type Deposit,
   type DepositMutationResponse,
-  type DepositValidationProfile,
   type DepositsResponse,
   compactDecimal,
   messageFrom,
@@ -34,17 +33,7 @@ interface PackageDepositContext {
     maximumInvestment: string | null;
     durationDays: number | null;
   };
-  receivingAccount: {
-    id: string;
-    label: string;
-    paymentRailId: string;
-    paymentRailDisplayName: string;
-    asset: string;
-    network: string;
-    walletAddress: string;
-    qrCodeDataUrl: string;
-    validationProfile: DepositValidationProfile;
-  };
+  receivingAccountReserved: false;
   openDeposit: {
     id: string;
     status: string;
@@ -220,23 +209,12 @@ export default function PackageDepositClient({
     }
   }
 
-  async function submitPackageDeposit() {
+  async function reservePackageDeposit() {
     if (!context || busy || openDeposit) return;
 
     const amount = investmentAmount.trim();
     if (!INVESTMENT_PATTERN.test(amount) || amount === "0") {
       setError("Enter a valid investment amount with up to 8 decimals.");
-      return;
-    }
-
-    const normalizedTxid = normalizeTransactionId(
-      context.receivingAccount.validationProfile,
-      txid,
-    );
-    if (!normalizedTxid) {
-      setError(
-        `Transaction ID is invalid for ${context.receivingAccount.network}.`,
-      );
       return;
     }
 
@@ -250,29 +228,31 @@ export default function PackageDepositClient({
         body: JSON.stringify({
           packagePlanItemId: context.package.id,
           investmentAmount: amount,
-          txid: normalizedTxid,
         }),
       });
       const payload = await readJson<DepositMutationResponse & ApiMessagePayload>(
         response,
       );
       if (!response.ok || !payload) {
-        throw new Error(messageFrom(payload, "Could not submit deposit."));
+        throw new Error(
+          messageFrom(payload, "Could not reserve a receiving address."),
+        );
       }
 
-      setTxid("");
       setNotice(payload.message);
       await applyReload();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not submit deposit.",
+        caught instanceof Error
+          ? caught.message
+          : "Could not reserve a receiving address.",
       );
     } finally {
       setBusy(false);
     }
   }
 
-  async function submitLegacyTxid(deposit: Deposit) {
+  async function submitReservedTxid(deposit: Deposit) {
     const normalizedTxid = normalizeTransactionId(
       deposit.assignedValidationProfile,
       txid,
@@ -322,9 +302,9 @@ export default function PackageDepositClient({
             <p className={styles.eyebrow}>PACKAGE-SPECIFIC DEPOSIT</p>
             <h1>{context?.package.displayName ?? "Deposit"}</h1>
             <p>
-              This page is locked to the package you selected. Its configured
-              receiving account, network, QR and public address are fixed for all
-              new deposits to this package.
+              Choose the exact investment first. The receiving address is shown
+              only after the backend creates an exclusive payment reservation and
+              immutable checkpoint for this deposit.
             </p>
           </div>
           <Link href="/user/packages" className={styles.buttonSecondary}>
@@ -398,13 +378,16 @@ export default function PackageDepositClient({
 
             {openDeposit.status === "AWAITING_TXID" ? (
               <div className={styles.formGrid}>
+                <div className={`${styles.notice} ${styles.full}`}>
+                  Send exactly {compactDecimal(openDeposit.amount)} {openDeposit.currency} on {openDeposit.assignedNetwork} only after this reservation was created. Transactions from before this checkpoint will be rejected.
+                </div>
                 <div className={`${styles.field} ${styles.full}`}>
-                  <label htmlFor="legacy-txid">
+                  <label htmlFor="reserved-txid">
                     Transaction ID · {openDeposit.assignedNetwork}
                   </label>
                   <input
                     className={styles.input}
-                    id="legacy-txid"
+                    id="reserved-txid"
                     value={txid}
                     onChange={(event) => setTxid(event.target.value)}
                     placeholder={transactionIdHint(
@@ -421,7 +404,7 @@ export default function PackageDepositClient({
                     className={styles.button}
                     type="button"
                     disabled={busy}
-                    onClick={() => void submitLegacyTxid(openDeposit)}
+                    onClick={() => void submitReservedTxid(openDeposit)}
                   >
                     {busy ? "Submitting…" : "Submit Transaction ID"}
                   </button>
@@ -442,62 +425,30 @@ export default function PackageDepositClient({
                 <h2>{context.package.displayName}</h2>
               </div>
               <span className={styles.badge} data-tone="success">
-                FIXED PACKAGE ROUTE
+                CHECKPOINT BEFORE PAYMENT
               </span>
             </div>
 
-            <div className={styles.qrWrap}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                className={styles.qr}
-                src={context.receivingAccount.qrCodeDataUrl}
-                alt={`${context.receivingAccount.asset} ${context.receivingAccount.network} receiving QR`}
-              />
-              <div className={styles.list}>
-                <div className={styles.kv}>
-                  <div>
-                    <small>Investment range</small>
-                    <strong>
-                      {investmentRange(context)} {context.package.currency}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Duration</small>
-                    <strong>
-                      {context.package.durationDays ?? "—"} days
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Network</small>
-                    <strong>{context.receivingAccount.network}</strong>
-                  </div>
-                  <div>
-                    <small>Receiving account</small>
-                    <strong>{context.receivingAccount.label}</strong>
-                  </div>
-                  <div className={styles.full}>
-                    <small>Receiving address</small>
-                    <strong className={styles.mono}>
-                      {context.receivingAccount.walletAddress}
-                    </strong>
-                  </div>
+            <div className={styles.list}>
+              <div className={styles.kv}>
+                <div>
+                  <small>Investment range</small>
+                  <strong>
+                    {investmentRange(context)} {context.package.currency}
+                  </strong>
                 </div>
-                <div className={styles.actions}>
-                  <button
-                    className={styles.buttonSecondary}
-                    type="button"
-                    onClick={() =>
-                      void copyAddress(context.receivingAccount.walletAddress)
-                    }
-                  >
-                    Copy address
-                  </button>
+                <div>
+                  <small>Duration</small>
+                  <strong>{context.package.durationDays ?? "—"} days</strong>
                 </div>
+              </div>
+              <div className={styles.notice}>
+                For security, the wallet address and QR are not exposed until you reserve this deposit. Reservation locks the configured wallet to this open deposit and creates the blockchain payment checkpoint.
               </div>
             </div>
 
             <div className={styles.formGrid}>
-              <div className={styles.field}>
+              <div className={`${styles.field} ${styles.full}`}>
                 <label htmlFor="investment-amount">
                   Investment amount · {context.package.currency}
                 </label>
@@ -510,35 +461,14 @@ export default function PackageDepositClient({
                   autoComplete="off"
                 />
               </div>
-              <div className={styles.field}>
-                <label htmlFor="package-txid">
-                  Transaction ID · {context.receivingAccount.network}
-                </label>
-                <input
-                  className={styles.input}
-                  id="package-txid"
-                  value={txid}
-                  onChange={(event) => setTxid(event.target.value)}
-                  placeholder={transactionIdHint(
-                    context.receivingAccount.validationProfile,
-                    context.receivingAccount.network,
-                  )}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-              </div>
-              <div className={`${styles.notice} ${styles.full}`}>
-                Send only {context.receivingAccount.asset} on {context.receivingAccount.network} to the address above. The package, account and network are selected by configuration and cannot be changed on this page.
-              </div>
               <div className={`${styles.actions} ${styles.full}`}>
                 <button
                   className={styles.button}
                   type="button"
                   disabled={busy}
-                  onClick={() => void submitPackageDeposit()}
+                  onClick={() => void reservePackageDeposit()}
                 >
-                  {busy ? "Submitting…" : "Submit Deposit"}
+                  {busy ? "Reserving…" : "Reserve Payment Address"}
                 </button>
               </div>
             </div>
