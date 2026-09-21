@@ -76,7 +76,7 @@ export class DepositSubmissionOrchestratorService {
           required: true,
           attempted: true,
           message:
-            'Deposit was submitted, but automatic blockchain verification could not complete. Approval behavior remains controlled by the configured MANUAL or AUTO_AFTER_BLOCKCHAIN_VERIFIED policy.',
+            'The transaction ID was saved, but blockchain verification could not complete. Approval remains blocked until the configured verification requirement reaches VERIFIED.',
           verification: null,
         },
       };
