@@ -8,6 +8,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { normalizeDepositTransactionId } from './deposit.validation';
 import type { SubmitPackageDepositDto } from './dto/deposit.dto';
 import {
   DEPOSIT_AUDIT_OPERATIONS,
@@ -148,7 +149,10 @@ export class PackageDepositFlowService {
       LIMIT 1
     `);
 
-    this.assertConfiguredAccount(routeRows[0] ?? null, item.currency);
+    const account = this.assertConfiguredAccount(
+      routeRows[0] ?? null,
+      item.currency,
+    );
 
     const openDeposit = await this.prisma.deposit.findUnique({
       where: { openKey: actor.id },
@@ -176,7 +180,7 @@ export class PackageDepositFlowService {
           : null,
         durationDays: item.durationDays,
       },
-      receivingAccountReserved: false,
+      receivingAccount: this.accountSnapshot(account),
       openDeposit,
     };
   }
@@ -188,12 +192,23 @@ export class PackageDepositFlowService {
   ) {
     return this.runSerializable(async (transaction) => {
       const resolved = await this.resolveDepositInput(transaction, dto, actor);
+      const normalizedTxid = normalizeDepositTransactionId(
+        resolved.account.validationProfile,
+        dto.txid,
+      );
 
+      if (!normalizedTxid) {
+        throw new BadRequestException(
+          `Transaction ID is invalid for ${resolved.account.network}.`,
+        );
+      }
+
+      const submittedAt = new Date();
       const deposit = await transaction.deposit.create({
         data: {
           userId: actor.id,
           openKey: actor.id,
-          status: 'AWAITING_TXID',
+          status: 'PENDING_REVIEW',
           packagePlanVersionId: resolved.plan.id,
           packagePlanItemId: resolved.item.id,
           packageCode: resolved.item.packageDefinition.code,
@@ -218,8 +233,8 @@ export class PackageDepositFlowService {
           assignedNetwork: resolved.account.network,
           assignedValidationProfile: resolved.account.validationProfile,
           assignedQrCodeDataUrl: resolved.account.qrCodeDataUrl,
-          txid: null,
-          submittedAt: null,
+          txid: normalizedTxid,
+          submittedAt,
         },
         include: DEPOSIT_INCLUDE,
       });
@@ -230,11 +245,10 @@ export class PackageDepositFlowService {
           action: 'CREATE',
           entityType: 'Deposit',
           entityId: deposit.id,
-          description:
-            'User reserved the package receiving account before sending payment.',
+          description: 'User submitted a package deposit for manual review.',
           metadata: {
             source: 'USER_DEPOSIT',
-            operation: DEPOSIT_AUDIT_OPERATIONS.CREATE_REQUEST,
+            operation: DEPOSIT_AUDIT_OPERATIONS.SUBMIT_PACKAGE_DEPOSIT,
             packagePlanVersionId: resolved.plan.id,
             packagePlanItemId: resolved.item.id,
             packageDefinitionId: resolved.item.packageDefinition.id,
@@ -245,8 +259,9 @@ export class PackageDepositFlowService {
             assignedWalletAddress: resolved.account.walletAddress,
             assignedNetwork: resolved.account.network,
             assignedValidationProfile: resolved.account.validationProfile,
-            paymentCheckpoint: deposit.createdAt.toISOString(),
-            paymentSentBeforeReservation: false,
+            txid: normalizedTxid,
+            submittedAt: submittedAt.toISOString(),
+            singleStepSubmission: true,
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -254,8 +269,7 @@ export class PackageDepositFlowService {
       });
 
       return {
-        message:
-          'Deposit request created. Send payment only to the reserved receiving address, then submit the transaction ID.',
+        message: 'Deposit submitted for manual review.',
         deposit: this.depositSnapshot(deposit),
       };
     });
@@ -491,6 +505,20 @@ export class PackageDepositFlowService {
     return route;
   }
 
+  private accountSnapshot(account: PackageRouteRow) {
+    return {
+      id: account.depositAccountId,
+      label: account.accountLabel,
+      paymentRailId: account.paymentRailId,
+      paymentRailDisplayName: account.railDisplayName,
+      asset: account.asset,
+      network: account.network,
+      walletAddress: account.walletAddress,
+      qrCodeDataUrl: account.qrCodeDataUrl,
+      validationProfile: account.validationProfile,
+    };
+  }
+
   private depositSnapshot(deposit: {
     id: string;
     userId: string;
@@ -631,7 +659,7 @@ export class PackageDepositFlowService {
     }
 
     throw new ConflictException(
-      'Deposit reservation changed concurrently; reload and retry.',
+      'Deposit submission changed concurrently; reload and retry.',
     );
   }
 }

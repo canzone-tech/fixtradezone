@@ -227,6 +227,11 @@ export class SubmitPackageDepositDto {
   @IsString()
   @Matches(INVESTMENT_AMOUNT_PATTERN)
   investmentAmount?: string;
+
+  @Transform(normalizeTxid)
+  @IsString()
+  @Length(1, 191)
+  txid!: string;
 }
 
 export class SubmitDepositTxidDto {
