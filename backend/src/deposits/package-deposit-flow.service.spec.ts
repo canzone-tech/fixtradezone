@@ -181,10 +181,9 @@ describe('PackageDepositFlowService', () => {
     expect(result.receivingAccount.id).toBe(ACCOUNT_ID);
     expect(result.receivingAccount.walletAddress).toBe(ADDRESS);
     expect(result.receivingAccount.network).toBe('TRC20');
-    expect(result.paymentIntent).toMatchObject({
-      checkpointAt: expect.any(Date),
-      expiresAt: expect.any(Date),
-    });
+    expect(result.paymentIntent).not.toBeNull();
+    expect(result.paymentIntent?.checkpointAt).toBeInstanceOf(Date);
+    expect(result.paymentIntent?.expiresAt).toBeInstanceOf(Date);
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(1);
   });
@@ -244,16 +243,15 @@ describe('PackageDepositFlowService', () => {
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(3);
-    expect(transaction.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          metadata: expect.objectContaining({
-            paymentIntentId: INTENT_ID,
-            paymentCheckpointAt: CHECKPOINT.toISOString(),
-          }),
-        }),
-      }),
-    );
+    const auditCreateArg = transaction.auditLog.create.mock.calls[0]?.[0] as unknown;
+    expect(auditCreateArg).toMatchObject({
+      data: {
+        metadata: {
+          paymentIntentId: INTENT_ID,
+          paymentCheckpointAt: CHECKPOINT.toISOString(),
+        },
+      },
+    });
   });
 
   it('rejects submission when the user has no active payment intent', async () => {
