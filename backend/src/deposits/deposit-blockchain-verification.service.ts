@@ -67,7 +67,7 @@ interface DepositCandidateRow {
   assignedWalletAddress: string;
   assignedNetwork: string;
   assignedValidationProfile: string;
-  createdAt: Date;
+  paymentCheckpointAt: Date | null;
   paymentRailId: string;
   railNetworkCode: string;
   railValidationProfile: string;
@@ -199,9 +199,9 @@ function parseHexQuantity(value: string): bigint {
 
 export function isBlockAtOrAfterDepositCheckpoint(
   blockTimestampHex: string,
-  depositCreatedAt: Date,
+  paymentCheckpointAt: Date,
 ): boolean {
-  const checkpointMilliseconds = depositCreatedAt.getTime();
+  const checkpointMilliseconds = paymentCheckpointAt.getTime();
   if (!Number.isFinite(checkpointMilliseconds)) {
     throw new RpcUnavailableError('Deposit checkpoint timestamp is invalid.');
   }
@@ -563,26 +563,28 @@ export class DepositBlockchainVerificationService {
         );
       }
 
-      const blockValue = await this.rpc<unknown>('eth_getBlockByNumber', [
-        receiptValue.blockNumber,
-        false,
-      ]);
-      if (!isBlock(blockValue)) {
-        throw new RpcUnavailableError(
-          'Blockchain RPC returned a malformed transaction block.',
-        );
-      }
-      if (
-        !isBlockAtOrAfterDepositCheckpoint(
-          blockValue.timestamp,
-          candidate.createdAt,
-        )
-      ) {
-        return this.failed(
-          'TX_BEFORE_DEPOSIT_CHECKPOINT',
-          'Blockchain transaction predates this deposit request and cannot be used for this deposit.',
+      if (candidate.paymentCheckpointAt) {
+        const blockValue = await this.rpc<unknown>('eth_getBlockByNumber', [
           receiptValue.blockNumber,
-        );
+          false,
+        ]);
+        if (!isBlock(blockValue)) {
+          throw new RpcUnavailableError(
+            'Blockchain RPC returned a malformed transaction block.',
+          );
+        }
+        if (
+          !isBlockAtOrAfterDepositCheckpoint(
+            blockValue.timestamp,
+            candidate.paymentCheckpointAt,
+          )
+        ) {
+          return this.failed(
+            'TX_BEFORE_DEPOSIT_CHECKPOINT',
+            'Blockchain transaction predates this payment session checkpoint and cannot be used for this deposit.',
+            receiptValue.blockNumber,
+          );
+        }
       }
 
       const transferredBaseUnits = sumMatchingErc20Transfers(
@@ -781,7 +783,8 @@ export class DepositBlockchainVerificationService {
               observedConfirmations: result.observedConfirmations,
               blockNumber: result.blockNumber,
               onChainAmount: result.onChainAmount,
-              depositCheckpointAt: candidate.createdAt.toISOString(),
+              depositCheckpointAt:
+                candidate.paymentCheckpointAt?.toISOString() ?? null,
               receivingAddress: normalizeEvmAddress(
                 candidate.assignedWalletAddress,
               ),
@@ -869,7 +872,7 @@ export class DepositBlockchainVerificationService {
         d.assignedWalletAddress AS assignedWalletAddress,
         d.assignedNetwork AS assignedNetwork,
         d.assignedValidationProfile AS assignedValidationProfile,
-        d.createdAt AS createdAt,
+        d.paymentCheckpointAt AS paymentCheckpointAt,
         da.paymentRailId AS paymentRailId,
         dpr.networkCode AS railNetworkCode,
         dpr.validationProfile AS railValidationProfile,
