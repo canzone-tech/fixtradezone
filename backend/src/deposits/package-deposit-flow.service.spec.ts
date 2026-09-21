@@ -1,3 +1,4 @@
+import { ServiceUnavailableException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
@@ -166,7 +167,8 @@ describe('PackageDepositFlowService', () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     transaction.$queryRaw
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([route]);
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([]);
     transaction.deposit.create.mockImplementation((args: unknown) => {
       const data = (
         args as {
@@ -201,5 +203,29 @@ describe('PackageDepositFlowService', () => {
     expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
     expect(result.deposit.status).toBe('PENDING_REVIEW');
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
+  });
+
+  it('blocks package submission when the configured wallet is reserved by another open deposit', async () => {
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.$queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([
+        { id: '77777777-7777-4777-8777-777777777778' },
+      ]);
+
+    await expect(
+      service.submitDeposit(
+        {
+          packagePlanItemId: ITEM_ID,
+          investmentAmount: '25',
+          txid: TXID,
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(transaction.deposit.create).not.toHaveBeenCalled();
   });
 });
