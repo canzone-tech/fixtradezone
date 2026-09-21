@@ -1,6 +1,8 @@
 import {
   baseUnitsToDecimal,
   decimalToBaseUnits,
+  DepositBlockchainVerificationService,
+  isBlockAtOrAfterDepositCheckpoint,
   sumMatchingErc20Transfers,
 } from './deposit-blockchain-verification.service';
 
@@ -76,5 +78,95 @@ describe('deposit blockchain verification helpers', () => {
     );
 
     expect(total).toBe(3_000_000n);
+  });
+
+  it('accepts a transaction mined in the same second as the deposit checkpoint', () => {
+    const checkpoint = new Date('2026-09-21T05:30:00.900Z');
+    const blockTimestampSeconds = Math.floor(checkpoint.getTime() / 1000);
+
+    expect(
+      isBlockAtOrAfterDepositCheckpoint(
+        `0x${blockTimestampSeconds.toString(16)}`,
+        checkpoint,
+      ),
+    ).toBe(true);
+  });
+
+  it('rejects a transaction mined before the deposit checkpoint second', () => {
+    const checkpoint = new Date('2026-09-21T05:30:00.000Z');
+    const blockTimestampSeconds = Math.floor(checkpoint.getTime() / 1000) - 1;
+
+    expect(
+      isBlockAtOrAfterDepositCheckpoint(
+        `0x${blockTimestampSeconds.toString(16)}`,
+        checkpoint,
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
+  it('fails an otherwise genuine receipt when its block predates the deposit request', async () => {
+    const service = new DepositBlockchainVerificationService(
+      {} as never,
+      {} as never,
+    );
+    const rpc = jest
+      .spyOn(
+        service as unknown as {
+          rpc: (method: string, params: unknown[]) => Promise<unknown>;
+        },
+        'rpc',
+      )
+      .mockImplementation(async (method: string) => {
+        switch (method) {
+          case 'eth_chainId':
+            return '0x38';
+          case 'eth_getTransactionReceipt':
+            return {
+              status: '0x1',
+              blockNumber: '0x64',
+              logs: [],
+            };
+          case 'eth_getBlockByNumber':
+            return { timestamp: '0x64' };
+          default:
+            throw new Error(`Unexpected RPC method ${method}`);
+        }
+      });
+
+    const result = await (
+      service as unknown as {
+        performVerification: (candidate: Record<string, unknown>) => Promise<{
+          status: string;
+          failureCode: string | null;
+          blockNumber: string | null;
+        }>;
+      }
+    ).performVerification({
+      depositId: '11111111-1111-4111-8111-111111111111',
+      amount: '5',
+      currency: 'USDT',
+      txid: 'a'.repeat(64),
+      assignedWalletAddress: '0x2222222222222222222222222222222222222222',
+      assignedNetwork: 'BEP20',
+      assignedValidationProfile: 'EVM',
+      createdAt: new Date('2026-09-21T05:30:00.000Z'),
+      paymentRailId: '22222222-2222-4222-8222-222222222222',
+      railNetworkCode: 'BEP20',
+      railValidationProfile: 'EVM',
+      verificationMode: 'VERIFY_ONLY',
+      chainId: 56,
+      tokenContractAddress: '0x1111111111111111111111111111111111111111',
+      tokenDecimals: 18,
+      requiredConfirmations: 12,
+    });
+
+    expect(result).toMatchObject({
+      status: 'FAILED',
+      failureCode: 'TX_BEFORE_DEPOSIT_CHECKPOINT',
+      blockNumber: '100',
+    });
+    expect(rpc).toHaveBeenCalledWith('eth_getBlockByNumber', ['0x64', false]);
   });
 });
