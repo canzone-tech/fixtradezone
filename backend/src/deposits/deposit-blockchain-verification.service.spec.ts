@@ -139,20 +139,20 @@ describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
         },
         'rpc',
       )
-      .mockImplementation(async (method: string) => {
+      .mockImplementation((method: string) => {
         switch (method) {
           case 'eth_chainId':
-            return '0x38';
+            return Promise.resolve('0x38');
           case 'eth_getTransactionReceipt':
-            return {
+            return Promise.resolve({
               status: '0x1',
               blockNumber: '0x64',
               logs: [],
-            };
+            });
           case 'eth_getBlockByNumber':
-            return { timestamp: '0x64' };
+            return Promise.resolve({ timestamp: '0x64' });
           default:
-            throw new Error(`Unexpected RPC method ${method}`);
+            return Promise.reject(new Error(`Unexpected RPC method ${method}`));
         }
       });
 
@@ -188,18 +188,18 @@ describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
         },
         'rpc',
       )
-      .mockImplementation(async (method: string) => {
+      .mockImplementation((method: string) => {
         switch (method) {
           case 'eth_chainId':
-            return '0x38';
+            return Promise.resolve('0x38');
           case 'eth_getTransactionReceipt':
-            return {
+            return Promise.resolve({
               status: '0x1',
               blockNumber: '0x64',
               logs: [],
-            };
+            });
           default:
-            throw new Error(`Unexpected RPC method ${method}`);
+            return Promise.reject(new Error(`Unexpected RPC method ${method}`));
         }
       });
 
