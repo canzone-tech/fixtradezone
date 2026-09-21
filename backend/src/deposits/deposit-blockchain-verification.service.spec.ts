@@ -164,9 +164,7 @@ describe('DepositBlockchainVerificationService checkpoint enforcement', () => {
           blockNumber: string | null;
         }>;
       }
-    ).performVerification(
-      candidate(new Date('2026-09-21T05:30:00.000Z')),
-    );
+    ).performVerification(candidate(new Date('2026-09-21T05:30:00.000Z')));
 
     expect(result).toMatchObject({
       status: 'FAILED',
