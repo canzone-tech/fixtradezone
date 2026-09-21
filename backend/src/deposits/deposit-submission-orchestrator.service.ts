@@ -97,15 +97,15 @@ export class DepositSubmissionOrchestratorService {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      const metadata = JSON.stringify(error.meta ?? {});
+      const target = this.p2002Target(error.meta);
 
-      if (metadata.includes('txid')) {
+      if (target.includes('txid')) {
         throw new ConflictException(
           'This transaction ID has already been submitted on this network.',
         );
       }
 
-      if (metadata.includes('openKey')) {
+      if (target.includes('openKey')) {
         throw new ConflictException(
           'An open deposit already exists for this user.',
         );
@@ -113,6 +113,40 @@ export class DepositSubmissionOrchestratorService {
     }
 
     throw error;
+  }
+
+  private p2002Target(meta: Record<string, unknown> | undefined): string {
+    const targetMeta = meta?.target;
+    const targets = Array.isArray(targetMeta)
+      ? targetMeta.filter(
+          (value): value is string => typeof value === 'string',
+        )
+      : typeof targetMeta === 'string'
+        ? [targetMeta]
+        : [];
+
+    const driverAdapterError = meta?.driverAdapterError;
+    if (!driverAdapterError || typeof driverAdapterError !== 'object') {
+      return targets.join(',');
+    }
+
+    const cause =
+      'cause' in driverAdapterError ? driverAdapterError.cause : undefined;
+    if (!cause || typeof cause !== 'object') {
+      return targets.join(',');
+    }
+
+    const constraint = 'constraint' in cause ? cause.constraint : undefined;
+    if (!constraint || typeof constraint !== 'object') {
+      return targets.join(',');
+    }
+
+    const index = 'index' in constraint ? constraint.index : undefined;
+    if (typeof index === 'string') {
+      targets.push(index);
+    }
+
+    return targets.join(',');
   }
 
   private errorMessage(error: unknown): string {
