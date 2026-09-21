@@ -380,21 +380,20 @@ describe('DepositsService', () => {
       'No receiving account is currently available for USDT on TRON (TRC20).',
     );
 
-    expect(transaction.depositAccount.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          paymentRailId: RAIL_ID,
-          isActive: true,
-          deposits: {
-            none: {
-              openKey: {
-                not: null,
-              },
+    const findManyArgs = transaction.depositAccount.findMany.mock.calls[0]?.[0] as unknown;
+    expect(findManyArgs).toMatchObject({
+      where: {
+        paymentRailId: RAIL_ID,
+        isActive: true,
+        deposits: {
+          none: {
+            openKey: {
+              not: null,
             },
           },
-        }),
-      }),
-    );
+        },
+      },
+    });
   });
 
   it('snapshots the exact user-selected ranged investment and rail/account', async () => {
