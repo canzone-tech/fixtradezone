@@ -19,7 +19,7 @@ const ADDRESS = 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE';
 const QR = 'data:image/png;base64,aGVsbG8=';
 const TXID = 'a'.repeat(64);
 const CHECKPOINT = new Date('2026-09-21T08:00:00.000Z');
-const EXPIRES = new Date('2026-09-21T08:30:00.000Z');
+const EXPIRES = new Date('2099-09-21T08:30:00.000Z');
 
 const actor: AuthenticatedUser = {
   id: USER_ID,
