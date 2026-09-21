@@ -1,0 +1,32 @@
+ALTER TABLE `deposits`
+  ADD COLUMN `paymentCheckpointAt` DATETIME(3) NULL AFTER `submittedAt`;
+
+CREATE TABLE `deposit_payment_intents` (
+  `id` CHAR(36) NOT NULL,
+  `userId` CHAR(36) NOT NULL,
+  `activeUserKey` CHAR(36) NULL,
+  `packagePlanVersionId` CHAR(36) NOT NULL,
+  `packagePlanItemId` CHAR(36) NOT NULL,
+  `packageDefinitionId` CHAR(36) NOT NULL,
+  `depositAccountId` CHAR(36) NOT NULL,
+  `paymentRailId` CHAR(36) NOT NULL,
+  `asset` VARCHAR(10) NOT NULL,
+  `network` VARCHAR(40) NOT NULL,
+  `walletAddress` VARCHAR(191) NOT NULL,
+  `activeWalletKey` VARCHAR(191) NULL,
+  `checkpointAt` DATETIME(3) NOT NULL,
+  `expiresAt` DATETIME(3) NOT NULL,
+  `consumedAt` DATETIME(3) NULL,
+  `releasedAt` DATETIME(3) NULL,
+  `releaseReason` VARCHAR(100) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `deposit_payment_intents_active_user_uq` (`activeUserKey`),
+  UNIQUE KEY `deposit_payment_intents_active_wallet_uq` (`activeWalletKey`),
+  KEY `deposit_payment_intents_user_idx` (`userId`),
+  KEY `deposit_payment_intents_package_item_idx` (`packagePlanItemId`),
+  KEY `deposit_payment_intents_account_idx` (`depositAccountId`),
+  KEY `deposit_payment_intents_expires_idx` (`expiresAt`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
