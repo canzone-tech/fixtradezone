@@ -101,7 +101,9 @@ describe('DepositBlockchainProcessingService', () => {
 
     expect(approvalOrchestrator.approveDeposit).not.toHaveBeenCalled();
     expect(result.approvalPolicy.manualApprovalAllowed).toBe(false);
-    expect(result.message).toContain('blocked until verification reaches VERIFIED');
+    expect(result.message).toContain(
+      'blocked until verification reaches VERIFIED',
+    );
     expect(result.autoApproval.message).toContain(
       'approval remains blocked until blockchain verification reaches VERIFIED',
     );
