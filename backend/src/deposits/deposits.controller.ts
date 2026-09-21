@@ -79,8 +79,8 @@ export class DepositsController {
     @Body() dto: SubmitDepositTxidDto,
     @CurrentUser() actor: AuthenticatedUser,
     @Req() request: Request,
-  ) {
-    return this.depositsService.submitTxid(
+  ): Promise<unknown> {
+    return this.depositSubmissionOrchestrator.submitDepositTxid(
       depositId,
       dto,
       actor,
