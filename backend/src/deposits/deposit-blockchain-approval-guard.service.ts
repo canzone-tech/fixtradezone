@@ -43,6 +43,13 @@ export class DepositBlockchainApprovalGuardService {
       );
     }
 
+    if (
+      row.verificationMode === 'VERIFY_ONLY' &&
+      row.verificationStatus !== 'VERIFIED'
+    ) {
+      throw new ConflictException(this.manualBlockMessage(row));
+    }
+
     return {
       approvalMode,
       allowed: true,
@@ -111,6 +118,19 @@ export class DepositBlockchainApprovalGuardService {
     const row = rows[0];
     if (!row) throw new NotFoundException('Deposit was not found.');
     return row;
+  }
+
+  private manualBlockMessage(row: ApprovalGuardRow): string {
+    switch (row.verificationStatus) {
+      case 'PENDING':
+        return 'Blockchain verification is pending. Manual approval is blocked until the transaction reaches VERIFIED.';
+      case 'FAILED':
+        return `Blockchain verification failed${row.failureCode ? ` (${row.failureCode})` : ''}. Manual approval is blocked; reject or investigate this deposit.`;
+      case 'UNAVAILABLE':
+        return 'Blockchain verification is temporarily unavailable. Manual approval is blocked until verification can be completed.';
+      default:
+        return 'Blockchain verification must reach VERIFIED before manual approval.';
+    }
   }
 
   private blockMessage(row: ApprovalGuardRow): string {
