@@ -118,9 +118,7 @@ export class DepositSubmissionOrchestratorService {
   private p2002Target(meta: Record<string, unknown> | undefined): string {
     const targetMeta = meta?.target;
     const targets = Array.isArray(targetMeta)
-      ? targetMeta.filter(
-          (value): value is string => typeof value === 'string',
-        )
+      ? targetMeta.filter((value): value is string => typeof value === 'string')
       : typeof targetMeta === 'string'
         ? [targetMeta]
         : [];
