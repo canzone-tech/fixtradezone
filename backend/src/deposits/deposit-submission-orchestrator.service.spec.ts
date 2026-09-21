@@ -21,6 +21,18 @@ const actor = {
   permissions: [],
 } satisfies AuthenticatedUser;
 
+type SubmissionResult = {
+  message: string;
+  deposit: Record<string, unknown>;
+  blockchainVerification: {
+    required: boolean;
+    attempted: boolean;
+    verification: unknown;
+    approvalPolicy?: unknown;
+    message?: string;
+  };
+};
+
 function prismaP2002(meta: Record<string, unknown>) {
   const error = Object.assign(new Error('Unique constraint failed'), {
     code: 'P2002',
@@ -77,7 +89,7 @@ describe('DepositSubmissionOrchestratorService', () => {
         txid: 'a'.repeat(64),
       },
       actor,
-    )) as Record<string, any>;
+    )) as SubmissionResult;
 
     expect(packageDepositFlowService.submitDeposit).toHaveBeenCalledTimes(1);
     expect(blockchainProcessing.verifyAndApplyPolicy).toHaveBeenCalledWith(
@@ -110,7 +122,7 @@ describe('DepositSubmissionOrchestratorService', () => {
         txid: 'a'.repeat(64),
       },
       actor,
-    )) as Record<string, any>;
+    )) as SubmissionResult;
 
     expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
     expect(result.message).toBe('Deposit submitted successfully.');
@@ -132,7 +144,7 @@ describe('DepositSubmissionOrchestratorService', () => {
         txid: 'a'.repeat(64),
       },
       actor,
-    )) as Record<string, any>;
+    )) as SubmissionResult;
 
     expect(result.message).toBe(
       'Deposit submitted successfully. Payment verification could not complete yet.',
