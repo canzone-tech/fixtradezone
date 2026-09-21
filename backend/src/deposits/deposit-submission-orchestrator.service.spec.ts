@@ -176,23 +176,31 @@ describe('DepositSubmissionOrchestratorService', () => {
         },
       },
     ],
-  ])('maps duplicate transaction IDs from %s to ConflictException', async (_label, meta) => {
-    packageDepositFlowService.submitDeposit.mockRejectedValue(prismaP2002(meta));
+  ])(
+    'maps duplicate transaction IDs from %s to ConflictException',
+    async (_label, meta) => {
+      packageDepositFlowService.submitDeposit.mockRejectedValue(
+        prismaP2002(meta),
+      );
 
-    const submission = service.submitPackageDeposit(
-      {
-        packagePlanItemId: '33333333-3333-4333-8333-333333333333',
-        amount: '20',
-        txid: 'a'.repeat(64),
-      },
-      actor,
-    );
+      const submission = service.submitPackageDeposit(
+        {
+          packagePlanItemId: '33333333-3333-4333-8333-333333333333',
+          amount: '20',
+          txid: 'a'.repeat(64),
+        },
+        actor,
+      );
 
-    await expect(submission).rejects.toBeInstanceOf(ConflictException);
-    await expect(submission).rejects.toMatchObject({
-      message: 'This transaction ID has already been submitted on this network.',
-    });
-    expect(blockchainVerification.getDepositVerification).not.toHaveBeenCalled();
-    expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
-  });
+      await expect(submission).rejects.toBeInstanceOf(ConflictException);
+      await expect(submission).rejects.toMatchObject({
+        message:
+          'This transaction ID has already been submitted on this network.',
+      });
+      expect(
+        blockchainVerification.getDepositVerification,
+      ).not.toHaveBeenCalled();
+      expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
+    },
+  );
 });
