@@ -13,7 +13,6 @@ const DEPOSIT_ID = '66666666-6666-4666-8666-666666666666';
 const RAIL_ID = '77777777-7777-4777-8777-777777777777';
 const ADDRESS = 'TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE';
 const QR = 'data:image/png;base64,aGVsbG8=';
-const TXID = 'a'.repeat(64);
 
 const actor: AuthenticatedUser = {
   id: USER_ID,
@@ -69,11 +68,11 @@ function publishedPlan() {
   ];
 }
 
-function pendingDeposit() {
+function awaitingTxidDeposit() {
   return {
     id: DEPOSIT_ID,
     userId: USER_ID,
-    status: 'PENDING_REVIEW' as const,
+    status: 'AWAITING_TXID' as const,
     packagePlanVersionId: PLAN_ID,
     packagePlanItemId: ITEM_ID,
     packageCode: 'FTZ_BULLBOT',
@@ -90,8 +89,8 @@ function pendingDeposit() {
     assignedNetwork: 'TRC20',
     assignedValidationProfile: 'TRON' as const,
     assignedQrCodeDataUrl: QR,
-    txid: TXID,
-    submittedAt: new Date('2026-09-09T12:00:00.000Z'),
+    txid: null,
+    submittedAt: null,
     readyForApprovalByUserId: null,
     readyForApprovalAt: null,
     readyForApprovalNote: null,
@@ -149,7 +148,7 @@ describe('PackageDepositFlowService', () => {
     service = new PackageDepositFlowService(prisma);
   });
 
-  it('returns the package-configured receiving account without per-user assignment', async () => {
+  it('does not expose the receiving wallet before a deposit is reserved', async () => {
     prismaMock.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     prismaMock.$queryRaw.mockResolvedValue([route]);
     prismaMock.deposit.findUnique.mockResolvedValue(null);
@@ -157,12 +156,11 @@ describe('PackageDepositFlowService', () => {
     const result = await service.getPackageDepositContext(ITEM_ID, actor);
 
     expect(result.package.id).toBe(ITEM_ID);
-    expect(result.receivingAccount.id).toBe(ACCOUNT_ID);
-    expect(result.receivingAccount.walletAddress).toBe(ADDRESS);
-    expect(result.receivingAccount.network).toBe('TRC20');
+    expect(result.receivingAccountReserved).toBe(false);
+    expect(result).not.toHaveProperty('receivingAccount');
   });
 
-  it('creates PENDING_REVIEW directly using the package-configured account', async () => {
+  it('creates AWAITING_TXID before revealing the package-configured receiving account', async () => {
     transaction.deposit.findUnique.mockResolvedValue(null);
     transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     transaction.$queryRaw
@@ -178,16 +176,18 @@ describe('PackageDepositFlowService', () => {
             assignedWalletAddress: string;
             assignedNetwork: string;
             txid: string | null;
+            submittedAt: Date | null;
           };
         }
       ).data;
 
-      expect(data.status).toBe('PENDING_REVIEW');
+      expect(data.status).toBe('AWAITING_TXID');
       expect(data.assignedDepositAccountId).toBe(ACCOUNT_ID);
       expect(data.assignedWalletAddress).toBe(ADDRESS);
       expect(data.assignedNetwork).toBe('TRC20');
-      expect(data.txid).toBe(TXID);
-      return Promise.resolve(pendingDeposit());
+      expect(data.txid).toBeNull();
+      expect(data.submittedAt).toBeNull();
+      return Promise.resolve(awaitingTxidDeposit());
     });
     transaction.auditLog.create.mockResolvedValue({});
 
@@ -195,17 +195,17 @@ describe('PackageDepositFlowService', () => {
       {
         packagePlanItemId: ITEM_ID,
         investmentAmount: '25',
-        txid: TXID,
       },
       actor,
     );
 
     expect(transaction.deposit.create).toHaveBeenCalledTimes(1);
-    expect(result.deposit.status).toBe('PENDING_REVIEW');
+    expect(result.deposit.status).toBe('AWAITING_TXID');
+    expect(result.deposit.txid).toBeNull();
     expect(result.deposit.assignedDepositAccountId).toBe(ACCOUNT_ID);
   });
 
-  it('blocks package submission when the configured wallet is reserved by another open deposit', async () => {
+  it('blocks reservation when the configured wallet is reserved by another open deposit', async () => {
     transaction.deposit.findUnique.mockResolvedValue(null);
     transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     transaction.$queryRaw
@@ -220,7 +220,6 @@ describe('PackageDepositFlowService', () => {
         {
           packagePlanItemId: ITEM_ID,
           investmentAmount: '25',
-          txid: TXID,
         },
         actor,
       ),
