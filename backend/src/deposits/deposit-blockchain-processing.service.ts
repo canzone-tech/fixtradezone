@@ -62,17 +62,21 @@ export class DepositBlockchainProcessingService {
     const policy = await this.approvalMode.getDepositApprovalPolicy(depositId);
 
     if (policy.approvalMode !== 'AUTO_AFTER_BLOCKCHAIN_VERIFIED') {
+      const verified = verificationResult.verification.status === 'VERIFIED';
       return {
         ...verificationResult,
         message: this.manualModeMessage(verificationResult.verification.status),
         approvalPolicy: {
           approvalMode: 'MANUAL' as const,
           automaticApprovalEnabled: false,
+          manualApprovalAllowed: verified,
         },
         autoApproval: {
           attempted: false,
           approved: false,
-          message: 'Manual approval mode is active.',
+          message: verified
+            ? 'Manual approval mode is active and the blockchain verification gate is satisfied.'
+            : 'Manual approval mode is active, but approval remains blocked until blockchain verification reaches VERIFIED.',
         },
       };
     }
@@ -148,14 +152,14 @@ export class DepositBlockchainProcessingService {
   ): string {
     switch (status) {
       case 'VERIFIED':
-        return 'Blockchain transaction is VERIFIED. MANUAL mode is active, so SUPER_ADMIN still owns the final approve or reject decision.';
+        return 'Blockchain transaction is VERIFIED. MANUAL mode is active, so SUPER_ADMIN may make the final approve or reject decision.';
       case 'FAILED':
-        return 'Blockchain verification FAILED. MANUAL mode remains active; SUPER_ADMIN must review the contradictory on-chain evidence before any final decision.';
+        return 'Blockchain verification FAILED. Manual approval is blocked until verification reaches VERIFIED; reject or investigate this deposit.';
       case 'UNAVAILABLE':
-        return 'Blockchain verification is temporarily UNAVAILABLE. MANUAL mode remains active and the evidence can be retried before the SUPER_ADMIN decision.';
+        return 'Blockchain verification is temporarily UNAVAILABLE. Manual approval is blocked until verification can be completed and reaches VERIFIED.';
       case 'PENDING':
       default:
-        return 'Blockchain verification is PENDING. MANUAL mode remains active and SUPER_ADMIN owns the final approve or reject decision after review.';
+        return 'Blockchain verification is PENDING. Manual approval is blocked until verification reaches VERIFIED.';
     }
   }
 
