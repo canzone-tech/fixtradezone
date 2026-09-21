@@ -1,4 +1,6 @@
+import { ConflictException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
+import { Prisma } from '../generated/prisma/client';
 import type { DepositBlockchainProcessingService } from './deposit-blockchain-processing.service';
 import type { DepositBlockchainVerificationService } from './deposit-blockchain-verification.service';
 import { DepositSubmissionOrchestratorService } from './deposit-submission-orchestrator.service';
@@ -18,6 +20,16 @@ const actor = {
   roles: ['USER'],
   permissions: [],
 } satisfies AuthenticatedUser;
+
+function prismaP2002(meta: Record<string, unknown>) {
+  const error = Object.assign(new Error('Unique constraint failed'), {
+    code: 'P2002',
+    clientVersion: '7.9.1',
+    meta,
+  });
+  Object.setPrototypeOf(error, Prisma.PrismaClientKnownRequestError.prototype);
+  return error as Prisma.PrismaClientKnownRequestError;
+}
 
 describe('DepositSubmissionOrchestratorService', () => {
   const packageDepositFlowService = {
@@ -137,5 +149,38 @@ describe('DepositSubmissionOrchestratorService', () => {
     expect(result.blockchainVerification.message).toContain(
       'Approval remains blocked until the configured verification requirement reaches VERIFIED',
     );
+  });
+
+  it.each([
+    ['Prisma target metadata', { target: ['assignedNetwork', 'txid'] }],
+    [
+      'MariaDB adapter constraint metadata',
+      {
+        modelName: 'Deposit',
+        driverAdapterError: {
+          cause: {
+            constraint: { index: 'deposits_assignedNetwork_txid_key' },
+          },
+        },
+      },
+    ],
+  ])('maps duplicate transaction IDs from %s to ConflictException', async (_label, meta) => {
+    packageDepositFlowService.submitDeposit.mockRejectedValue(prismaP2002(meta));
+
+    const submission = service.submitPackageDeposit(
+      {
+        packagePlanItemId: '33333333-3333-4333-8333-333333333333',
+        amount: '20',
+        txid: 'a'.repeat(64),
+      },
+      actor,
+    );
+
+    await expect(submission).rejects.toBeInstanceOf(ConflictException);
+    await expect(submission).rejects.toMatchObject({
+      message: 'This transaction ID has already been submitted on this network.',
+    });
+    expect(blockchainVerification.getDepositVerification).not.toHaveBeenCalled();
+    expect(blockchainProcessing.verifyAndApplyPolicy).not.toHaveBeenCalled();
   });
 });
