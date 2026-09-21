@@ -18,15 +18,37 @@ describe('DepositBlockchainApprovalGuardService', () => {
     );
   });
 
-  it('allows SUPER_ADMIN manual approval when MANUAL is configured even if verification is pending', async () => {
+  it.each(['PENDING', 'FAILED', 'UNAVAILABLE', null])(
+    'blocks manual approval when VERIFY_ONLY is enabled and verification status is %s',
+    async (verificationStatus) => {
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          depositId: DEPOSIT_ID,
+          depositStatus: 'PENDING_REVIEW',
+          approvalMode: 'MANUAL',
+          verificationMode: 'VERIFY_ONLY',
+          verificationStatus,
+          failureCode:
+            verificationStatus === 'FAILED' ? 'AMOUNT_MISMATCH' : null,
+          failureReason: null,
+        },
+      ]);
+
+      await expect(
+        service.assertManualApprovalAllowed(DEPOSIT_ID),
+      ).rejects.toBeInstanceOf(ConflictException);
+    },
+  );
+
+  it('allows manual approval when VERIFY_ONLY is enabled and verification is VERIFIED', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         depositId: DEPOSIT_ID,
         depositStatus: 'PENDING_REVIEW',
         approvalMode: 'MANUAL',
         verificationMode: 'VERIFY_ONLY',
-        verificationStatus: 'PENDING',
-        failureCode: 'TX_NOT_FOUND_OR_PENDING',
+        verificationStatus: 'VERIFIED',
+        failureCode: null,
         failureReason: null,
       },
     ]);
@@ -36,11 +58,32 @@ describe('DepositBlockchainApprovalGuardService', () => {
     ).resolves.toMatchObject({
       approvalMode: 'MANUAL',
       allowed: true,
-      verificationStatus: 'PENDING',
+      verificationStatus: 'VERIFIED',
     });
   });
 
-  it('treats missing approval config as safe MANUAL default', async () => {
+  it('treats missing approval config as MANUAL when blockchain verification is OFF', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        depositId: DEPOSIT_ID,
+        depositStatus: 'PENDING_REVIEW',
+        approvalMode: null,
+        verificationMode: 'OFF',
+        verificationStatus: null,
+        failureCode: null,
+        failureReason: null,
+      },
+    ]);
+
+    await expect(
+      service.assertManualApprovalAllowed(DEPOSIT_ID),
+    ).resolves.toMatchObject({
+      approvalMode: 'MANUAL',
+      allowed: true,
+    });
+  });
+
+  it('blocks missing approval config when VERIFY_ONLY is enabled but verification failed', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
         depositId: DEPOSIT_ID,
@@ -55,10 +98,7 @@ describe('DepositBlockchainApprovalGuardService', () => {
 
     await expect(
       service.assertManualApprovalAllowed(DEPOSIT_ID),
-    ).resolves.toMatchObject({
-      approvalMode: 'MANUAL',
-      allowed: true,
-    });
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('blocks manual approval when AUTO_AFTER_BLOCKCHAIN_VERIFIED is configured', async () => {
