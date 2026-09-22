@@ -70,6 +70,75 @@ export class EmailVerificationService {
     }
   }
 
+  async getPendingLinkState(identifier: string): Promise<{
+    canResend: boolean;
+    expiresIn: number;
+    verificationTtlSeconds: number;
+  }> {
+    const normalizedIdentifier = identifier.trim();
+    const identifierType = /^\+[1-9]\d{7,14}$/.test(normalizedIdentifier)
+      ? 'MOBILE'
+      : normalizedIdentifier.includes('@')
+        ? 'EMAIL'
+        : 'USERNAME';
+    const lookupValue =
+      identifierType === 'MOBILE'
+        ? normalizedIdentifier
+        : normalizedIdentifier.toLowerCase();
+    const select = {
+      id: true,
+      email: true,
+      emailVerifiedAt: true,
+      status: true,
+    } as const;
+
+    const matches =
+      identifierType === 'USERNAME'
+        ? null
+        : await this.prisma.user.findMany({
+            where:
+              identifierType === 'EMAIL'
+                ? { email: lookupValue }
+                : { phone: lookupValue },
+            take: 2,
+            select,
+          });
+
+    const user =
+      identifierType === 'USERNAME'
+        ? await this.prisma.user.findUnique({
+            where: { username: lookupValue },
+            select,
+          })
+        : matches?.length === 1
+          ? matches[0]
+          : null;
+    const verificationTtlSeconds = this.getVerificationTtlSeconds();
+
+    if (
+      !user ||
+      !user.email ||
+      user.emailVerifiedAt ||
+      user.status !== 'PENDING'
+    ) {
+      return {
+        canResend: true,
+        expiresIn: 0,
+        verificationTtlSeconds,
+      };
+    }
+
+    const remainingSeconds = await this.redisService
+      .getClient()
+      .ttl(this.userKey(user.id));
+
+    return {
+      canResend: remainingSeconds <= 0,
+      expiresIn: Math.max(0, remainingSeconds),
+      verificationTtlSeconds,
+    };
+  }
+
   async resend(
     email: string,
     context: RequestContext = {},
