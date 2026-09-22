@@ -77,7 +77,25 @@ export class AuthController {
   @Post('register')
   async register(@Body() dto: RegisterDto, @Req() request: Request) {
     await this.siteModeService.assertRegistrationAllowed();
-    return this.authService.register(dto, getRequestContext(request));
+    const result = await this.authService.register(
+      dto,
+      getRequestContext(request),
+    );
+
+    if (!result.user.email) {
+      return result;
+    }
+
+    const state = await this.emailVerificationService.getPendingLinkState(
+      result.user.email,
+    );
+
+    return {
+      ...result,
+      canResendVerification: state.canResend,
+      verificationLinkExpiresIn: state.expiresIn,
+      verificationLinkTtlSeconds: state.verificationTtlSeconds,
+    };
   }
 
   @Public()
