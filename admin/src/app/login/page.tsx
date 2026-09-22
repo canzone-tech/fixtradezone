@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import EmailVerificationResend from "@/components/email-verification-resend";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import { clearSessionLockStorage } from "@/lib/session-lock-client";
 
@@ -98,6 +99,9 @@ export default function LoginPage() {
 
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const emailVerificationPending = error
+    .toLowerCase()
+    .includes("email verification pending");
 
   async function loadCaptcha() {
     setCaptchaLoading(true);
@@ -454,6 +458,12 @@ export default function LoginPage() {
             >
               {error || " "}
             </div>
+
+            {emailVerificationPending ? (
+              <EmailVerificationResend
+                defaultEmail={identifier.includes("@") ? identifier.trim() : ""}
+              />
+            ) : null}
 
             <button
               className="ftz-auth-submit"
