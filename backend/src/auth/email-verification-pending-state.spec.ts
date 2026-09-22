@@ -79,9 +79,7 @@ describe('EmailVerificationService pending link state', () => {
   });
 
   it('supports pending login performed with the username without exposing email', async () => {
-    await expect(
-      service.getPendingLinkState('PENDING.USER'),
-    ).resolves.toEqual({
+    await expect(service.getPendingLinkState('PENDING.USER')).resolves.toEqual({
       canResend: false,
       expiresIn: 1200,
       verificationTtlSeconds: 1800,
