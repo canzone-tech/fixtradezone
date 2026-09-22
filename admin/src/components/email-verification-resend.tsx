@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 interface ErrorPayload {
   message?: string;
@@ -27,17 +27,10 @@ export default function EmailVerificationResend({
   defaultEmail = "",
 }: EmailVerificationResendProps) {
   const inputId = useId();
-  const [email, setEmail] = useState(defaultEmail);
+  const [email, setEmail] = useState(defaultEmail.trim());
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const normalizedDefault = defaultEmail.trim();
-    if (normalizedDefault.includes("@")) {
-      setEmail(normalizedDefault);
-    }
-  }, [defaultEmail]);
 
   async function resendVerification() {
     const normalizedEmail = email.trim();
