@@ -227,10 +227,9 @@ export class AuthController {
               : '';
 
         if (message.toLowerCase().includes('email verification pending')) {
-          const state =
-            await this.emailVerificationService.getPendingLinkState(
-              dto.identifier,
-            );
+          const state = await this.emailVerificationService.getPendingLinkState(
+            dto.identifier,
+          );
 
           throw new UnauthorizedException({
             message: state.canResend
