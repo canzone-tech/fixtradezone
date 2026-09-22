@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Req,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
@@ -173,25 +174,60 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() request: Request) {
     const context = getRequestContext(request);
-    const result = await this.authService.login(dto, context);
 
-    // A temporary-password challenge is not an authenticated application
-    // session. Access is checked on the next successful login after the
-    // password change. Normal session responses are gated immediately.
-    if ('roles' in result.user) {
-      try {
-        await this.siteModeService.assertAuthenticatedAccess(result.user);
-      } catch (error) {
-        if ('refreshToken' in result) {
-          await this.authService
-            .logout({ refreshToken: result.refreshToken }, context)
-            .catch(() => undefined);
+    try {
+      const result = await this.authService.login(dto, context);
+
+      // A temporary-password challenge is not an authenticated application
+      // session. Access is checked on the next successful login after the
+      // password change. Normal session responses are gated immediately.
+      if ('roles' in result.user) {
+        try {
+          await this.siteModeService.assertAuthenticatedAccess(result.user);
+        } catch (error) {
+          if ('refreshToken' in result) {
+            await this.authService
+              .logout({ refreshToken: result.refreshToken }, context)
+              .catch(() => undefined);
+          }
+          throw error;
         }
-        throw error;
       }
-    }
 
-    return result;
+      return result;
+    } catch (error: unknown) {
+      if (error instanceof UnauthorizedException) {
+        const response = error.getResponse();
+        const message =
+          typeof response === 'string'
+            ? response
+            : typeof response === 'object' &&
+                response !== null &&
+                'message' in response &&
+                typeof response.message === 'string'
+              ? response.message
+              : '';
+
+        if (message.toLowerCase().includes('email verification pending')) {
+          const state =
+            await this.emailVerificationService.getPendingLinkState(
+              dto.identifier,
+            );
+
+          throw new UnauthorizedException({
+            message: state.canResend
+              ? 'Email verification link has expired. Request a new verification email before signing in.'
+              : 'Email verification pending. Check your email and verify your account before the current link expires.',
+            code: 'EMAIL_VERIFICATION_PENDING',
+            canResend: state.canResend,
+            verificationLinkExpiresIn: state.expiresIn,
+            verificationLinkTtlSeconds: state.verificationTtlSeconds,
+          });
+        }
+      }
+
+      throw error;
+    }
   }
 
   @Public()
