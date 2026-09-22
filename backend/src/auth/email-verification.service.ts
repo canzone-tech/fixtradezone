@@ -142,7 +142,7 @@ export class EmailVerificationService {
   async resend(
     email: string,
     context: RequestContext = {},
-  ): Promise<{ message: string }> {
+  ): Promise<{ message: string; verificationLinkTtlSeconds: number }> {
     const normalizedEmail = email.trim().toLowerCase();
 
     const users = await this.prisma.user.findMany({
@@ -161,7 +161,7 @@ export class EmailVerificationService {
     });
 
     if (users.length !== 1) {
-      return { message: GENERIC_RESEND_MESSAGE };
+      return this.buildGenericResendResponse();
     }
 
     const user = users[0];
@@ -172,10 +172,16 @@ export class EmailVerificationService {
       user.status === 'BLOCKED' ||
       user.status === 'SUSPENDED'
     ) {
-      return { message: GENERIC_RESEND_MESSAGE };
+      return this.buildGenericResendResponse();
     }
 
     const redis = this.redisService.getClient();
+    const activeLinkTtl = await redis.ttl(this.userKey(user.id));
+
+    if (activeLinkTtl > 0) {
+      return this.buildGenericResendResponse();
+    }
+
     const cooldownResult = await redis.set(
       this.cooldownKey(user.id),
       '1',
@@ -185,7 +191,7 @@ export class EmailVerificationService {
     );
 
     if (cooldownResult !== 'OK') {
-      return { message: GENERIC_RESEND_MESSAGE };
+      return this.buildGenericResendResponse();
     }
 
     try {
@@ -195,7 +201,7 @@ export class EmailVerificationService {
       throw error;
     }
 
-    return { message: GENERIC_RESEND_MESSAGE };
+    return this.buildGenericResendResponse();
   }
 
   async verify(
@@ -473,6 +479,16 @@ export class EmailVerificationService {
       const reason = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to record email verification audit: ${reason}`);
     }
+  }
+
+  private buildGenericResendResponse(): {
+    message: string;
+    verificationLinkTtlSeconds: number;
+  } {
+    return {
+      message: GENERIC_RESEND_MESSAGE,
+      verificationLinkTtlSeconds: this.getVerificationTtlSeconds(),
+    };
   }
 
   private getVerificationTtlSeconds(): number {
