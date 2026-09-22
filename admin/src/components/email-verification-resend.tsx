@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 interface ErrorPayload {
   message?: string;
@@ -8,6 +8,9 @@ interface ErrorPayload {
 
 interface EmailVerificationResendProps {
   defaultEmail?: string;
+  canResend?: boolean;
+  initialExpiresIn?: number;
+  verificationTtlSeconds?: number;
 }
 
 function readMessage(payload: unknown, fallback: string): string {
@@ -23,14 +26,37 @@ function readMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+function formatRemaining(seconds: number): string {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 export default function EmailVerificationResend({
   defaultEmail = "",
+  canResend = true,
+  initialExpiresIn = 0,
+  verificationTtlSeconds = 30 * 60,
 }: EmailVerificationResendProps) {
   const inputId = useId();
   const [email, setEmail] = useState(defaultEmail.trim());
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [remainingSeconds, setRemainingSeconds] = useState(
+    canResend ? 0 : Math.max(1, Math.floor(initialExpiresIn)),
+  );
+
+  useEffect(() => {
+    if (remainingSeconds <= 0) return;
+
+    const timer = window.setTimeout(() => {
+      setRemainingSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [remainingSeconds]);
 
   async function resendVerification() {
     const normalizedEmail = email.trim();
@@ -67,6 +93,7 @@ export default function EmailVerificationResend({
           "If the account is eligible, a verification email has been sent.",
         ),
       );
+      setRemainingSeconds(Math.max(1, Math.floor(verificationTtlSeconds)));
     } catch (caught: unknown) {
       setError(
         caught instanceof Error
@@ -78,11 +105,40 @@ export default function EmailVerificationResend({
     }
   }
 
+  if (remainingSeconds > 0) {
+    return (
+      <div
+        style={{ display: "grid", gap: 10, padding: "8px 0 4px" }}
+        aria-live="polite"
+      >
+        <div className="ftz-register-state">
+          <i className="iconoir-mail" aria-hidden="true" />
+          <div>
+            <strong>Check your email for verification.</strong>
+            <span>
+              Current verification link expires in{" "}
+              <b>{formatRemaining(remainingSeconds)}</b>.
+            </span>
+          </div>
+        </div>
+        {message ? <small>{message}</small> : null}
+      </div>
+    );
+  }
+
   return (
     <div
       style={{ display: "grid", gap: 12, padding: "8px 0 4px" }}
       aria-live="polite"
     >
+      <div className="ftz-register-state is-warning">
+        <i className="iconoir-warning-triangle" aria-hidden="true" />
+        <div>
+          <strong>Verification link expired</strong>
+          <span>Request a fresh verification email to continue.</span>
+        </div>
+      </div>
+
       <div className="ftz-auth-label-row">
         <label htmlFor={inputId}>Verification email</label>
         <small>Request a fresh verification link</small>
@@ -111,12 +167,6 @@ export default function EmailVerificationResend({
         <span>{sending ? "Sending…" : "Resend verification email"}</span>
         <i className="iconoir-mail" aria-hidden="true" />
       </button>
-
-      {message ? (
-        <div className="ftz-register-state">
-          <i className="iconoir-check-circle" aria-hidden="true" /> {message}
-        </div>
-      ) : null}
 
       {error ? (
         <div className="ftz-auth-error is-visible" role="alert">
