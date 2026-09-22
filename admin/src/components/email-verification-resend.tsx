@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 
 interface ErrorPayload {
   message?: string;
+  verificationLinkTtlSeconds?: number;
 }
 
 interface EmailVerificationResendProps {
@@ -93,7 +94,12 @@ export default function EmailVerificationResend({
           "If the account is eligible, a verification email has been sent.",
         ),
       );
-      setRemainingSeconds(Math.max(1, Math.floor(verificationTtlSeconds)));
+      const nextTtl =
+        typeof payload?.verificationLinkTtlSeconds === "number" &&
+        Number.isFinite(payload.verificationLinkTtlSeconds)
+          ? payload.verificationLinkTtlSeconds
+          : verificationTtlSeconds;
+      setRemainingSeconds(Math.max(1, Math.floor(nextTtl)));
     } catch (caught: unknown) {
       setError(
         caught instanceof Error
