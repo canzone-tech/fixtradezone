@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type FormEvent,
 } from "react";
+import EmailVerificationResend from "@/components/email-verification-resend";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import styles from "./register.module.css";
 
@@ -52,6 +53,9 @@ interface RegistrationResult {
   emailVerificationRequired: boolean;
   verificationEmailSent: boolean;
   verificationStatus: string;
+  canResendVerification?: boolean;
+  verificationLinkExpiresIn?: number;
+  verificationLinkTtlSeconds?: number;
   temporaryPassword?: string;
   mustChangePassword?: boolean;
 }
@@ -140,9 +144,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(true);
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
-  const [resendMessage, setResendMessage] = useState("");
   const [result, setResult] = useState<RegistrationResult | null>(null);
 
   async function reloadCaptcha() {
@@ -197,7 +199,6 @@ export default function RegisterPage() {
     if (!currentPolicy?.publicRegistrationEnabled) return;
 
     setError("");
-    setResendMessage("");
 
     if (currentPolicy.age18DeclarationRequired && !age18Declared) {
       setError("You must declare that you are 18 years of age or older.");
@@ -276,30 +277,6 @@ export default function RegisterPage() {
       if (captcha) void reloadCaptcha();
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function resendVerification() {
-    const targetEmail = result?.user.email;
-    if (!targetEmail) return;
-
-    setResending(true);
-    setResendMessage("");
-
-    try {
-      const response = await fetch("/api/auth/email-verification/resend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: targetEmail }),
-      });
-      const payload = (await response.json().catch(() => null)) as unknown;
-      setResendMessage(
-        readMessage(payload, "If eligible, a verification email was sent."),
-      );
-    } catch {
-      setResendMessage("Unable to resend verification email right now.");
-    } finally {
-      setResending(false);
     }
   }
 
@@ -414,15 +391,22 @@ export default function RegisterPage() {
                       Verify <b>{result.user.email}</b> before signing in. Your
                       account remains restricted until verification succeeds.
                     </p>
-                    <button
-                      type="button"
-                      className={styles.resendButton}
-                      onClick={() => void resendVerification()}
-                      disabled={resending}
-                    >
-                      {resending ? "Sending…" : "Resend verification email"}
-                    </button>
-                    {resendMessage ? <small>{resendMessage}</small> : null}
+                    <EmailVerificationResend
+                      defaultEmail={result.user.email ?? ""}
+                      canResend={
+                        result.canResendVerification ??
+                        !result.verificationEmailSent
+                      }
+                      initialExpiresIn={
+                        result.verificationLinkExpiresIn ??
+                        (result.verificationEmailSent
+                          ? result.verificationLinkTtlSeconds ?? 30 * 60
+                          : 0)
+                      }
+                      verificationTtlSeconds={
+                        result.verificationLinkTtlSeconds ?? 30 * 60
+                      }
+                    />
                   </div>
                 ) : null}
 

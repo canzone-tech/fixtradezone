@@ -5,11 +5,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import EmailVerificationResend from "@/components/email-verification-resend";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import { clearSessionLockStorage } from "@/lib/session-lock-client";
 
 interface ErrorPayload {
   message?: string;
+  code?: string;
+  canResend?: boolean;
+  verificationLinkExpiresIn?: number;
+  verificationLinkTtlSeconds?: number;
+}
+
+interface VerificationPendingState {
+  canResend: boolean;
+  expiresIn: number;
+  ttlSeconds: number;
 }
 
 interface CaptchaDisabled {
@@ -30,6 +41,34 @@ interface LoginSuccessPayload {
   redirectTo?: "/dashboard" | "/user/dashboard";
   user?: {
     id?: string;
+  };
+}
+
+function readVerificationPending(
+  payload: ErrorPayload | LoginSuccessPayload,
+): VerificationPendingState | null {
+  if (!("code" in payload) || payload.code !== "EMAIL_VERIFICATION_PENDING") {
+    return null;
+  }
+
+  const expiresIn =
+    typeof payload.verificationLinkExpiresIn === "number" &&
+    Number.isFinite(payload.verificationLinkExpiresIn)
+      ? Math.max(0, Math.floor(payload.verificationLinkExpiresIn))
+      : 0;
+  const ttlSeconds =
+    typeof payload.verificationLinkTtlSeconds === "number" &&
+    Number.isFinite(payload.verificationLinkTtlSeconds)
+      ? Math.max(1, Math.floor(payload.verificationLinkTtlSeconds))
+      : 30 * 60;
+
+  return {
+    canResend:
+      typeof payload.canResend === "boolean"
+        ? payload.canResend
+        : expiresIn <= 0,
+    expiresIn,
+    ttlSeconds,
   };
 }
 
@@ -97,6 +136,8 @@ export default function LoginPage() {
   const [captchaError, setCaptchaError] = useState("");
 
   const [error, setError] = useState("");
+  const [verificationPending, setVerificationPending] =
+    useState<VerificationPendingState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function loadCaptcha() {
@@ -149,6 +190,7 @@ export default function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setVerificationPending(null);
 
     if (captchaLoading) {
       setError("Security challenge is still loading.");
@@ -196,6 +238,7 @@ export default function LoginPage() {
             ? payload.message
             : "Unable to sign in.",
         );
+        setVerificationPending(readVerificationPending(payload));
         if (captcha) void loadCaptcha();
         return;
       }
@@ -229,6 +272,7 @@ export default function LoginPage() {
       router.replace(redirectTo);
       router.refresh();
     } catch {
+      setVerificationPending(null);
       setError("Unable to reach the authentication service. Please try again.");
       if (captcha) void loadCaptcha();
     } finally {
@@ -454,6 +498,16 @@ export default function LoginPage() {
             >
               {error || " "}
             </div>
+
+            {verificationPending ? (
+              <EmailVerificationResend
+                key={`${identifier.trim().toLowerCase()}:${verificationPending.canResend}:${verificationPending.expiresIn}`}
+                defaultEmail={identifier.includes("@") ? identifier.trim() : ""}
+                canResend={verificationPending.canResend}
+                initialExpiresIn={verificationPending.expiresIn}
+                verificationTtlSeconds={verificationPending.ttlSeconds}
+              />
+            ) : null}
 
             <button
               className="ftz-auth-submit"

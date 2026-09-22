@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import EmailVerificationResend from "@/components/email-verification-resend";
 import styles from "./verify-email.module.css";
 
 interface VerifyResult {
@@ -127,9 +128,12 @@ export default function VerifyEmailPage() {
             ) : null}
 
             {!loading && error ? (
-              <div className="ftz-auth-error is-visible" role="alert">
-                {error}
-              </div>
+              <>
+                <div className="ftz-auth-error is-visible" role="alert">
+                  {error}
+                </div>
+                <EmailVerificationResend />
+              </>
             ) : null}
 
             <div className={styles.actions}>

@@ -27,6 +27,41 @@ interface LoginBody {
   captchaAnswer?: unknown;
 }
 
+function readPendingVerificationError(payload: unknown) {
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("code" in payload) ||
+    payload.code !== "EMAIL_VERIFICATION_PENDING"
+  ) {
+    return null;
+  }
+
+  const expiresIn =
+    "verificationLinkExpiresIn" in payload &&
+    typeof payload.verificationLinkExpiresIn === "number" &&
+    Number.isFinite(payload.verificationLinkExpiresIn)
+      ? Math.max(0, Math.floor(payload.verificationLinkExpiresIn))
+      : 0;
+  const ttlSeconds =
+    "verificationLinkTtlSeconds" in payload &&
+    typeof payload.verificationLinkTtlSeconds === "number" &&
+    Number.isFinite(payload.verificationLinkTtlSeconds)
+      ? Math.max(1, Math.floor(payload.verificationLinkTtlSeconds))
+      : 30 * 60;
+
+  return {
+    message: getApiErrorMessage(payload, "Email verification pending."),
+    code: "EMAIL_VERIFICATION_PENDING" as const,
+    canResend:
+      "canResend" in payload && typeof payload.canResend === "boolean"
+        ? payload.canResend
+        : expiresIn <= 0,
+    verificationLinkExpiresIn: expiresIn,
+    verificationLinkTtlSeconds: ttlSeconds,
+  };
+}
+
 export async function POST(request: NextRequest) {
   if (isCrossSiteRequest(request)) {
     return NextResponse.json(
@@ -112,8 +147,12 @@ export async function POST(request: NextRequest) {
     const payload = await readJson(backendResponse);
 
     if (!backendResponse.ok) {
+      const pendingVerification = readPendingVerificationError(payload);
+
       return NextResponse.json(
-        { message: getApiErrorMessage(payload, "Unable to sign in.") },
+        pendingVerification ?? {
+          message: getApiErrorMessage(payload, "Unable to sign in."),
+        },
         { status: backendResponse.status },
       );
     }

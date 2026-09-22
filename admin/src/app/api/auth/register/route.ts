@@ -130,6 +130,16 @@ export async function POST(request: NextRequest) {
 
     const source = payload as Record<string, unknown>;
     const user = source.user as Record<string, unknown>;
+    const verificationLinkExpiresIn =
+      typeof source.verificationLinkExpiresIn === "number" &&
+      Number.isFinite(source.verificationLinkExpiresIn)
+        ? Math.max(0, Math.floor(source.verificationLinkExpiresIn))
+        : 0;
+    const verificationLinkTtlSeconds =
+      typeof source.verificationLinkTtlSeconds === "number" &&
+      Number.isFinite(source.verificationLinkTtlSeconds)
+        ? Math.max(1, Math.floor(source.verificationLinkTtlSeconds))
+        : 30 * 60;
 
     return NextResponse.json(
       {
@@ -152,6 +162,12 @@ export async function POST(request: NextRequest) {
           typeof source.verificationStatus === "string"
             ? source.verificationStatus
             : "PENDING_EMAIL_VERIFICATION",
+        canResendVerification:
+          typeof source.canResendVerification === "boolean"
+            ? source.canResendVerification
+            : verificationLinkExpiresIn <= 0,
+        verificationLinkExpiresIn,
+        verificationLinkTtlSeconds,
         ...(typeof source.temporaryPassword === "string"
           ? {
               temporaryPassword: source.temporaryPassword,
