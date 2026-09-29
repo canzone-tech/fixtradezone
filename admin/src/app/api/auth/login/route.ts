@@ -6,7 +6,9 @@ import {
   isAuthResponse,
   isCrossSiteRequest,
   isPasswordChangeRequiredResponse,
+  normalizeDeviceInstallationId,
   setAuthCookies,
+  setDeviceInstallationCookie,
   setPasswordChangeCookie,
 } from "@/lib/auth";
 import {
@@ -15,9 +17,6 @@ import {
   getApiErrorMessage,
   readJson,
 } from "@/lib/backend";
-
-const DEVICE_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface LoginBody {
   identifier?: unknown;
@@ -93,11 +92,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (
-    body.deviceInstallationId !== undefined &&
-    (typeof body.deviceInstallationId !== "string" ||
-      !DEVICE_ID_PATTERN.test(body.deviceInstallationId.trim()))
-  ) {
+  const deviceInstallationId =
+    body.deviceInstallationId === undefined
+      ? null
+      : normalizeDeviceInstallationId(body.deviceInstallationId);
+
+  if (body.deviceInstallationId !== undefined && !deviceInstallationId) {
     return NextResponse.json(
       { message: "Invalid device installation ID." },
       { status: 400 },
@@ -130,13 +130,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         identifier: body.identifier,
         password: body.password,
-        ...(typeof body.deviceInstallationId === "string"
-          ? {
-              deviceInstallationId: body.deviceInstallationId
-                .trim()
-                .toLowerCase(),
-            }
-          : {}),
+        ...(deviceInstallationId ? { deviceInstallationId } : {}),
         ...(body.captchaId !== undefined ? { captchaId: body.captchaId } : {}),
         ...(body.captchaAnswer !== undefined
           ? { captchaAnswer: body.captchaAnswer }
@@ -166,6 +160,9 @@ export async function POST(request: NextRequest) {
       });
 
       clearAuthCookies(response);
+      if (deviceInstallationId) {
+        setDeviceInstallationCookie(response, deviceInstallationId);
+      }
       setPasswordChangeCookie(response, payload);
       return response;
     }
@@ -197,6 +194,9 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({ user: auth.user, redirectTo });
     setAuthCookies(response, auth);
+    if (deviceInstallationId) {
+      setDeviceInstallationCookie(response, deviceInstallationId);
+    }
     return response;
   } catch {
     return NextResponse.json(
