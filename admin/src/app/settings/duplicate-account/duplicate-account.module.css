@@ -116,7 +116,8 @@
 }
 
 .primary,
-.allowForm button {
+.allowForm button,
+.policyForm button {
   min-height: 40px;
   margin-top: 14px;
   padding: 0 14px;
@@ -131,6 +132,7 @@
 
 .primary:disabled,
 .allowForm button:disabled,
+.policyForm button:disabled,
 .listRow button:disabled {
   cursor: wait;
   opacity: 0.62;
@@ -140,16 +142,26 @@
   margin-top: 10px;
 }
 
-.allowForm {
+.allowForm,
+.policyForm {
   display: grid;
-  grid-template-columns: 190px minmax(240px, 1.4fr) minmax(180px, 1fr) auto;
   gap: 9px;
   align-items: end;
   margin-top: 16px;
 }
 
+.allowForm {
+  grid-template-columns: 190px minmax(240px, 1.4fr) minmax(180px, 1fr) auto;
+}
+
+.policyForm {
+  grid-template-columns: minmax(260px, 1.5fr) 150px minmax(200px, 1fr) auto;
+}
+
 .allowForm input,
-.allowForm select {
+.allowForm select,
+.policyForm input,
+.policyForm select {
   height: 40px;
   padding: 0 11px;
   border: 1px solid rgba(84, 117, 160, 0.25);
@@ -160,7 +172,8 @@
   font-size: 10px;
 }
 
-.allowForm button {
+.allowForm button,
+.policyForm button {
   margin-top: 0;
 }
 
@@ -269,7 +282,8 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .allowForm {
+  .allowForm,
+  .policyForm {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -284,7 +298,8 @@
   }
 
   .modeGrid,
-  .allowForm {
+  .allowForm,
+  .policyForm {
     grid-template-columns: 1fr;
   }
 }
