@@ -28,84 +28,27 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Repair unsafe refresh-session assertion
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('backend/src/auth/auth.service.spec.ts')
-          text = path.read_text()
-
-          old_header = """  it('revokes a device-bound refresh session when presented from another device', async () => {\n    prepareRefreshSession();\n"""
-          new_header = """  it('revokes a device-bound refresh session when presented from another device', async () => {\n    const revokedAt = new Date('2026-08-19T06:00:00.000Z');\n    jest.useFakeTimers().setSystemTime(revokedAt);\n    prepareRefreshSession();\n"""
-          if old_header in text:
-              text = text.replace(old_header, new_header, 1)
-
-          old_assertion = """      data: expect.objectContaining({\n        revocationReason: 'SESSION_DEVICE_MISMATCH',\n      }),\n    });\n    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();\n"""
-          new_assertion = """      data: {\n        revokedAt,\n        revocationReason: 'SESSION_DEVICE_MISMATCH',\n      },\n    });\n    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();\n    jest.useRealTimers();\n"""
-          if old_assertion in text:
-              text = text.replace(old_assertion, new_assertion, 1)
-
-          path.write_text(text)
-          PY
-
-      - name: Format affected backend files
+      - name: Generate Prisma client
         working-directory: backend
-        run: |
-          npx prettier --write \
-            src/auth/auth.service.spec.ts \
-            src/auth/auth.service.ts \
-            src/duplicate-account/dto/upsert-user-device-policy.dto.ts \
-            src/duplicate-account/duplicate-account.service.ts
+        run: npm run prisma:generate
 
-      - name: Capture backend lint result
-        id: lint
+      - name: Verify backend lint
         working-directory: backend
-        shell: bash
-        run: |
-          set +e
-          npm run lint > ../.github/final-backend-lint-output.txt 2>&1
-          status=$?
-          cat ../.github/final-backend-lint-output.txt
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Commit diagnostic result when lint is still red
-        if: steps.lint.outputs.status != '0'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            .github/final-backend-lint-output.txt \
-            backend/src/auth/auth.service.spec.ts \
-            backend/src/auth/auth.service.ts \
-            backend/src/duplicate-account/dto/upsert-user-device-policy.dto.ts \
-            backend/src/duplicate-account/duplicate-account.service.ts
-          git commit -m 'chore: capture remaining backend lint failures'
-          git push origin HEAD:${GITHUB_REF_NAME}
-          exit 1
+        run: npm run lint
 
       - name: Verify targeted auth tests
-        if: steps.lint.outputs.status == '0'
         working-directory: backend
         run: npm test -- --runInBand src/duplicate-account/duplicate-account.service.spec.ts src/auth/auth.service.spec.ts src/auth/auth.service.monitor.spec.ts
 
       - name: Verify backend build
-        if: steps.lint.outputs.status == '0'
         working-directory: backend
         run: npm run build
 
-      - name: Commit verified repair and remove helper
-        if: steps.lint.outputs.status == '0'
+      - name: Remove temporary diagnostics and helper
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          rm -f .github/final-backend-lint-output.txt
+          git rm .github/final-backend-lint-output.txt
           git rm .github/workflows/final-backend-lint-repair.yml
-          git add \
-            backend/src/auth/auth.service.spec.ts \
-            backend/src/auth/auth.service.ts \
-            backend/src/duplicate-account/dto/upsert-user-device-policy.dto.ts \
-            backend/src/duplicate-account/duplicate-account.service.ts
-          git commit -m 'chore: fix backend lint after auth hardening'
+          git commit -m 'chore: finalize backend lint repair'
           git push origin HEAD:${GITHUB_REF_NAME}
