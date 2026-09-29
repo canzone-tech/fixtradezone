@@ -11,6 +11,7 @@ import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
 
 const DEVICE_ID = '11111111-1111-4111-8111-111111111111';
+const OTHER_DEVICE_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('AuthService', () => {
   const activeUser = {
@@ -54,6 +55,7 @@ describe('AuthService', () => {
     auditLog: {
       create: jest.fn(),
     },
+    $executeRaw: jest.fn(),
   };
   const prisma = {
     user: {
@@ -66,9 +68,16 @@ describe('AuthService', () => {
     systemRegistrationConfig: {
       findUnique: jest.fn(),
     },
+    systemDuplicateAccountConfig: {
+      findUnique: jest.fn(),
+    },
+    userDeviceInstallation: {
+      findUnique: jest.fn(),
+    },
     authSession: {
       findFirst: jest.fn(),
     },
+    $queryRaw: jest.fn(),
     $transaction: jest.fn(
       async (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -97,9 +106,21 @@ describe('AuthService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.authSession.updateMany.mockResolvedValue({ count: 1 });
+    transaction.$executeRaw.mockResolvedValue(1);
 
     prisma.systemAuthConfig.findUnique.mockResolvedValue(null);
     prisma.systemRegistrationConfig.findUnique.mockResolvedValue(null);
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'OFF',
+      deviceSignalEnabled: true,
+    });
+    prisma.userDeviceInstallation.findUnique.mockResolvedValue(null);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        deviceInstallationId: null,
+        deviceBindingPending: true,
+      },
+    ]);
     duplicateAccountService.evaluateLogin.mockResolvedValue({
       enforcementMode: 'BLOCK',
       action: 'ALLOWED',
@@ -179,7 +200,7 @@ describe('AuthService', () => {
     ).rejects.toBe(error);
   });
 
-  it('logs in an active user and persists an audited refresh session', async () => {
+  it('logs in an active user and persists an audited device-bound refresh session', async () => {
     prisma.user.findUnique.mockResolvedValue(activeUser);
     passwordService.verifyForAuthentication.mockResolvedValue(true);
     tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
@@ -210,6 +231,7 @@ describe('AuthService', () => {
         expiresAt: issuedTokens.refreshTokenExpiresAt,
       },
     });
+    expect(transaction.$executeRaw).toHaveBeenCalled();
     expect(transaction.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: activeUser.id },
@@ -225,6 +247,7 @@ describe('AuthService', () => {
         metadata: {
           event: 'SESSION_CREATED',
           identifierType: 'USERNAME',
+          deviceInstallationId: DEVICE_ID,
         },
         ipAddress: undefined,
         userAgent: undefined,
@@ -366,10 +389,7 @@ describe('AuthService', () => {
     expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
   });
 
-  it('rotates a valid refresh token and revokes the previous session', async () => {
-    const rotatedAt = new Date('2026-08-19T06:00:00.000Z');
-    jest.useFakeTimers().setSystemTime(rotatedAt);
-
+  function prepareRefreshSession() {
     tokenService.verifyRefreshToken.mockResolvedValue({
       sub: activeUser.id,
       type: 'refresh',
@@ -384,6 +404,12 @@ describe('AuthService', () => {
       user: activeUser,
     });
     tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
+  }
+
+  it('rotates a valid legacy refresh token and consumes its one-time binding grace', async () => {
+    const rotatedAt = new Date('2026-08-19T06:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(rotatedAt);
+    prepareRefreshSession();
 
     const result = await service.refresh({ refreshToken: 'old-token' });
 
@@ -410,8 +436,104 @@ describe('AuthService', () => {
         expiresAt: issuedTokens.refreshTokenExpiresAt,
       },
     });
+    expect(transaction.$executeRaw).toHaveBeenCalled();
     expect(result.refreshToken).toBe(issuedTokens.refreshToken);
     expect(result.message).toBe('Session refreshed.');
+  });
+
+  it('refreshes a normal-user session only on its bound approved device', async () => {
+    prepareRefreshSession();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        deviceInstallationId: DEVICE_ID,
+        deviceBindingPending: false,
+      },
+    ]);
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+    });
+    prisma.userDeviceInstallation.findUnique.mockResolvedValue({ id: 'binding-id' });
+    duplicateAccountService.evaluateLogin.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      matchedUserIds: [],
+      deviceInstallationId: DEVICE_ID,
+      ipAddress: null,
+      reason: null,
+    });
+
+    await expect(
+      service.refresh({
+        refreshToken: 'old-token',
+        deviceInstallationId: DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({ message: 'Session refreshed.' });
+
+    expect(prisma.userDeviceInstallation.findUnique).toHaveBeenCalledWith({
+      where: {
+        userId_installationId: {
+          userId: activeUser.id,
+          installationId: DEVICE_ID,
+        },
+      },
+      select: { id: true },
+    });
+  });
+
+  it('revokes a device-bound refresh session when presented from another device', async () => {
+    prepareRefreshSession();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        deviceInstallationId: DEVICE_ID,
+        deviceBindingPending: false,
+      },
+    ]);
+
+    await expect(
+      service.refresh({
+        refreshToken: 'old-token',
+        deviceInstallationId: OTHER_DEVICE_ID,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(transaction.authSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'old-session-id',
+        userId: activeUser.id,
+        revokedAt: null,
+      },
+      data: expect.objectContaining({
+        revocationReason: 'SESSION_DEVICE_MISMATCH',
+      }),
+    });
+    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
+  });
+
+  it('rejects a legacy refresh claim when the requested device is no longer approved', async () => {
+    prepareRefreshSession();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        deviceInstallationId: null,
+        deviceBindingPending: true,
+      },
+    ]);
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+    });
+    prisma.userDeviceInstallation.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.refresh({
+        refreshToken: 'old-token',
+        deviceInstallationId: DEVICE_ID,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
   });
 
   it('revokes active sessions when a rotated refresh token is reused', async () => {
@@ -484,20 +606,7 @@ describe('AuthService', () => {
   it('revokes active sessions after a concurrent refresh loses rotation', async () => {
     const rotatedAt = new Date('2026-08-19T06:00:00.000Z');
     jest.useFakeTimers().setSystemTime(rotatedAt);
-    tokenService.verifyRefreshToken.mockResolvedValue({
-      sub: activeUser.id,
-      type: 'refresh',
-      jti: 'old-session-id',
-    });
-    tokenService.hashRefreshToken.mockReturnValue('old-token-hash');
-    prisma.authSession.findFirst.mockResolvedValue({
-      id: 'old-session-id',
-      userId: activeUser.id,
-      expiresAt: new Date(rotatedAt.getTime() + 60_000),
-      revokedAt: null,
-      user: activeUser,
-    });
-    tokenService.issueTokenPair.mockResolvedValue(issuedTokens);
+    prepareRefreshSession();
     transaction.authSession.updateMany.mockResolvedValueOnce({ count: 0 });
 
     await expect(
@@ -604,6 +713,7 @@ describe('AuthService', () => {
         metadata: {
           event: 'SESSION_CREATED',
           identifierType: 'MOBILE',
+          deviceInstallationId: DEVICE_ID,
         },
         ipAddress: undefined,
         userAgent: undefined,
