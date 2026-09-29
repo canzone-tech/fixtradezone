@@ -13,6 +13,7 @@ import {
   SIMULATED_ACTIVITY_WORKER_LOCK_KEY,
   SIMULATED_ACTIVITY_WORKER_MIN_LOCK_TTL_MS,
 } from './simulated-activity.constants';
+import { SimulatedActivityFinalDayRecoveryService } from './simulated-activity-final-day-recovery.service';
 import { SimulatedActivityService } from './simulated-activity.service';
 
 @Injectable()
@@ -27,6 +28,7 @@ export class SimulatedActivityWorkerService
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly simulatedActivityService: SimulatedActivityService,
+    private readonly finalDayRecoveryService: SimulatedActivityFinalDayRecoveryService,
     private readonly operationsConfigService: OperationsConfigService,
   ) {}
 
@@ -92,10 +94,26 @@ export class SimulatedActivityWorkerService
           {},
           true,
         );
-        this.simulatedActivityService.noteWorkerSuccess(summary);
+        const finalDayRecovery =
+          await this.finalDayRecoveryService.processDueBatch();
+        const healthSummary = {
+          ...summary,
+          finalDayRecovery,
+        };
+        this.simulatedActivityService.noteWorkerSuccess(healthSummary);
         if (summary.createdEvents > 0) {
           this.logger.log(
             `Simulated activity worker created ${summary.createdEvents} event(s) across ${summary.processedSubscriptions} subscription(s).`,
+          );
+        }
+        if (finalDayRecovery.createdEvents > 0) {
+          this.logger.log(
+            `Simulated activity worker recovered ${finalDayRecovery.createdEvents} final-day event(s) across ${finalDayRecovery.processedSubscriptions} subscription(s).`,
+          );
+        }
+        if (finalDayRecovery.failedSubscriptions > 0) {
+          this.logger.warn(
+            `Simulated activity final-day recovery failed for ${finalDayRecovery.failedSubscriptions} subscription(s).`,
           );
         }
       } catch (error) {

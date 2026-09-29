@@ -6,6 +6,7 @@ import {
   AdminSubscriptionSimulatedActivityController,
 } from './admin-simulated-activity.controller';
 import { SimulatedActivityController } from './simulated-activity.controller';
+import { SimulatedActivityFinalDayRecoveryService } from './simulated-activity-final-day-recovery.service';
 import { SimulatedActivityInitialDraftService } from './simulated-activity-initial-draft.service';
 import { SimulatedActivityService } from './simulated-activity.service';
 import { SimulatedActivityUserViewService } from './simulated-activity-user-view.service';
@@ -23,6 +24,7 @@ import { SimulatedActivityWorkerService } from './simulated-activity.worker.serv
     SimulatedActivityService,
     SimulatedActivityInitialDraftService,
     SimulatedActivityUserViewService,
+    SimulatedActivityFinalDayRecoveryService,
     SimulatedActivityWorkerService,
   ],
   exports: [SimulatedActivityService],

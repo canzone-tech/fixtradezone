@@ -1,6 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import type { OperationsConfigService } from '../platform-config/operations-config.service';
 import type { RedisService } from '../redis/redis.service';
+import type { SimulatedActivityFinalDayRecoveryService } from './simulated-activity-final-day-recovery.service';
 import type { SimulatedActivityService } from './simulated-activity.service';
 import { SimulatedActivityWorkerService } from './simulated-activity.worker.service';
 
@@ -12,6 +13,9 @@ describe('SimulatedActivityWorkerService runtime gating', () => {
     noteWorkerStart: jest.fn(),
     noteWorkerSuccess: jest.fn(),
     noteWorkerFailure: jest.fn(),
+    processDueBatch: jest.fn(),
+  };
+  const finalDayRecoveryService = {
     processDueBatch: jest.fn(),
   };
   const operationsConfigService = {
@@ -27,6 +31,7 @@ describe('SimulatedActivityWorkerService runtime gating', () => {
       configService as unknown as ConfigService,
       redisService as unknown as RedisService,
       activityService as unknown as SimulatedActivityService,
+      finalDayRecoveryService as unknown as SimulatedActivityFinalDayRecoveryService,
       operationsConfigService as unknown as OperationsConfigService,
     );
   }
