@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -18,8 +19,11 @@ import type {
   DuplicateAccountEnforcementMode,
   UpdateDuplicateAccountConfigDto,
 } from './dto/update-duplicate-account-config.dto';
+import type { UpsertUserDevicePolicyDto } from './dto/upsert-user-device-policy.dto';
 
 const CONFIG_ID = 1;
+const DEFAULT_MAX_DEVICES = 1;
+const MAX_CONFIGURABLE_DEVICES = 5;
 const DEVICE_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -29,7 +33,22 @@ type DuplicateAccountRiskAction =
 type DuplicateAccountRiskReason =
   | 'DEVICE_INSTALLATION_ALREADY_LINKED'
   | 'DEVICE_INSTALLATION_SIGNAL_MISSING'
+  | 'USER_DEVICE_LIMIT_REACHED'
   | 'SUPER_ADMIN_EXEMPTION';
+
+type UserDevicePolicyRow = {
+  userId: string;
+  maxDevices: number;
+  label: string | null;
+  updatedByUserId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type UserDevicePolicyAdminRow = UserDevicePolicyRow & {
+  email: string | null;
+  username: string;
+};
 
 export interface ConfigSnapshot {
   enforcementMode: DuplicateAccountEnforcementMode;
@@ -65,22 +84,38 @@ export class DuplicateAccountService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAdminSnapshot() {
-    const [configRow, allowlist, recentEvents] = await Promise.all([
-      this.prisma.systemDuplicateAccountConfig.findUnique({
-        where: { id: CONFIG_ID },
-      }),
-      this.prisma.duplicateAccountAllowlist.findMany({
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-      }),
-      this.prisma.duplicateAccountRiskEvent.findMany({
-        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-        take: 50,
-      }),
-    ]);
+    const [configRow, allowlist, recentEvents, devicePolicies] =
+      await Promise.all([
+        this.prisma.systemDuplicateAccountConfig.findUnique({
+          where: { id: CONFIG_ID },
+        }),
+        this.prisma.duplicateAccountAllowlist.findMany({
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        }),
+        this.prisma.duplicateAccountRiskEvent.findMany({
+          orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+          take: 50,
+        }),
+        this.prisma.$queryRaw<UserDevicePolicyAdminRow[]>`
+          SELECT
+            p.userId,
+            p.maxDevices,
+            p.label,
+            p.updatedByUserId,
+            p.createdAt,
+            p.updatedAt,
+            u.email,
+            u.username
+          FROM duplicate_account_user_device_policies p
+          INNER JOIN users u ON u.id = p.userId
+          ORDER BY p.updatedAt DESC, p.userId ASC
+        `,
+      ]);
 
     return {
       config: this.toConfigSnapshot(configRow),
       allowlist,
+      devicePolicies,
       recentEvents,
     };
   }
@@ -249,6 +284,186 @@ export class DuplicateAccountService {
         });
 
         return { message: 'Allowlist entry removed.' };
+      },
+      { isolationLevel: 'Serializable' },
+    );
+  }
+
+  async upsertUserDevicePolicy(
+    userId: string,
+    dto: UpsertUserDevicePolicyDto,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    this.assertSuperAdmin(actor);
+    const label = dto.label?.trim() || null;
+
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const target = await transaction.user.findUnique({
+          where: { id: userId },
+          select: { id: true, email: true, username: true },
+        });
+        if (!target) {
+          throw new NotFoundException('User was not found.');
+        }
+
+        const previousRows = await transaction.$queryRaw<UserDevicePolicyRow[]>`
+          SELECT
+            userId,
+            maxDevices,
+            label,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          FROM duplicate_account_user_device_policies
+          WHERE userId = ${userId}
+          LIMIT 1
+        `;
+        const previous = previousRows[0] ?? null;
+
+        await transaction.$executeRaw`
+          INSERT INTO duplicate_account_user_device_policies (
+            userId,
+            maxDevices,
+            label,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          ) VALUES (
+            ${userId},
+            ${dto.maxDevices},
+            ${label},
+            ${actor.id},
+            CURRENT_TIMESTAMP(3),
+            CURRENT_TIMESTAMP(3)
+          )
+          ON DUPLICATE KEY UPDATE
+            maxDevices = VALUES(maxDevices),
+            label = VALUES(label),
+            updatedByUserId = VALUES(updatedByUserId),
+            updatedAt = CURRENT_TIMESTAMP(3)
+        `;
+
+        const currentRows = await transaction.$queryRaw<UserDevicePolicyRow[]>`
+          SELECT
+            userId,
+            maxDevices,
+            label,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          FROM duplicate_account_user_device_policies
+          WHERE userId = ${userId}
+          LIMIT 1
+        `;
+        const current = currentRows[0];
+        if (!current) {
+          throw new ConflictException('Unable to persist user device policy.');
+        }
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: actor.id,
+            action: previous ? 'UPDATE' : 'CREATE',
+            entityType: 'DuplicateAccountUserDevicePolicy',
+            entityId: userId,
+            description:
+              'SUPER_ADMIN updated a per-user duplicate-account device limit.',
+            metadata: {
+              source: 'DUPLICATE_ACCOUNT_USER_DEVICE_POLICY',
+              targetUser: {
+                id: target.id,
+                email: target.email,
+                username: target.username,
+              },
+              previous: previous
+                ? {
+                    maxDevices: previous.maxDevices,
+                    label: previous.label,
+                  }
+                : null,
+              current: {
+                maxDevices: current.maxDevices,
+                label: current.label,
+              },
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return {
+          message: 'User device policy updated.',
+          policy: {
+            ...current,
+            email: target.email,
+            username: target.username,
+          },
+        };
+      },
+      { isolationLevel: 'Serializable' },
+    );
+  }
+
+  async removeUserDevicePolicy(
+    userId: string,
+    actor: AuthenticatedUser,
+    context: RequestContext = {},
+  ) {
+    this.assertSuperAdmin(actor);
+
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const rows = await transaction.$queryRaw<UserDevicePolicyRow[]>`
+          SELECT
+            userId,
+            maxDevices,
+            label,
+            updatedByUserId,
+            createdAt,
+            updatedAt
+          FROM duplicate_account_user_device_policies
+          WHERE userId = ${userId}
+          LIMIT 1
+        `;
+        const existing = rows[0];
+        if (!existing) {
+          throw new NotFoundException('User device policy was not found.');
+        }
+
+        await transaction.$executeRaw`
+          DELETE FROM duplicate_account_user_device_policies
+          WHERE userId = ${userId}
+        `;
+
+        await transaction.auditLog.create({
+          data: {
+            actorUserId: actor.id,
+            action: 'DELETE',
+            entityType: 'DuplicateAccountUserDevicePolicy',
+            entityId: userId,
+            description:
+              'SUPER_ADMIN removed a per-user duplicate-account device limit override.',
+            metadata: {
+              source: 'DUPLICATE_ACCOUNT_USER_DEVICE_POLICY',
+              previous: {
+                maxDevices: existing.maxDevices,
+                label: existing.label,
+              },
+              current: {
+                maxDevices: DEFAULT_MAX_DEVICES,
+                label: null,
+              },
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+        });
+
+        return {
+          message: 'User device policy removed. Default one-device limit applies.',
+        };
       },
       { isolationLevel: 'Serializable' },
     );
@@ -459,7 +674,44 @@ export class DuplicateAccountService {
       };
     }
 
-    if (otherUserIds.length === 0) {
+    if (otherUserIds.length > 0) {
+      if (config.enforcementMode === 'MONITOR') {
+        return {
+          enforcementMode: config.enforcementMode,
+          action: 'MONITORED',
+          blockLogin: false,
+          bindDevice: false,
+          matchedUserIds: otherUserIds,
+          deviceInstallationId,
+          ipAddress,
+          reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+        };
+      }
+
+      return {
+        enforcementMode: config.enforcementMode,
+        action:
+          config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
+        blockLogin: true,
+        bindDevice: false,
+        matchedUserIds: otherUserIds,
+        deviceInstallationId,
+        ipAddress,
+        reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+      };
+    }
+
+    const [deviceIds, maxDevices] = await Promise.all([
+      this.findUserDeviceIds(input.userId),
+      this.getUserMaxDevices(input.userId),
+    ]);
+    const deviceAllowed = this.canUseDevice(
+      deviceInstallationId,
+      deviceIds,
+      maxDevices,
+    );
+
+    if (deviceAllowed) {
       return {
         enforcementMode: config.enforcementMode,
         action: 'ALLOWED',
@@ -477,11 +729,11 @@ export class DuplicateAccountService {
         enforcementMode: config.enforcementMode,
         action: 'MONITORED',
         blockLogin: false,
-        bindDevice: true,
-        matchedUserIds: otherUserIds,
+        bindDevice: false,
+        matchedUserIds: [],
         deviceInstallationId,
         ipAddress,
-        reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+        reason: 'USER_DEVICE_LIMIT_REACHED',
       };
     }
 
@@ -490,10 +742,10 @@ export class DuplicateAccountService {
       action: config.enforcementMode === 'RESTRICT' ? 'RESTRICTED' : 'BLOCKED',
       blockLogin: true,
       bindDevice: false,
-      matchedUserIds: otherUserIds,
+      matchedUserIds: [],
       deviceInstallationId,
       ipAddress,
-      reason: 'DEVICE_INSTALLATION_ALREADY_LINKED',
+      reason: 'USER_DEVICE_LIMIT_REACHED',
     };
   }
 
@@ -552,26 +804,92 @@ export class DuplicateAccountService {
   async recordSuccessfulLogin(
     transaction: Prisma.TransactionClient,
     decision: LoginDuplicateDecision,
-    user: Pick<AuthenticatedUser, 'id' | 'email'>,
+    user: Pick<AuthenticatedUser, 'id' | 'email' | 'roles'>,
     context: RequestContext = {},
   ): Promise<void> {
+    let runtimeRiskReason: DuplicateAccountRiskReason | null = null;
+    let runtimeMatchedUserIds: string[] = [];
+
     if (decision.bindDevice && decision.deviceInstallationId) {
-      await transaction.userDeviceInstallation.upsert({
-        where: {
-          userId_installationId: {
+      let canBind = true;
+
+      if (
+        !user.roles.includes(SUPER_ADMIN_ROLE_NAME) &&
+        decision.enforcementMode !== 'OFF'
+      ) {
+        runtimeMatchedUserIds = (
+          await this.findUsersForDeviceInTransaction(
+            transaction,
+            decision.deviceInstallationId,
+          )
+        ).filter((id) => id !== user.id);
+
+        if (runtimeMatchedUserIds.length > 0) {
+          canBind = false;
+          runtimeRiskReason = 'DEVICE_INSTALLATION_ALREADY_LINKED';
+        } else {
+          const [deviceIds, maxDevices] = await Promise.all([
+            this.findUserDeviceIdsInTransaction(transaction, user.id),
+            this.getUserMaxDevicesInTransaction(transaction, user.id),
+          ]);
+          canBind = this.canUseDevice(
+            decision.deviceInstallationId,
+            deviceIds,
+            maxDevices,
+          );
+          if (!canBind) {
+            runtimeRiskReason = 'USER_DEVICE_LIMIT_REACHED';
+          }
+        }
+      }
+
+      if (!canBind && decision.enforcementMode !== 'MONITOR') {
+        throw new ForbiddenException(
+          'Login is blocked by the duplicate-account protection policy.',
+        );
+      }
+
+      if (canBind) {
+        await transaction.userDeviceInstallation.upsert({
+          where: {
+            userId_installationId: {
+              userId: user.id,
+              installationId: decision.deviceInstallationId,
+            },
+          },
+          create: {
             userId: user.id,
             installationId: decision.deviceInstallationId,
+            firstSeenIp: decision.ipAddress,
+            lastSeenIp: decision.ipAddress,
           },
-        },
-        create: {
+          update: {
+            lastSeenIp: decision.ipAddress,
+            lastSeenAt: new Date(),
+          },
+        });
+      }
+    }
+
+    if (runtimeRiskReason) {
+      await transaction.duplicateAccountRiskEvent.create({
+        data: {
           userId: user.id,
+          attemptedEmail: user.email,
           installationId: decision.deviceInstallationId,
-          firstSeenIp: decision.ipAddress,
-          lastSeenIp: decision.ipAddress,
-        },
-        update: {
-          lastSeenIp: decision.ipAddress,
-          lastSeenAt: new Date(),
+          ipAddress: decision.ipAddress,
+          enforcementMode: decision.enforcementMode,
+          action: 'MONITORED',
+          bypassType: null,
+          matchedUserIds: runtimeMatchedUserIds,
+          metadata: {
+            source: 'LOGIN',
+            reason: runtimeRiskReason,
+            raceRevalidation: true,
+            deviceSignalPresent: Boolean(decision.deviceInstallationId),
+            ipSignalPresent: Boolean(decision.ipAddress),
+            userAgent: context.userAgent ?? null,
+          },
         },
       });
     }
@@ -654,57 +972,86 @@ export class DuplicateAccountService {
   ) {
     const installationId = this.normalizeDeviceId(deviceInstallationId);
     const ipAddress = this.normalizeIp(context.ipAddress);
-    const existingUsers = await this.findUsersForDevice(installationId);
-    const otherUsers = existingUsers.filter((id) => id !== user.id);
     const config = this.toConfigSnapshot(
       await this.prisma.systemDuplicateAccountConfig.findUnique({
         where: { id: CONFIG_ID },
       }),
     );
 
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.userDeviceInstallation.upsert({
-        where: {
-          userId_installationId: {
-            userId: user.id,
-            installationId,
-          },
-        },
-        create: {
-          userId: user.id,
-          installationId,
-          firstSeenIp: ipAddress,
-          lastSeenIp: ipAddress,
-        },
-        update: {
-          lastSeenIp: ipAddress,
-          lastSeenAt: new Date(),
-        },
-      });
+    return this.prisma.$transaction(
+      async (transaction) => {
+        const otherUsers = (
+          await this.findUsersForDeviceInTransaction(transaction, installationId)
+        ).filter((id) => id !== user.id);
+        let canBind = otherUsers.length === 0;
+        let reason: DuplicateAccountRiskReason | null =
+          otherUsers.length > 0 ? 'DEVICE_INSTALLATION_ALREADY_LINKED' : null;
 
-      if (otherUsers.length > 0) {
-        await transaction.duplicateAccountRiskEvent.create({
-          data: {
-            userId: user.id,
-            attemptedEmail: user.email,
-            installationId,
-            ipAddress,
-            enforcementMode: config.enforcementMode,
-            action: 'MONITORED',
-            matchedUserIds: otherUsers,
-            metadata: {
-              source: 'AUTHENTICATED_DEVICE_OBSERVATION',
-              retroactiveEnforcementApplied: false,
+        if (
+          canBind &&
+          !user.roles.includes(SUPER_ADMIN_ROLE_NAME) &&
+          config.enforcementMode !== 'OFF' &&
+          config.deviceSignalEnabled
+        ) {
+          const [deviceIds, maxDevices] = await Promise.all([
+            this.findUserDeviceIdsInTransaction(transaction, user.id),
+            this.getUserMaxDevicesInTransaction(transaction, user.id),
+          ]);
+          canBind = this.canUseDevice(installationId, deviceIds, maxDevices);
+          if (!canBind) {
+            reason = 'USER_DEVICE_LIMIT_REACHED';
+          }
+        }
+
+        if (canBind) {
+          await transaction.userDeviceInstallation.upsert({
+            where: {
+              userId_installationId: {
+                userId: user.id,
+                installationId,
+              },
             },
-          },
-        });
-      }
-    });
+            create: {
+              userId: user.id,
+              installationId,
+              firstSeenIp: ipAddress,
+              lastSeenIp: ipAddress,
+            },
+            update: {
+              lastSeenIp: ipAddress,
+              lastSeenAt: new Date(),
+            },
+          });
+        } else {
+          await transaction.duplicateAccountRiskEvent.create({
+            data: {
+              userId: user.id,
+              attemptedEmail: user.email,
+              installationId,
+              ipAddress,
+              enforcementMode: config.enforcementMode,
+              action: 'MONITORED',
+              matchedUserIds: otherUsers,
+              metadata: {
+                source: 'AUTHENTICATED_DEVICE_OBSERVATION',
+                reason,
+                retroactiveEnforcementApplied: false,
+              },
+            },
+          });
+        }
 
-    return {
-      message: 'Device installation observed.',
-      duplicateDeviceObserved: otherUsers.length > 0,
-    };
+        return {
+          message: canBind
+            ? 'Device installation observed.'
+            : 'Device installation was observed but not bound.',
+          deviceObserved: canBind,
+          duplicateDeviceObserved: otherUsers.length > 0,
+          deviceLimitReached: reason === 'USER_DEVICE_LIMIT_REACHED',
+        };
+      },
+      { isolationLevel: 'Serializable' },
+    );
   }
 
   private async findBypass(
@@ -746,6 +1093,94 @@ export class DuplicateAccountService {
       take: 100,
     });
     return rows.map((row) => row.userId);
+  }
+
+  private async findUsersForDeviceInTransaction(
+    transaction: Prisma.TransactionClient,
+    installationId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.userDeviceInstallation.findMany({
+      where: { installationId },
+      select: { userId: true },
+      distinct: ['userId'],
+      take: 100,
+    });
+    return rows.map((row) => row.userId);
+  }
+
+  private async findUserDeviceIds(userId: string): Promise<string[]> {
+    const rows = await this.prisma.userDeviceInstallation.findMany({
+      where: { userId },
+      select: { installationId: true },
+      orderBy: [
+        { lastSeenAt: 'desc' },
+        { firstSeenAt: 'asc' },
+        { id: 'asc' },
+      ],
+      take: 100,
+    });
+    return rows.map((row) => row.installationId);
+  }
+
+  private async findUserDeviceIdsInTransaction(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.userDeviceInstallation.findMany({
+      where: { userId },
+      select: { installationId: true },
+      orderBy: [
+        { lastSeenAt: 'desc' },
+        { firstSeenAt: 'asc' },
+        { id: 'asc' },
+      ],
+      take: 100,
+    });
+    return rows.map((row) => row.installationId);
+  }
+
+  private async getUserMaxDevices(userId: string): Promise<number> {
+    const rows = await this.prisma.$queryRaw<Array<{ maxDevices: number }>>`
+      SELECT maxDevices
+      FROM duplicate_account_user_device_policies
+      WHERE userId = ${userId}
+      LIMIT 1
+    `;
+    return this.normalizeMaxDevices(rows[0]?.maxDevices);
+  }
+
+  private async getUserMaxDevicesInTransaction(
+    transaction: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<number> {
+    const rows = await transaction.$queryRaw<Array<{ maxDevices: number }>>`
+      SELECT maxDevices
+      FROM duplicate_account_user_device_policies
+      WHERE userId = ${userId}
+      LIMIT 1
+    `;
+    return this.normalizeMaxDevices(rows[0]?.maxDevices);
+  }
+
+  private canUseDevice(
+    installationId: string,
+    orderedDeviceIds: string[],
+    maxDevices: number,
+  ): boolean {
+    const approvedDeviceIds = orderedDeviceIds.slice(0, maxDevices);
+    if (approvedDeviceIds.includes(installationId)) return true;
+
+    if (orderedDeviceIds.includes(installationId)) return false;
+
+    return orderedDeviceIds.length < maxDevices;
+  }
+
+  private normalizeMaxDevices(value: number | undefined): number {
+    if (!Number.isInteger(value)) return DEFAULT_MAX_DEVICES;
+    return Math.min(
+      MAX_CONFIGURABLE_DEVICES,
+      Math.max(DEFAULT_MAX_DEVICES, value ?? DEFAULT_MAX_DEVICES),
+    );
   }
 
   private normalizeAllowlistValue(
