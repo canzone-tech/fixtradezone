@@ -29,6 +29,11 @@ import { PasswordService } from './password.service';
 import { RegistrationService } from './registration.service';
 import { TokenService } from './token.service';
 
+type AuthSessionDeviceRow = {
+  deviceInstallationId: string | null;
+  deviceBindingPending: boolean | number;
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -234,6 +239,14 @@ export class AuthService {
         },
       });
 
+      await transaction.$executeRaw`
+        UPDATE auth_sessions
+        SET
+          deviceInstallationId = ${duplicateDecision.deviceInstallationId},
+          deviceBindingPending = FALSE
+        WHERE id = ${tokens.sessionId}
+      `;
+
       await transaction.user.update({
         where: {
           id: user.id,
@@ -253,6 +266,7 @@ export class AuthService {
           metadata: {
             event: 'SESSION_CREATED',
             identifierType,
+            deviceInstallationId: duplicateDecision.deviceInstallationId,
           },
           ipAddress: context.ipAddress,
           userAgent: context.userAgent,
@@ -422,6 +436,106 @@ export class AuthService {
       throw new UnauthorizedException(GENERIC_SESSION_ERROR);
     }
 
+    const bindingRows = await this.prisma.$queryRaw<AuthSessionDeviceRow[]>`
+      SELECT deviceInstallationId, deviceBindingPending
+      FROM auth_sessions
+      WHERE id = ${session.id}
+      LIMIT 1
+    `;
+    const binding = bindingRows[0];
+    if (!binding) {
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+    }
+
+    const authenticatedUser = toAuthenticatedUser(session.user);
+    const isSuperAdmin = authenticatedUser.roles.includes(SUPER_ADMIN_ROLE_NAME);
+    const requestedDeviceInstallationId =
+      dto.deviceInstallationId?.trim().toLowerCase() ?? null;
+    const storedDeviceInstallationId = binding.deviceInstallationId;
+    const legacyBindingPending = Boolean(binding.deviceBindingPending);
+    let rotatedDeviceInstallationId = storedDeviceInstallationId;
+    let usedLegacyBindingGrace = false;
+
+    if (
+      storedDeviceInstallationId &&
+      requestedDeviceInstallationId !== storedDeviceInstallationId
+    ) {
+      await this.revokeSession(
+        session.userId,
+        session.id,
+        'SESSION_DEVICE_MISMATCH',
+        context,
+      );
+      throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+    }
+
+    if (!isSuperAdmin) {
+      const duplicateConfig =
+        await this.prisma.systemDuplicateAccountConfig.findUnique({
+          where: { id: 1 },
+          select: {
+            enforcementMode: true,
+            deviceSignalEnabled: true,
+          },
+        });
+      const devicePolicyEnabled =
+        (duplicateConfig?.deviceSignalEnabled ?? true) &&
+        (duplicateConfig?.enforcementMode ?? 'OFF') !== 'OFF';
+
+      if (devicePolicyEnabled) {
+        if (!requestedDeviceInstallationId) {
+          if (!legacyBindingPending || storedDeviceInstallationId) {
+            await this.revokeSession(
+              session.userId,
+              session.id,
+              'SESSION_DEVICE_SIGNAL_MISSING',
+              context,
+            );
+            throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+          }
+
+          usedLegacyBindingGrace = true;
+        } else {
+          const [mapping, duplicateDecision] = await Promise.all([
+            this.prisma.userDeviceInstallation.findUnique({
+              where: {
+                userId_installationId: {
+                  userId: session.userId,
+                  installationId: requestedDeviceInstallationId,
+                },
+              },
+              select: { id: true },
+            }),
+            this.duplicateAccountService.evaluateLogin({
+              userId: session.userId,
+              isSuperAdmin: false,
+              deviceInstallationId: requestedDeviceInstallationId,
+              context,
+            }),
+          ]);
+
+          if (!mapping || duplicateDecision.blockLogin) {
+            await this.revokeSession(
+              session.userId,
+              session.id,
+              'SESSION_DEVICE_POLICY_REJECTED',
+              context,
+            );
+            throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+          }
+
+          rotatedDeviceInstallationId = requestedDeviceInstallationId;
+        }
+      } else if (
+        !storedDeviceInstallationId &&
+        requestedDeviceInstallationId
+      ) {
+        rotatedDeviceInstallationId = requestedDeviceInstallationId;
+      }
+    } else if (!storedDeviceInstallationId && requestedDeviceInstallationId) {
+      rotatedDeviceInstallationId = requestedDeviceInstallationId;
+    }
+
     const nextTokens = await this.tokenService.issueTokenPair(session.user);
     const rotatedAt = new Date();
     const rotationSucceeded = await this.prisma.$transaction(
@@ -479,6 +593,15 @@ export class AuthService {
             expiresAt: nextTokens.refreshTokenExpiresAt,
           },
         });
+
+        await transaction.$executeRaw`
+          UPDATE auth_sessions
+          SET
+            deviceInstallationId = ${rotatedDeviceInstallationId},
+            deviceBindingPending = FALSE
+          WHERE id = ${nextTokens.sessionId}
+        `;
+
         await transaction.auditLog.create({
           data: {
             actorUserId: session.userId,
@@ -489,6 +612,8 @@ export class AuthService {
             metadata: {
               event: 'SESSION_ROTATED',
               rotatedToSessionId: nextTokens.sessionId,
+              deviceInstallationId: rotatedDeviceInstallationId,
+              legacyDeviceBindingGrace: usedLegacyBindingGrace,
             },
             ipAddress: context.ipAddress,
             userAgent: context.userAgent,
@@ -505,7 +630,7 @@ export class AuthService {
 
     return this.buildAuthResponse(
       nextTokens,
-      toAuthenticatedUser(session.user),
+      authenticatedUser,
       'Session refreshed.',
     );
   }
@@ -617,7 +742,7 @@ export class AuthService {
             action: 'UPDATE',
             entityType: 'AuthSession',
             entityId: sessionId,
-            description: 'Expired refresh session revoked.',
+            description: 'Refresh session revoked after a session security event.',
             metadata: {
               event: reason,
             },
