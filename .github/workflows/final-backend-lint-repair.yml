@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   repair:
-    if: github.event.head_commit.message == 'chore: run final backend lint repair'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
@@ -74,7 +73,7 @@ jobs:
       - name: Commit verified repair and remove helper
         run: |
           git config user.name 'github-actions[bot]'
-          git config user.email '4189826+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/final-backend-lint-repair.yml
           git add \
             backend/src/auth/auth.service.spec.ts \
