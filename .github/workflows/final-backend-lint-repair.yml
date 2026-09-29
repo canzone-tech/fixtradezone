@@ -1,0 +1,85 @@
+name: Final Backend Lint Repair
+
+on:
+  push:
+    branches:
+      - fix/user-access-and-subscription-history
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'chore: run final backend lint repair'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Repair unsafe refresh-session assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/src/auth/auth.service.spec.ts')
+          text = path.read_text()
+
+          old_header = """  it('revokes a device-bound refresh session when presented from another device', async () => {\n    prepareRefreshSession();\n"""
+          new_header = """  it('revokes a device-bound refresh session when presented from another device', async () => {\n    const revokedAt = new Date('2026-08-19T06:00:00.000Z');\n    jest.useFakeTimers().setSystemTime(revokedAt);\n    prepareRefreshSession();\n"""
+          if old_header not in text:
+              raise SystemExit('Expected device-mismatch test header was not found')
+          text = text.replace(old_header, new_header, 1)
+
+          old_assertion = """      data: expect.objectContaining({\n        revocationReason: 'SESSION_DEVICE_MISMATCH',\n      }),\n    });\n    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();\n"""
+          new_assertion = """      data: {\n        revokedAt,\n        revocationReason: 'SESSION_DEVICE_MISMATCH',\n      },\n    });\n    expect(tokenService.issueTokenPair).not.toHaveBeenCalled();\n    jest.useRealTimers();\n"""
+          if old_assertion not in text:
+              raise SystemExit('Expected unsafe device-mismatch assertion was not found')
+          path.write_text(text.replace(old_assertion, new_assertion, 1))
+          PY
+
+      - name: Format affected backend files
+        working-directory: backend
+        run: |
+          npx prettier --write \
+            src/auth/auth.service.spec.ts \
+            src/auth/auth.service.ts \
+            src/duplicate-account/dto/upsert-user-device-policy.dto.ts \
+            src/duplicate-account/duplicate-account.service.ts
+
+      - name: Verify backend lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Verify targeted auth tests
+        working-directory: backend
+        run: npm test -- --runInBand src/duplicate-account/duplicate-account.service.spec.ts src/auth/auth.service.spec.ts src/auth/auth.service.monitor.spec.ts
+
+      - name: Verify backend build
+        working-directory: backend
+        run: npm run build
+
+      - name: Commit verified repair and remove helper
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '4189826+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/final-backend-lint-repair.yml
+          git add \
+            backend/src/auth/auth.service.spec.ts \
+            backend/src/auth/auth.service.ts \
+            backend/src/duplicate-account/dto/upsert-user-device-policy.dto.ts \
+            backend/src/duplicate-account/duplicate-account.service.ts
+          git commit -m 'chore: fix backend lint after auth hardening'
+          git push origin HEAD:${GITHUB_REF_NAME}
