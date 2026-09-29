@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { getRequestContext } from '../auth/request-context';
 import { SuperAdminOnlyGuard } from '../security-config/super-admin-only.guard';
 import { CreateDuplicateAccountAllowlistDto } from './dto/create-duplicate-account-allowlist.dto';
 import { UpdateDuplicateAccountConfigDto } from './dto/update-duplicate-account-config.dto';
+import { UpsertUserDevicePolicyDto } from './dto/upsert-user-device-policy.dto';
 import { DuplicateAccountService } from './duplicate-account.service';
 
 @Controller('admin/settings/duplicate-account')
@@ -61,5 +63,37 @@ export class AdminDuplicateAccountController {
     @Req() request: Request,
   ) {
     return this.service.removeAllowlist(id, actor, getRequestContext(request));
+  }
+
+  @Put('device-policies/:userId')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  upsertUserDevicePolicy(
+    @Param('userId') userId: string,
+    @Body() dto: UpsertUserDevicePolicyDto,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.service.upsertUserDevicePolicy(
+      userId,
+      dto,
+      actor,
+      getRequestContext(request),
+    );
+  }
+
+  @Delete('device-policies/:userId')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  removeUserDevicePolicy(
+    @Param('userId') userId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.service.removeUserDevicePolicy(
+      userId,
+      actor,
+      getRequestContext(request),
+    );
   }
 }

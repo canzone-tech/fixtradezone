@@ -26,6 +26,17 @@ interface AllowlistEntry {
   createdAt: string;
 }
 
+interface DevicePolicy {
+  userId: string;
+  maxDevices: number;
+  label: string | null;
+  updatedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  email: string | null;
+  username: string;
+}
+
 interface RiskEvent {
   id: string;
   attemptedEmail: string | null;
@@ -41,6 +52,7 @@ interface RiskEvent {
 interface Snapshot {
   config: DuplicateConfig;
   allowlist: AllowlistEntry[];
+  devicePolicies: DevicePolicy[];
   recentEvents: RiskEvent[];
   message?: string;
 }
@@ -59,6 +71,9 @@ export default function DuplicateAccountConfigurationClient() {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [mode, setMode] = useState<EnforcementMode>("OFF");
+  const [policyUserId, setPolicyUserId] = useState("");
+  const [policyMaxDevices, setPolicyMaxDevices] = useState("2");
+  const [policyLabel, setPolicyLabel] = useState("");
   const [allowType, setAllowType] = useState<AllowlistType>(
     "DEVICE_INSTALLATION_ID",
   );
@@ -97,7 +112,12 @@ export default function DuplicateAccountConfigurationClient() {
       );
     }
 
-    return payload;
+    return {
+      ...payload,
+      allowlist: payload.allowlist ?? [],
+      devicePolicies: payload.devicePolicies ?? [],
+      recentEvents: payload.recentEvents ?? [],
+    };
   }
 
   useEffect(() => {
@@ -161,6 +181,102 @@ export default function DuplicateAccountConfigurationClient() {
       setSuccess(payload.message ?? "Duplicate-account mode updated.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Unable to save mode.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveDevicePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const userId = policyUserId.trim();
+    const maxDevices = Number(policyMaxDevices);
+    if (!userId || !Number.isInteger(maxDevices)) return;
+
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(
+        `/api/admin/settings/duplicate-account/device-policies/${encodeURIComponent(userId)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            maxDevices,
+            label: policyLabel.trim() || undefined,
+          }),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string; policy?: DevicePolicy }
+        | null;
+      if (!response.ok || !payload?.policy) {
+        throw new Error(
+          messageOf(payload as ApiError | null, "Unable to save user device policy."),
+        );
+      }
+
+      setSnapshot((current) => {
+        if (!current) return current;
+        const policy = payload.policy as DevicePolicy;
+        return {
+          ...current,
+          devicePolicies: [
+            policy,
+            ...current.devicePolicies.filter(
+              (entry) => entry.userId !== policy.userId,
+            ),
+          ],
+        };
+      });
+      setPolicyUserId("");
+      setPolicyMaxDevices("2");
+      setPolicyLabel("");
+      setSuccess(payload.message ?? "User device policy updated.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to save user device policy.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeDevicePolicy(userId: string) {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const response = await fetch(
+        `/api/admin/settings/duplicate-account/device-policies/${encodeURIComponent(userId)}`,
+        { method: "DELETE" },
+      );
+      const payload = (await response.json().catch(() => null)) as ApiError | null;
+      if (!response.ok) {
+        throw new Error(messageOf(payload, "Unable to remove user device policy."));
+      }
+
+      setSnapshot((current) =>
+        current
+          ? {
+              ...current,
+              devicePolicies: current.devicePolicies.filter(
+                (entry) => entry.userId !== userId,
+              ),
+            }
+          : current,
+      );
+      setSuccess(
+        messageOf(payload, "User device policy removed. One-device default applies."),
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to remove user device policy.",
+      );
     } finally {
       setSaving(false);
     }
@@ -301,10 +417,10 @@ export default function DuplicateAccountConfigurationClient() {
                   {value === "OFF"
                     ? "Observe only normal registration; no duplicate enforcement."
                     : value === "MONITOR"
-                      ? "Allow registration and create an immutable risk event."
+                      ? "Allow login/registration but record duplicate-device risk."
                       : value === "RESTRICT"
-                        ? "Create the account restricted; email verification does not activate it."
-                        : "Reject registration when the installation is already linked."}
+                        ? "Apply duplicate restrictions and block conflicting logins."
+                        : "Reject conflicting registrations and device-policy login violations."}
                 </span>
               </button>
             ),
@@ -324,13 +440,86 @@ export default function DuplicateAccountConfigurationClient() {
       <section className={styles.panel}>
         <div className={styles.panelHead}>
           <div>
+            <span>USER DEVICE POLICY</span>
+            <h2>Audited multi-device exceptions</h2>
+          </div>
+        </div>
+        <p className={styles.note}>
+          Normal users default to one approved device. Add a user-ID-scoped
+          override only when a controlled exception is required. A device linked
+          to another user remains blocked regardless of this limit.
+        </p>
+
+        <form className={styles.policyForm} onSubmit={saveDevicePolicy}>
+          <input
+            value={policyUserId}
+            onChange={(event) => setPolicyUserId(event.target.value)}
+            placeholder="User UUID"
+            required
+            disabled={saving}
+          />
+          <select
+            value={policyMaxDevices}
+            onChange={(event) => setPolicyMaxDevices(event.target.value)}
+            disabled={saving}
+          >
+            {[1, 2, 3, 4, 5].map((count) => (
+              <option key={count} value={count}>
+                Max {count} device{count === 1 ? "" : "s"}
+              </option>
+            ))}
+          </select>
+          <input
+            value={policyLabel}
+            onChange={(event) => setPolicyLabel(event.target.value)}
+            placeholder="Reason / label (optional)"
+            maxLength={100}
+            disabled={saving}
+          />
+          <button type="submit" disabled={saving}>
+            Save policy
+          </button>
+        </form>
+
+        <div className={styles.list}>
+          {snapshot?.devicePolicies.length ? (
+            snapshot.devicePolicies.map((policy) => (
+              <div key={policy.userId} className={styles.listRow}>
+                <div>
+                  <strong>
+                    {policy.email || policy.username} · {policy.maxDevices} devices
+                  </strong>
+                  <code>{policy.userId}</code>
+                  <span>{policy.label || "No label"}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void removeDevicePolicy(policy.userId)}
+                  disabled={saving}
+                >
+                  Restore default
+                </button>
+              </div>
+            ))
+          ) : (
+            <p className={styles.empty}>
+              No user exceptions configured. One-device default applies.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className={styles.panel}>
+        <div className={styles.panelHead}>
+          <div>
             <span>LOCAL / TEST BYPASS</span>
             <h2>Allowlist</h2>
           </div>
         </div>
         <p className={styles.note}>
           Use exact device installation IDs or exact IP addresses for approved
-          local/testing bypasses. Every change is audited.
+          registration/testing bypasses. Per-user multi-device login exceptions
+          belong in User Device Policy above. Every change is audited.
         </p>
 
         <form className={styles.allowForm} onSubmit={addAllowlist}>

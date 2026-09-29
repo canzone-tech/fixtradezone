@@ -178,6 +178,124 @@
   font-size: 10px;
 }
 
+.historySection {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(88, 131, 184, 0.16);
+}
+
+.historyHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.historyHeading span {
+  color: #35efe2;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.historyHeading h4 {
+  margin: 4px 0 0;
+  color: #f2f7ff;
+  font-size: 17px;
+}
+
+.historyHeading small {
+  color: #748aa5;
+  font-size: 9px;
+}
+
+.historyList {
+  display: grid;
+  gap: 10px;
+}
+
+.historyCard {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid rgba(93, 127, 169, 0.18);
+  border-radius: 12px;
+  background: rgba(5, 16, 35, 0.72);
+}
+
+.historyIdentity {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.historyIdentity span {
+  color: #7188a4;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.historyIdentity h5 {
+  margin: 3px 0 0;
+  color: #eaf2fb;
+  font-size: 15px;
+}
+
+.historyAmount {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+  text-align: right;
+}
+
+.historyAmount strong {
+  color: #cfe2f4;
+  font-size: 13px;
+}
+
+.historyAmount small {
+  padding: 4px 7px;
+  border: 1px solid rgba(73, 222, 181, 0.22);
+  border-radius: 999px;
+  color: #7ce4bf;
+  background: rgba(10, 91, 65, 0.18);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.historyDetails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.historyDetails div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(93, 127, 169, 0.1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.historyDetails dt {
+  margin-bottom: 3px;
+  color: #667d98;
+  font-size: 8px;
+}
+
+.historyDetails dd {
+  margin: 0;
+  color: #cbd9e8;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
 .historyNote {
   display: flex;
   align-items: center;
@@ -195,6 +313,10 @@
   .activeCard dl {
     grid-template-columns: 1fr 1fr;
   }
+
+  .historyDetails {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -208,8 +330,15 @@
     grid-template-columns: 1fr;
   }
 
-  .header {
+  .header,
+  .historyHeading,
+  .historyIdentity {
     flex-direction: column;
+  }
+
+  .historyHeading,
+  .historyIdentity {
+    align-items: stretch;
   }
 
   .activeCard {
@@ -280,5 +409,14 @@
   .subscriptionDetails .source {
     display: block;
     padding-top: 2px;
+  }
+
+  .historyAmount {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .historyDetails {
+    grid-template-columns: 1fr;
   }
 }

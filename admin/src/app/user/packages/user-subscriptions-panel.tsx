@@ -20,6 +20,7 @@ interface Subscription {
   status: string;
   activatedAt: string;
   scheduledEndAt: string;
+  completedAt: string | null;
   goalDays: number;
   cycleDays: number;
   principalTreatment: string;
@@ -37,8 +38,8 @@ function message(payload: ResponsePayload, fallback: string) {
   return fallback;
 }
 
-function dateLabel(value: string) {
-  return formatPlatformDateTime(value);
+function dateLabel(value: string | null) {
+  return value ? formatPlatformDateTime(value) : "—";
 }
 
 // Keep initial loading separate from manual refresh so React effects stay passive.
@@ -105,7 +106,9 @@ export default function UserSubscriptionsPanel() {
   }, []);
 
   const active = payload.active ?? [];
-  const history = payload.history ?? [];
+  const history = (payload.history ?? []).filter(
+    (item) => item.status !== "ACTIVE",
+  );
 
   return (
     <section className={styles.panel}>
@@ -227,11 +230,78 @@ export default function UserSubscriptionsPanel() {
         );
       })}
 
-      {history.length > 0 ? (
-        <div className={styles.historyNote}>
-          <i className="iconoir-history" />
-          {history.length} immutable activation record
-          {history.length === 1 ? "" : "s"} retained.
+      {!loading && history.length > 0 ? (
+        <div className={styles.historySection}>
+          <div className={styles.historyHeading}>
+            <div>
+              <span>IMMUTABLE ACTIVATION HISTORY</span>
+              <h4>Package History</h4>
+            </div>
+            <small>
+              {history.length} completed or terminal activation record
+              {history.length === 1 ? "" : "s"}
+            </small>
+          </div>
+
+          <div className={styles.historyList}>
+            {history.map((item) => (
+              <article className={styles.historyCard} key={item.id}>
+                <div className={styles.historyIdentity}>
+                  <div>
+                    <span>{item.packageCode}</span>
+                    <h5>{item.packageDisplayName}</h5>
+                  </div>
+                  <div className={styles.historyAmount}>
+                    <strong>
+                      {item.price} {item.currency}
+                    </strong>
+                    <small>{item.status}</small>
+                  </div>
+                </div>
+
+                <dl className={styles.historyDetails}>
+                  <div>
+                    <dt>Activated</dt>
+                    <dd>{dateLabel(item.activatedAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Scheduled end</dt>
+                    <dd>{dateLabel(item.scheduledEndAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Completed</dt>
+                    <dd>{dateLabel(item.completedAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Goal / cycle</dt>
+                    <dd>
+                      {item.goalDays}d / {item.cycleDays}d
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Principal treatment</dt>
+                    <dd>{enumLabel(item.principalTreatment)}</dd>
+                  </div>
+                  <div>
+                    <dt>Activation</dt>
+                    <dd>{enumLabel(item.activationTrigger)}</dd>
+                  </div>
+                </dl>
+
+                <small className={styles.source}>
+                  {item.sourceDepositId
+                    ? `Source deposit: ${item.sourceDepositId}`
+                    : `Source reinvestment: ${item.fundingLedgerTransactionId}`}
+                </small>
+              </article>
+            ))}
+          </div>
+
+          <div className={styles.historyNote}>
+            <i className="iconoir-history" />
+            Historical package snapshots are read-only and retained for account
+            traceability.
+          </div>
         </div>
       ) : null}
     </section>

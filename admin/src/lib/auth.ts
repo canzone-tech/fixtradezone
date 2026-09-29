@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 export const ACCESS_COOKIE = "ftz_admin_access";
 export const REFRESH_COOKIE = "ftz_admin_refresh";
 export const PASSWORD_CHANGE_COOKIE = "ftz_password_change";
+export const DEVICE_INSTALLATION_COOKIE = "ftz_device_installation";
+
+const DEVICE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 400;
+const DEVICE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type PortalRedirectPath = "/dashboard" | "/user/dashboard";
 
@@ -155,6 +160,12 @@ export function isCrossSiteRequest(request: NextRequest): boolean {
   return request.headers.get("sec-fetch-site") === "cross-site";
 }
 
+export function normalizeDeviceInstallationId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toLowerCase();
+  return DEVICE_ID_PATTERN.test(normalized) ? normalized : null;
+}
+
 function sharedCookieOptions() {
   return {
     httpOnly: true,
@@ -162,6 +173,19 @@ function sharedCookieOptions() {
     sameSite: "strict" as const,
     path: "/",
   };
+}
+
+export function setDeviceInstallationCookie(
+  response: NextResponse,
+  deviceInstallationId: string,
+): void {
+  const normalized = normalizeDeviceInstallationId(deviceInstallationId);
+  if (!normalized) return;
+
+  response.cookies.set(DEVICE_INSTALLATION_COOKIE, normalized, {
+    ...sharedCookieOptions(),
+    maxAge: DEVICE_COOKIE_MAX_AGE_SECONDS,
+  });
 }
 
 export function setAuthCookies(

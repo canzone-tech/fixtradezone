@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isStandaloneApp, markAppInstalled } from "@/lib/entry-experience";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -13,10 +14,7 @@ type InstallPromptWindow = Window & {
 };
 
 function isStandaloneMode(): boolean {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  );
+  return isStandaloneApp();
 }
 
 function isMobileLikeDevice(): boolean {
@@ -72,6 +70,10 @@ export default function AppPwa() {
   useEffect(() => {
     const installWindow = window as InstallPromptWindow;
 
+    if (isStandaloneMode()) {
+      markAppInstalled();
+    }
+
     if ("serviceWorker" in navigator) {
       void registerFullAppServiceWorker().catch((error: unknown) => {
         if (process.env.NODE_ENV !== "production") {
@@ -99,6 +101,7 @@ export default function AppPwa() {
 
     const handleInstalled = () => {
       installWindow.__ftzPwaInstallPrompt = null;
+      markAppInstalled();
       setInstallPrompt(null);
       setInstallAccepted(true);
     };
@@ -131,6 +134,7 @@ export default function AppPwa() {
     setInstallPrompt(null);
 
     if (choice.outcome === "accepted") {
+      markAppInstalled();
       setInstallAccepted(true);
     }
   }

@@ -1,3 +1,4 @@
+import SmartEntryGate from "@/components/auth/smart-entry-gate";
 import PublicSiteModeScreen from "@/components/platform/public-site-mode-screen";
 import { getPublicSiteModeStatus } from "@/lib/site-mode-server";
 import LiveHome, { generateMetadata as generateLiveMetadata } from "./live-home";
@@ -36,5 +37,9 @@ export default async function Home() {
     return <PublicSiteModeScreen status={status} />;
   }
 
-  return <LiveHome />;
+  return (
+    <SmartEntryGate>
+      <LiveHome />
+    </SmartEntryGate>
+  );
 }
