@@ -478,23 +478,26 @@ export class AuthService {
             deviceSignalEnabled: true,
           },
         });
+      const enforcementMode = duplicateConfig?.enforcementMode ?? 'OFF';
       const devicePolicyEnabled =
         (duplicateConfig?.deviceSignalEnabled ?? true) &&
-        (duplicateConfig?.enforcementMode ?? 'OFF') !== 'OFF';
+        enforcementMode !== 'OFF';
 
       if (devicePolicyEnabled) {
         if (!requestedDeviceInstallationId) {
-          if (!legacyBindingPending || storedDeviceInstallationId) {
-            await this.revokeSession(
-              session.userId,
-              session.id,
-              'SESSION_DEVICE_SIGNAL_MISSING',
-              context,
-            );
-            throw new UnauthorizedException(GENERIC_SESSION_ERROR);
-          }
+          if (enforcementMode !== 'MONITOR') {
+            if (!legacyBindingPending || storedDeviceInstallationId) {
+              await this.revokeSession(
+                session.userId,
+                session.id,
+                'SESSION_DEVICE_SIGNAL_MISSING',
+                context,
+              );
+              throw new UnauthorizedException(GENERIC_SESSION_ERROR);
+            }
 
-          usedLegacyBindingGrace = true;
+            usedLegacyBindingGrace = true;
+          }
         } else {
           const [mapping, duplicateDecision] = await Promise.all([
             this.prisma.userDeviceInstallation.findUnique({
@@ -514,7 +517,10 @@ export class AuthService {
             }),
           ]);
 
-          if (!mapping || duplicateDecision.blockLogin) {
+          if (
+            duplicateDecision.blockLogin ||
+            (enforcementMode !== 'MONITOR' && !mapping)
+          ) {
             await this.revokeSession(
               session.userId,
               session.id,
