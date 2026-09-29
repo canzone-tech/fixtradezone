@@ -13,7 +13,6 @@ import {
   SIMULATED_ACTIVITY_BATCH_LIMIT,
   SIMULATED_ACTIVITY_MAX_PER_DAY,
   simulatedActivitySourceKey,
-  type SimulatedActivityOutcome,
   type SimulatedTimingWindow,
 } from './simulated-activity.constants';
 
@@ -316,7 +315,9 @@ export class SimulatedActivityFinalDayRecoveryService {
     finalLocalDate: string,
     existingEvents: ExistingEventRow[],
   ): Promise<PolicyRow> {
-    const policyIds = [...new Set(existingEvents.map((event) => event.policyVersionId))];
+    const policyIds = [
+      ...new Set(existingEvents.map((event) => event.policyVersionId)),
+    ];
 
     if (policyIds.length > 1) {
       throw new ServiceUnavailableException(
@@ -395,11 +396,7 @@ export class SimulatedActivityFinalDayRecoveryService {
       );
     }
 
-    validateTimingWindows(
-      timingWindows,
-      activitiesPerDay,
-      minimumGapMinutes,
-    );
+    validateTimingWindows(timingWindows, activitiesPerDay, minimumGapMinutes);
 
     return {
       enabled: Boolean(policy.enabled),
@@ -408,10 +405,18 @@ export class SimulatedActivityFinalDayRecoveryService {
       assetSymbols,
       winWeight: policy.winWeight,
       lossWeight: policy.lossWeight,
-      winMinimumPercent: new Prisma.Decimal(policy.winMinimumPercent).toFixed(6),
-      winMaximumPercent: new Prisma.Decimal(policy.winMaximumPercent).toFixed(6),
-      lossMinimumPercent: new Prisma.Decimal(policy.lossMinimumPercent).toFixed(6),
-      lossMaximumPercent: new Prisma.Decimal(policy.lossMaximumPercent).toFixed(6),
+      winMinimumPercent: new Prisma.Decimal(policy.winMinimumPercent).toFixed(
+        6,
+      ),
+      winMaximumPercent: new Prisma.Decimal(policy.winMaximumPercent).toFixed(
+        6,
+      ),
+      lossMinimumPercent: new Prisma.Decimal(policy.lossMinimumPercent).toFixed(
+        6,
+      ),
+      lossMaximumPercent: new Prisma.Decimal(policy.lossMaximumPercent).toFixed(
+        6,
+      ),
       timingWindows,
     };
   }

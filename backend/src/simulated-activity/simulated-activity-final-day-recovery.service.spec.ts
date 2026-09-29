@@ -86,7 +86,7 @@ describe('SimulatedActivityFinalDayRecoveryService', () => {
     expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
 
     for (const call of prisma.$executeRaw.mock.calls) {
-      const sql = call[0] as { values?: unknown[] };
+      const sql = (call as unknown[])[0] as { values?: unknown[] };
       expect(sql.values).toContain(finalLocalDate);
       expect(sql.values).not.toContain('2026-09-29');
     }
