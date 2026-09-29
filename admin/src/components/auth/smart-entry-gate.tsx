@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
 import {
   hasAuthenticatedDeviceExperience,
   hasInstalledAppExperience,
@@ -15,6 +16,17 @@ interface SessionProbe {
     id?: string;
   };
   redirectTo?: string;
+}
+
+async function bootstrapDeviceContext(): Promise<void> {
+  const deviceInstallationId = await getOrCreateDeviceInstallationId();
+  await fetch("/api/auth/device-context", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deviceInstallationId }),
+    cache: "no-store",
+    credentials: "same-origin",
+  });
 }
 
 export default function SmartEntryGate({ children }: { children: ReactNode }) {
@@ -33,6 +45,10 @@ export default function SmartEntryGate({ children }: { children: ReactNode }) {
       const returning = hasAuthenticatedDeviceExperience();
 
       try {
+        await bootstrapDeviceContext();
+
+        if (cancelled) return;
+
         const response = await fetch("/api/user/session", {
           method: "GET",
           cache: "no-store",
