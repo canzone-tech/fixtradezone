@@ -64,9 +64,9 @@ describe('AuthService MONITOR-mode refresh', () => {
   const passwordService = {};
   const registrationService = {};
   const tokenService = {
-    verifyRefreshToken: jest.fn(),
-    hashRefreshToken: jest.fn(),
-    issueTokenPair: jest.fn(),
+    verifyRefreshToken: jest.fn<TokenService['verifyRefreshToken']>(),
+    hashRefreshToken: jest.fn<TokenService['hashRefreshToken']>(),
+    issueTokenPair: jest.fn<TokenService['issueTokenPair']>(),
   };
   const duplicateAccountService = {
     evaluateLogin: jest.fn(),
