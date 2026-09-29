@@ -11,6 +11,8 @@ permissions:
 jobs:
   repair:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: mysql://127.0.0.1:3306/fixtradezone_artifact
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
