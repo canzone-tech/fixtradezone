@@ -453,7 +453,9 @@ describe('AuthService', () => {
       enforcementMode: 'BLOCK',
       deviceSignalEnabled: true,
     });
-    prisma.userDeviceInstallation.findUnique.mockResolvedValue({ id: 'binding-id' });
+    prisma.userDeviceInstallation.findUnique.mockResolvedValue({
+      id: 'binding-id',
+    });
     duplicateAccountService.evaluateLogin.mockResolvedValue({
       enforcementMode: 'BLOCK',
       action: 'ALLOWED',
@@ -484,6 +486,8 @@ describe('AuthService', () => {
   });
 
   it('revokes a device-bound refresh session when presented from another device', async () => {
+    const revokedAt = new Date('2026-08-19T06:00:00.000Z');
+    jest.useFakeTimers().setSystemTime(revokedAt);
     prepareRefreshSession();
     prisma.$queryRaw.mockResolvedValue([
       {
@@ -505,11 +509,13 @@ describe('AuthService', () => {
         userId: activeUser.id,
         revokedAt: null,
       },
-      data: expect.objectContaining({
+      data: {
+        revokedAt,
         revocationReason: 'SESSION_DEVICE_MISMATCH',
-      }),
+      },
     });
     expect(tokenService.issueTokenPair).not.toHaveBeenCalled();
+    jest.useRealTimers();
   });
 
   it('rejects a legacy refresh claim when the requested device is no longer approved', async () => {

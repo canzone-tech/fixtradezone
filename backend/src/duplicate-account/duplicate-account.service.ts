@@ -466,7 +466,8 @@ export class DuplicateAccountService {
         });
 
         return {
-          message: 'User device policy removed. Default one-device limit applies.',
+          message:
+            'User device policy removed. Default one-device limit applies.',
         };
       },
       { isolationLevel: 'Serializable' },
@@ -989,7 +990,10 @@ export class DuplicateAccountService {
         await this.lockDevicePolicyMutation(transaction);
 
         const otherUsers = (
-          await this.findUsersForDeviceInTransaction(transaction, installationId)
+          await this.findUsersForDeviceInTransaction(
+            transaction,
+            installationId,
+          )
         ).filter((id) => id !== user.id);
         let canBind = otherUsers.length === 0;
         let reason: DuplicateAccountRiskReason | null =
@@ -1137,11 +1141,7 @@ export class DuplicateAccountService {
     const rows = await this.prisma.userDeviceInstallation.findMany({
       where: { userId },
       select: { installationId: true },
-      orderBy: [
-        { lastSeenAt: 'desc' },
-        { firstSeenAt: 'asc' },
-        { id: 'asc' },
-      ],
+      orderBy: [{ lastSeenAt: 'desc' }, { firstSeenAt: 'asc' }, { id: 'asc' }],
       take: 100,
     });
     return rows.map((row) => row.installationId);
@@ -1154,11 +1154,7 @@ export class DuplicateAccountService {
     const rows = await transaction.userDeviceInstallation.findMany({
       where: { userId },
       select: { installationId: true },
-      orderBy: [
-        { lastSeenAt: 'desc' },
-        { firstSeenAt: 'asc' },
-        { id: 'asc' },
-      ],
+      orderBy: [{ lastSeenAt: 'desc' }, { firstSeenAt: 'asc' }, { id: 'asc' }],
       take: 100,
     });
     return rows.map((row) => row.installationId);

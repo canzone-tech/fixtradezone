@@ -448,7 +448,9 @@ export class AuthService {
     }
 
     const authenticatedUser = toAuthenticatedUser(session.user);
-    const isSuperAdmin = authenticatedUser.roles.includes(SUPER_ADMIN_ROLE_NAME);
+    const isSuperAdmin = authenticatedUser.roles.includes(
+      SUPER_ADMIN_ROLE_NAME,
+    );
     const requestedDeviceInstallationId =
       dto.deviceInstallationId?.trim().toLowerCase() ?? null;
     const storedDeviceInstallationId = binding.deviceInstallationId;
@@ -532,10 +534,7 @@ export class AuthService {
 
           rotatedDeviceInstallationId = requestedDeviceInstallationId;
         }
-      } else if (
-        !storedDeviceInstallationId &&
-        requestedDeviceInstallationId
-      ) {
+      } else if (!storedDeviceInstallationId && requestedDeviceInstallationId) {
         rotatedDeviceInstallationId = requestedDeviceInstallationId;
       }
     } else if (!storedDeviceInstallationId && requestedDeviceInstallationId) {
@@ -748,7 +747,8 @@ export class AuthService {
             action: 'UPDATE',
             entityType: 'AuthSession',
             entityId: sessionId,
-            description: 'Refresh session revoked after a session security event.',
+            description:
+              'Refresh session revoked after a session security event.',
             metadata: {
               event: reason,
             },
