@@ -3,6 +3,7 @@ import { DuplicateAccountService } from './duplicate-account.service';
 
 const DEVICE_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_DEVICE_ID = '22222222-2222-4222-8222-222222222222';
+const THIRD_DEVICE_ID = '33333333-3333-4333-8333-333333333333';
 
 describe('DuplicateAccountService', () => {
   const prisma = {
@@ -15,6 +16,7 @@ describe('DuplicateAccountService', () => {
     userDeviceInstallation: {
       findMany: jest.fn(),
     },
+    $queryRaw: jest.fn(),
   };
 
   let service: DuplicateAccountService;
@@ -29,8 +31,18 @@ describe('DuplicateAccountService', () => {
     });
     prisma.duplicateAccountAllowlist.findFirst.mockResolvedValue(null);
     prisma.userDeviceInstallation.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
     service = new DuplicateAccountService(prisma as unknown as PrismaService);
   });
+
+  function blockMode() {
+    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
+      enforcementMode: 'BLOCK',
+      deviceSignalEnabled: true,
+      ipSignalEnabled: true,
+      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+    });
+  }
 
   it('allows a first-seen device when enforcement is OFF', async () => {
     await expect(
@@ -82,12 +94,7 @@ describe('DuplicateAccountService', () => {
   );
 
   it('fails registration closed in BLOCK mode when device identity is missing', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
 
     await expect(
       service.evaluateRegistration({
@@ -103,12 +110,7 @@ describe('DuplicateAccountService', () => {
   });
 
   it('never treats IP alone as conclusive duplicate identity', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
 
     const decision = await service.evaluateRegistration({
       deviceInstallationId: OTHER_DEVICE_ID,
@@ -125,12 +127,7 @@ describe('DuplicateAccountService', () => {
   });
 
   it('bypasses registration enforcement for an allowlisted device installation', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
     prisma.duplicateAccountAllowlist.findFirst.mockResolvedValueOnce({
       id: 'allow-id',
     });
@@ -153,12 +150,7 @@ describe('DuplicateAccountService', () => {
   });
 
   it('bypasses registration enforcement for an allowlisted IP without making IP an identity signal', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
     prisma.duplicateAccountAllowlist.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: 'ip-allow-id' });
@@ -182,12 +174,7 @@ describe('DuplicateAccountService', () => {
   });
 
   it('blocks a non-super-admin login when the device is linked to another account', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
     prisma.userDeviceInstallation.findMany.mockResolvedValue([
       { userId: 'other-user-id' },
     ]);
@@ -209,16 +196,31 @@ describe('DuplicateAccountService', () => {
     });
   });
 
-  it('allows login when the device is linked only to the same user', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
+  it('allows the first device for a normal user in BLOCK mode', async () => {
+    blockMode();
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      reason: null,
     });
-    prisma.userDeviceInstallation.findMany.mockResolvedValue([
-      { userId: 'current-user-id' },
-    ]);
+  });
+
+  it('allows login from the same approved device', async () => {
+    blockMode();
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([{ userId: 'current-user-id' }])
+      .mockResolvedValueOnce([{ installationId: DEVICE_ID }]);
 
     await expect(
       service.evaluateLogin({
@@ -231,16 +233,103 @@ describe('DuplicateAccountService', () => {
       blockLogin: false,
       bindDevice: true,
       matchedUserIds: [],
+      reason: null,
     });
   });
 
-  it('fails non-super-admin login closed in BLOCK mode when device identity is missing', async () => {
+  it('blocks a second device by default', async () => {
+    blockMode();
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ installationId: DEVICE_ID }]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: OTHER_DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      matchedUserIds: [],
+      reason: 'USER_DEVICE_LIMIT_REACHED',
+    });
+  });
+
+  it('allows a second device when an audited max-two policy exists', async () => {
+    blockMode();
+    prisma.$queryRaw.mockResolvedValue([{ maxDevices: 2 }]);
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ installationId: DEVICE_ID }]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: OTHER_DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'ALLOWED',
+      blockLogin: false,
+      bindDevice: true,
+      reason: null,
+    });
+  });
+
+  it('blocks a third device even when max-two policy exists', async () => {
+    blockMode();
+    prisma.$queryRaw.mockResolvedValue([{ maxDevices: 2 }]);
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { installationId: DEVICE_ID },
+        { installationId: OTHER_DEVICE_ID },
+      ]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: THIRD_DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'BLOCKED',
+      blockLogin: true,
+      bindDevice: false,
+      reason: 'USER_DEVICE_LIMIT_REACHED',
+    });
+  });
+
+  it('monitors but does not bind a device beyond the user limit in MONITOR mode', async () => {
     prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
+      enforcementMode: 'MONITOR',
       deviceSignalEnabled: true,
       ipSignalEnabled: true,
       updatedAt: new Date('2026-09-03T00:00:00.000Z'),
     });
+    prisma.userDeviceInstallation.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ installationId: DEVICE_ID }]);
+
+    await expect(
+      service.evaluateLogin({
+        userId: 'current-user-id',
+        isSuperAdmin: false,
+        deviceInstallationId: OTHER_DEVICE_ID,
+      }),
+    ).resolves.toMatchObject({
+      action: 'MONITORED',
+      blockLogin: false,
+      bindDevice: false,
+      reason: 'USER_DEVICE_LIMIT_REACHED',
+    });
+  });
+
+  it('fails non-super-admin login closed in BLOCK mode when device identity is missing', async () => {
+    blockMode();
 
     await expect(
       service.evaluateLogin({
@@ -257,12 +346,7 @@ describe('DuplicateAccountService', () => {
   });
 
   it('allows SUPER_ADMIN login on a conflicting device but marks the exemption for audit', async () => {
-    prisma.systemDuplicateAccountConfig.findUnique.mockResolvedValue({
-      enforcementMode: 'BLOCK',
-      deviceSignalEnabled: true,
-      ipSignalEnabled: true,
-      updatedAt: new Date('2026-09-03T00:00:00.000Z'),
-    });
+    blockMode();
     prisma.userDeviceInstallation.findMany.mockResolvedValue([
       { userId: 'other-user-id' },
     ]);
