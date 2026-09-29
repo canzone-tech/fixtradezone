@@ -4,6 +4,7 @@ import {
   type AdminUser,
   type AuthResponse,
   clearAuthCookies,
+  DEVICE_INSTALLATION_COOKIE,
   isAuthResponse,
   isAdministrator,
   isCrossSiteRequest,
@@ -36,6 +37,9 @@ export async function GET(request: NextRequest) {
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+  const deviceInstallationId = request.cookies.get(
+    DEVICE_INSTALLATION_COOKIE,
+  )?.value;
 
   try {
     if (accessToken) {
@@ -80,7 +84,10 @@ export async function GET(request: NextRequest) {
     const refreshResponse = await backendFetch("/auth/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({
+        refreshToken,
+        ...(deviceInstallationId ? { deviceInstallationId } : {}),
+      }),
     });
     const payload = await readJson(refreshResponse);
 
