@@ -1,3 +1,4 @@
+import LoginSessionGate from "@/components/auth/login-session-gate";
 import SiteModeBanner from "@/components/platform/site-mode-banner";
 
 export default function LoginAvailabilityLayout({
@@ -6,7 +7,7 @@ export default function LoginAvailabilityLayout({
   return (
     <>
       <SiteModeBanner />
-      {children}
+      <LoginSessionGate>{children}</LoginSessionGate>
     </>
   );
 }
