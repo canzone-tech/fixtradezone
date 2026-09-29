@@ -300,6 +300,8 @@ export class DuplicateAccountService {
 
     return this.prisma.$transaction(
       async (transaction) => {
+        await this.lockDevicePolicyMutation(transaction);
+
         const target = await transaction.user.findUnique({
           where: { id: userId },
           select: { id: true, email: true, username: true },
@@ -415,6 +417,8 @@ export class DuplicateAccountService {
 
     return this.prisma.$transaction(
       async (transaction) => {
+        await this.lockDevicePolicyMutation(transaction);
+
         const rows = await transaction.$queryRaw<UserDevicePolicyRow[]>`
           SELECT
             userId,
@@ -817,6 +821,8 @@ export class DuplicateAccountService {
         !user.roles.includes(SUPER_ADMIN_ROLE_NAME) &&
         decision.enforcementMode !== 'OFF'
       ) {
+        await this.lockDevicePolicyMutation(transaction);
+
         runtimeMatchedUserIds = (
           await this.findUsersForDeviceInTransaction(
             transaction,
@@ -980,6 +986,8 @@ export class DuplicateAccountService {
 
     return this.prisma.$transaction(
       async (transaction) => {
+        await this.lockDevicePolicyMutation(transaction);
+
         const otherUsers = (
           await this.findUsersForDeviceInTransaction(transaction, installationId)
         ).filter((id) => id !== user.id);
@@ -1052,6 +1060,23 @@ export class DuplicateAccountService {
       },
       { isolationLevel: 'Serializable' },
     );
+  }
+
+  private async lockDevicePolicyMutation(
+    transaction: Prisma.TransactionClient,
+  ): Promise<void> {
+    const rows = await transaction.$queryRaw<Array<{ id: number }>>`
+      SELECT id
+      FROM system_duplicate_account_config
+      WHERE id = ${CONFIG_ID}
+      FOR UPDATE
+    `;
+
+    if (rows.length !== 1) {
+      throw new ConflictException(
+        'Duplicate-account configuration is unavailable for device binding.',
+      );
+    }
   }
 
   private async findBypass(
