@@ -7,6 +7,7 @@ import SiteModeBanner from "@/components/platform/site-mode-banner";
 import IdleLock from "@/components/security/idle-lock";
 import LiveMarketOverview from "@/components/ui/live-market-overview";
 import { getOrCreateDeviceInstallationId } from "@/lib/device-installation";
+import { markAuthenticatedDeviceExperience } from "@/lib/entry-experience";
 import {
   isImpersonationSession,
   type UserPortalSession,
@@ -52,6 +53,8 @@ export default function UserShell({
 
   useEffect(() => {
     if (!deviceObservationUserId) return;
+
+    markAuthenticatedDeviceExperience();
 
     let cancelled = false;
 
