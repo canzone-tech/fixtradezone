@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { DuplicateAccountService } from './duplicate-account.service';
 
@@ -364,6 +365,52 @@ describe('DuplicateAccountService', () => {
       matchedUserIds: ['other-user-id'],
       reason: 'SUPER_ADMIN_EXEMPTION',
     });
+  });
+
+  it('serializes device binding before transaction-time race revalidation', async () => {
+    const lockQuery = jest.fn().mockResolvedValue([{ id: 1 }]);
+    const findMany = jest.fn().mockResolvedValue([{ userId: 'other-user-id' }]);
+    const upsert = jest.fn();
+    const transaction = {
+      $queryRaw: lockQuery,
+      userDeviceInstallation: {
+        findMany,
+        upsert,
+      },
+      duplicateAccountRiskEvent: {
+        create: jest.fn(),
+      },
+    } as unknown as Parameters<
+      DuplicateAccountService['recordSuccessfulLogin']
+    >[0];
+
+    await expect(
+      service.recordSuccessfulLogin(
+        transaction,
+        {
+          enforcementMode: 'BLOCK',
+          action: 'ALLOWED',
+          blockLogin: false,
+          bindDevice: true,
+          matchedUserIds: [],
+          deviceInstallationId: DEVICE_ID,
+          ipAddress: null,
+          reason: null,
+        },
+        {
+          id: 'current-user-id',
+          email: 'current@example.com',
+          roles: ['USER'],
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(lockQuery).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(lockQuery.mock.invocationCallOrder[0]).toBeLessThan(
+      findMany.mock.invocationCallOrder[0],
+    );
   });
 
   it('normalizes IPv4-mapped request addresses for risk readback', async () => {
