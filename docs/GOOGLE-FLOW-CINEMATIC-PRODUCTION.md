@@ -111,3 +111,15 @@ A ready-to-paste scene prompt must contain everything required for that individu
 ### Fast continuation phrase for a new chat
 
 > Read `docs/GOOGLE-FLOW-CINEMATIC-PRODUCTION.md` and `docs/MARKETING-TERMINOLOGY.md` on `docs/algorithm-generated-marketing-terminology` in `canzone-tech/fixtradezone`. Continue the currently approved FixTradeZone Flow cinematic video production **one 8-second scene at a time**, with the uploaded official `fixtradezone_final_logo.png`, Founder-requested (but claim-gated) phrase `Algorithm & AI-Based Trading Platform`, Flow-native voice, verified financial claims, and Founder approval after each clip. Do not start more prompts than requested.
+
+## 10. Video 1 — Scene 1 generation and Founder approval (2026-10-08)
+
+**APPROVED / COMPLETED — first attempt in Google Flow, 8 seconds, portrait 9:16.**
+
+- Founder supplied Google Flow player/timeline screenshots showing a midnight navy technology chamber, electric-cyan central lightning and particle buildup, cyan/purple rings and light beams, and a center-stage FixTradeZone logo hero reveal around seconds 5–8.
+- Founder feedback, verbatim: **"Bingo Perfect in first try bro with powerfull voice"**. Treat this as explicit approval of the **first generated intro scene's overall appearance and Flow-native narration**. Do not claim the assistant personally listened to the audio; approval is from the Founder.
+- The logo appears in the final screenshots centered above a stepped futuristic platform. The approx. 7–8s final frame is a glowing cyan logo square against a dark, hexagonal/geometric environment. Use this end-frame composition as the reference for Scene 2 continuation, not a new independent opening.
+- No local copy of the generated 8-second MP4 was supplied in this approval turn, only screenshots. Before precise final-frame extension, scene matching, or full audio QA, ask Founder to download/preserve and, if needed, upload the original Google Flow MP4. No external-sound merge is authorized.
+- Preserve the same **warm deep male cinema-narrator quality**, voice prominence, dramatic but subordinate score, cyan/navy/purple visual palette and established art direction. Exact voice identity on subsequent separate generations is not guaranteed; the Founder must review continuity and audio before approval.
+- **Next stage when Founder explicitly requests it:** one copy-paste-ready Video 1 / Scene 2 8-second prompt; match Scene 1's end-frame and include a short, fully intelligible Flow-native spoken line. Do not jump to Video 2 or generate multiple scenes without review.
+- Screenshot-only verification is insufficient for precise original PNG/logo pixel fidelity or independent confirmation of voice; those remain review checks for final master.
