@@ -133,3 +133,14 @@ A ready-to-paste scene prompt must contain everything required for that individu
 - Maintain the same approved Hollywood/alien-tech midnight-navy, cyan and subtle purple world, official `fixtradezone_final_logo.png`, premium male Flow-native voice and music-under-voice principle.
 - **Next stage only when Founder asks:** Video 1 / Scene 3 (8 seconds), an interconnected overview of packages, algorithm-generated daily activity, qualified earnings settlement, wallet, payout/reinvestment and referrals/rewards; pick a restrained subset for readable 8-second visuals. Request current last-frame/screenshot or source video if precise camera/visual continuity is required. Short spoken words must fit comfortably inside the clip. Use self-contained copy-paste prompt and do not invent returns, balances or AI trading capabilities.
 - Founder approval is based on direct Flow playback by the Founder, **not independent audio or MP4 verification by assistant**. Keep final export/voice/logotype QA pending.
+
+## 12. Video 1 — Scene 3 Founder approval and mandatory Trading-word correction (2026-10-08)
+
+**APPROVED / COMPLETED IN GOOGLE FLOW — Scene 3, 8 seconds, platform ecosystem.**
+
+- Founder directly reviewed generated Scene 3 and described it as **"perfect ban gaya"**.
+- Founder spotted an important **marketing wording omission**: Scene 3 showed/said **"Daily Activity"** but did **not** use the word **"Trading"** anywhere in that scene.
+- **Do not treat "Daily Activity" alone as the best final promotional explanation of trading.** The accurate preferred full product-process terminology remains **"Algorithm-Generated Trade Activity"**; **"Algorithm-Based Trading Technology"** is also acceptable as a truthful platform-technology phrase. A shorter public-facing **"Daily Trading Activity"** may be used only in context that explains the activity is generated internally, not broker/exchange execution.
+- **Founder has not requested a Scene 3 regeneration.** Preserve its approved visuals and Flow-native voice. Avoid wasting credits solely on one label; include the key word **"Trading"** naturally and prominently in **Scene 4's on-screen marketing copy and/or spoken line**, provided timing permits and it does not distort the product truth.
+- **Scene 4 is not yet generated or approved.** When Founder asks for its prompt, include explicit Trading reference, grand finale, exact original `fixtradezone_final_logo.png` hero, **LIVE NOW — fixtradezone.com** closing CTA, same Hollywood/alien-tech look and Flow-generated deep clear male narrator. Preserve cinematic visual/audio continuity from Scene 3's actual ending (request end-frame if needed); avoid false "AI engine", exchange execution, guaranteed returns or fabricated earnings.
+- Full joined-video mobile audio quality, smooth splices, original-logo fidelity, accurate typography and CTA spelling remain pending final QA.
