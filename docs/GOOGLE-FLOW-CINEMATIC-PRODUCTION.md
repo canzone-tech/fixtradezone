@@ -144,3 +144,14 @@ A ready-to-paste scene prompt must contain everything required for that individu
 - **Founder has not requested a Scene 3 regeneration.** Preserve its approved visuals and Flow-native voice. Avoid wasting credits solely on one label; include the key word **"Trading"** naturally and prominently in **Scene 4's on-screen marketing copy and/or spoken line**, provided timing permits and it does not distort the product truth.
 - **Scene 4 is not yet generated or approved.** When Founder asks for its prompt, include explicit Trading reference, grand finale, exact original `fixtradezone_final_logo.png` hero, **LIVE NOW — fixtradezone.com** closing CTA, same Hollywood/alien-tech look and Flow-generated deep clear male narrator. Preserve cinematic visual/audio continuity from Scene 3's actual ending (request end-frame if needed); avoid false "AI engine", exchange execution, guaranteed returns or fabricated earnings.
 - Full joined-video mobile audio quality, smooth splices, original-logo fidelity, accurate typography and CTA spelling remain pending final QA.
+
+## 13. Video 1 — Scene 4 Founder approval with duplicated end-card branding (2026-10-08)
+
+**FOUNDER-APPROVED SCENE 4, WITH MINOR FINAL-END-CARD COPY ISSUE TO REVIEW BEFORE PUBLISHING.**
+
+- The Founder reviewed Flow-generated Scene 4 and explicitly approved the scene's overall result ("approve to hai").
+- Reported defect: toward the end, **FixTradeZone appears twice**; the **second instance lacks `.com`**. The exact on-screen layout and whether the second text is replacing the intended URL are NOT independently verified; obtain a final-frame screenshot or source MP4 before choosing a correction.
+- Expected clean end frame: **exact unaltered original `fixtradezone_final_logo.png`** (its included wordmark is permitted), one short **`LIVE NOW`** label, and one clearly legible website CTA **`fixtradezone.com`**; **no extra loose `FixTradeZone` label without `.com`**. Do not duplicate an extra brand wordmark outside the original logo.
+- Founder has not requested regenerating or rejecting Scene 4. **Avoid automatically spending Flow credits.** First check screenshot: if correct URL already remains clearly visible and only a harmless logo wordmark is repeated, consider accepting. If the website is incorrect/missing or a confusing duplicate label is prominent, consider the minimal Flow editing/trimming/regeneration option subject to Founder approval and the UI's actual capabilities.
+- Keep **Google Flow native cinematic voice** and approved audio intact; any fix must avoid cutting speech or obscuring the CTA. Full compiled Video 1 (four approx. 8-second scenes, ~32s) still needs mobile playback and final upload/export QA.
+- The Founder has not approved beginning Video 2 yet. Save 1080p exported video for the approved first campaign before advancing.
