@@ -123,3 +123,13 @@ A ready-to-paste scene prompt must contain everything required for that individu
 - Preserve the same **warm deep male cinema-narrator quality**, voice prominence, dramatic but subordinate score, cyan/navy/purple visual palette and established art direction. Exact voice identity on subsequent separate generations is not guaranteed; the Founder must review continuity and audio before approval.
 - **Next stage when Founder explicitly requests it:** one copy-paste-ready Video 1 / Scene 2 8-second prompt; match Scene 1's end-frame and include a short, fully intelligible Flow-native spoken line. Do not jump to Video 2 or generate multiple scenes without review.
 - Screenshot-only verification is insufficient for precise original PNG/logo pixel fidelity or independent confirmation of voice; those remain review checks for final master.
+
+## 11. Video 1 — Scene 2 Founder approval and transition note (2026-10-08)
+
+**APPROVED / COMPLETED IN GOOGLE FLOW — Video 1, Scene 2, the 8-second technology/platform continuation.**
+
+- Founder feedback (translated faithfully from Hinglish): **Second scene is perfect**, but the connection/hook between Scene 1 and Scene 2 was **not entirely smooth**. Founder explicitly accepts the minor seam for now ("thoda sa hooks smoth nahi tha but chalega").
+- **Do not rewrite or regenerate Scenes 1–2 solely because of this minor seam.** Keep both as approved takes. At the final joined-video QA stage, inspect the splice; if useful and supported by available Flow timeline tools, a tiny overlap, match-on-motion or short audio crossfade may soften it **without losing speech or corrupting logo**. Do not promise a guaranteed seamless fix, assume external editing is permitted, or add unsupported audio tools.
+- Maintain the same approved Hollywood/alien-tech midnight-navy, cyan and subtle purple world, official `fixtradezone_final_logo.png`, premium male Flow-native voice and music-under-voice principle.
+- **Next stage only when Founder asks:** Video 1 / Scene 3 (8 seconds), an interconnected overview of packages, algorithm-generated daily activity, qualified earnings settlement, wallet, payout/reinvestment and referrals/rewards; pick a restrained subset for readable 8-second visuals. Request current last-frame/screenshot or source video if precise camera/visual continuity is required. Short spoken words must fit comfortably inside the clip. Use self-contained copy-paste prompt and do not invent returns, balances or AI trading capabilities.
+- Founder approval is based on direct Flow playback by the Founder, **not independent audio or MP4 verification by assistant**. Keep final export/voice/logotype QA pending.
