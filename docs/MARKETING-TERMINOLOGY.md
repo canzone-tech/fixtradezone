@@ -6,7 +6,9 @@ This document does not certify live feature availability or authorize UI/API/bus
 
 ## Positioning and approved terminology
 
-Describe FixTradeZone as an **internal algorithm-based trading platform/software** with a defined platform workflow:
+**Approved brand category: Algorithm-Based Trading Platform.** Do not prefix the public brand category, tagline, headline, or introductory marketing description with “Internal.” Technical descriptions of the settlement architecture may still identify internal processing when needed for accuracy.
+
+Describe the platform workflow as follows:
 
 1. **Algorithm-Generated Trade Activity** — daily activity generated and recorded by the internal algorithm.
 2. **Internal Trading and Earnings** — the financial interpretation/settlement of existing daily activity according to applicable package terms, platform rules, and limits.
@@ -27,7 +29,7 @@ Do not portray internal algorithm-generated activity as orders executed through 
 
 ### Preferred general copy
 
-> FixTradeZone is an internal algorithm-based trading platform built around daily algorithm-generated activity, package-based earnings settlement, wallet management, and payout or reinvestment options. Eligible earnings are credited according to applicable package terms and settlement rules. Users can request payouts or reinvest eligible balances in accordance with platform policies.
+> FixTradeZone is an algorithm-based trading platform built around daily algorithm-generated activity, package-based earnings settlement, wallet management, and payout or reinvestment options. Eligible earnings are credited according to applicable package terms and settlement rules. Users can request payouts or reinvest eligible balances in accordance with platform policies.
 
 ### Explanatory disclosure when context requires it
 
