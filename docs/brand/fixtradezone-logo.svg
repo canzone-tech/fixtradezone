@@ -1,0 +1,38 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>FixTradeZone — approved cyan hexagon brand mark</title>
+  <defs>
+    <linearGradient id="bgGrad" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07264E"/><stop offset="0.5" stop-color="#031833"/><stop offset="1" stop-color="#020F25"/>
+    </linearGradient>
+    <linearGradient id="strokeGrad" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#29F2FF"/><stop offset="0.55" stop-color="#17DDF3"/><stop offset="1" stop-color="#1AAFFF"/>
+    </linearGradient>
+    <linearGradient id="strokeGrad2" x1="260" y1="220" x2="780" y2="820" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6CFFFF"/><stop offset="0.45" stop-color="#18E8F2"/><stop offset="1" stop-color="#18BDEB"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="90" y="90" width="844" height="844" rx="132" fill="url(#bgGrad)"/>
+  <rect x="90" y="90" width="844" height="844" rx="132" stroke="url(#strokeGrad)" stroke-width="18" filter="url(#softGlow)"/>
+  <rect x="104" y="104" width="816" height="816" rx="118" stroke="#0CCFE8" stroke-opacity="0.55" stroke-width="6"/>
+  <polygon points="512,226 774,377 774,679 512,830 250,679 250,377" fill="none" stroke="#19E8F4" stroke-width="38" stroke-linejoin="miter" filter="url(#glow)" opacity="0.92"/>
+  <polygon points="512,226 774,377 774,679 512,830 250,679 250,377" fill="none" stroke="url(#strokeGrad2)" stroke-width="30" stroke-linejoin="miter"/>
+  <path d="M 390 386 V 701" stroke="#22E8F2" stroke-width="34" stroke-linecap="square" stroke-linejoin="miter" filter="url(#softGlow)"/>
+  <path d="M 390 386 H 640 L 698 386" stroke="#22E8F2" stroke-width="34" stroke-linecap="square" stroke-linejoin="miter" filter="url(#softGlow)"/>
+  <path d="M 390 515 H 627" stroke="#22E8F2" stroke-width="34" stroke-linecap="square" stroke-linejoin="miter" filter="url(#softGlow)"/>
+  <path d="M 610 515 L 760 408" stroke="#22E8F2" stroke-width="34" stroke-linecap="square" stroke-linejoin="miter" filter="url(#softGlow)"/>
+  <path d="M 610 515 L 760 641" stroke="#22E8F2" stroke-width="34" stroke-linecap="square" stroke-linejoin="miter" filter="url(#softGlow)"/>
+  <polygon points="512,226 774,377 760,390 512,246 264,390 250,377" fill="#9AFFFF" fill-opacity="0.18"/>
+  <polygon points="250,377 264,390 264,669 250,679" fill="#8FFFFF" fill-opacity="0.18"/>
+  <polygon points="774,377 760,390 760,669 774,679" fill="#8FFFFF" fill-opacity="0.18"/>
+  <polygon points="390,386 424,386 424,701 390,673" fill="#9DFFFF" fill-opacity="0.14"/>
+  <polygon points="390,386 698,386 668,406 424,406" fill="#9DFFFF" fill-opacity="0.16"/>
+  <polygon points="390,515 627,515 600,535 424,535" fill="#9DFFFF" fill-opacity="0.16"/>
+</svg>
