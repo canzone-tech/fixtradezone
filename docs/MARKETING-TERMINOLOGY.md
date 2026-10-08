@@ -54,3 +54,10 @@ Existing locked decisions in `docs/DECISIONS.md` (especially ADR-008 and ADR-027
 Any mandatory in-product label or business-rule changes require a separate, explicitly approved and versioned decision. No application code, migration, accounting data, or production settings are modified by this document.
 
 Do not market planned capabilities as already launched. In particular, ADR-027 excludes an AI Agents/trading-engine milestone from v1; old campaign drafts that imply it is live or committed to v1 must be corrected before publication.
+
+## Founder-requested Flow campaign positioning — 2026-10-08 (CLAIM GATE)
+
+- The Founder requested the exact marketing category string **`Algorithm & AI-Based Trading Platform`**, replacing the earlier `Algorithm-Based Trading Platform` wording **as a desired campaign direction**.
+- **This is not a verified live feature claim or an automatic approval to advertise an AI trading engine.** Locked ADR-027 currently excludes AI Agents / an AI trading engine in v1. Only describe the platform publicly as AI-based in a way that implies implemented trading functionality after that functionality and claim scope are substantiated, approved, and documented. Until then, use the verified `Algorithm-Based Trading Platform` classification for factual public claims, with AI-inspired visuals as creative direction.
+- **Google Flow production rules (including Founder preference for Flow-generated voice rather than separately merged Gemini audio), creative direction, exact official logo filename, four-video campaign plan, and new-chat handoff:** see [GOOGLE-FLOW-CINEMATIC-PRODUCTION.md](./GOOGLE-FLOW-CINEMATIC-PRODUCTION.md).
+- Google Flow Agent Instructions and the original `fixtradezone_final_logo.png` media reference were already set/uploaded by the Founder in Flow. **Do not start video 2 or later until Video 1 is approved; generate one 8-second intro scene at a time only when explicitly requested.** All later prompts must be self-contained and must not require manual facts blocks.
