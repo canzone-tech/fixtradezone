@@ -35,6 +35,16 @@ Do not portray internal algorithm-generated activity as orders executed through 
 
 > Trading activity is generated within FixTradeZone's internal system; it does not represent trades executed through an external broker or exchange. Displayed daily activity and settled wallet earnings are distinct. Payouts and reinvestment depend on eligible settled balances and applicable terms.
 
+## Marketing asset formats, links, and distribution — Founder-approved
+
+- **Facebook / Instagram image posts:** use PNG (or another platform-supported image format) for the poster. A URL printed inside a PNG is **not** an embedded clickable hyperlink; include the complete `https://fixtradezone.com` URL in the post caption as an actionable link where the platform makes it clickable. For paid advertisements, configure the platform's supported website destination and CTA button (for example, Learn More) rather than assuming text drawn into an image will be clickable.
+- **PDF brochures and documents:** when requested for WhatsApp, Telegram, email, or other document-sharing workflows, create a PDF that contains an actual clickable hyperlink to `https://fixtradezone.com` (not merely text that looks like a URL). The receiving app or PDF viewer controls whether the hyperlink is activated.
+- **QR codes:** optional on PNG or PDF when a scannable website destination adds value; verify the encoded URL.
+- **Format selection:** default to a Facebook-ready PNG for Facebook poster requests; provide a clickable-link PDF version **when requested or useful for the stated sharing context**. Do not automatically create both formats for every creative.
+- **File naming:** use descriptive, channel-specific names (for example, `FixTradeZone_Facebook_Wallet_Payout_Reinvestment_USDT_BEP20.png` and a matching `.pdf` when created); avoid `image.png`, `default`, or unexplained generated filenames.
+- **Brand/currency consistency:** use the Founder-approved original `fixtradezone_final_logo.png` as the unchanged logo source for assets, and use `USDT (BEP-20)` where the relevant wallet network is shown. Avoid unrelated currency symbols and wrong network labels. Do not substitute a recreated/generated logo.
+- **Truthful claims:** asset format and clickable-link choices do not change product truthfulness, eligibility, or platform advertising requirements.
+
 ## Current-state and governance boundaries
 
 The canonical trading checkpoint describes **Daily Trade = immutable source identity/result -> Internal Trading = financial interpretation/settlement**. Daily Trade generation alone has no direct wallet effect. Internal Trading owns financial settlement and package caps. The payout workflow separately validates eligibility and saved withdrawal destination.
