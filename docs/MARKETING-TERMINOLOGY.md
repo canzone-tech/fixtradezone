@@ -1,31 +1,44 @@
-# FixTradeZone — Marketing Terminology Preference
+# FixTradeZone — Marketing Terminology and Product Messaging
 
-Status: Founder-requested marketing copy standard, recorded 2026-10-08.
-Scope: Draft marketing content, campaign planning, public-facing promotional copy.
-This document does not certify feature availability or authorize application/UI/API changes.
+Status: Founder-confirmed marketing messaging clarification, 2026-10-08.
+Scope: Draft marketing content, campaign planning, and promotional copy.
+This document does not certify live feature availability or authorize UI/API/business-rule changes.
 
-## Preferred wording
+## Positioning and approved terminology
 
-Use **Algorithm-Generated Trade Activity** as the primary phrase when describing the relevant product concept in marketing materials.
+Describe FixTradeZone as an **internal algorithm-based trading platform/software** with a defined platform workflow:
 
-Avoid using **Simulated Trade Activity** or **SIMULATED RESULTS** as promotional headlines, campaign taglines, or general brand positioning.
+1. **Algorithm-Generated Trade Activity** — daily activity generated and recorded by the internal algorithm.
+2. **Internal Trading and Earnings** — the financial interpretation/settlement of existing daily activity according to applicable package terms, platform rules, and limits.
+3. **Wallet** — eligible settled amounts are recorded through the authoritative accounting flow.
+4. **Payout or Reinvestment** — eligible wallet amounts can be requested for payout or reinvested, subject to relevant policies and validations.
 
-## Accuracy and mandatory disclosure
+Prefer **Algorithm-Generated Trade Activity**, **Daily Earnings**, **Internal Trading**, **Wallet**, **Payout**, and **Reinvestment** where accurate.
 
-The preferred phrase is a naming convention, **not** a representation that users execute real trades. Plain-language explanations must make clear that algorithm-generated activity is not real-market trade execution, that generated results are not actual trading profits, and that the activity does not by itself establish withdrawable earnings.
+Avoid **Simulated Trade Activity** or **SIMULATED RESULTS** as promotional headlines, taglines, and general brand positioning. This preference does not authorize removal of required in-product labels or disclosures under existing locked decisions.
 
-Suggested explanatory copy:
+## Copy accuracy
 
-> Algorithm-generated trade activity is created within the platform; users do not execute corresponding trades on live markets. Displayed outcomes are not real trading profits or a guarantee of earnings.
+Do not write blanket claims that **all displayed outcomes are not real earnings** or **all platform balances cannot be withdrawn**. Those claims conflate display-only daily activity with separately settled financial entitlements and would inaccurately describe the documented wallet/payout workflow.
 
-Do not promote guaranteed income, investment returns, broker/exchange execution, real-market performance, or unverified product availability.
+Also do not claim that an algorithm-generated daily activity record **automatically** creates a payable balance. Daily activity is display-only until the authoritative Internal Trading settlement processes it. Eligible credits, caps, payout eligibility, reinvestment, and transaction status must reflect the actual platform rules.
 
-## Relationship to existing locked decisions
+Do not portray internal algorithm-generated activity as orders executed through an external exchange or brokerage. Do not promise guaranteed, fixed, risk-free, or unconditional daily returns. The Founder describes a daily profit/earnings business model; the precise obligations and permissible advertising claims require verification against applicable package contracts, payout policies, current implementation, and legal requirements.
 
-This document records the Founder's marketing terminology preference. It **does not silently amend or override** locked truthfulness/disclosure obligations in `docs/DECISIONS.md` (especially ADR-008 and ADR-027), the product's required labeling in applicable UI/results contexts, or any regulatory advertising requirement.
+### Preferred general copy
 
-Any change to mandatory in-product disclosure text, historical architectural decisions, or application behavior requires separate review, an explicit versioned decision, and appropriate verification.
+> FixTradeZone is an internal algorithm-based trading platform built around daily algorithm-generated activity, package-based earnings settlement, wallet management, and payout or reinvestment options. Eligible earnings are credited according to applicable package terms and settlement rules. Users can request payouts or reinvest eligible balances in accordance with platform policies.
 
-## Delivery status
+### Explanatory disclosure when context requires it
 
-Marketing-only documentation change. No runtime code, API contracts, data, migration, or production configuration changed. Live/current feature status must be verified against the repository before publication. In particular, historical draft marketing mentioning v1 AI Agents must not be reused: ADR-027 excludes that milestone.
+> Trading activity is generated within FixTradeZone's internal system; it does not represent trades executed through an external broker or exchange. Displayed daily activity and settled wallet earnings are distinct. Payouts and reinvestment depend on eligible settled balances and applicable terms.
+
+## Current-state and governance boundaries
+
+The canonical trading checkpoint describes **Daily Trade = immutable source identity/result -> Internal Trading = financial interpretation/settlement**. Daily Trade generation alone has no direct wallet effect. Internal Trading owns financial settlement and package caps. The payout workflow separately validates eligibility and saved withdrawal destination.
+
+Existing locked decisions in `docs/DECISIONS.md` (especially ADR-008 and ADR-027) still govern product truthfulness and required product labeling. This marketing document does not silently amend those decisions, change historical records, or permit presenting internally generated activity as real exchange execution.
+
+Any mandatory in-product label or business-rule changes require a separate, explicitly approved and versioned decision. No application code, migration, accounting data, or production settings are modified by this document.
+
+Do not market planned capabilities as already launched. In particular, ADR-027 excludes an AI Agents/trading-engine milestone from v1; old campaign drafts that imply it is live or committed to v1 must be corrected before publication.
