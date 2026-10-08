@@ -42,6 +42,23 @@
 - Vertical **9:16**, intended export **1080 × 1920**. Prefer Flow/Veo **8-second** scenes, one generation at a time while optimizing credits; confirm options/pricing/limits in the actual UI, do not promise constant capabilities. Export/framerate can be standardized after approval if Flow output differs.
 - Build scenes to stitch together **without visible break**: persistent palette, coherent stage/world, matching lighting, consistent camera direction, compatible movement/energy motif, exact first/last frame continuity, no fade-to-black between clips unless narratively deliberate. Use reference last-frame/extend features if present; verify actual Flow UI functionality.
 
+## 4A. Mandatory end-card centering and mobile-safe typography — Founder-approved
+
+**Applies to ALL future FixTradeZone marketing videos, Google Flow generation and review, not just the first launch reel.**
+
+- The final **logo / its original wordmark / `LIVE NOW` / `fixtradezone.com` must share ONE exact horizontal centerline** of the vertical 9:16 frame. Their visual centers must all be at approximately **50% of the canvas width**, with symmetric left/right padding and balanced vertical spacing.
+- **Never align final CTA labels to the left or right of the logo**; center-align text and objects independently. Avoid any drifting, scaling, mismatched baselines, angled text, tilted wordmarks or asymmetric positioning during the final hold.
+- Preserve **the official unaltered `fixtradezone_final_logo.png`** and its wordmark without modifying, retyping, distorting or recreating it. **Do not add a second detached `FixTradeZone` brand line** if the logo already contains the wordmark.
+- Make every line **fully visible inside a mobile-safe title area**, with **at least ~8% horizontal inset on both sides**, plus clear top/bottom padding against platform UI; scale the logo and longer text DOWN proportionately to fit rather than allowing the first/last letters or `.com` to be cut off at the right/left screen edge.
+- Keep the website **exactly `fixtradezone.com`** in one readable line, not `FixTradeZone`, a truncated `fixtradezone`, misspelled text or a broken/wrapped domain. Keep `LIVE NOW` clean, small but legible above the website.
+- Use a stable final-frame **hold long enough to read both CTA labels** on a phone. Preserve the approved Hollywood/alien-tech/navy-cyan visual identity, but reduce competing light streaks behind important text.
+- General title cards and spoken section callouts should be aligned deliberately; **when a graphic is supposed to be centered, check its true optical center**, including margins and safe area. This rule does not force every intermediate scene element to be center-aligned where the shot intentionally has a different composition.
+- **Every self-contained prompt for an end card MUST include this instruction verbatim:**
+
+  > FINAL CTA CENTER-ALIGNMENT: Keep the original unaltered FixTradeZone logo and its built-in wordmark, LIVE NOW, and fixtradezone.com vertically stacked and perfectly center-aligned on the same x=50% axis of the 9:16 canvas. Make all lettering completely visible within generous symmetric safe margins (minimum approximately 8% left and right). No duplicated FixTradeZone text, no missing .com, no cropped letters, no off-center logo or URL. Hold the completed composition steady and readable to the final frame.
+
+- **Mandatory last-frame visual QA:** review 1) logo exactness and its built-in wordmark; 2) all lines' horizontal center; 3) generous symmetric side margins; 4) intact correct `.com`; 5) no duplicated text; 6) readability at actual mobile size; 7) voice completion without clipping. A centered URL alone is insufficient if the logo/brand wordmark is shifted or cropped.
+
 ## 5. Voice is generated INSIDE Google Flow — Founder correction (supersedes prior plan)
 
 **Founder-locked preference, 2026-10-08:** **Generate both voice narration and visuals in Google Flow itself.** Do **not** plan a separate Gemini AI Studio TTS WAV and later audio merge as the default, since Founder reports that separate audio merging caused problems.
@@ -179,3 +196,10 @@ A ready-to-paste scene prompt must contain everything required for that individu
 - Earlier Scene 4 issues were Team Rewards speech/title sync and duplicate `FixTradeZone` lower text instead of `fixtradezone.com`. Founder described the updated joined film as "baki perfect"; **do not assert the exact corrected final CTA is verified by the assistant without seeing new exported frames or video**. At final export review, specifically check the exact `LIVE NOW` and `fixtradezone.com` visual text.
 - **Do not regenerate approved scenes merely for a slight join jerk; retain the accepted Flow-native voice.** If the actual Google Flow scene UI exposes a transition control, optionally test only a very short subtle blend/match-on-motion around the Scene 1/2 boundary, making sure no audio double-voice, clipping, logo ghosting or black frame is introduced. Do not claim Flow exposes a dedicated crossfade control unless observed. Otherwise leave the acceptable join and preserve the approved 32-second video.
 - Preserve original 1080p downloads and perform a final complete listen/watch pass before publishing: voice clarity, continuity, CTA text, accurate logo and mobile 9:16 framing. Next detailed promotional video is a separate Founder-approved step.
+
+## 17. Launch Video 1 — Founder identified end-card center-alignment defect (2026-10-08)
+
+- Founder shared a **WhatsApp playback screenshot of the corrected 32-second video** showing an original cyan hexagonal logo, `LIVE NOW` and correctly spelled `fixtradezone.com`, with the main **FixTradeZone wordmark appearing too far right / potentially clipped at the edge**. Founder requests all logo/text components be **perfectly centered** for future campaigns.
+- Record the above **§4A as a mandatory prompt and final-frame QA gate** starting with the next video. Do not retroactively regenerate the currently accepted intro or expend credits solely for cosmetic alignment without Founder request.
+- Prior known issue of missing/duplicated end-card URL appears corrected in the supplied new screenshot (`fixtradezone.com` visibly present), but centered mobile-safe layout still needs attention in future productions.
+- Preserve Flow-native voice and existing approved video; no code, API, business-rule, PR, or main-branch change requested.
