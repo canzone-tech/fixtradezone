@@ -20,6 +20,7 @@ import {
   packageUserNetRateForDate,
 } from './internal-trading-package-earnings';
 import { InternalTradingTradeService } from './internal-trading-trade.service';
+import { InternalTradingV2TradeService } from './internal-trading-v2-trade.service';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 const MAX_RECONCILE_DAYS = 1500;
@@ -129,7 +130,10 @@ interface BalanceSideRow {
 export class CanonicalInternalTradingTradeService {
   private readonly legacyTradeService: InternalTradingTradeService;
 
-  constructor(private readonly canonicalPrisma: PrismaService) {
+  constructor(
+    private readonly canonicalPrisma: PrismaService,
+    private readonly v2TradeService: InternalTradingV2TradeService,
+  ) {
     this.legacyTradeService = new InternalTradingTradeService(canonicalPrisma);
   }
 
@@ -181,6 +185,17 @@ export class CanonicalInternalTradingTradeService {
     context: RequestContext = {},
     generationSource: 'WORKER' | 'RECONCILIATION' = 'RECONCILIATION',
   ) {
+    const versions = await this.canonicalPrisma.$queryRaw<Array<{
+      financialModelVersion: 'V1' | 'V2';
+    }>>(Prisma.sql`
+      SELECT financialModelVersion FROM internal_trade_subscription_states
+      WHERE subscriptionId = ${subscriptionId} LIMIT 1
+    `);
+    if (versions[0]?.financialModelVersion === 'V2') {
+      return this.v2TradeService.reconcileSubscription(
+        subscriptionId, actor, context, generationSource,
+      );
+    }
     if (await this.requiresLegacyContinuation(subscriptionId)) {
       return this.legacyTradeService.reconcileSubscription(
         subscriptionId,
