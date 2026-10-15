@@ -9,7 +9,7 @@ import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import type { AdminInternalTradingStateQueryDto } from './dto/internal-trading-lifecycle.dto';
-import { derivePackageLifetimeTarget } from './internal-trading-package-earnings';
+import { addLocalDays, derivePackageLifetimeTarget } from './internal-trading-package-earnings';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -51,6 +51,7 @@ interface CountRow {
 
 interface InternalTradeStateRow {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   userId: string;
   splitPolicyVersionId: string;
   packagePlanVersionId: string;
@@ -217,20 +218,34 @@ export class InternalTradingLifecycleService {
         subscription.activatedAt,
         subscription.settlementTimezone,
       );
-      const target = derivePackageLifetimeTarget({
-        subscriptionId: subscription.id,
-        principalAmount: principal,
-        userSharePercent: subscription.internalTradeUserSharePercent,
-        activationLocalDate,
-        earningDays: subscription.goalDays,
-        rewardRateMode: subscription.rewardRateMode,
-        fixedRewardRate: subscription.fixedRewardRate,
-        minimumRewardRate: subscription.minimumRewardRate,
-        maximumRewardRate: subscription.maximumRewardRate,
-        rewardRateMeaning: subscription.rewardRateMeaning,
-      });
+      // Forward-only opt-in: existing subscriptions retain their V1 lifetime
+      // target. New V2 subscriptions never precompute a duration-long target.
+      const v2Enabled = process.env.FTZ_INTERNAL_TRADING_V2_ENABLED === 'true';
+      const target = v2Enabled
+        ? {
+            firstEarningLocalDate: addLocalDays(activationLocalDate, 1),
+            finalEarningLocalDate: addLocalDays(
+              activationLocalDate,
+              subscription.goalDays,
+            ),
+            userNetTarget: new Prisma.Decimal(0),
+            grossTarget: new Prisma.Decimal(0),
+            grossMultiplier: new Prisma.Decimal(1),
+          }
+        : derivePackageLifetimeTarget({
+            subscriptionId: subscription.id,
+            principalAmount: principal,
+            userSharePercent: subscription.internalTradeUserSharePercent,
+            activationLocalDate,
+            earningDays: subscription.goalDays,
+            rewardRateMode: subscription.rewardRateMode,
+            fixedRewardRate: subscription.fixedRewardRate,
+            minimumRewardRate: subscription.minimumRewardRate,
+            maximumRewardRate: subscription.maximumRewardRate,
+            rewardRateMeaning: subscription.rewardRateMeaning,
+          });
 
-      if (target.grossTarget.lte(0)) {
+      if (!v2Enabled && target.grossTarget.lte(0)) {
         throw new ConflictException(
           'Internal trading gross target must be positive.',
         );
@@ -239,6 +254,7 @@ export class InternalTradingLifecycleService {
       await transaction.$executeRaw(Prisma.sql`
         INSERT INTO internal_trade_subscription_states (
           subscriptionId,
+          financialModelVersion,
           userId,
           splitPolicyVersionId,
           packagePlanVersionId,
@@ -266,6 +282,7 @@ export class InternalTradingLifecycleService {
           updatedAt
         ) VALUES (
           ${subscription.id},
+          ${v2Enabled ? 'V2' : 'V1'},
           ${subscription.userId},
           ${subscription.internalTradeSplitPolicyVersionId},
           ${subscription.packagePlanVersionId},
@@ -326,7 +343,8 @@ export class InternalTradingLifecycleService {
           metadata: {
             source: 'INTERNAL_TRADING',
             operation: 'INITIALIZE_SUBSCRIPTION',
-            targetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
+            targetBasis: v2Enabled ? 'PACKAGE_DAILY_NET_GROSS_RATE' : 'PACKAGE_USER_NET_DAILY_RATE',
+            financialModelVersion: v2Enabled ? 'V2' : 'V1',
             subscriptionId: subscription.id,
             userId: subscription.userId,
             splitPolicyVersionId:
@@ -440,6 +458,7 @@ export class InternalTradingLifecycleService {
   private stateSnapshot(row: InternalTradeStateRow) {
     return {
       subscriptionId: row.subscriptionId,
+      financialModelVersion: row.financialModelVersion,
       userId: row.userId,
       splitPolicyVersionId: row.splitPolicyVersionId,
       packagePlanVersionId: row.packagePlanVersionId,
