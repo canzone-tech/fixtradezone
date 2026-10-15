@@ -11,6 +11,7 @@ import { SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type {
   AdminSimulatedActivityEventQueryDto,
@@ -567,11 +568,13 @@ export class SimulatedActivityService {
 
   async getMyActivity(userId: string, query: SimulatedActivityPageQueryDto) {
     const skip = (query.page - 1) * query.limit;
+    const dateFilter = historyDateFilter(Prisma.sql`localActivityDate`, query);
     const rows = await this.prisma.$queryRaw<EventRow[]>(Prisma.sql`
       SELECT *
       FROM simulated_trade_activity_events
       WHERE userId = ${userId}
         AND scheduledAt <= UTC_TIMESTAMP(3)
+        ${dateFilter}
       ORDER BY scheduledAt DESC, id DESC
       LIMIT ${query.limit} OFFSET ${skip}
     `);
@@ -580,6 +583,7 @@ export class SimulatedActivityService {
       FROM simulated_trade_activity_events
       WHERE userId = ${userId}
         AND scheduledAt <= UTC_TIMESTAMP(3)
+        ${dateFilter}
     `);
     const activeRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total

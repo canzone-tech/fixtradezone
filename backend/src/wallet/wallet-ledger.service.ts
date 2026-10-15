@@ -8,6 +8,7 @@ import {
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type {
   AdminLedgerQueryDto,
@@ -176,6 +177,7 @@ export class WalletLedgerService {
     );
 
     const skip = (query.page - 1) * query.limit;
+    const dateFilter = historyDateFilter(Prisma.sql`activity_rows.postedAt`, query);
     const activity = await this.prisma.$queryRaw<
       WalletActivityRow[]
     >(Prisma.sql`
@@ -237,6 +239,7 @@ export class WalletLedgerService {
         LEFT JOIN ledger_transactions lt ON lt.id = twe.ledgerTransactionId
         WHERE twe.userId = ${userId}
       ) activity_rows
+      WHERE 1=1 ${dateFilter}
       ORDER BY activity_rows.postedAt DESC, activity_rows.sortAt DESC
       LIMIT ${query.limit} OFFSET ${skip}
     `);
@@ -244,9 +247,10 @@ export class WalletLedgerService {
     const countRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
       FROM (
-        SELECT le.id AS activityId
+        SELECT le.id AS activityId, lt.postedAt AS postedAt
         FROM ledger_entries le
         INNER JOIN ledger_accounts la ON la.id = le.accountId
+        INNER JOIN ledger_transactions lt ON lt.id = le.transactionId
         WHERE la.ownerType = 'USER'
           AND la.ownerUserId = ${userId}
           AND la.bucket IN (
@@ -255,10 +259,13 @@ export class WalletLedgerService {
 
         UNION ALL
 
-        SELECT twe.id AS activityId
+        SELECT twe.id AS activityId,
+          COALESCE(lt.postedAt, twe.createdAt) AS postedAt
         FROM user_total_wallet_events twe
+        LEFT JOIN ledger_transactions lt ON lt.id = twe.ledgerTransactionId
         WHERE twe.userId = ${userId}
       ) activity_rows
+      WHERE 1=1 ${dateFilter}
     `);
 
     return {

@@ -8,6 +8,7 @@ import {
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type {
   InternalTradingEventQueryDto,
@@ -875,7 +876,7 @@ export class InternalTradingTradeService {
 
     const dateFilter = query.localDate
       ? Prisma.sql`AND localTradeDate = ${query.localDate}`
-      : Prisma.empty;
+      : historyDateFilter(Prisma.sql`localTradeDate`, query);
 
     const rows = await this.prisma.$queryRaw<EventRow[]>(Prisma.sql`
       SELECT *
