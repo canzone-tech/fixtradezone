@@ -49,6 +49,7 @@ interface Policy {
 
 interface StateRow {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   userId: string;
   username?: string;
   email?: string | null;
@@ -795,7 +796,7 @@ export default function InternalTradingAdminClient() {
                     </span>
                   </td>
                   <td>{money(state.principalAmount, state.currency)}</td>
-                  <td>{money(state.grossTarget, state.currency)}</td>
+                  <td>{state.financialModelVersion === 'V2' ? 'Daily NET (V2)' : money(state.grossTarget, state.currency)}</td>
                   <td>{money(state.grossNetProgress, state.currency)}</td>
                   <td>{money(state.grossHighWaterMark, state.currency)}</td>
                   <td>{money(state.userCreditedAmount, state.currency)}</td>
@@ -841,14 +842,23 @@ export default function InternalTradingAdminClient() {
                 <dt>Principal</dt>
                 <dd>{money(selected.principalAmount, selected.currency)}</dd>
               </div>
-              <div>
-                <dt>Multiplier</dt>
-                <dd>{selected.grossMultiplier}x</dd>
-              </div>
-              <div>
-                <dt>Gross target</dt>
-                <dd>{money(selected.grossTarget, selected.currency)}</dd>
-              </div>
+              {selected.financialModelVersion === 'V1' ? (
+                <>
+                  <div>
+                    <dt>Multiplier (legacy V1)</dt>
+                    <dd>{selected.grossMultiplier}x</dd>
+                  </div>
+                  <div>
+                    <dt>Gross target (legacy V1)</dt>
+                    <dd>{money(selected.grossTarget, selected.currency)}</dd>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <dt>Trading model</dt>
+                  <dd>V2 — independent daily NET / manual profit claim</dd>
+                </div>
+              )}
               <div>
                 <dt>Gross progress</dt>
                 <dd>{money(selected.grossNetProgress, selected.currency)}</dd>
