@@ -585,6 +585,7 @@ export default function InternalTradingAdminClient() {
               </label>
               <select
                 id="ftz-internal-trading-financial-model"
+                className={styles.select}
                 value={form.financialModelVersion}
                 disabled={!isSuperAdmin || !draft || busy}
                 onChange={(event) =>
