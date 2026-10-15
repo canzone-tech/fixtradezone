@@ -28,3 +28,92 @@ Working branch: `feat/daily-net-trading-claims-history-pagination`. Do not merge
 8. Tests required before enabling V2: exactly 5 slots and sum-of-P&L at 8 decimal amount precision; min-one-WIN-last; no duplicated claims under concurrency; pending claim after package completes; split snapshot immutability; 0 wallet credit before claim; admin share and 3-ledger-entry balance after claim; client history reflects same canonical source; worker restart/resume and idempotent replay.
 
 **Financial cutover is a separate checkpoint**, not included in this initial pagination commit. Test API first on local Postman before implementing/enabling next module; never auto-deploy to main.
+
+
+---
+
+## V2 implementation checkpoint (2026-10-15)
+
+**Code committed to the working branch. NOT YET VERIFIED or production-approved.**
+V2 financial migration and all features require local build, database integration,
+and direct-USER browser acceptance. Do NOT raise a PR to main until approved.
+
+### Versioning / cutover
+- V1 existing ACTIVE/COMPLETED subscriptions remain V1; immutable trade/ledger rows are untouched.
+- After local migration `0049_internal_trading_v2_daily_claims`, opt-in
+  `FTZ_INTERNAL_TRADING_V2_ENABLED=true` **on the local backend only**.
+  New INTERNAL_TRADING subscription activation then stores financialModelVersion=V2,
+  with zero lifetime target, not a projected total. Setting the variable never
+  migrates existing funded subscriptions.
+- Default V2 switch is OFF. Do not enable in production without review.
+- Existing V1 target/reconciliation and published policy columns remain for
+  historical processing; only new V2 trading ignores legacy WIN/LOSS weights/ranges.
+- The effective canonical `simulated_activity_policy_versions` policy must have
+  exactly five slots and timezone equal to subscription's trading timezone.
+- Daily gross rate interpretation is **net-of-loss BEFORE 70/30 split** for V2.
+  Legacy packages tagged `USER_NET_AFTER_SPLIT` have a different commercial
+  interpretation: review published package disclosures and secure business/legal
+  sign-off before enabling V2 outside QA.
+
+### V2 processing boundaries
+1. The algorithm picks daily signed NET gross rate per subscription/day from immutable
+   FIXED or RANDOM_RANGE package values, and independently allocates exactly 5
+   WIN/LOSS percent results summing to that rate (six-percent-decimal precision).
+   Four LOSS then one WIN is enforced if a day has only one WIN. Fixed technical
+   loss magnitudes constrain internal simulation so the day can reconcile.
+2. Simulated Activity records each scheduled canonical event; V2 financial
+   reconciliation records its signed 8-decimal amount with settlementMode
+   `CLAIM_PENDING`, **zero ledger posting per trade**.
+3. After all five events, signed gross trading profit is split with activated
+   USER/ADMIN share snapshot, and one immutable daily claim is stored in PENDING.
+4. `POST /internal-trading/me/claims/:claimId/claim` acquires a claim row lock;
+   only the authenticated actual USER may claim (administrator impersonation is
+   blocked). Transactional balanced ledger posting credits USER PACKAGE_EARNINGS
+   and SYSTEM ADMIN profit only once, with a unique ledger sourceKey.
+5. No expiration: PENDING survives package completion. The principal return
+   lifecycle remains separate.
+6. The user Trading page lists daily claim cards/status and one Claim Profit action.
+   The Wallet page shows the posted ledger only after claiming.
+
+### LOCAL acceptance order: UI first (no Postman required)
+
+**Do not run migrations against a production database or with unknown DATABASE_URL.**
+The untracked `backups/` directory should not be removed; consider a separate
+database backup before any migration.
+
+1. Fetch branch from the local Git remote `prashant` and verify checkout.
+   Run backend `npm run build`, frontend `npm run typecheck` and `npm run build`.
+   Also run `npm test -- --runInBand` locally before approving finance changes.
+2. Stop both local app processes. Verify the backend `DATABASE_URL` points
+   to a disposable local QA database; then `cd backend && npm run db:status`,
+   review migration, and `npm run db:deploy`. Restart backend with
+   `FTZ_INTERNAL_TRADING_V2_ENABLED=true` **only after migration applies cleanly**.
+3. Create a NEW funded local QA INTERNAL_TRADING subscription after enabling V2.
+   Existing historical V1 subscriptions remain V1. Use packages whose displayed
+   daily percentage range is intended to mean gross NET trading P&L.
+4. Browser direct QA USER session: `/user/trading` and `/user/trade-activity`.
+   Each day exactly 5 canonical trades in chronological slots; WIN > 0, LOSS < 0.
+   Sum signed trade P&L to a daily result within published package range.
+   The fifth trade must finish before a pending claim exists.
+5. Before clicking Claim Profit inspect `/user/wallet`: PACKAGE_EARNINGS
+   and Total Wallet must remain unchanged by new V2 trades.
+6. After five slots become due, direct USER clicks Claim Profit:
+   exactly one PACKAGE_EARNINGS wallet posting and split reflected in state,
+   status changes to Claimed. Reload/retry/duplicate submissions must not credit
+   twice. ADMIN impersonation can read claims but cannot click the button.
+7. Check delayed login/unclaimed days and claims after package completion; wallet
+   credit only after each claim, no expiry. Verify principal completion/return
+   independently and preserve V1 existing completed subscription histories.
+8. Explicitly test worker restarts, mixed V1/V2 packages, and concurrency before
+   declaring this financially sensitive feature ready.
+
+### Blockers before production
+- Full local migrations, local UI, worker, concurrency and financial regression
+  tests have NOT been run by the assistant. Do not interpret commits as passing.
+- The older Simulated Activity worker only generates from the effective *current*
+  policy/day. Long multi-day outages may leave historical V2 canonical days
+  ungenerated. Implement and test safe backfill/recovery before production rollout.
+- The package rate label/meaning must be aligned with V2 gross-before-split
+  economics before any user-facing activation.
+- Do not auto-convert existing V1 subscribed assets to V2. Require a separate
+  migration plan and user approval if ever requested.
