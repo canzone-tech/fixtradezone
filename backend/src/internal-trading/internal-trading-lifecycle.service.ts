@@ -43,6 +43,7 @@ interface SubscriptionLifecycleRow {
 
 interface PolicyIdRow {
   id: string;
+  financialModelVersion: 'V1' | 'V2';
 }
 
 interface CountRow {
@@ -199,7 +200,7 @@ export class InternalTradingLifecycleService {
       }
 
       const policyRows = await transaction.$queryRaw<PolicyIdRow[]>(Prisma.sql`
-        SELECT id
+        SELECT id, financialModelVersion
         FROM internal_trade_policy_versions
         WHERE id = ${subscription.internalTradeSplitPolicyVersionId}
           AND status = 'PUBLISHED'
@@ -218,9 +219,18 @@ export class InternalTradingLifecycleService {
         subscription.activatedAt,
         subscription.settlementTimezone,
       );
-      // Forward-only opt-in: existing subscriptions retain their V1 lifetime
-      // target. New V2 subscriptions never precompute a duration-long target.
-      const v2Enabled = process.env.FTZ_INTERNAL_TRADING_V2_ENABLED === 'true';
+      // The model is the immutable activation-time snapshot of the existing
+      // SUPER_ADMIN-published Trading Policy, NOT an environment-flag choice.
+      // The environment flag only acts as an emergency V2 safety gate.
+      const v2Enabled = policyRows[0].financialModelVersion === 'V2';
+      if (
+        v2Enabled &&
+        process.env.FTZ_INTERNAL_TRADING_V2_ENABLED !== 'true'
+      ) {
+        throw new ServiceUnavailableException(
+          'V2 activations are paused by the backend safety gate.',
+        );
+      }
       const target = v2Enabled
         ? {
             firstEarningLocalDate: addLocalDays(activationLocalDate, 1),
