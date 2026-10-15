@@ -23,7 +23,7 @@ interface PendingCompletionRow {
 interface CompletionStateRow {
   subscriptionId: string;
   status: 'ACTIVE' | 'COMPLETED' | 'BLOCKED';
-  completionReason: 'TARGET_REACHED_AT_DURATION_END' | null;
+  completionReason: 'TARGET_REACHED_AT_DURATION_END' | 'DURATION_ELAPSED' | null;
   principalAmount: Prisma.Decimal | string | number;
   completedAt: Date | null;
 }
@@ -78,7 +78,7 @@ export class InternalTradingPackageCompletionService {
       INNER JOIN user_package_subscriptions ups
         ON ups.id = s.subscriptionId
       WHERE s.status = 'COMPLETED'
-        AND s.completionReason = 'TARGET_REACHED_AT_DURATION_END'
+        AND s.completionReason IN ('TARGET_REACHED_AT_DURATION_END', 'DURATION_ELAPSED')
         AND ups.status = 'ACTIVE'
       ORDER BY s.completedAt ASC, s.subscriptionId ASC
       LIMIT ${safeLimit}
@@ -142,7 +142,8 @@ export class InternalTradingPackageCompletionService {
 
       if (
         state.status !== 'COMPLETED' ||
-        state.completionReason !== 'TARGET_REACHED_AT_DURATION_END' ||
+        (state.completionReason !== 'TARGET_REACHED_AT_DURATION_END' &&
+          state.completionReason !== 'DURATION_ELAPSED') ||
         !state.completedAt
       ) {
         return {
