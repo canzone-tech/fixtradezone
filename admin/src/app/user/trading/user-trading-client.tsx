@@ -9,7 +9,7 @@ import HistoryControls, {
   type HistoryQuery,
 } from "@/components/user/history-controls";
 import { formatPlatformDate } from "@/lib/platform-time";
-import type { UserPortalSession } from "@/lib/user-session";
+import { isImpersonationSession, type UserPortalSession } from "@/lib/user-session";
 import styles from "../../internal-trading/internal-trading.module.css";
 
 interface ApiMessage {
@@ -19,6 +19,7 @@ interface ApiMessage {
 
 interface TradingPackage {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   packageCode: string;
   packageDisplayName: string;
   currency: string;
@@ -41,6 +42,26 @@ interface TradingPackage {
 
 interface PackagesPayload extends ApiMessage {
   packages: TradingPackage[];
+}
+
+interface DailyClaim {
+  id: string;
+  subscriptionId: string;
+  localTradeDate: string;
+  currency: string;
+  dailyGrossRatePercent: string;
+  dailyNetGrossAmount: string;
+  userSharePercent: string;
+  userAmount: string;
+  status: 'PENDING' | 'CLAIMED';
+  tradeCount: number;
+  claimedAt: string | null;
+}
+
+interface ClaimsPayload extends ApiMessage {
+  pendingCount: number;
+  pendingAmount: string;
+  claims: DailyClaim[];
 }
 
 interface TradeEvent {
@@ -129,6 +150,9 @@ export default function UserTradingClient() {
   const [events, setEvents] = useState<TradeEvent[]>([]);
   const [eventsTotal, setEventsTotal] = useState(0);
   const [history, setHistory] = useState<HistoryQuery>(INITIAL_HISTORY_QUERY);
+  const [claims, setClaims] = useState<DailyClaim[]>([]);
+  const [claimBusy, setClaimBusy] = useState("");
+  const [claimNotice, setClaimNotice] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -148,6 +172,20 @@ export default function UserTradingClient() {
     () => packages.filter((item) => item.status === "ACTIVE").length,
     [packages],
   );
+
+  const loadClaims = useCallback(async () => {
+    const response = await fetch('/api/user/internal-trading/claims?page=1&limit=100', {
+      cache: 'no-store',
+    });
+    const payload = await json<ClaimsPayload>(response);
+    if (response.ok && payload) {
+      setClaims(payload.claims);
+      return;
+    }
+    if (response.status !== 404) {
+      throw new Error(messageFrom(payload, 'Unable to load daily claims.'));
+    }
+  }, []);
 
   const loadEvents = useCallback(
     async (subscriptionId: string, query: HistoryQuery) => {
@@ -233,6 +271,7 @@ export default function UserTradingClient() {
           const id = packagePayload.packages[0].subscriptionId;
           setSelectedId(id);
         }
+        await loadClaims();
       } catch (caught) {
         if (mounted) {
           setError(
@@ -249,7 +288,7 @@ export default function UserTradingClient() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, loadClaims]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -274,6 +313,34 @@ export default function UserTradingClient() {
       cancelled = true;
     };
   }, [selectedId, history, loadEvents]);
+
+  async function claimProfit(claim: DailyClaim) {
+    if (!session || isImpersonationSession(session) || claimBusy) return;
+    setClaimBusy(claim.id);
+    setError('');
+    setClaimNotice('');
+    try {
+      const response = await fetch(
+        `/api/user/internal-trading/claims/${encodeURIComponent(claim.id)}/claim`,
+        { method: 'POST', cache: 'no-store' },
+      );
+      const payload = await json<ApiMessage>(response);
+      if (!response.ok) {
+        throw new Error(messageFrom(payload, 'Daily profit claim failed.'));
+      }
+      await loadClaims();
+      const packageResponse = await fetch('/api/user/internal-trading/packages', {
+        cache: 'no-store',
+      });
+      const updated = await json<PackagesPayload>(packageResponse);
+      if (packageResponse.ok && updated) setPackages(updated.packages);
+      setClaimNotice('Daily profit has been credited to Package Earnings wallet.');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Daily claim failed.');
+    } finally {
+      setClaimBusy('');
+    }
+  }
 
   function selectPackage(subscriptionId: string) {
     setError("");
@@ -315,6 +382,11 @@ export default function UserTradingClient() {
             {error}
           </div>
         ) : null}
+        {claimNotice ? (
+          <div className={styles.alert} data-tone="success">
+            {claimNotice}
+          </div>
+        ) : null}
 
         <section className={styles.stats}>
           <div className={styles.stat}>
@@ -343,7 +415,7 @@ export default function UserTradingClient() {
 
           <div className={styles.stat}>
             <small>Settlement model</small>
-            <strong>Legacy immediate settlement</strong>
+            <strong>{selected?.financialModelVersion === 'V2' ? 'Daily manual claim' : 'Legacy immediate settlement'}</strong>
           </div>
         </section>
 
@@ -381,7 +453,7 @@ export default function UserTradingClient() {
                   </div>
 
                   <div>
-                    <small>Progress</small>
+                    <small>Cumulative trading P&L</small>
                     <strong>
                       {money(item.grossNetProgress, item.currency)}
                     </strong>
@@ -433,12 +505,12 @@ export default function UserTradingClient() {
                 </div>
 
                 <div>
-                  <dt>Current progress</dt>
+                  <dt>Cumulative signed trading P&L</dt>
                   <dd>{money(selected.grossNetProgress, selected.currency)}</dd>
                 </div>
 
                 <div>
-                  <dt>Progress high-water</dt>
+                  <dt>Recorded high-water</dt>
                   <dd>
                     {money(selected.grossHighWaterMark, selected.currency)}
                   </dd>
@@ -488,15 +560,80 @@ export default function UserTradingClient() {
           </section>
         ) : null}
 
+        {selected?.financialModelVersion === 'V2' ? (
+          <section className={styles.card}>
+            <div className={styles.cardHeader}>
+              <div>
+                <h3>Daily Profit Claims</h3>
+                <p className={styles.muted}>
+                  Exactly five algorithm-generated trades complete each daily result.
+                  USER share becomes available after day completion and never expires.
+                  Your wallet is credited only after you claim.
+                </p>
+              </div>
+            </div>
+            {claims.filter((claim) => claim.subscriptionId === selectedId).length === 0 ? (
+              <div className={styles.empty}>No completed daily claims yet.</div>
+            ) : (
+              <div className={styles.tableWrap}>
+                <table className={styles.table}>
+                  <thead>
+                    <tr>
+                      <th>Day (UTC)</th>
+                      <th>Trades</th>
+                      <th>Daily NET gross</th>
+                      <th>My share</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claims.filter((claim) => claim.subscriptionId === selectedId).map((claim) => (
+                      <tr key={claim.id}>
+                        <td>{claim.localTradeDate}</td>
+                        <td>{claim.tradeCount}/5</td>
+                        <td>{money(claim.dailyNetGrossAmount, claim.currency)}
+                          <span className={styles.muted}> ({claim.dailyGrossRatePercent}%)</span>
+                        </td>
+                        <td className={styles.moneyPositive}>{money(claim.userAmount, claim.currency)}</td>
+                        <td>{claim.status}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className={styles.buttonSecondary}
+                            disabled={claim.status === 'CLAIMED' || Boolean(claimBusy) || Boolean(session && isImpersonationSession(session))}
+                            onClick={() => void claimProfit(claim)}
+                          >
+                            {claim.status === 'CLAIMED'
+                              ? 'Claimed'
+                              : claimBusy === claim.id
+                                ? 'Claiming…'
+                                : 'Claim Profit'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {session && isImpersonationSession(session) ? (
+              <p className={styles.muted}>
+                Financial claims are disabled during administrator impersonation.
+                Sign in as the account owner to claim.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         <section className={styles.card}>
           <div className={styles.cardHeader}>
             <div>
               <h3>Trade History</h3>
               <p className={styles.muted}>
-                Trade result shows package performance. Package Earnings credit
-                shows only the amount actually posted for that trade. A positive
-                result can have no additional credit once the applicable earning
-                target has already been satisfied.
+                {selected?.financialModelVersion === 'V2'
+                  ? 'Algorithm-generated signed trade P&L is recorded here. No per-trade wallet credit occurs; daily profit is credited only on Claim Profit.'
+                  : 'Historical V1 trade results and prior wallet settlements are shown unchanged.'}
               </p>
             </div>
 
@@ -522,7 +659,7 @@ export default function UserTradingClient() {
                   <th>%</th>
                   <th>Gross result</th>
                   <th>Progress</th>
-                  <th>Package Earnings credit</th>
+                  <th>{selected?.financialModelVersion === 'V2' ? 'Wallet credit (claim-based)' : 'Package Earnings credit'}</th>
                 </tr>
               </thead>
 
@@ -554,7 +691,7 @@ export default function UserTradingClient() {
                       <td>{event.grossProgressAfter}</td>
                       <td className={styles.moneyPositive}>
                         {event.userShareAmount}
-                        {!hasAdditionalCredit && Number(event.grossResultAmount) > 0 ? (
+                        {selected?.financialModelVersion !== 'V2' && !hasAdditionalCredit && Number(event.grossResultAmount) > 0 ? (
                           <>
                             <br />
                             <span className={styles.muted}>No additional credit</span>
