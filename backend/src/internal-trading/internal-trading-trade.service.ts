@@ -104,6 +104,7 @@ interface PolicyRow {
 }
 
 interface EventRow {
+  financialModelVersion: 'V1' | 'V2';
   id: string;
   sourceKey: string;
   subscriptionId: string;
