@@ -11,6 +11,7 @@ import { SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { v2DailyTradePlan } from '../internal-trading/internal-trading-v2-plan';
 import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type {
@@ -79,6 +80,11 @@ interface PolicyRow {
 
 interface SubscriptionRow {
   id: string;
+  financialModelVersion: 'V1' | 'V2' | null;
+  rewardRateMode: 'FIXED' | 'RANDOM_RANGE' | 'MANUAL' | 'RULE_BASED';
+  fixedRewardRate: DecimalValue | null;
+  minimumRewardRate: DecimalValue | null;
+  maximumRewardRate: DecimalValue | null;
   userId: string;
   packagePlanVersionId: string;
   packagePlanItemId: string;
@@ -959,6 +965,31 @@ export class SimulatedActivityService {
           ? activityStartAt
           : policy.effectiveFrom;
 
+      if (
+        subscription.financialModelVersion === 'V2' &&
+        (config.activitiesPerDay !== 5 ||
+          policy.timezoneSnapshot !== subscription.settlementTimezone)
+      ) {
+        throw new ServiceUnavailableException(
+          'V2 requires exactly five canonical slots in the subscription timezone.',
+        );
+      }
+
+      const v2Plan =
+        subscription.financialModelVersion === 'V2'
+          ? v2DailyTradePlan({
+              subscriptionId: subscription.id,
+              localTradeDate: localActivityDate,
+              terms: {
+                rewardRateMode: subscription.rewardRateMode,
+                fixedRewardRate: subscription.fixedRewardRate,
+                minimumRewardRate: subscription.minimumRewardRate,
+                maximumRewardRate: subscription.maximumRewardRate,
+              },
+              activitiesPerDay: config.activitiesPerDay,
+            })
+          : null;
+
       let createdEvents = 0;
       let alreadyPresent = 0;
       let skippedNotDue = 0;
@@ -975,7 +1006,7 @@ export class SimulatedActivityService {
           localActivityDate,
           slotNumber,
         );
-        const slot = deterministicSimulatedSlot({
+        const baseSlot = deterministicSimulatedSlot({
           sourceKey,
           localActivityDate,
           slotNumber,
@@ -991,6 +1022,14 @@ export class SimulatedActivityService {
           timingWindows: config.timingWindows,
           timezoneSnapshot: policy.timezoneSnapshot,
         });
+        const v2Slot = v2Plan?.slots[slotNumber - 1];
+        const slot = v2Slot
+          ? {
+              ...baseSlot,
+              outcome: v2Slot.outcome,
+              resultPercent: v2Slot.resultPercent,
+            }
+          : baseSlot;
 
         if (slot.scheduledAt < anchor || slot.scheduledAt > asOf) {
           skippedNotDue += 1;
@@ -1113,11 +1152,17 @@ export class SimulatedActivityService {
     const lock = forUpdate ? Prisma.sql`FOR UPDATE` : Prisma.empty;
     const rows = await client.$queryRaw<SubscriptionRow[]>(Prisma.sql`
       SELECT
-        id, userId, packagePlanVersionId, packagePlanItemId,
-        packageCode, packageDisplayName, status, activatedAt, scheduledEndAt,
-        settlementTimezone, rewardStartMode
-      FROM user_package_subscriptions
-      WHERE id = ${subscriptionId}
+        ups.id, ups.userId, ups.packagePlanVersionId, ups.packagePlanItemId,
+        ups.packageCode, ups.packageDisplayName,
+        ups.status, ups.activatedAt, ups.scheduledEndAt,
+        ups.settlementTimezone, ups.rewardStartMode,
+        ups.rewardRateMode, ups.fixedRewardRate,
+        ups.minimumRewardRate, ups.maximumRewardRate,
+        its.financialModelVersion
+      FROM user_package_subscriptions ups
+      LEFT JOIN internal_trade_subscription_states its
+        ON its.subscriptionId = ups.id
+      WHERE ups.id = ${subscriptionId}
       LIMIT 1
       ${lock}
     `);
