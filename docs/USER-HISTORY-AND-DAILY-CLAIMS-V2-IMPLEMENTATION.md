@@ -27,7 +27,7 @@ Working branch: `feat/daily-net-trading-claims-history-pagination`. Do not merge
 7. Existing funded ACTIVE/COMPLETED package ledgers and V1 rows must **not** be rewritten. Add versioned per-subscription model and migration with explicit cutover; same source event must not settle in legacy/canonical and V2.
 8. Tests required before enabling V2: exactly 5 slots and sum-of-P&L at 8 decimal amount precision; min-one-WIN-last; no duplicated claims under concurrency; pending claim after package completes; split snapshot immutability; 0 wallet credit before claim; admin share and 3-ledger-entry balance after claim; client history reflects same canonical source; worker restart/resume and idempotent replay.
 
-**Financial cutover uses the versioned V2 implementation below**. The first pagination commit alone did not contain these financial changes. Test API first on local Postman before implementing/enabling next module; never auto-deploy to main.
+**Financial cutover uses the versioned V2 implementation below**. The first pagination commit alone did not contain these financial changes. Test the complete flow on the local browser and backend worker; never auto-deploy to main.
 
 
 ---
@@ -40,17 +40,26 @@ and direct-USER browser acceptance. Do NOT raise a PR to main until approved.
 
 ### Versioning / cutover
 - V1 existing ACTIVE/COMPLETED subscriptions remain V1; immutable trade/ledger rows are untouched.
-- After local migration `0049_internal_trading_v2_daily_claims`, opt-in
-  `FTZ_INTERNAL_TRADING_V2_ENABLED=true` **on the local backend only**.
-  New INTERNAL_TRADING subscription activation then stores financialModelVersion=V2,
-  with zero lifetime target, not a projected total. Setting the variable never
-  migrates existing funded subscriptions.
+- After local migrations `0049_internal_trading_v2_daily_claims` and
+  `0050_internal_trading_policy_financial_model`, the existing SUPER_ADMIN
+  **Internal Trading Policy Draft -> Save -> Publish** workflow selects
+  financialModelVersion V1 or V2. No new publishing endpoint/button.
+- Existing published policies acquire **V1 by default**, without changing
+  their published terms. A cloned draft starts with the source policy's model.
+- Once a SUPER_ADMIN publishes an **enabled V2** policy, it becomes effective
+  on the normal next safe trading-day boundary. Only newly activated eligible
+  subscriptions that snapshot that effective policy become V2; old ACTIVE
+  and COMPLETED subscriptions retain their original V1 state.
+- `FTZ_INTERNAL_TRADING_V2_ENABLED=true` is a second **safety gate**, not
+  the engine selector: turning it on while a V1 policy remains published
+  does not activate V2. Turning it OFF when a V2 policy is effective blocks
+  NEW V2 activations rather than silently creating V1 financial terms.
 - Default V2 switch is OFF. Do not enable in production without review.
 - Existing V1 target/reconciliation and published policy columns remain for
   historical processing; only new V2 trading ignores legacy WIN/LOSS weights/ranges.
 - The effective canonical `simulated_activity_policy_versions` policy must have
   exactly five slots and timezone equal to subscription's trading timezone.
-- Daily gross rate interpretation is **net-of-loss BEFORE 70/30 split** for V2.
+- Daily gross rate interpretation is **net-of-loss BEFORE the published policy USER/ADMIN split** for V2.
   Legacy packages tagged `USER_NET_AFTER_SPLIT` have a different commercial
   interpretation: review published package disclosures and secure business/legal
   sign-off before enabling V2 outside QA.
@@ -86,25 +95,30 @@ database backup before any migration.
    Also run `npm test -- --runInBand` locally before approving finance changes.
 2. Stop both local app processes. Verify the backend `DATABASE_URL` points
    to a disposable local QA database; then `cd backend && npm run db:status`,
-   review migration, and `npm run db:deploy`. Restart backend with
-   `FTZ_INTERNAL_TRADING_V2_ENABLED=true` **only after migration applies cleanly**.
-3. Create a NEW funded local QA INTERNAL_TRADING subscription after enabling V2.
+   review migration 0050, and `npm run db:deploy` once approved.
+3. Restart the backend with `FTZ_INTERNAL_TRADING_V2_ENABLED=true`
+   **only in local QA**. From the existing SUPER_ADMIN Internal Trading screen,
+   Create Draft -> select V2 -> Save Draft -> Publish for Next Trading Day.
+   Confirm the published Daily Trades policy has exactly five activities/day
+   and the same platform timezone. A published V2 policy will not take effect
+   until the normal future effective trading-day boundary.
+4. Create a NEW funded local QA INTERNAL_TRADING subscription **after V2 policy becomes effective**.
    Existing historical V1 subscriptions remain V1. Use packages whose displayed
    daily percentage range is intended to mean gross NET trading P&L.
-4. Browser direct QA USER session: `/user/trading` and `/user/trade-activity`.
+5. Browser direct QA USER session: `/user/trading` and `/user/trade-activity`.
    Each day exactly 5 canonical trades in chronological slots; WIN > 0, LOSS < 0.
    Sum signed trade P&L to a daily result within published package range.
    The fifth trade must finish before a pending claim exists.
-5. Before clicking Claim Profit inspect `/user/wallet`: PACKAGE_EARNINGS
+6. Before clicking Claim Profit inspect `/user/wallet`: PACKAGE_EARNINGS
    and Total Wallet must remain unchanged by new V2 trades.
-6. After five slots become due, direct USER clicks Claim Profit:
+7. After five slots become due, direct USER clicks Claim Profit:
    exactly one PACKAGE_EARNINGS wallet posting and split reflected in state,
    status changes to Claimed. Reload/retry/duplicate submissions must not credit
    twice. ADMIN impersonation can read claims but cannot click the button.
-7. Check delayed login/unclaimed days and claims after package completion; wallet
+8. Check delayed login/unclaimed days and claims after package completion; wallet
    credit only after each claim, no expiry. Verify principal completion/return
    independently and preserve V1 existing completed subscription histories.
-8. Explicitly test worker restarts, mixed V1/V2 packages, and concurrency before
+9. Explicitly test worker restarts, mixed V1/V2 packages, and concurrency before
    declaring this financially sensitive feature ready.
 
 ### Blockers before production
@@ -117,3 +131,15 @@ database backup before any migration.
   economics before any user-facing activation.
 - Do not auto-convert existing V1 subscribed assets to V2. Require a separate
   migration plan and user approval if ever requested.
+
+### SUPER_ADMIN published model checklist (0050)
+- Existing policy versioning, Publish endpoint, auth guard, revision checks, audit
+  logs and effective-date scheduling remain authoritative.
+- V2 drafts require `activitiesPerDay=5`. Publish checks the effective
+  simulated activity policy for **enabled**, **five canonical slots** and a
+  **matching timezone**; misconfiguration fails closed.
+- V1 drafts/policies retain historical slot allowances and legacy settlement.
+- A failed V2 activation due to the backend gate or unsupported package reward
+  mode must roll back the package activation transaction; no V1 fallback.
+- Existing 0049 migration was already applied locally before 0050 was authored.
+  Apply 0050 separately on local QA after code/build review; never on production.
