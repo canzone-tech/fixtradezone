@@ -12,6 +12,11 @@ import { InternalTradingTradeService } from './internal-trading-trade.service';
 import { InternalTradingService } from './internal-trading.service';
 import { InternalTradingWorkerService } from './internal-trading-worker.service';
 import { InternalTradingV2TradeService } from './internal-trading-v2-trade.service';
+import { InternalTradingDailyClaimService } from './internal-trading-daily-claim.service';
+import {
+  InternalTradingClaimsReadController,
+  InternalTradingClaimsWriteController,
+} from './internal-trading-claim.controller';
 
 @Module({
   imports: [PlatformConfigModule, RedisModule],
@@ -20,10 +25,13 @@ import { InternalTradingV2TradeService } from './internal-trading-v2-trade.servi
     AdminInternalTradingLifecycleController,
     AdminInternalTradingTradeController,
     InternalTradingController,
+    InternalTradingClaimsReadController,
+    InternalTradingClaimsWriteController,
   ],
   providers: [
     InternalTradingService,
     InternalTradingV2TradeService,
+    InternalTradingDailyClaimService,
     InternalTradingLifecycleService,
     InternalTradingPackageCompletionService,
     {
