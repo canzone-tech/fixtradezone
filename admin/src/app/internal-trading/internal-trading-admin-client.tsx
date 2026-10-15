@@ -30,6 +30,7 @@ interface Policy {
   status: "DRAFT" | "PUBLISHED";
   revision: number;
   enabled: boolean;
+  financialModelVersion: "V1" | "V2";
   activitiesPerDay: number;
   assetSymbols: string[];
   winWeight: number;
@@ -114,6 +115,7 @@ interface EventsPayload {
 
 interface FormState {
   enabled: boolean;
+  financialModelVersion: "V1" | "V2";
   activitiesPerDay: string;
   assetSymbols: string;
   winWeight: string;
@@ -130,6 +132,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   enabled: true,
+  financialModelVersion: "V1",
   activitiesPerDay: "5",
   assetSymbols: "BTC/USDT, ETH/USDT, SOL/USDT",
   winWeight: "3",
@@ -187,6 +190,7 @@ function parseWindows(value: string): TimingWindow[] {
 function formFor(policy: Policy): FormState {
   return {
     enabled: policy.enabled,
+    financialModelVersion: policy.financialModelVersion,
     activitiesPerDay: String(policy.activitiesPerDay),
     assetSymbols: formatAssetSymbols(policy.assetSymbols).join(", "),
     winWeight: String(policy.winWeight),
@@ -446,6 +450,7 @@ export default function InternalTradingAdminClient() {
             expectedRevision: draft.revision,
             reason: form.reason || "Update internal trading policy.",
             enabled: form.enabled,
+            financialModelVersion: form.financialModelVersion,
             activitiesPerDay: 5,
             assetSymbols: form.assetSymbols
               .split(/[,\n]+/)
@@ -574,6 +579,30 @@ export default function InternalTradingAdminClient() {
           </div>
 
           <div className={styles.formGrid}>
+            <div className={styles.fieldWide}>
+              <label htmlFor="ftz-internal-trading-financial-model">
+                Financial model (new subscriptions only)
+              </label>
+              <select
+                id="ftz-internal-trading-financial-model"
+                value={form.financialModelVersion}
+                disabled={!isSuperAdmin || !draft || busy}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    financialModelVersion: event.target.value as "V1" | "V2",
+                  }))
+                }
+              >
+                <option value="V1">V1 — Existing automatic settlement</option>
+                <option value="V2">V2 — Five Daily Trades + Claim Profit</option>
+              </select>
+              <p className={styles.muted}>
+                Uses the existing Draft → Save → Publish workflow. Publishing
+                applies from the next effective trading day, only to new package
+                activations. Existing subscriptions keep their original model.
+              </p>
+            </div>
             <label className={styles.checkbox}>
               <input
                 type="checkbox"
@@ -713,6 +742,10 @@ export default function InternalTradingAdminClient() {
               <div>
                 <dt>Version</dt>
                 <dd>V{published.versionNumber}</dd>
+              </div>
+              <div>
+                <dt>Financial model</dt>
+                <dd>{published.financialModelVersion} {published.financialModelVersion === "V2" ? "(Claim Profit)" : "(automatic)"}</dd>
               </div>
               <div>
                 <dt>Trades / day</dt>
