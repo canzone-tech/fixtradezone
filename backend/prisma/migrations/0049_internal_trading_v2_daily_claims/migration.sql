@@ -73,7 +73,7 @@ ALTER TABLE `internal_trade_events`
         (`settlementMode` = 'CLAIM_PENDING'
           AND `financialModelVersion` = 'V2'
           AND `grossSettlementAmount` = 0
-          AND `ledgerTransactionId` IS NULL)
+          )
         OR (`financialModelVersion` = 'V1'
           AND (
             ((`settlementMode` IS NULL OR `settlementMode` = 'HIGH_WATER')
@@ -128,7 +128,7 @@ CREATE TABLE `internal_trade_daily_claims` (
     AND `tradeCount` = 5
   ),
   CONSTRAINT `itd_daily_claim_status_check` CHECK (
-    (`status` = 'PENDING' AND `ledgerTransactionId` IS NULL AND `claimedAt` IS NULL)
-    OR (`status` = 'CLAIMED' AND `ledgerTransactionId` IS NOT NULL AND `claimedAt` IS NOT NULL)
+    (`status` = 'PENDING' AND `claimedAt` IS NULL)
+    OR (`status` = 'CLAIMED' AND `claimedAt` IS NOT NULL)
   )
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
