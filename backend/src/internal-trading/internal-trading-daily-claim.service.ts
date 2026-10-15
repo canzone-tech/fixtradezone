@@ -46,14 +46,18 @@ interface LedgerAccount {
 export class InternalTradingDailyClaimService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listMyClaims(userId: string, page = 1, limit = 25) {
+  async listMyClaims(userId: string, page = 1, limit = 25, subscriptionId?: string) {
     const safePage = Number.isInteger(page) && page > 0 ? Math.min(page, 100000) : 1;
     const safeLimit =
       Number.isInteger(limit) && limit > 0 ? Math.min(limit, 100) : 25;
     const offset = (safePage - 1) * safeLimit;
+    const subscriptionFilter = subscriptionId
+      ? Prisma.sql`AND subscriptionId = ${subscriptionId}`
+      : Prisma.empty;
     const claims = await this.prisma.$queryRaw<DailyClaimRow[]>(Prisma.sql`
       SELECT * FROM internal_trade_daily_claims
       WHERE userId = ${userId}
+        ${subscriptionFilter}
       ORDER BY localTradeDate DESC, subscriptionId DESC
       LIMIT ${safeLimit} OFFSET ${offset}
     `);
@@ -68,6 +72,7 @@ export class InternalTradingDailyClaimService {
           AS pendingAmount
       FROM internal_trade_daily_claims
       WHERE userId = ${userId}
+        ${subscriptionFilter}
     `);
     return {
       page: safePage, limit: safeLimit,
