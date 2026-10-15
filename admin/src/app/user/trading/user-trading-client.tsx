@@ -173,10 +173,13 @@ export default function UserTradingClient() {
     [packages],
   );
 
-  const loadClaims = useCallback(async () => {
-    const response = await fetch('/api/user/internal-trading/claims?page=1&limit=100', {
-      cache: 'no-store',
-    });
+  const loadClaims = useCallback(async (subscriptionId: string) => {
+    const response = await fetch(
+      `/api/user/internal-trading/claims?page=1&limit=100&subscriptionId=${encodeURIComponent(subscriptionId)}`,
+      {
+        cache: 'no-store',
+      },
+    );
     const payload = await json<ClaimsPayload>(response);
     if (response.ok && payload) {
       setClaims(payload.claims);
@@ -271,7 +274,6 @@ export default function UserTradingClient() {
           const id = packagePayload.packages[0].subscriptionId;
           setSelectedId(id);
         }
-        await loadClaims();
       } catch (caught) {
         if (mounted) {
           setError(
@@ -288,7 +290,7 @@ export default function UserTradingClient() {
     return () => {
       mounted = false;
     };
-  }, [router, loadClaims]);
+  }, [router]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -314,6 +316,13 @@ export default function UserTradingClient() {
     };
   }, [selectedId, history, loadEvents]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    void loadClaims(selectedId).catch((caught) =>
+      setError(caught instanceof Error ? caught.message : 'Cannot load profit claims.'),
+    );
+  }, [selectedId, loadClaims]);
+
   async function claimProfit(claim: DailyClaim) {
     if (!session || isImpersonationSession(session) || claimBusy) return;
     setClaimBusy(claim.id);
@@ -328,7 +337,7 @@ export default function UserTradingClient() {
       if (!response.ok) {
         throw new Error(messageFrom(payload, 'Daily profit claim failed.'));
       }
-      await loadClaims();
+      await loadClaims(claim.subscriptionId);
       const packageResponse = await fetch('/api/user/internal-trading/packages', {
         cache: 'no-store',
       });
@@ -346,6 +355,7 @@ export default function UserTradingClient() {
     setError("");
     setEvents([]);
     setEventsTotal(0);
+    setClaims([]);
     setHistory((value) => ({ ...value, page: 1 }));
     setSelectedId(subscriptionId);
   }
