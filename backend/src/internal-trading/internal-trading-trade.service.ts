@@ -37,6 +37,7 @@ interface CountRow {
 
 interface StateRow {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   userId: string;
   splitPolicyVersionId: string;
   packagePlanVersionId: string;
@@ -1397,6 +1398,7 @@ export class InternalTradingTradeService {
   private stateSnapshot(row: StateRow) {
     return {
       subscriptionId: row.subscriptionId,
+      financialModelVersion: row.financialModelVersion,
       userId: row.userId,
       username: row.username,
       email: row.email,
@@ -1433,6 +1435,7 @@ export class InternalTradingTradeService {
   private userStateSnapshot(row: StateRow) {
     return {
       subscriptionId: row.subscriptionId,
+      financialModelVersion: row.financialModelVersion,
       packageCode: row.packageCode,
       packageDisplayName: row.packageDisplayName,
       currency: row.currency,
