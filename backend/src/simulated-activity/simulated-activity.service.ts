@@ -23,6 +23,7 @@ import type {
 } from './dto/simulated-activity.dto';
 import {
   deterministicSimulatedSlot,
+  deterministicV2SlotIdentity,
   localDateForInstant,
   localDateStartAtOrAfterUtc,
   nextLocalDateStartUtc,
@@ -1029,30 +1030,38 @@ export class SimulatedActivityService {
           localActivityDate,
           slotNumber,
         );
-        const baseSlot = deterministicSimulatedSlot({
-          sourceKey,
-          localActivityDate,
-          slotNumber,
-          activitiesPerDay: config.activitiesPerDay,
-          minimumGapMinutes: config.minimumGapMinutes,
-          assetSymbols: config.assetSymbols,
-          winWeight: config.winWeight,
-          lossWeight: config.lossWeight,
-          winMinimumPercent: config.winMinimumPercent,
-          winMaximumPercent: config.winMaximumPercent,
-          lossMinimumPercent: config.lossMinimumPercent,
-          lossMaximumPercent: config.lossMaximumPercent,
-          timingWindows: config.timingWindows,
-          timezoneSnapshot: policy.timezoneSnapshot,
-        });
         const v2Slot = v2Plan?.slots[slotNumber - 1];
         const slot = v2Slot
           ? {
-              ...baseSlot,
+              ...deterministicV2SlotIdentity({
+                sourceKey,
+                localActivityDate,
+                slotNumber,
+                activitiesPerDay: 5,
+                minimumGapMinutes: config.minimumGapMinutes,
+                assetSymbols: config.assetSymbols,
+                timingWindows: config.timingWindows,
+                timezoneSnapshot: policy.timezoneSnapshot,
+              }),
               outcome: v2Slot.outcome,
               resultPercent: v2Slot.resultPercent,
             }
-          : baseSlot;
+          : deterministicSimulatedSlot({
+              sourceKey,
+              localActivityDate,
+              slotNumber,
+              activitiesPerDay: config.activitiesPerDay,
+              minimumGapMinutes: config.minimumGapMinutes,
+              assetSymbols: config.assetSymbols,
+              winWeight: config.winWeight,
+              lossWeight: config.lossWeight,
+              winMinimumPercent: config.winMinimumPercent,
+              winMaximumPercent: config.winMaximumPercent,
+              lossMinimumPercent: config.lossMinimumPercent,
+              lossMaximumPercent: config.lossMaximumPercent,
+              timingWindows: config.timingWindows,
+              timezoneSnapshot: policy.timezoneSnapshot,
+            });
 
         if (slot.scheduledAt < anchor || slot.scheduledAt > asOf) {
           skippedNotDue += 1;
