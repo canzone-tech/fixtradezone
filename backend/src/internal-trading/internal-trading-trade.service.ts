@@ -129,7 +129,7 @@ interface EventRow {
   grossProgressAfter: DecimalValue;
   grossHighWaterBefore: DecimalValue;
   grossHighWaterAfter: DecimalValue;
-  settlementMode: 'HIGH_WATER' | 'WIN_IMMEDIATE' | null;
+  settlementMode: 'HIGH_WATER' | 'WIN_IMMEDIATE' | 'CLAIM_PENDING' | null;
   grossSettlementAmount: DecimalValue;
   userShareAmount: DecimalValue;
   adminShareAmount: DecimalValue;
@@ -248,13 +248,14 @@ export class InternalTradingTradeService {
         createdAt DESC
     `);
 
+    const hasV2 = rows.some((row) => row.financialModelVersion === 'V2');
     return {
       scope: 'MY_INTERNAL_TRADING',
-      financialModel: 'GROSS_BEFORE_SPLIT',
+      financialModel: hasV2 ? 'VERSIONED_V1_V2' : 'GROSS_BEFORE_SPLIT',
       resultBasis: 'PACKAGE_PRINCIPAL',
-      earningTargetBasis: 'PACKAGE_USER_NET_DAILY_RATE',
+      earningTargetBasis: hasV2 ? 'PER_SUBSCRIPTION_MODEL' : 'PACKAGE_USER_NET_DAILY_RATE',
       highWaterSettlement: false,
-      settlementMode: 'WIN_IMMEDIATE',
+      settlementMode: hasV2 ? 'DAILY_MANUAL_CLAIM_OR_LEGACY' : 'WIN_IMMEDIATE',
       highWaterTracking: true,
       packages: rows.map((row) => this.userStateSnapshot(row)),
     };
@@ -1482,6 +1483,7 @@ export class InternalTradingTradeService {
       grossProgressAfter: this.moneyString(row.grossProgressAfter),
       grossHighWaterBefore: this.moneyString(row.grossHighWaterBefore),
       grossHighWaterAfter: this.moneyString(row.grossHighWaterAfter),
+      financialModelVersion: row.financialModelVersion,
       settlementMode: row.settlementMode ?? 'HIGH_WATER',
       grossSettlementAmount: this.moneyString(row.grossSettlementAmount),
       userShareAmount: this.moneyString(row.userShareAmount),
