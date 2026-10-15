@@ -31,6 +31,7 @@ interface InternalTradingPolicyRow {
   status: InternalTradingPolicyStatus;
   revision: number;
   enabled: boolean | number;
+  financialModelVersion: 'V1' | 'V2';
   activitiesPerDay: number;
   assetSymbols: unknown;
   winWeight: number;
@@ -60,6 +61,7 @@ interface OperationsConfigRow {
 
 interface NormalizedPolicyConfig {
   enabled: boolean;
+  financialModelVersion: 'V1' | 'V2';
   activitiesPerDay: number;
   assetSymbols: string[];
   winWeight: number;
@@ -157,6 +159,7 @@ export class InternalTradingService {
           status,
           revision,
           enabled,
+          financialModelVersion,
           activitiesPerDay,
           assetSymbols,
           winWeight,
@@ -184,6 +187,7 @@ export class InternalTradingService {
           'DRAFT',
           1,
           ${config.enabled},
+          ${config.financialModelVersion},
           ${config.activitiesPerDay},
           ${JSON.stringify(config.assetSymbols)},
           ${config.winWeight},
@@ -265,6 +269,7 @@ export class InternalTradingService {
 
       const next: NormalizedPolicyConfig = {
         enabled: dto.enabled ?? previous.enabled,
+        financialModelVersion: dto.financialModelVersion ?? previous.financialModelVersion,
         activitiesPerDay: dto.activitiesPerDay ?? previous.activitiesPerDay,
         assetSymbols: dto.assetSymbols ?? previous.assetSymbols,
         winWeight: dto.winWeight ?? previous.winWeight,
@@ -286,6 +291,7 @@ export class InternalTradingService {
         UPDATE internal_trade_policy_versions
         SET
           enabled = ${next.enabled},
+          financialModelVersion = ${next.financialModelVersion},
           activitiesPerDay = ${next.activitiesPerDay},
           assetSymbols = ${JSON.stringify(next.assetSymbols)},
           winWeight = ${next.winWeight},
@@ -366,6 +372,15 @@ export class InternalTradingService {
 
       const config = this.normalizedPolicyConfig(current);
       this.validatePolicyConfig(config);
+      if (
+        config.financialModelVersion === 'V2' &&
+        config.enabled &&
+        process.env.FTZ_INTERNAL_TRADING_V2_ENABLED !== 'true'
+      ) {
+        throw new ConflictException(
+          'Enable the backend V2 safety gate before publishing an enabled V2 trading policy.',
+        );
+      }
 
       const operationsRows = await transaction.$queryRaw<
         OperationsConfigRow[]
@@ -439,6 +454,35 @@ export class InternalTradingService {
         );
       } else {
         effectiveFrom = nextLocalDateStartUtc(publishedAt, timezoneSnapshot);
+      }
+
+      if (config.financialModelVersion === 'V2' && config.enabled) {
+        // Both published policies must agree on the canonical trading day.
+        // This uses the existing versioned simulation policy, not a second
+        // publishing method or an override of historical subscriptions.
+        const simulations = await transaction.$queryRaw<Array<{
+          enabled: boolean | number;
+          activitiesPerDay: number;
+          timezoneSnapshot: string | null;
+        }>>(Prisma.sql`
+          SELECT enabled, activitiesPerDay, timezoneSnapshot
+          FROM simulated_activity_policy_versions
+          WHERE status = 'PUBLISHED'
+            AND effectiveFrom <= ${effectiveFrom}
+            AND (effectiveTo IS NULL OR effectiveTo > ${effectiveFrom})
+          ORDER BY effectiveFrom DESC, versionNumber DESC
+          LIMIT 2 FOR SHARE
+        `);
+        if (
+          simulations.length !== 1 ||
+          !Boolean(simulations[0].enabled) ||
+          simulations[0].activitiesPerDay !== 5 ||
+          simulations[0].timezoneSnapshot !== timezoneSnapshot
+        ) {
+          throw new ConflictException(
+            'V2 publishing requires one enabled published Daily Trades policy with five slots and the same platform timezone at the effective boundary.',
+          );
+        }
       }
 
       const conflicts = await transaction.$queryRaw<InternalTradingPolicyRow[]>(
@@ -561,6 +605,7 @@ export class InternalTradingService {
   ): NormalizedPolicyConfig {
     return {
       enabled: Boolean(row.enabled),
+      financialModelVersion: row.financialModelVersion,
       activitiesPerDay: Number(row.activitiesPerDay),
       assetSymbols: this.jsonArray<string>(
         row.assetSymbols,
@@ -585,6 +630,15 @@ export class InternalTradingService {
   }
 
   private validatePolicyConfig(config: NormalizedPolicyConfig): void {
+    if (
+      config.financialModelVersion !== 'V1' &&
+      config.financialModelVersion !== 'V2'
+    ) {
+      throw new BadRequestException('Financial model must be V1 or V2.');
+    }
+    if (config.financialModelVersion === 'V2' && config.activitiesPerDay !== 5) {
+      throw new BadRequestException('V2 requires exactly five trades per day.');
+    }
     if (
       !Number.isInteger(config.activitiesPerDay) ||
       config.activitiesPerDay < INTERNAL_TRADING_MIN_ACTIVITIES_PER_DAY
