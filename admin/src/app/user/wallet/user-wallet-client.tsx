@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
-import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
+import HistoryControls, {
+  INITIAL_HISTORY_QUERY,
+  historyQueryParams,
+  type HistoryQuery,
+} from "@/components/user/history-controls";
 import styles from "@/components/wallet/wallet.module.css";
 import type { UserDirectSession } from "@/lib/user-session";
 import {
@@ -246,7 +250,11 @@ export default function UserWalletClient() {
             </button>
           </div>
 
-          <HistoryControls value={history} total={wallet?.totalActivity ?? 0} onChange={setHistory} />
+          <HistoryControls
+            value={history}
+            total={wallet?.totalActivity ?? 0}
+            onChange={setHistory}
+          />
 
           {!wallet || wallet.activity.length === 0 ? (
             <div className={styles.empty}>No posted ledger activity yet.</div>

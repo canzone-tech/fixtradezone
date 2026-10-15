@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
-import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
+import HistoryControls, {
+  INITIAL_HISTORY_QUERY,
+  historyQueryParams,
+  type HistoryQuery,
+} from "@/components/user/history-controls";
 import { formatPlatformDate } from "@/lib/platform-time";
 import type { UserPortalSession } from "@/lib/user-session";
 import styles from "../../internal-trading/internal-trading.module.css";
@@ -228,7 +232,6 @@ export default function UserTradingClient() {
         if (packagePayload.packages[0]) {
           const id = packagePayload.packages[0].subscriptionId;
           setSelectedId(id);
-
         }
       } catch (caught) {
         if (mounted) {
@@ -251,18 +254,28 @@ export default function UserTradingClient() {
   useEffect(() => {
     if (!selectedId) return;
     let cancelled = false;
-    void loadEvents(selectedId, history).then((payload) => {
-      if (!cancelled && payload) {
-        setEvents(payload.events);
-        setEventsTotal(payload.total);
-      }
-    }).catch((caught) => {
-      if (!cancelled) setError(caught instanceof Error ? caught.message : 'Unable to load trade history.');
-    });
-    return () => { cancelled = true; };
+    void loadEvents(selectedId, history)
+      .then((payload) => {
+        if (!cancelled && payload) {
+          setEvents(payload.events);
+          setEventsTotal(payload.total);
+        }
+      })
+      .catch((caught) => {
+        if (!cancelled) {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "Unable to load trade history.",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, history, loadEvents]);
 
-  async function selectPackage(subscriptionId: string) {
+  function selectPackage(subscriptionId: string) {
     setError("");
     setEvents([]);
     setEventsTotal(0);
@@ -330,7 +343,7 @@ export default function UserTradingClient() {
 
           <div className={styles.stat}>
             <small>Settlement model</small>
-            <strong>Immediate WIN</strong>
+            <strong>Legacy immediate settlement</strong>
           </div>
         </section>
 
@@ -341,7 +354,7 @@ export default function UserTradingClient() {
                 key={item.subscriptionId}
                 className={styles.packageCard}
                 data-selected={selectedId === item.subscriptionId}
-                onClick={() => void selectPackage(item.subscriptionId)}
+                onClick={() => selectPackage(item.subscriptionId)}
               >
                 <div className={styles.packageHeader}>
                   <div>
@@ -492,7 +505,11 @@ export default function UserTradingClient() {
             </span>
           </div>
 
-          <HistoryControls value={history} total={eventsTotal} onChange={setHistory} />
+          <HistoryControls
+            value={history}
+            total={eventsTotal}
+            onChange={setHistory}
+          />
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>

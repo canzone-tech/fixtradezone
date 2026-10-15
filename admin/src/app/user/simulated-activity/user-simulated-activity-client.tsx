@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
-import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
+import HistoryControls, {
+  INITIAL_HISTORY_QUERY,
+  historyQueryParams,
+  type HistoryQuery,
+} from "@/components/user/history-controls";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "../../simulated-trades/simulated-trades.module.css";
@@ -249,7 +253,11 @@ export default function UserSimulatedActivityClient() {
             </span>
           </div>
 
-          <HistoryControls value={history} total={activity?.total ?? 0} onChange={setHistory} />
+          <HistoryControls
+            value={history}
+            total={activity?.total ?? 0}
+            onChange={setHistory}
+          />
 
           {!activity || activity.events.length === 0 ? (
             <div className={styles.empty}>

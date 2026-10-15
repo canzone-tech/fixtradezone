@@ -30,7 +30,6 @@ export class InternalTradingEventQueryDto {
   @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   toDate?: string;
-
 }
 
 export class InternalTradingWorkspaceQueryDto {
