@@ -445,17 +445,11 @@ export default function InternalTradingAdminClient() {
             expectedRevision: draft.revision,
             reason: form.reason || "Update internal trading policy.",
             enabled: form.enabled,
-            activitiesPerDay: Number(form.activitiesPerDay),
+            activitiesPerDay: 5,
             assetSymbols: form.assetSymbols
               .split(/[,\n]+/)
               .map(normalizeAssetSymbol)
               .filter(Boolean),
-            winWeight: Number(form.winWeight),
-            lossWeight: Number(form.lossWeight),
-            winMinimumPercent: form.winMinimumPercent,
-            winMaximumPercent: form.winMaximumPercent,
-            lossMinimumPercent: form.lossMinimumPercent,
-            lossMaximumPercent: form.lossMaximumPercent,
             timingWindows: parseWindows(form.timingWindows),
             userSharePercent: form.userSharePercent,
             adminSharePercent: form.adminSharePercent,
@@ -511,8 +505,8 @@ export default function InternalTradingAdminClient() {
           <p className={styles.eyebrow}>ITD / INTERNAL TRADING</p>
           <h2>Internal Trading</h2>
           <p>
-            Manage package-linked internal trading, global trade policy, package
-            progress, immediate WIN settlements and immutable trade history.
+            Manage algorithm-generated trading, historical V1 and new V2 manual
+            claim settlements, and immutable trade history.
           </p>
         </div>
 
@@ -596,16 +590,7 @@ export default function InternalTradingAdminClient() {
 
             <div className={styles.field}>
               <label>Trades per day</label>
-              <input
-                value={form.activitiesPerDay}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    activitiesPerDay: event.target.value,
-                  }))
-                }
-              />
+              <input value="5" readOnly aria-label="V2 trades per day (fixed)" />
             </div>
 
             <div className={styles.fieldWide}>
@@ -617,90 +602,6 @@ export default function InternalTradingAdminClient() {
                   setForm((current) => ({
                     ...current,
                     assetSymbols: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN weight · 3 = 60%</label>
-              <input
-                value={form.winWeight}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winWeight: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS weight · 2 = 40%</label>
-              <input
-                value={form.lossWeight}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossWeight: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN % minimum</label>
-              <input
-                value={form.winMinimumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winMinimumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN % maximum</label>
-              <input
-                value={form.winMaximumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winMaximumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS % minimum</label>
-              <input
-                value={form.lossMinimumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossMinimumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS % maximum</label>
-              <input
-                value={form.lossMaximumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossMaximumPercent: event.target.value,
                   }))
                 }
               />
