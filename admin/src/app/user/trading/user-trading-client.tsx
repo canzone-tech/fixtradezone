@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
 import { formatPlatformDate } from "@/lib/platform-time";
 import type { UserPortalSession } from "@/lib/user-session";
 import styles from "../../internal-trading/internal-trading.module.css";
@@ -107,13 +108,6 @@ function utcTime(value: string) {
   return parsed.toISOString().slice(11, 19);
 }
 
-function percentage(progress: string, target: string) {
-  const denominator = Number(target);
-  if (!denominator) return 0;
-
-  return Math.max(0, Math.min(100, (Number(progress) / denominator) * 100));
-}
-
 function tone(status: TradingPackage["status"]) {
   if (status === "ACTIVE") return "success";
   if (status === "BLOCKED") return "danger";
@@ -129,6 +123,8 @@ export default function UserTradingClient() {
 
   const [selectedId, setSelectedId] = useState("");
   const [events, setEvents] = useState<TradeEvent[]>([]);
+  const [eventsTotal, setEventsTotal] = useState(0);
+  const [history, setHistory] = useState<HistoryQuery>(INITIAL_HISTORY_QUERY);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -150,11 +146,11 @@ export default function UserTradingClient() {
   );
 
   const loadEvents = useCallback(
-    async (subscriptionId: string) => {
+    async (subscriptionId: string, query: HistoryQuery) => {
       const response = await fetch(
         `/api/user/internal-trading/packages/${encodeURIComponent(
           subscriptionId,
-        )}/events?page=1&limit=100`,
+        )}/events?${historyQueryParams(query).toString()}`,
         { cache: "no-store" },
       );
 
@@ -170,7 +166,7 @@ export default function UserTradingClient() {
         throw new Error(messageFrom(payload, "Unable to load trade history."));
       }
 
-      setEvents(payload.events);
+      return payload;
     },
     [router],
   );
@@ -232,7 +228,7 @@ export default function UserTradingClient() {
         if (packagePayload.packages[0]) {
           const id = packagePayload.packages[0].subscriptionId;
           setSelectedId(id);
-          await loadEvents(id);
+
         }
       } catch (caught) {
         if (mounted) {
@@ -250,21 +246,28 @@ export default function UserTradingClient() {
     return () => {
       mounted = false;
     };
-  }, [loadEvents, router]);
+  }, [router]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    let cancelled = false;
+    void loadEvents(selectedId, history).then((payload) => {
+      if (!cancelled && payload) {
+        setEvents(payload.events);
+        setEventsTotal(payload.total);
+      }
+    }).catch((caught) => {
+      if (!cancelled) setError(caught instanceof Error ? caught.message : 'Unable to load trade history.');
+    });
+    return () => { cancelled = true; };
+  }, [selectedId, history, loadEvents]);
 
   async function selectPackage(subscriptionId: string) {
-    setSelectedId(subscriptionId);
     setError("");
-
-    try {
-      await loadEvents(subscriptionId);
-    } catch (caught) {
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "Unable to load trade history.",
-      );
-    }
+    setEvents([]);
+    setEventsTotal(0);
+    setHistory((value) => ({ ...value, page: 1 }));
+    setSelectedId(subscriptionId);
   }
 
   if (loading && !session) {
@@ -321,8 +324,8 @@ export default function UserTradingClient() {
           </div>
 
           <div className={styles.stat}>
-            <small>Loaded trades</small>
-            <strong>{events.length}</strong>
+            <small>History records</small>
+            <strong>{eventsTotal}</strong>
           </div>
 
           <div className={styles.stat}>
@@ -333,11 +336,6 @@ export default function UserTradingClient() {
 
         <section className={styles.packageGrid}>
           {packages.map((item) => {
-            const progress = percentage(
-              item.grossNetProgress,
-              item.grossTarget,
-            );
-
             return (
               <article
                 key={item.subscriptionId}
@@ -348,21 +346,12 @@ export default function UserTradingClient() {
                 <div className={styles.packageHeader}>
                   <div>
                     <h3>{item.packageDisplayName}</h3>
-                    <p className={styles.muted}>
-                      {item.grossMultiplier}x gross target
-                    </p>
+                    <p className={styles.muted}>Algorithm-generated internal trades</p>
                   </div>
 
                   <span className={styles.badge} data-tone={tone(item.status)}>
                     {item.status}
                   </span>
-                </div>
-
-                <div className={styles.progressTrack}>
-                  <div
-                    className={styles.progressBar}
-                    style={{ width: `${progress}%` }}
-                  />
                 </div>
 
                 <div className={styles.packageMeta}>
@@ -374,8 +363,8 @@ export default function UserTradingClient() {
                   </div>
 
                   <div>
-                    <small>Gross target</small>
-                    <strong>{money(item.grossTarget, item.currency)}</strong>
+                    <small>Recorded trades</small>
+                    <strong>{item.settledTradeCount}</strong>
                   </div>
 
                   <div>
@@ -426,8 +415,8 @@ export default function UserTradingClient() {
                 </div>
 
                 <div>
-                  <dt>Gross target</dt>
-                  <dd>{money(selected.grossTarget, selected.currency)}</dd>
+                  <dt>Trades recorded</dt>
+                  <dd>{selected.settledTradeCount}</dd>
                 </div>
 
                 <div>
@@ -499,10 +488,11 @@ export default function UserTradingClient() {
             </div>
 
             <span className={styles.badge} data-tone="muted">
-              {events.length} LOADED
+              {eventsTotal} TOTAL
             </span>
           </div>
 
+          <HistoryControls value={history} total={eventsTotal} onChange={setHistory} />
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
+import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
 import styles from "@/components/wallet/wallet.module.css";
 import type { UserDirectSession } from "@/lib/user-session";
 import {
@@ -58,7 +59,7 @@ function redirectFor(error: unknown): string | null {
   return null;
 }
 
-async function fetchWalletWorkspace(): Promise<{
+async function fetchWalletWorkspace(query: HistoryQuery): Promise<{
   session: UserDirectSession;
   wallet: UserWalletResponse;
 }> {
@@ -72,7 +73,7 @@ async function fetchWalletWorkspace(): Promise<{
     throw new Error("USER session is incomplete.");
   }
 
-  const walletResponse = await fetch("/api/user/wallet?limit=50", {
+  const walletResponse = await fetch(`/api/user/wallet?${historyQueryParams(query).toString()}`, {
     cache: "no-store",
   });
   const wallet = await checkedUserJson<
@@ -86,6 +87,7 @@ export default function UserWalletClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [wallet, setWallet] = useState<UserWalletResponse | null>(null);
+  const [history, setHistory] = useState<HistoryQuery>(INITIAL_HISTORY_QUERY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,7 +95,7 @@ export default function UserWalletClient() {
     setLoading(true);
     setError(null);
     try {
-      const workspace = await fetchWalletWorkspace();
+      const workspace = await fetchWalletWorkspace(history);
       setSession(workspace.session);
       setWallet(workspace.wallet);
     } catch (caught) {
@@ -117,7 +119,7 @@ export default function UserWalletClient() {
 
     async function loadInitial() {
       try {
-        const workspace = await fetchWalletWorkspace();
+        const workspace = await fetchWalletWorkspace(history);
         if (!mounted) return;
         setSession(workspace.session);
         setWallet(workspace.wallet);
@@ -142,7 +144,7 @@ export default function UserWalletClient() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, history]);
 
   return (
     <UserShell session={session}>
@@ -243,6 +245,8 @@ export default function UserWalletClient() {
               Refresh
             </button>
           </div>
+
+          <HistoryControls value={history} total={wallet?.totalActivity ?? 0} onChange={setHistory} />
 
           {!wallet || wallet.activity.length === 0 ? (
             <div className={styles.empty}>No posted ledger activity yet.</div>

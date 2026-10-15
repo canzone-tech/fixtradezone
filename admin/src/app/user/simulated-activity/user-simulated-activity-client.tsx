@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import UserShell from "@/components/user/user-shell";
+import HistoryControls, { INITIAL_HISTORY_QUERY, historyQueryParams, type HistoryQuery } from "@/components/user/history-controls";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "../../simulated-trades/simulated-trades.module.css";
@@ -106,7 +107,7 @@ function formatAssetSymbol(symbol: string): string {
   return normalized;
 }
 
-async function fetchWorkspace(): Promise<{
+async function fetchWorkspace(query: HistoryQuery): Promise<{
   session: UserDirectSession;
   activity: ActivityPayload;
 }> {
@@ -124,7 +125,7 @@ async function fetchWorkspace(): Promise<{
   // Internal API naming remains stable for backwards compatibility. The portal
   // presents the client-facing feature as Trade Activity.
   const activityResponse = await fetch(
-    "/api/user/simulated-activity?page=1&limit=100",
+    `/api/user/simulated-activity?${historyQueryParams(query).toString()}`,
     { cache: "no-store" },
   );
   const activity = await checkedUserJson<ActivityPayload>(
@@ -138,6 +139,7 @@ export default function UserSimulatedActivityClient() {
   const router = useRouter();
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [activity, setActivity] = useState<ActivityPayload | null>(null);
+  const [history, setHistory] = useState<HistoryQuery>(INITIAL_HISTORY_QUERY);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -146,7 +148,7 @@ export default function UserSimulatedActivityClient() {
 
     async function loadInitial() {
       try {
-        const workspace = await fetchWorkspace();
+        const workspace = await fetchWorkspace(history);
         if (!mounted) return;
         setSession(workspace.session);
         setActivity(workspace.activity);
@@ -172,7 +174,7 @@ export default function UserSimulatedActivityClient() {
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, history]);
 
   const loadedWins = useMemo(
     () =>
@@ -246,6 +248,8 @@ export default function UserSimulatedActivityClient() {
               {activity?.total ?? 0} total
             </span>
           </div>
+
+          <HistoryControls value={history} total={activity?.total ?? 0} onChange={setHistory} />
 
           {!activity || activity.events.length === 0 ? (
             <div className={styles.empty}>
