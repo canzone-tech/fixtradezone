@@ -17,7 +17,7 @@ Working branch: `feat/daily-net-trading-claims-history-pagination`. Do not merge
 5. Postman: import `postman/FixTradeZone-USER-HISTORY-PAGINATION-LOCAL.postman_collection.json`, set `baseUrl`, `userIdentifier`, `userPassword`; run read-only calls with a local eligible package. Test empty/no-history account and a rich-history account separately.
 6. Investigate SQL performance with EXPLAIN if large history: DATE() currently sacrifices date-index sargability. Add covering indexes/range predicates if necessary before production.
 
-## Financial engine V2 — approved business rules but NOT YET IMPLEMENTED
+## V2 original acceptance requirements (implementation checkpoint and blockers below)
 1. Generate **per-subscription, per-UTC-trading-day** daily gross NET P&L rate independently from package 0.70%-0.90% range (FTZ DynamoBot example); no fixed lifetime gross target or compounding.
 2. Exactly configured 5 trade slots (or effective global activitiesPerDay); WIN/LOSS mix and order vary independently; at least one WIN. With one WIN, it must be last after four LOSS slots.
 3. Every LOSS has negative trade P&L, wallet credit 0. WIN P&L positive; sum of signed WIN/LOSS trade P&Ls equals that day's generated gross NET P&L. No artificial 'TARGET CLOSE', no positive WIN with 'No additional credit' due to lifetime cap. UI must disclose internally generated activity.
@@ -27,7 +27,7 @@ Working branch: `feat/daily-net-trading-claims-history-pagination`. Do not merge
 7. Existing funded ACTIVE/COMPLETED package ledgers and V1 rows must **not** be rewritten. Add versioned per-subscription model and migration with explicit cutover; same source event must not settle in legacy/canonical and V2.
 8. Tests required before enabling V2: exactly 5 slots and sum-of-P&L at 8 decimal amount precision; min-one-WIN-last; no duplicated claims under concurrency; pending claim after package completes; split snapshot immutability; 0 wallet credit before claim; admin share and 3-ledger-entry balance after claim; client history reflects same canonical source; worker restart/resume and idempotent replay.
 
-**Financial cutover is a separate checkpoint**, not included in this initial pagination commit. Test API first on local Postman before implementing/enabling next module; never auto-deploy to main.
+**Financial cutover uses the versioned V2 implementation below**. The first pagination commit alone did not contain these financial changes. Test API first on local Postman before implementing/enabling next module; never auto-deploy to main.
 
 
 ---
