@@ -81,6 +81,7 @@ interface PolicyRow {
 interface SubscriptionRow {
   id: string;
   financialModelVersion: 'V1' | 'V2' | null;
+  finalTradeLocalDate: Date | string | null;
   rewardRateMode: 'FIXED' | 'RANDOM_RANGE' | 'MANUAL' | 'RULE_BASED';
   fixedRewardRate: DecimalValue | null;
   minimumRewardRate: DecimalValue | null;
@@ -679,10 +680,17 @@ export class SimulatedActivityService {
     );
     const eligibleRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
-      FROM user_package_subscriptions
-      WHERE status = 'ACTIVE'
-        AND activatedAt <= ${asOf}
-        AND scheduledEndAt > ${asOf}
+      FROM user_package_subscriptions ups
+      LEFT JOIN internal_trade_subscription_states its
+        ON its.subscriptionId = ups.id
+      WHERE ups.status = 'ACTIVE'
+        AND ups.activatedAt <= ${asOf}
+        AND (
+          ups.scheduledEndAt > ${asOf}
+          OR (its.financialModelVersion = 'V2'
+            AND its.status = 'ACTIVE'
+            AND its.finalLocalDate >= ${localActivityDate})
+        )
     `);
     const eventRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
@@ -747,13 +755,20 @@ export class SimulatedActivityService {
       Prisma.sql`
         SELECT ups.id
         FROM user_package_subscriptions ups
+        LEFT JOIN internal_trade_subscription_states its
+          ON its.subscriptionId = ups.id
         LEFT JOIN simulated_trade_activity_events e
           ON e.subscriptionId = ups.id
           AND e.policyVersionId = ${policy.id}
           AND e.localActivityDate = ${localActivityDate}
         WHERE ups.status = 'ACTIVE'
           AND ups.activatedAt <= ${asOf}
-          AND ups.scheduledEndAt > ${asOf}
+          AND (
+            ups.scheduledEndAt > ${asOf}
+            OR (its.financialModelVersion = 'V2'
+              AND its.status = 'ACTIVE'
+              AND its.finalLocalDate >= ${localActivityDate})
+          )
         GROUP BY ups.id, ups.activatedAt
         ORDER BY COUNT(e.id) ASC, MAX(e.scheduledAt) ASC, ups.activatedAt ASC, ups.id ASC
         LIMIT ${SIMULATED_ACTIVITY_BATCH_LIMIT}
@@ -943,7 +958,15 @@ export class SimulatedActivityService {
       if (
         subscription.status !== 'ACTIVE' ||
         activityStartAt > asOf ||
-        subscription.scheduledEndAt <= asOf
+        (
+          subscription.scheduledEndAt <= asOf &&
+          !(
+            subscription.financialModelVersion === 'V2' &&
+            subscription.finalTradeLocalDate !== null &&
+            localDateForInstant(asOf, subscription.settlementTimezone) <=
+              this.localDateString(subscription.finalTradeLocalDate)
+          )
+        )
       ) {
         return {
           createdEvents: 0,
@@ -1158,7 +1181,8 @@ export class SimulatedActivityService {
         ups.settlementTimezone, ups.rewardStartMode,
         ups.rewardRateMode, ups.fixedRewardRate,
         ups.minimumRewardRate, ups.maximumRewardRate,
-        its.financialModelVersion
+        its.financialModelVersion,
+        its.finalLocalDate AS finalTradeLocalDate
       FROM user_package_subscriptions ups
       LEFT JOIN internal_trade_subscription_states its
         ON its.subscriptionId = ups.id
@@ -1392,6 +1416,12 @@ export class SimulatedActivityService {
     if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
       throw new ForbiddenException('SUPER_ADMIN access is required.');
     }
+  }
+
+  private localDateString(value: Date | string): string {
+    return value instanceof Date
+      ? value.toISOString().slice(0, 10)
+      : String(value).slice(0, 10);
   }
 
   private async runSerializable<T>(
