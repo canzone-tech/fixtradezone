@@ -17,8 +17,12 @@ export class InternalTradingClaimsReadController {
     @CurrentUser() user: AuthenticatedUser,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('subscriptionId') subscriptionId?: string,
   ) {
-    return this.claims.listMyClaims(user.id, page ? Number(page) : 1, limit ? Number(limit) : 25);
+    return this.claims.listMyClaims(
+      user.id, page ? Number(page) : 1,
+      limit ? Number(limit) : 25, subscriptionId,
+    );
   }
 }
 
