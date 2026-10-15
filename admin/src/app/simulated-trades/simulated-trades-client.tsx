@@ -651,17 +651,8 @@ export default function SimulatedTradesClient() {
                 <label htmlFor="activitiesPerDay">
                   Trades / day / ACTIVE subscription
                 </label>
-                <input
-                  id="activitiesPerDay"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={form.activitiesPerDay}
-                  onChange={(event) =>
-                    updateForm("activitiesPerDay", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
+                <input id="activitiesPerDay" type="number" value={5} readOnly />
+                <small className={styles.muted}>V2 uses exactly five canonical trades per day.</small>
               </div>
               <div className={styles.field}>
                 <label htmlFor="minimumGapMinutes">Minimum gap (minutes)</label>
