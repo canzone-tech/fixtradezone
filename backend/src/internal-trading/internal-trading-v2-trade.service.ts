@@ -309,10 +309,25 @@ export class InternalTradingV2TradeService {
           throw new ServiceUnavailableException('V2 daily claim requires five trades.');
         }
         const gross = D8(total.total);
-        if (gross.lte(0)) {
-          throw new ServiceUnavailableException('V2 daily signed NET profit is non-positive.');
+        const nominalGross = D8(
+          new Prisma.Decimal(state.principalAmount)
+            .mul(plan.dailyGrossRatePercent)
+            .div(100),
+        );
+        // Five independently rounded 8dp amounts can differ by a few
+        // one-satoshi units from the single rounded daily target.
+        if (
+          gross.lte(0) ||
+          gross.sub(nominalGross).abs().gt(new Prisma.Decimal('0.00000003'))
+        ) {
+          throw new ServiceUnavailableException(
+            'V2 five signed trade amounts do not reconcile to daily NET profit.',
+          );
         }
         const user = D8(gross.mul(state.userSharePercent).div(100));
+        if (user.lte(0)) {
+          throw new ServiceUnavailableException('V2 USER amount rounds to zero.');
+        }
         const admin = D8(gross.sub(user));
         const claimId = randomUUID();
         await tx.$executeRaw(Prisma.sql`
