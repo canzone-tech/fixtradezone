@@ -11,6 +11,7 @@ import { InternalTradingPackageCompletionService } from './internal-trading-pack
 import { InternalTradingTradeService } from './internal-trading-trade.service';
 import { InternalTradingService } from './internal-trading.service';
 import { InternalTradingWorkerService } from './internal-trading-worker.service';
+import { InternalTradingV2TradeService } from './internal-trading-v2-trade.service';
 
 @Module({
   imports: [PlatformConfigModule, RedisModule],
@@ -22,6 +23,7 @@ import { InternalTradingWorkerService } from './internal-trading-worker.service'
   ],
   providers: [
     InternalTradingService,
+    InternalTradingV2TradeService,
     InternalTradingLifecycleService,
     InternalTradingPackageCompletionService,
     {
