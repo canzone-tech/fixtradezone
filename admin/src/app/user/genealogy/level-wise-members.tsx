@@ -96,7 +96,6 @@ export default function LevelWiseMembers({ onAccessError }: Props) {
             onChange={(event) => {
               setLevel(Number(event.target.value));
               setPage(1);
-              setData(null);
             }}
           >
             {(data?.levels.length ? data.levels : [{ level: 1, count: 0 }]).map(
@@ -114,7 +113,7 @@ export default function LevelWiseMembers({ onAccessError }: Props) {
         <div className={styles.counts}>
           <span>Direct Members: <strong>{data.directCount}</strong></span>
           <span>Total Team Members: <strong>{data.teamCount}</strong></span>
-          <span>Level {level} Members: <strong>{data.pagination.total}</strong></span>
+          <span>Level {level} Members: <strong>{data.levels.find((item) => item.level === level)?.count ?? 0}</strong></span>
         </div>
       ) : null}
 
