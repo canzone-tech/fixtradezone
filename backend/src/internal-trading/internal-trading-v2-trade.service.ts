@@ -12,6 +12,7 @@ import { addLocalDays } from './internal-trading-package-earnings';
 import { v2DailyTradePlan } from './internal-trading-v2-plan';
 
 const MAX_DAYS_PER_RECONCILE = 1500;
+const MAX_SERIALIZABLE_ATTEMPTS = 3;
 const D8 = (value: Prisma.Decimal | string | number) =>
   new Prisma.Decimal(value).toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
 const dateString = (value: string | Date) =>
@@ -82,7 +83,7 @@ export class InternalTradingV2TradeService {
     context: RequestContext = {},
     generationSource: 'WORKER' | 'RECONCILIATION' = 'RECONCILIATION',
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    return this.runSerializable(async (tx) => {
       const stateRows = await tx.$queryRaw<V2State[]>(Prisma.sql`
         SELECT * FROM internal_trade_subscription_states
         WHERE subscriptionId = ${subscriptionId}
@@ -386,6 +387,35 @@ export class InternalTradingV2TradeService {
         createdEvents, createdSettlements: 0, eventIds,
         state: { subscriptionId, status: state.status },
       };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    });
+  }
+
+  private async runSerializable<T>(
+    work: (transaction: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= MAX_SERIALIZABLE_ATTEMPTS; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(work, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        const known = error instanceof Prisma.PrismaClientKnownRequestError;
+        const adapter = (
+          known ? error.meta?.driverAdapterError : undefined
+        ) as { cause?: { originalCode?: string | number } } | undefined;
+        // Prisma 7 MariaDB adapter may surface ER_LOCK_DEADLOCK (1213)
+        // as P2010 rather than P2034. Retry the entire rolled-back transaction.
+        const retryable =
+          known &&
+          (error.code === 'P2034' ||
+            (error.code === 'P2010' &&
+              String(adapter?.cause?.originalCode) === '1213'));
+        if (!retryable || attempt === MAX_SERIALIZABLE_ATTEMPTS) {
+          throw error;
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, attempt * 50));
+      }
+    }
+    throw new ServiceUnavailableException('V2 reconciliation retries exhausted.');
   }
 }
