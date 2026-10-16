@@ -254,8 +254,11 @@ export default function InternalTradingAdminClient() {
   // A PUBLISHED policy can be scheduled for a future trading-day boundary.
   // Match the backend's effectiveFrom/effectiveTo predicates instead of
   // presenting the latest published policy as active immediately.
+  // A fixed page-load timestamp avoids evaluating an impure clock during
+  // React render and gives both policy labels the same comparison instant.
+  const [policyReferenceNow] = useState(() => Date.now());
   const effectivePolicy = useMemo(() => {
-    const now = Date.now();
+    const now = policyReferenceNow;
     return (
       policies.find((policy) => {
         if (policy.status !== "PUBLISHED" || !policy.effectiveFrom) {
@@ -268,10 +271,10 @@ export default function InternalTradingAdminClient() {
         return Number.isFinite(from) && from <= now && now < to;
       }) ?? null
     );
-  }, [policies]);
+  }, [policies, policyReferenceNow]);
 
   const scheduledPolicy = useMemo(() => {
-    const now = Date.now();
+    const now = policyReferenceNow;
     return (
       policies.find(
         (policy) =>
@@ -280,7 +283,7 @@ export default function InternalTradingAdminClient() {
           Date.parse(policy.effectiveFrom!) > now,
       ) ?? null
     );
-  }, [policies]);
+  }, [policies, policyReferenceNow]);
 
   const selected = useMemo(
     () =>
