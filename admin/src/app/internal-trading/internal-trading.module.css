@@ -195,6 +195,50 @@
 
 .button,
 .buttonSecondary,
+
+/* Only pending V2 profit claims use this attention state. */
+.claimProfitButton {
+  color: #f0fdf4;
+  background: linear-gradient(135deg, #047857 0%, #16a34a 100%);
+  border: 1px solid #4ade80;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.32);
+  animation: claimProfitPulse 2.2s ease-in-out infinite;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.claimProfitButton:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #22c55e 100%);
+  transform: translateY(-1px);
+}
+
+.claimProfitButton:focus-visible {
+  outline: 2px solid #bbf7d0;
+  outline-offset: 3px;
+}
+
+.claimProfitButton:disabled {
+  animation: none;
+  box-shadow: none;
+}
+
+@keyframes claimProfitPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.12), 0 0 8px rgba(34, 197, 94, 0.25);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(74, 222, 128, 0), 0 0 19px rgba(34, 197, 94, 0.64);
+    filter: brightness(1.14);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claimProfitButton {
+    animation: none;
+    transition: none;
+  }
+}
+
 .buttonWarning {
   border-radius: var(--ftz-radius-control);
   padding: 10px 14px;
