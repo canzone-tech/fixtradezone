@@ -610,7 +610,7 @@ export default function UserTradingClient() {
                         <td>
                           <button
                             type="button"
-                            className={styles.buttonSecondary}
+                            className={claim.status === 'PENDING' ? `${styles.buttonSecondary} ${styles.claimProfitButton}` : styles.buttonSecondary}
                             disabled={claim.status === 'CLAIMED' || Boolean(claimBusy) || Boolean(session && isImpersonationSession(session))}
                             onClick={() => void claimProfit(claim)}
                           >
