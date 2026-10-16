@@ -254,7 +254,9 @@ export class InternalTradingTradeService {
       scope: 'MY_INTERNAL_TRADING',
       financialModel: hasV2 ? 'VERSIONED_V1_V2' : 'GROSS_BEFORE_SPLIT',
       resultBasis: 'PACKAGE_PRINCIPAL',
-      earningTargetBasis: hasV2 ? 'PER_SUBSCRIPTION_MODEL' : 'PACKAGE_USER_NET_DAILY_RATE',
+      earningTargetBasis: hasV2
+        ? 'PER_SUBSCRIPTION_MODEL'
+        : 'PACKAGE_USER_NET_DAILY_RATE',
       highWaterSettlement: false,
       settlementMode: hasV2 ? 'DAILY_MANUAL_CLAIM_OR_LEGACY' : 'WIN_IMMEDIATE',
       highWaterTracking: true,

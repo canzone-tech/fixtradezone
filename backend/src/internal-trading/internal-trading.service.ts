@@ -269,7 +269,8 @@ export class InternalTradingService {
 
       const next: NormalizedPolicyConfig = {
         enabled: dto.enabled ?? previous.enabled,
-        financialModelVersion: dto.financialModelVersion ?? previous.financialModelVersion,
+        financialModelVersion:
+          dto.financialModelVersion ?? previous.financialModelVersion,
         activitiesPerDay: dto.activitiesPerDay ?? previous.activitiesPerDay,
         assetSymbols: dto.assetSymbols ?? previous.assetSymbols,
         winWeight: dto.winWeight ?? previous.winWeight,
@@ -460,11 +461,13 @@ export class InternalTradingService {
         // Both published policies must agree on the canonical trading day.
         // This uses the existing versioned simulation policy, not a second
         // publishing method or an override of historical subscriptions.
-        const simulations = await transaction.$queryRaw<Array<{
-          enabled: boolean | number;
-          activitiesPerDay: number;
-          timezoneSnapshot: string | null;
-        }>>(Prisma.sql`
+        const simulations = await transaction.$queryRaw<
+          Array<{
+            enabled: boolean | number;
+            activitiesPerDay: number;
+            timezoneSnapshot: string | null;
+          }>
+        >(Prisma.sql`
           SELECT enabled, activitiesPerDay, timezoneSnapshot
           FROM simulated_activity_policy_versions
           WHERE status = 'PUBLISHED'
@@ -475,7 +478,7 @@ export class InternalTradingService {
         `);
         if (
           simulations.length !== 1 ||
-          !Boolean(simulations[0].enabled) ||
+          !simulations[0].enabled ||
           simulations[0].activitiesPerDay !== 5 ||
           simulations[0].timezoneSnapshot !== timezoneSnapshot
         ) {
@@ -636,7 +639,10 @@ export class InternalTradingService {
     ) {
       throw new BadRequestException('Financial model must be V1 or V2.');
     }
-    if (config.financialModelVersion === 'V2' && config.activitiesPerDay !== 5) {
+    if (
+      config.financialModelVersion === 'V2' &&
+      config.activitiesPerDay !== 5
+    ) {
       throw new BadRequestException('V2 requires exactly five trades per day.');
     }
     if (

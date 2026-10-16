@@ -60,7 +60,10 @@ export class SimulatedActivityUserViewService {
       );
     });
 
-    const hiddenDateFilter = historyDateFilter(Prisma.sql`e.localActivityDate`, query);
+    const hiddenDateFilter = historyDateFilter(
+      Prisma.sql`e.localActivityDate`,
+      query,
+    );
     const hiddenRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
       FROM simulated_trade_activity_events e

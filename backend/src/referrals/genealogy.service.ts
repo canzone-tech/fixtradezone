@@ -88,20 +88,23 @@ export class GenealogyService {
     const total = levels.find((row) => row.level === query.level)?.count ?? 0;
     const offset = (query.page - 1) * query.limit;
 
-    const members = total === 0
-      ? []
-      : await this.prisma.$queryRaw<Array<{
-          id: string;
-          username: string;
-          firstName: string | null;
-          lastName: string | null;
-          status: string;
-          referralCode: string;
-          sponsorUserId: string | null;
-          sponsorUsername: string | null;
-          sponsorFirstName: string | null;
-          sponsorLastName: string | null;
-        }>>(Prisma.sql`
+    const members =
+      total === 0
+        ? []
+        : await this.prisma.$queryRaw<
+            Array<{
+              id: string;
+              username: string;
+              firstName: string | null;
+              lastName: string | null;
+              status: string;
+              referralCode: string;
+              sponsorUserId: string | null;
+              sponsorUsername: string | null;
+              sponsorFirstName: string | null;
+              sponsorLastName: string | null;
+            }>
+          >(Prisma.sql`
           WITH RECURSIVE downline (userId, depth) AS (
             SELECT p.userId, 0
             FROM referral_profiles p

@@ -16,7 +16,9 @@ const MAX_SERIALIZABLE_ATTEMPTS = 3;
 const D8 = (value: Prisma.Decimal | string | number) =>
   new Prisma.Decimal(value).toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
 const dateString = (value: string | Date) =>
-  value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+  value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
 
 interface V2State {
   subscriptionId: string;
@@ -116,19 +118,26 @@ export class InternalTradingV2TradeService {
       `);
       const terms = termRows[0];
       if (!terms) {
-        throw new ServiceUnavailableException('V2 package earning terms are missing.');
+        throw new ServiceUnavailableException(
+          'V2 package earning terms are missing.',
+        );
       }
 
       const expectedFinal = addLocalDays(
-        dateString(state.activationLocalDate), terms.goalDays,
+        dateString(state.activationLocalDate),
+        terms.goalDays,
       );
       if (expectedFinal !== dateString(state.finalLocalDate)) {
-        throw new ServiceUnavailableException('V2 package duration snapshot mismatch.');
+        throw new ServiceUnavailableException(
+          'V2 package duration snapshot mismatch.',
+        );
       }
       const now = new Date();
       const asOfDate = new Intl.DateTimeFormat('en-CA', {
-        timeZone: state.timezoneSnapshot, year: 'numeric',
-        month: '2-digit', day: '2-digit',
+        timeZone: state.timezoneSnapshot,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
       });
       const parts = asOfDate.formatToParts(now);
       const part = (type: 'year' | 'month' | 'day') =>
@@ -139,7 +148,11 @@ export class InternalTradingV2TradeService {
       let createdEvents = 0;
       const eventIds: string[] = [];
 
-      for (let loop = 0; loop < MAX_DAYS_PER_RECONCILE && date <= through; loop += 1) {
+      for (
+        let loop = 0;
+        loop < MAX_DAYS_PER_RECONCILE && date <= through;
+        loop += 1
+      ) {
         const plan = v2DailyTradePlan({
           subscriptionId,
           localTradeDate: date,
@@ -162,7 +175,9 @@ export class InternalTradingV2TradeService {
         `);
         if (canonical.length === 0) break;
         if (canonical.length > 5) {
-          throw new ServiceUnavailableException('V2 canonical day has more than five events.');
+          throw new ServiceUnavailableException(
+            'V2 canonical day has more than five events.',
+          );
         }
         canonical.forEach((event, index) => {
           const expected = plan.slots[index];
@@ -171,7 +186,8 @@ export class InternalTradingV2TradeService {
             event.slotNumber !== index + 1 ||
             !expected ||
             event.outcome !== expected.outcome ||
-            new Prisma.Decimal(event.resultPercent).toFixed(6) !== expected.resultPercent ||
+            new Prisma.Decimal(event.resultPercent).toFixed(6) !==
+              expected.resultPercent ||
             event.subscriptionId !== state.subscriptionId ||
             event.userId !== state.userId ||
             event.packagePlanVersionId !== state.packagePlanVersionId ||
@@ -193,19 +209,27 @@ export class InternalTradingV2TradeService {
           ORDER BY slotNumber ASC FOR UPDATE
         `);
         if (existing.length > canonical.length) {
-          throw new ServiceUnavailableException('V2 event count exceeds canonical source.');
+          throw new ServiceUnavailableException(
+            'V2 event count exceeds canonical source.',
+          );
         }
         existing.forEach((event, index) => {
           if (
             event.slotNumber !== index + 1 ||
             event.simulatedActivityEventId !== canonical[index]?.id
           ) {
-            throw new ServiceUnavailableException('V2 history contains a mismatched slot.');
+            throw new ServiceUnavailableException(
+              'V2 history contains a mismatched slot.',
+            );
           }
         });
 
         let completed = existing.length === 5;
-        for (let index = existing.length; index < canonical.length; index += 1) {
+        for (
+          let index = existing.length;
+          index < canonical.length;
+          index += 1
+        ) {
           const e = canonical[index];
           if (e.scheduledAt > now) {
             completed = false;
@@ -221,7 +245,9 @@ export class InternalTradingV2TradeService {
             (e.outcome === 'WIN' && amount.lte(0)) ||
             (e.outcome === 'LOSS' && amount.gte(0))
           ) {
-            throw new ServiceUnavailableException('V2 signed trade amount is invalid.');
+            throw new ServiceUnavailableException(
+              'V2 signed trade amount is invalid.',
+            );
           }
           const before = D8(state.grossNetProgress);
           const after = D8(before.add(amount));
@@ -230,7 +256,9 @@ export class InternalTradingV2TradeService {
           const dayNumber =
             Math.round(
               (Date.parse(`${date}T00:00:00Z`) -
-                Date.parse(`${addLocalDays(dateString(state.activationLocalDate), 1)}T00:00:00Z`)) /
+                Date.parse(
+                  `${addLocalDays(dateString(state.activationLocalDate), 1)}T00:00:00Z`,
+                )) /
                 86_400_000,
             ) + 1;
           const eventId = randomUUID();
@@ -281,9 +309,12 @@ export class InternalTradingV2TradeService {
             WHERE subscriptionId = ${subscriptionId}
               AND revision = ${state.revision}
           `);
-          if (updated !== 1) throw new ConflictException('V2 state revision changed.');
+          if (updated !== 1)
+            throw new ConflictException('V2 state revision changed.');
           state = {
-            ...state, grossNetProgress: after, grossHighWaterMark: highAfter,
+            ...state,
+            grossNetProgress: after,
+            grossHighWaterMark: highAfter,
             settledTradeCount: Number(state.settledTradeCount) + 1,
             revision: state.revision + 1,
             status: isFinal ? 'COMPLETED' : 'ACTIVE',
@@ -294,10 +325,12 @@ export class InternalTradingV2TradeService {
         }
         if (!completed) break;
 
-        const totals = await tx.$queryRaw<Array<{
-          total: Prisma.Decimal;
-          count: bigint;
-        }>>(Prisma.sql`
+        const totals = await tx.$queryRaw<
+          Array<{
+            total: Prisma.Decimal;
+            count: bigint;
+          }>
+        >(Prisma.sql`
           SELECT COALESCE(SUM(grossResultAmount), 0) AS total,
             COUNT(*) AS count
           FROM internal_trade_events
@@ -307,7 +340,9 @@ export class InternalTradingV2TradeService {
         `);
         const total = totals[0];
         if (Number(total?.count ?? 0) !== 5) {
-          throw new ServiceUnavailableException('V2 daily claim requires five trades.');
+          throw new ServiceUnavailableException(
+            'V2 daily claim requires five trades.',
+          );
         }
         const gross = D8(total.total);
         const nominalGross = D8(
@@ -327,7 +362,9 @@ export class InternalTradingV2TradeService {
         }
         const user = D8(gross.mul(state.userSharePercent).div(100));
         if (user.lte(0)) {
-          throw new ServiceUnavailableException('V2 USER amount rounds to zero.');
+          throw new ServiceUnavailableException(
+            'V2 USER amount rounds to zero.',
+          );
         }
         const admin = D8(gross.sub(user));
         const claimId = randomUUID();
@@ -358,8 +395,13 @@ export class InternalTradingV2TradeService {
           WHERE subscriptionId = ${subscriptionId}
             AND revision = ${state.revision}
         `);
-        if (advanced !== 1) throw new ConflictException('V2 day advance conflict.');
-        state = { ...state, nextTradeLocalDate: next, revision: state.revision + 1 };
+        if (advanced !== 1)
+          throw new ConflictException('V2 day advance conflict.');
+        state = {
+          ...state,
+          nextTradeLocalDate: next,
+          revision: state.revision + 1,
+        };
         date = next;
       }
 
@@ -370,11 +412,15 @@ export class InternalTradingV2TradeService {
             action: 'CREATE',
             entityType: 'InternalTradingV2DailyActivity',
             entityId: subscriptionId,
-            description: 'V2 canonical generated trading events reconciled without wallet settlement.',
+            description:
+              'V2 canonical generated trading events reconciled without wallet settlement.',
             metadata: {
               operation: 'RECONCILE_V2_TRADES',
-              financialModelVersion: 'V2', subscriptionId,
-              eventIds, createdEvents, generatedSource: generationSource,
+              financialModelVersion: 'V2',
+              subscriptionId,
+              eventIds,
+              createdEvents,
+              generatedSource: generationSource,
               settlementMode: 'MANUAL_DAILY_CLAIM',
             },
             ipAddress: context.ipAddress,
@@ -383,8 +429,12 @@ export class InternalTradingV2TradeService {
         });
       }
       return {
-        message: createdEvents ? 'V2 due trades reconciled.' : 'No V2 due trades.',
-        createdEvents, createdSettlements: 0, eventIds,
+        message: createdEvents
+          ? 'V2 due trades reconciled.'
+          : 'No V2 due trades.',
+        createdEvents,
+        createdSettlements: 0,
+        eventIds,
         state: { subscriptionId, status: state.status },
       };
     });
@@ -400,9 +450,8 @@ export class InternalTradingV2TradeService {
         });
       } catch (error) {
         const known = error instanceof Prisma.PrismaClientKnownRequestError;
-        const adapter = (
-          known ? error.meta?.driverAdapterError : undefined
-        ) as { cause?: { originalCode?: string | number } } | undefined;
+        const adapter = (known ? error.meta?.driverAdapterError : undefined) as
+          { cause?: { originalCode?: string | number } } | undefined;
         // Prisma 7 MariaDB adapter may surface ER_LOCK_DEADLOCK (1213)
         // as P2010 rather than P2034. Retry the entire rolled-back transaction.
         const retryable =
@@ -416,6 +465,8 @@ export class InternalTradingV2TradeService {
         await new Promise<void>((resolve) => setTimeout(resolve, attempt * 50));
       }
     }
-    throw new ServiceUnavailableException('V2 reconciliation retries exhausted.');
+    throw new ServiceUnavailableException(
+      'V2 reconciliation retries exhausted.',
+    );
   }
 }

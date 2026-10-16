@@ -7,7 +7,11 @@ describe('Canonical V1 historical timezone snapshots', () => {
     {} as PrismaService,
     {} as InternalTradingV2TradeService,
   );
-  const check = (event: unknown, state: unknown, localTradeDate = '2026-09-21') =>
+  const check = (
+    event: unknown,
+    state: unknown,
+    localTradeDate = '2026-09-21',
+  ) =>
     (
       reconciler as unknown as {
         assertCanonicalEventMatchesState(

@@ -15,17 +15,23 @@ describe('V2 generated daily trading (five signed trades)', () => {
       const date = `2026-10-${String(day).padStart(2, '0')}`;
       for (const subscriptionId of ['a', 'b', 'c']) {
         const plan = v2DailyTradePlan({
-          subscriptionId, localTradeDate: date,
-          terms, activitiesPerDay: 5,
+          subscriptionId,
+          localTradeDate: date,
+          terms,
+          activitiesPerDay: 5,
         });
         rates.add(plan.dailyGrossRatePercent);
         expect(Number(plan.dailyGrossRatePercent)).toBeGreaterThanOrEqual(0.7);
         expect(Number(plan.dailyGrossRatePercent)).toBeLessThanOrEqual(0.9);
         expect(plan.slots).toHaveLength(5);
-        expect(plan.slots.map((slot) => slot.slotNumber)).toEqual([1, 2, 3, 4, 5]);
+        expect(plan.slots.map((slot) => slot.slotNumber)).toEqual([
+          1, 2, 3, 4, 5,
+        ]);
         expect(plan.slots.some((slot) => slot.outcome === 'WIN')).toBe(true);
         for (const slot of plan.slots) {
-          expect(new Prisma.Decimal(slot.resultPercent).gt(0)).toBe(slot.outcome === 'WIN');
+          expect(new Prisma.Decimal(slot.resultPercent).gt(0)).toBe(
+            slot.outcome === 'WIN',
+          );
         }
         const signed = plan.slots.reduce(
           (sum, slot) => sum.add(slot.resultPercent),
@@ -41,14 +47,23 @@ describe('V2 generated daily trading (five signed trades)', () => {
   });
 
   it('is replay deterministic', () => {
-    const input = { subscriptionId: 'sample', localTradeDate: '2026-10-15', terms, activitiesPerDay: 5 };
+    const input = {
+      subscriptionId: 'sample',
+      localTradeDate: '2026-10-15',
+      terms,
+      activitiesPerDay: 5,
+    };
     expect(v2DailyTradePlan(input)).toEqual(v2DailyTradePlan(input));
   });
 
   it('enforces exactly five slots', () => {
-    expect(() => v2DailyTradePlan({
-      subscriptionId: 'sample', localTradeDate: '2026-10-15',
-      terms, activitiesPerDay: 4,
-    })).toThrow();
+    expect(() =>
+      v2DailyTradePlan({
+        subscriptionId: 'sample',
+        localTradeDate: '2026-10-15',
+        terms,
+        activitiesPerDay: 4,
+      }),
+    ).toThrow();
   });
 });

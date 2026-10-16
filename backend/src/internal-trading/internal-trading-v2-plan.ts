@@ -45,9 +45,7 @@ function micros(value: DecimalValue, field: string): bigint {
 }
 
 function formatMicros(value: bigint): string {
-  return new Prisma.Decimal(value.toString())
-    .div(MICRO.toString())
-    .toFixed(6);
+  return new Prisma.Decimal(value.toString()).div(MICRO.toString()).toFixed(6);
 }
 
 export function v2DailyTradePlan(input: {
@@ -99,9 +97,7 @@ export function v2DailyTradePlan(input: {
   }
 
   const lossMagnitudes = outcomes.map((outcome, index) =>
-    outcome === 'LOSS'
-      ? 50_000n + pick(`${seed}:loss:${index}`, 250_001n)
-      : 0n,
+    outcome === 'LOSS' ? 50_000n + pick(`${seed}:loss:${index}`, 250_001n) : 0n,
   );
   const totalLoss = lossMagnitudes.reduce((sum, amount) => sum + amount, 0n);
   const winIndices = outcomes
@@ -109,8 +105,8 @@ export function v2DailyTradePlan(input: {
     .filter((index) => index >= 0);
   let remainingWin = target + totalLoss;
   const winRates = Array<bigint>(5).fill(0n);
-  const weights = winIndices.map((index) =>
-    1n + pick(`${seed}:win-weight:${index}`, 100n),
+  const weights = winIndices.map(
+    (index) => 1n + pick(`${seed}:win-weight:${index}`, 100n),
   );
   let remainingWeight = weights.reduce((sum, weight) => sum + weight, 0n);
   winIndices.forEach((index, winIndex) => {
@@ -135,11 +131,16 @@ export function v2DailyTradePlan(input: {
   }));
   const actual = slots.reduce(
     (sum, slot) =>
-      sum + BigInt(new Prisma.Decimal(slot.resultPercent).mul(MICRO.toString()).toFixed(0)),
+      sum +
+      BigInt(
+        new Prisma.Decimal(slot.resultPercent).mul(MICRO.toString()).toFixed(0),
+      ),
     0n,
   );
   if (actual !== target) {
-    throw new BadRequestException('V2 daily signed trade rates do not balance.');
+    throw new BadRequestException(
+      'V2 daily signed trade rates do not balance.',
+    );
   }
   return { dailyGrossRatePercent: formatMicros(target), slots };
 }

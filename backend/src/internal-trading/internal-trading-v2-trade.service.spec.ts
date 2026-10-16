@@ -29,8 +29,8 @@ describe('V2 reconciliation transaction conflict handling', () => {
       $queryRaw: jest.fn().mockResolvedValue([finishedState]),
       $executeRaw: jest.fn(),
     };
-    const transaction = jest.fn(
-      (work: (tx: typeof tx) => Promise<unknown>) => work(tx),
+    const transaction = jest.fn((work: (tx: typeof tx) => Promise<unknown>) =>
+      work(tx),
     );
     const prisma = { $transaction: transaction } as unknown as PrismaService;
     return {
@@ -55,7 +55,9 @@ describe('V2 reconciliation transaction conflict handling', () => {
     const { service, transaction } = makeService();
     transaction.mockRejectedValueOnce(conflict('P2034'));
 
-    await expect(service.reconcileSubscription(subscriptionId, null)).resolves.toMatchObject({
+    await expect(
+      service.reconcileSubscription(subscriptionId, null),
+    ).resolves.toMatchObject({
       createdEvents: 0,
       createdSettlements: 0,
     });
@@ -67,7 +69,9 @@ describe('V2 reconciliation transaction conflict handling', () => {
     const error = conflict('P2010', '1064');
     transaction.mockRejectedValueOnce(error);
 
-    await expect(service.reconcileSubscription(subscriptionId, null)).rejects.toBe(error);
+    await expect(
+      service.reconcileSubscription(subscriptionId, null),
+    ).rejects.toBe(error);
     expect(transaction).toHaveBeenCalledTimes(1);
   });
 
@@ -75,7 +79,9 @@ describe('V2 reconciliation transaction conflict handling', () => {
     const { service, transaction } = makeService();
     transaction.mockRejectedValue(conflict('P2010', '1213'));
 
-    await expect(service.reconcileSubscription(subscriptionId, null)).rejects.toMatchObject({
+    await expect(
+      service.reconcileSubscription(subscriptionId, null),
+    ).rejects.toMatchObject({
       code: 'P2010',
     });
     expect(transaction).toHaveBeenCalledTimes(3);

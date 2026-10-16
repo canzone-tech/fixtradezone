@@ -1,5 +1,11 @@
 import {
-  Controller, Get, Header, Param, ParseUUIDPipe, Post, Query,
+  Controller,
+  Get,
+  Header,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
 } from '@nestjs/common';
 import { AllowUserImpersonation } from '../auth/allow-user-impersonation.decorator';
 import type { AuthenticatedUser } from '../auth/auth-user';
@@ -20,8 +26,10 @@ export class InternalTradingClaimsReadController {
     @Query('subscriptionId') subscriptionId?: string,
   ) {
     return this.claims.listMyClaims(
-      user.id, page ? Number(page) : 1,
-      limit ? Number(limit) : 25, subscriptionId,
+      user.id,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 25,
+      subscriptionId,
     );
   }
 }

@@ -792,7 +792,8 @@ export class SubscriptionsService {
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
             earningAuthority,
             internalTradeSplitPolicyVersionId: internalTradePolicy?.id ?? null,
-            internalTradeFinancialModelVersion: internalTradePolicy?.financialModelVersion ?? null,
+            internalTradeFinancialModelVersion:
+              internalTradePolicy?.financialModelVersion ?? null,
             internalTradeUserSharePercent: internalTradePolicy
               ? new Prisma.Decimal(
                   internalTradePolicy.userSharePercent,

@@ -9,7 +9,10 @@ import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import type { AdminInternalTradingStateQueryDto } from './dto/internal-trading-lifecycle.dto';
-import { addLocalDays, derivePackageLifetimeTarget } from './internal-trading-package-earnings';
+import {
+  addLocalDays,
+  derivePackageLifetimeTarget,
+} from './internal-trading-package-earnings';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 
@@ -223,10 +226,7 @@ export class InternalTradingLifecycleService {
       // SUPER_ADMIN-published Trading Policy, NOT an environment-flag choice.
       // The environment flag only acts as an emergency V2 safety gate.
       const v2Enabled = policyRows[0].financialModelVersion === 'V2';
-      if (
-        v2Enabled &&
-        process.env.FTZ_INTERNAL_TRADING_V2_ENABLED !== 'true'
-      ) {
+      if (v2Enabled && process.env.FTZ_INTERNAL_TRADING_V2_ENABLED !== 'true') {
         throw new ServiceUnavailableException(
           'V2 activations are paused by the backend safety gate.',
         );
@@ -353,7 +353,9 @@ export class InternalTradingLifecycleService {
           metadata: {
             source: 'INTERNAL_TRADING',
             operation: 'INITIALIZE_SUBSCRIPTION',
-            targetBasis: v2Enabled ? 'PACKAGE_DAILY_NET_GROSS_RATE' : 'PACKAGE_USER_NET_DAILY_RATE',
+            targetBasis: v2Enabled
+              ? 'PACKAGE_DAILY_NET_GROSS_RATE'
+              : 'PACKAGE_USER_NET_DAILY_RATE',
             financialModelVersion: v2Enabled ? 'V2' : 'V1',
             subscriptionId: subscription.id,
             userId: subscription.userId,

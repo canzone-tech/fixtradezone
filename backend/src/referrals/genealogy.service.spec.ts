@@ -177,5 +177,4 @@ describe('GenealogyService', () => {
     expect(result.members).toEqual([]);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
-
 });

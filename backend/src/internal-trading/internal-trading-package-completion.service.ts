@@ -23,7 +23,8 @@ interface PendingCompletionRow {
 interface CompletionStateRow {
   subscriptionId: string;
   status: 'ACTIVE' | 'COMPLETED' | 'BLOCKED';
-  completionReason: 'TARGET_REACHED_AT_DURATION_END' | 'DURATION_ELAPSED' | null;
+  completionReason:
+    'TARGET_REACHED_AT_DURATION_END' | 'DURATION_ELAPSED' | null;
   principalAmount: Prisma.Decimal | string | number;
   completedAt: Date | null;
 }

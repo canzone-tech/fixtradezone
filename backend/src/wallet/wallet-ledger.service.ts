@@ -177,7 +177,10 @@ export class WalletLedgerService {
     );
 
     const skip = (query.page - 1) * query.limit;
-    const dateFilter = historyDateFilter(Prisma.sql`activity_rows.postedAt`, query);
+    const dateFilter = historyDateFilter(
+      Prisma.sql`activity_rows.postedAt`,
+      query,
+    );
     const activity = await this.prisma.$queryRaw<
       WalletActivityRow[]
     >(Prisma.sql`

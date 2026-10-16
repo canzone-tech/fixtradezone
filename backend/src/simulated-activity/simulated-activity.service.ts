@@ -959,15 +959,13 @@ export class SimulatedActivityService {
       if (
         subscription.status !== 'ACTIVE' ||
         activityStartAt > asOf ||
-        (
-          subscription.scheduledEndAt <= asOf &&
+        (subscription.scheduledEndAt <= asOf &&
           !(
             subscription.financialModelVersion === 'V2' &&
             subscription.finalTradeLocalDate !== null &&
             localDateForInstant(asOf, subscription.settlementTimezone) <=
               this.localDateString(subscription.finalTradeLocalDate)
-          )
-        )
+          ))
       ) {
         return {
           createdEvents: 0,

@@ -70,7 +70,11 @@ export function deterministicV2SlotIdentity(input: {
   timingWindows: SimulatedTimingWindow[];
   timezoneSnapshot: string;
 }): { scheduledAt: Date; assetSymbol: string } {
-  if (input.activitiesPerDay !== 5 || input.slotNumber < 1 || input.slotNumber > 5) {
+  if (
+    input.activitiesPerDay !== 5 ||
+    input.slotNumber < 1 ||
+    input.slotNumber > 5
+  ) {
     throw new BadRequestException('V2 needs exactly five scheduled slots.');
   }
   if (input.assetSymbols.length === 0) {
@@ -87,7 +91,12 @@ export function deterministicV2SlotIdentity(input: {
       timezoneSnapshot: input.timezoneSnapshot,
     }),
     assetSymbol:
-      input.assetSymbols[deterministicIndex(`${input.sourceKey}:asset`, input.assetSymbols.length)],
+      input.assetSymbols[
+        deterministicIndex(
+          `${input.sourceKey}:asset`,
+          input.assetSymbols.length,
+        )
+      ],
   };
 }
 

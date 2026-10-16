@@ -188,15 +188,20 @@ export class CanonicalInternalTradingTradeService {
     context: RequestContext = {},
     generationSource: 'WORKER' | 'RECONCILIATION' = 'RECONCILIATION',
   ) {
-    const versions = await this.canonicalPrisma.$queryRaw<Array<{
-      financialModelVersion: 'V1' | 'V2';
-    }>>(Prisma.sql`
+    const versions = await this.canonicalPrisma.$queryRaw<
+      Array<{
+        financialModelVersion: 'V1' | 'V2';
+      }>
+    >(Prisma.sql`
       SELECT financialModelVersion FROM internal_trade_subscription_states
       WHERE subscriptionId = ${subscriptionId} LIMIT 1
     `);
     if (versions[0]?.financialModelVersion === 'V2') {
       return this.v2TradeService.reconcileSubscription(
-        subscriptionId, actor, context, generationSource,
+        subscriptionId,
+        actor,
+        context,
+        generationSource,
       );
     }
     if (await this.requiresLegacyContinuation(subscriptionId)) {

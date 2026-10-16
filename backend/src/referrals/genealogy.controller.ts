@@ -1,7 +1,10 @@
 import { Controller, Get, Header, Query } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { GenealogyPageQueryDto, GenealogyLevelQueryDto } from './dto/genealogy-query.dto';
+import {
+  GenealogyPageQueryDto,
+  GenealogyLevelQueryDto,
+} from './dto/genealogy-query.dto';
 import { GenealogyService } from './genealogy.service';
 
 @Controller('referrals/me/genealogy')
