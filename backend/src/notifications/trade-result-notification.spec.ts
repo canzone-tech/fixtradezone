@@ -14,7 +14,9 @@ describe('Daily Trade WIN/LOSS inbox notification', () => {
   };
 
   function mockTransaction() {
-    const execute = jest.fn<Promise<number>, [Prisma.Sql]>().mockResolvedValue(1);
+    const execute = jest
+      .fn<Promise<number>, [Prisma.Sql]>()
+      .mockResolvedValue(1);
     const tx = { $executeRaw: execute } as unknown as Prisma.TransactionClient;
     return { tx, execute };
   }
