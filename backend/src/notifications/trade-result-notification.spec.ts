@@ -14,7 +14,7 @@ describe('Daily Trade WIN/LOSS inbox notification', () => {
   };
 
   function mockTransaction() {
-    const execute = jest.fn().mockResolvedValue(1);
+    const execute = jest.fn(async (_query: Prisma.Sql) => 1);
     const tx = { $executeRaw: execute } as unknown as Prisma.TransactionClient;
     return { tx, execute };
   }
@@ -24,7 +24,7 @@ describe('Daily Trade WIN/LOSS inbox notification', () => {
     await recordTradeResultNotification(tx, base);
 
     expect(execute).toHaveBeenCalledTimes(1);
-    const query = execute.mock.calls[0][0] as Prisma.Sql;
+    const query = execute.mock.calls[0][0];
     expect(query.strings.join(' ')).toContain('INSERT INTO user_notifications');
     expect(query.values).toEqual(
       expect.arrayContaining([
@@ -48,7 +48,7 @@ describe('Daily Trade WIN/LOSS inbox notification', () => {
       assetSymbol: 'ETH/USDT',
     });
 
-    const query = execute.mock.calls[0][0] as Prisma.Sql;
+    const query = execute.mock.calls[0][0];
     expect(query.values).toContain('Daily Trade LOSS — ETH/USDT');
     expect(query.values).toContain(
       'Your algorithm-generated ETH/USDT Daily Trade #5 completed with a negative result. View Daily Trade History.',
