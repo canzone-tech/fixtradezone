@@ -10,6 +10,7 @@ import type {
   AdminGenealogyPageQueryDto,
   AdminGenealogySearchQueryDto,
   GenealogyPageQueryDto,
+  GenealogyLevelQueryDto,
 } from './dto/genealogy-query.dto';
 
 const CONFIG_ID = 1;
@@ -53,6 +54,92 @@ export class GenealogyService {
       query.page,
       query.limit,
     );
+  }
+
+  async getMineLevel(user: AuthenticatedUser, query: GenealogyLevelQueryDto) {
+    // The recursive query is anchored to the authenticated user, so it never
+    // traverses or exposes members of another referral subtree.
+    const counts = await this.prisma.$queryRaw<
+      Array<{ depth: number; total: bigint | number | string }>
+    >(Prisma.sql`
+      WITH RECURSIVE downline (userId, depth) AS (
+        SELECT p.userId, 0
+        FROM referral_profiles p
+        WHERE p.userId = ${user.id}
+        UNION ALL
+        SELECT child.userId, d.depth + 1
+        FROM referral_profiles child
+        INNER JOIN downline d ON child.sponsorUserId = d.userId
+        WHERE d.depth < ${MAX_GENEALOGY_DEPTH}
+      )
+      SELECT depth, COUNT(*) AS total
+      FROM downline
+      WHERE depth > 0
+      GROUP BY depth
+      ORDER BY depth ASC
+    `);
+
+    const levels = counts.map((row) => ({
+      level: Number(row.depth),
+      count: this.countNumber(row.total),
+    }));
+    const teamCount = levels.reduce((sum, row) => sum + row.count, 0);
+    const directCount = levels.find((row) => row.level === 1)?.count ?? 0;
+    const total = levels.find((row) => row.level === query.level)?.count ?? 0;
+    const offset = (query.page - 1) * query.limit;
+
+    const members = total === 0
+      ? []
+      : await this.prisma.$queryRaw<Array<{
+          id: string;
+          username: string;
+          firstName: string | null;
+          lastName: string | null;
+          status: string;
+          referralCode: string;
+          sponsorUserId: string | null;
+          sponsorUsername: string | null;
+          sponsorFirstName: string | null;
+          sponsorLastName: string | null;
+        }>>(Prisma.sql`
+          WITH RECURSIVE downline (userId, depth) AS (
+            SELECT p.userId, 0
+            FROM referral_profiles p
+            WHERE p.userId = ${user.id}
+            UNION ALL
+            SELECT child.userId, d.depth + 1
+            FROM referral_profiles child
+            INNER JOIN downline d ON child.sponsorUserId = d.userId
+            WHERE d.depth < ${MAX_GENEALOGY_DEPTH}
+          )
+          SELECT u.id, u.username, u.firstName, u.lastName, u.status,
+                 p.referralCode, p.sponsorUserId,
+                 sponsor.username AS sponsorUsername,
+                 sponsor.firstName AS sponsorFirstName,
+                 sponsor.lastName AS sponsorLastName
+          FROM downline d
+          INNER JOIN referral_profiles p ON p.userId = d.userId
+          INNER JOIN users u ON u.id = d.userId
+          LEFT JOIN users sponsor ON sponsor.id = p.sponsorUserId
+          WHERE d.depth = ${query.level}
+          ORDER BY p.createdAt ASC, p.userId ASC
+          LIMIT ${query.limit} OFFSET ${offset}
+        `);
+
+    return {
+      rootUserId: user.id,
+      directCount,
+      teamCount,
+      levels,
+      selectedLevel: query.level,
+      members,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / query.limit)),
+      },
+    };
   }
 
   async getAdmin(query: AdminGenealogyPageQueryDto) {
