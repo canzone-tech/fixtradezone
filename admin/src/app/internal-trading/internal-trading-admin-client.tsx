@@ -251,6 +251,37 @@ export default function InternalTradingAdminClient() {
     [policies],
   );
 
+  // A PUBLISHED policy can be scheduled for a future trading-day boundary.
+  // Match the backend's effectiveFrom/effectiveTo predicates instead of
+  // presenting the latest published policy as active immediately.
+  const effectivePolicy = useMemo(() => {
+    const now = Date.now();
+    return (
+      policies.find((policy) => {
+        if (policy.status !== "PUBLISHED" || !policy.effectiveFrom) {
+          return false;
+        }
+        const from = Date.parse(policy.effectiveFrom);
+        const to = policy.effectiveTo
+          ? Date.parse(policy.effectiveTo)
+          : Number.POSITIVE_INFINITY;
+        return Number.isFinite(from) && from <= now && now < to;
+      }) ?? null
+    );
+  }, [policies]);
+
+  const scheduledPolicy = useMemo(() => {
+    const now = Date.now();
+    return (
+      policies.find(
+        (policy) =>
+          policy.status === "PUBLISHED" &&
+          Boolean(policy.effectiveFrom) &&
+          Date.parse(policy.effectiveFrom!) > now,
+      ) ?? null
+    );
+  }, [policies]);
+
   const selected = useMemo(
     () =>
       workspace?.states.find((state) => state.subscriptionId === selectedId) ??
@@ -738,42 +769,65 @@ export default function InternalTradingAdminClient() {
             </span>
           </div>
 
-          {published ? (
+          {effectivePolicy ? (
             <dl className={styles.detailList}>
               <div>
                 <dt>Version</dt>
-                <dd>V{published.versionNumber}</dd>
+                <dd>V{effectivePolicy.versionNumber}</dd>
               </div>
               <div>
                 <dt>Financial model</dt>
-                <dd>{published.financialModelVersion} {published.financialModelVersion === "V2" ? "(Claim Profit)" : "(automatic)"}</dd>
+                <dd>
+                  {effectivePolicy.financialModelVersion}{" "}
+                  {effectivePolicy.financialModelVersion === "V2"
+                    ? "(Claim Profit)"
+                    : "(automatic)"}
+                </dd>
+              </div>
+              <div>
+                <dt>Trading enabled</dt>
+                <dd>{effectivePolicy.enabled ? "Yes" : "No"}</dd>
               </div>
               <div>
                 <dt>Trades / day</dt>
-                <dd>{published.activitiesPerDay}</dd>
+                <dd>{effectivePolicy.activitiesPerDay}</dd>
               </div>
               <div>
                 <dt>Split</dt>
                 <dd>
-                  {published.userSharePercent}% / {published.adminSharePercent}%
+                  {effectivePolicy.userSharePercent}% /{" "}
+                  {effectivePolicy.adminSharePercent}%
                 </dd>
               </div>
               <div>
                 <dt>Assets</dt>
-                <dd>{formatAssetSymbols(published.assetSymbols).join(", ")}</dd>
+                <dd>
+                  {formatAssetSymbols(effectivePolicy.assetSymbols).join(", ")}
+                </dd>
               </div>
               <div>
-                <dt>Effective (UTC)</dt>
+                <dt>Effective from (UTC)</dt>
                 <dd>
-                  {published.effectiveFrom
-                    ? formatPlatformDateTime(published.effectiveFrom)
+                  {effectivePolicy.effectiveFrom
+                    ? formatPlatformDateTime(effectivePolicy.effectiveFrom)
                     : "Not effective"}
                 </dd>
               </div>
             </dl>
           ) : (
-            <div className={styles.empty}>No published policy.</div>
+            <div className={styles.empty}>No policy is currently effective.</div>
           )}
+          {scheduledPolicy ? (
+            <p className={styles.muted}>
+              Scheduled: V{scheduledPolicy.versionNumber} (
+              {scheduledPolicy.financialModelVersion}) becomes effective{" "}
+              {scheduledPolicy.effectiveFrom
+                ? formatPlatformDateTime(scheduledPolicy.effectiveFrom)
+                : "at its published boundary"}
+              {" "}UTC. New subscriptions use the currently effective policy
+              until then.
+            </p>
+          ) : null}
         </div>
       </section>
 
