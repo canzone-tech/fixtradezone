@@ -45,8 +45,6 @@ export default function LevelWiseMembers({ onAccessError }: Props) {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
 
     const params = new URLSearchParams({
       level: String(level),
@@ -94,6 +92,8 @@ export default function LevelWiseMembers({ onAccessError }: Props) {
           <select
             value={level}
             onChange={(event) => {
+              setLoading(true);
+              setError("");
               setLevel(Number(event.target.value));
               setPage(1);
             }}
@@ -169,14 +169,22 @@ export default function LevelWiseMembers({ onAccessError }: Props) {
             <div>
               <button
                 type="button"
-                onClick={() => setPage((previous) => Math.max(1, previous - 1))}
+                onClick={() => {
+                  setLoading(true);
+                  setError("");
+                  setPage((previous) => Math.max(1, previous - 1));
+                }}
                 disabled={page <= 1}
               >
                 Previous
               </button>
               <button
                 type="button"
-                onClick={() => setPage((previous) => previous + 1)}
+                onClick={() => {
+                  setLoading(true);
+                  setError("");
+                  setPage((previous) => previous + 1);
+                }}
                 disabled={page >= data.pagination.totalPages}
               >
                 Next
