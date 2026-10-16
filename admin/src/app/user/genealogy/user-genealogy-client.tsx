@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import GenealogyTree from "@/components/genealogy/genealogy-tree";
+import LevelWiseMembers from "./level-wise-members";
 import UserShell from "@/components/user/user-shell";
 import type { UserDirectSession } from "@/lib/user-session";
 import styles from "./user-genealogy.module.css";
@@ -25,6 +26,8 @@ export default function UserGenealogyClient() {
   const [session, setSession] = useState<UserDirectSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"tree" | "levels">("tree");
+  const [counts, setCounts] = useState<{ directCount: number; teamCount: number } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -88,6 +91,36 @@ export default function UserGenealogyClient() {
     [router],
   );
 
+  useEffect(() => {
+    if (!session) return;
+    const controller = new AbortController();
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          "/api/user/referrals/genealogy/levels?level=1&page=1&limit=1",
+          { cache: "no-store", signal: controller.signal },
+        );
+        if (response.status === 401) handleAccessError(401);
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          directCount: number;
+          teamCount: number;
+        };
+        if (!controller.signal.aborted) {
+          setCounts({
+            directCount: payload.directCount,
+            teamCount: payload.teamCount,
+          });
+        }
+      } catch {
+        // The existing tree remains usable even if count retrieval fails.
+      }
+    })();
+
+    return () => controller.abort();
+  }, [session, handleAccessError]);
+
   if (loading) {
     return (
       <UserShell session={null}>
@@ -130,10 +163,40 @@ export default function UserGenealogyClient() {
           </div>
         </header>
 
-        <GenealogyTree
-          apiPath="/api/user/referrals/genealogy"
-          onAccessError={handleAccessError}
-        />
+        <div className={styles.counts} aria-label="Your referral network size">
+          <span>Direct Members: <strong>{counts?.directCount ?? "—"}</strong></span>
+          <span>Total Team Members: <strong>{counts?.teamCount ?? "—"}</strong></span>
+        </div>
+
+        <div className={styles.tabs} role="tablist" aria-label="Genealogy views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "tree"}
+            onClick={() => setTab("tree")}
+          >
+            Genealogy Tree
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "levels"}
+            onClick={() => setTab("levels")}
+          >
+            Level-wise Members
+          </button>
+        </div>
+
+        <div role="tabpanel" aria-label={tab === "tree" ? "Genealogy Tree" : "Level-wise Members"}>
+          {tab === "tree" ? (
+            <GenealogyTree
+              apiPath="/api/user/referrals/genealogy"
+              onAccessError={handleAccessError}
+            />
+          ) : (
+            <LevelWiseMembers onAccessError={handleAccessError} />
+          )}
+        </div>
       </div>
     </UserShell>
   );
