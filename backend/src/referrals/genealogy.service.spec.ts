@@ -125,4 +125,57 @@ describe('GenealogyService', () => {
     expect(result.parent.id).toBe(ROOT_ID);
     expect(result.children).toEqual([]);
   });
+  it('lists level members with their direct sponsors and full team counts', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([
+        { depth: 1, total: BigInt(1) },
+        { depth: 2, total: BigInt(2) },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: OUTSIDE_ID,
+          username: 'grandchild',
+          firstName: null,
+          lastName: null,
+          status: 'ACTIVE',
+          referralCode: 'FTZ-GRANDCHILD',
+          sponsorUserId: CHILD_ID,
+          sponsorUsername: 'child',
+          sponsorFirstName: null,
+          sponsorLastName: null,
+        },
+      ]);
+
+    const result = await service.getMineLevel(user, {
+      level: 2,
+      page: 1,
+      limit: 25,
+    });
+
+    expect(result).toMatchObject({
+      rootUserId: ROOT_ID,
+      directCount: 1,
+      teamCount: 3,
+      selectedLevel: 2,
+      pagination: { total: 2, totalPages: 1 },
+      members: [{ username: 'grandchild', sponsorUsername: 'child' }],
+    });
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports an empty team without exposing members from other subtrees', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([]);
+
+    const result = await service.getMineLevel(user, {
+      level: 1,
+      page: 1,
+      limit: 25,
+    });
+
+    expect(result.directCount).toBe(0);
+    expect(result.teamCount).toBe(0);
+    expect(result.members).toEqual([]);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
 });
