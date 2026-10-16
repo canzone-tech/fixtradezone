@@ -187,15 +187,14 @@ export default function UserGenealogyClient() {
           </button>
         </div>
 
-        <div role="tabpanel" aria-label={tab === "tree" ? "Genealogy Tree" : "Level-wise Members"}>
-          {tab === "tree" ? (
-            <GenealogyTree
-              apiPath="/api/user/referrals/genealogy"
-              onAccessError={handleAccessError}
-            />
-          ) : (
-            <LevelWiseMembers onAccessError={handleAccessError} />
-          )}
+        <div role="tabpanel" aria-label="Genealogy Tree" hidden={tab !== "tree"}>
+          <GenealogyTree
+            apiPath="/api/user/referrals/genealogy"
+            onAccessError={handleAccessError}
+          />
+        </div>
+        <div role="tabpanel" aria-label="Level-wise Members" hidden={tab !== "levels"}>
+          {tab === "levels" ? <LevelWiseMembers onAccessError={handleAccessError} /> : null}
         </div>
       </div>
     </UserShell>
