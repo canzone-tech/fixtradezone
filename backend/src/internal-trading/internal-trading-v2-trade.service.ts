@@ -10,6 +10,7 @@ import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import { addLocalDays } from './internal-trading-package-earnings';
 import { v2DailyTradePlan } from './internal-trading-v2-plan';
+import { recordTradeResultNotification } from '../notifications/trade-result-notification';
 
 const MAX_DAYS_PER_RECONCILE = 1500;
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
@@ -294,6 +295,14 @@ export class InternalTradingV2TradeService {
               CURRENT_TIMESTAMP(3)
             )
           `);
+
+          await recordTradeResultNotification(tx, {
+            userId: state.userId,
+            eventId,
+            assetSymbol: e.assetSymbol,
+            outcome: e.outcome,
+            slotNumber: e.slotNumber,
+          });
 
           const isFinal = date === expectedFinal && e.slotNumber === 5;
           const updated = await tx.$executeRaw(Prisma.sql`
