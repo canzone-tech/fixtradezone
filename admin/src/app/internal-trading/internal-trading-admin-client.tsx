@@ -30,6 +30,7 @@ interface Policy {
   status: "DRAFT" | "PUBLISHED";
   revision: number;
   enabled: boolean;
+  financialModelVersion: "V1" | "V2";
   activitiesPerDay: number;
   assetSymbols: string[];
   winWeight: number;
@@ -49,6 +50,7 @@ interface Policy {
 
 interface StateRow {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   userId: string;
   username?: string;
   email?: string | null;
@@ -113,6 +115,7 @@ interface EventsPayload {
 
 interface FormState {
   enabled: boolean;
+  financialModelVersion: "V1" | "V2";
   activitiesPerDay: string;
   assetSymbols: string;
   winWeight: string;
@@ -129,6 +132,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   enabled: true,
+  financialModelVersion: "V1",
   activitiesPerDay: "5",
   assetSymbols: "BTC/USDT, ETH/USDT, SOL/USDT",
   winWeight: "3",
@@ -186,6 +190,7 @@ function parseWindows(value: string): TimingWindow[] {
 function formFor(policy: Policy): FormState {
   return {
     enabled: policy.enabled,
+    financialModelVersion: policy.financialModelVersion,
     activitiesPerDay: String(policy.activitiesPerDay),
     assetSymbols: formatAssetSymbols(policy.assetSymbols).join(", "),
     winWeight: String(policy.winWeight),
@@ -245,6 +250,40 @@ export default function InternalTradingAdminClient() {
     () => policies.find((policy) => policy.status === "PUBLISHED") ?? null,
     [policies],
   );
+
+  // A PUBLISHED policy can be scheduled for a future trading-day boundary.
+  // Match the backend's effectiveFrom/effectiveTo predicates instead of
+  // presenting the latest published policy as active immediately.
+  // A fixed page-load timestamp avoids evaluating an impure clock during
+  // React render and gives both policy labels the same comparison instant.
+  const [policyReferenceNow] = useState(() => Date.now());
+  const effectivePolicy = useMemo(() => {
+    const now = policyReferenceNow;
+    return (
+      policies.find((policy) => {
+        if (policy.status !== "PUBLISHED" || !policy.effectiveFrom) {
+          return false;
+        }
+        const from = Date.parse(policy.effectiveFrom);
+        const to = policy.effectiveTo
+          ? Date.parse(policy.effectiveTo)
+          : Number.POSITIVE_INFINITY;
+        return Number.isFinite(from) && from <= now && now < to;
+      }) ?? null
+    );
+  }, [policies, policyReferenceNow]);
+
+  const scheduledPolicy = useMemo(() => {
+    const now = policyReferenceNow;
+    return (
+      policies.find(
+        (policy) =>
+          policy.status === "PUBLISHED" &&
+          Boolean(policy.effectiveFrom) &&
+          Date.parse(policy.effectiveFrom!) > now,
+      ) ?? null
+    );
+  }, [policies, policyReferenceNow]);
 
   const selected = useMemo(
     () =>
@@ -445,17 +484,12 @@ export default function InternalTradingAdminClient() {
             expectedRevision: draft.revision,
             reason: form.reason || "Update internal trading policy.",
             enabled: form.enabled,
-            activitiesPerDay: Number(form.activitiesPerDay),
+            financialModelVersion: form.financialModelVersion,
+            activitiesPerDay: 5,
             assetSymbols: form.assetSymbols
               .split(/[,\n]+/)
               .map(normalizeAssetSymbol)
               .filter(Boolean),
-            winWeight: Number(form.winWeight),
-            lossWeight: Number(form.lossWeight),
-            winMinimumPercent: form.winMinimumPercent,
-            winMaximumPercent: form.winMaximumPercent,
-            lossMinimumPercent: form.lossMinimumPercent,
-            lossMaximumPercent: form.lossMaximumPercent,
             timingWindows: parseWindows(form.timingWindows),
             userSharePercent: form.userSharePercent,
             adminSharePercent: form.adminSharePercent,
@@ -511,8 +545,8 @@ export default function InternalTradingAdminClient() {
           <p className={styles.eyebrow}>ITD / INTERNAL TRADING</p>
           <h2>Internal Trading</h2>
           <p>
-            Manage package-linked internal trading, global trade policy, package
-            progress, immediate WIN settlements and immutable trade history.
+            Manage algorithm-generated trading, historical V1 and new V2 manual
+            claim settlements, and immutable trade history.
           </p>
         </div>
 
@@ -579,6 +613,31 @@ export default function InternalTradingAdminClient() {
           </div>
 
           <div className={styles.formGrid}>
+            <div className={styles.fieldWide}>
+              <label htmlFor="ftz-internal-trading-financial-model">
+                Financial model (new subscriptions only)
+              </label>
+              <select
+                id="ftz-internal-trading-financial-model"
+                className={styles.select}
+                value={form.financialModelVersion}
+                disabled={!isSuperAdmin || !draft || busy}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    financialModelVersion: event.target.value as "V1" | "V2",
+                  }))
+                }
+              >
+                <option value="V1">V1 — Existing automatic settlement</option>
+                <option value="V2">V2 — Five Daily Trades + Claim Profit</option>
+              </select>
+              <p className={styles.muted}>
+                Uses the existing Draft → Save → Publish workflow. Publishing
+                applies from the next effective trading day, only to new package
+                activations. Existing subscriptions keep their original model.
+              </p>
+            </div>
             <label className={styles.checkbox}>
               <input
                 type="checkbox"
@@ -596,16 +655,7 @@ export default function InternalTradingAdminClient() {
 
             <div className={styles.field}>
               <label>Trades per day</label>
-              <input
-                value={form.activitiesPerDay}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    activitiesPerDay: event.target.value,
-                  }))
-                }
-              />
+              <input value="5" readOnly aria-label="V2 trades per day (fixed)" />
             </div>
 
             <div className={styles.fieldWide}>
@@ -617,90 +667,6 @@ export default function InternalTradingAdminClient() {
                   setForm((current) => ({
                     ...current,
                     assetSymbols: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN weight · 3 = 60%</label>
-              <input
-                value={form.winWeight}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winWeight: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS weight · 2 = 40%</label>
-              <input
-                value={form.lossWeight}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossWeight: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN % minimum</label>
-              <input
-                value={form.winMinimumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winMinimumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>WIN % maximum</label>
-              <input
-                value={form.winMaximumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    winMaximumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS % minimum</label>
-              <input
-                value={form.lossMinimumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossMinimumPercent: event.target.value,
-                  }))
-                }
-              />
-            </div>
-
-            <div className={styles.field}>
-              <label>LOSS % maximum</label>
-              <input
-                value={form.lossMaximumPercent}
-                disabled={!isSuperAdmin}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    lossMaximumPercent: event.target.value,
                   }))
                 }
               />
@@ -806,38 +772,65 @@ export default function InternalTradingAdminClient() {
             </span>
           </div>
 
-          {published ? (
+          {effectivePolicy ? (
             <dl className={styles.detailList}>
               <div>
                 <dt>Version</dt>
-                <dd>V{published.versionNumber}</dd>
+                <dd>V{effectivePolicy.versionNumber}</dd>
+              </div>
+              <div>
+                <dt>Financial model</dt>
+                <dd>
+                  {effectivePolicy.financialModelVersion}{" "}
+                  {effectivePolicy.financialModelVersion === "V2"
+                    ? "(Claim Profit)"
+                    : "(automatic)"}
+                </dd>
+              </div>
+              <div>
+                <dt>Trading enabled</dt>
+                <dd>{effectivePolicy.enabled ? "Yes" : "No"}</dd>
               </div>
               <div>
                 <dt>Trades / day</dt>
-                <dd>{published.activitiesPerDay}</dd>
+                <dd>{effectivePolicy.activitiesPerDay}</dd>
               </div>
               <div>
                 <dt>Split</dt>
                 <dd>
-                  {published.userSharePercent}% / {published.adminSharePercent}%
+                  {effectivePolicy.userSharePercent}% /{" "}
+                  {effectivePolicy.adminSharePercent}%
                 </dd>
               </div>
               <div>
                 <dt>Assets</dt>
-                <dd>{formatAssetSymbols(published.assetSymbols).join(", ")}</dd>
+                <dd>
+                  {formatAssetSymbols(effectivePolicy.assetSymbols).join(", ")}
+                </dd>
               </div>
               <div>
-                <dt>Effective (UTC)</dt>
+                <dt>Effective from (UTC)</dt>
                 <dd>
-                  {published.effectiveFrom
-                    ? formatPlatformDateTime(published.effectiveFrom)
+                  {effectivePolicy.effectiveFrom
+                    ? formatPlatformDateTime(effectivePolicy.effectiveFrom)
                     : "Not effective"}
                 </dd>
               </div>
             </dl>
           ) : (
-            <div className={styles.empty}>No published policy.</div>
+            <div className={styles.empty}>No policy is currently effective.</div>
           )}
+          {scheduledPolicy ? (
+            <p className={styles.muted}>
+              Scheduled: V{scheduledPolicy.versionNumber} (
+              {scheduledPolicy.financialModelVersion}) becomes effective{" "}
+              {scheduledPolicy.effectiveFrom
+                ? formatPlatformDateTime(scheduledPolicy.effectiveFrom)
+                : "at its published boundary"}
+              {" "}UTC. New subscriptions use the currently effective policy
+              until then.
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -894,7 +887,7 @@ export default function InternalTradingAdminClient() {
                     </span>
                   </td>
                   <td>{money(state.principalAmount, state.currency)}</td>
-                  <td>{money(state.grossTarget, state.currency)}</td>
+                  <td>{state.financialModelVersion === 'V2' ? 'Daily NET (V2)' : money(state.grossTarget, state.currency)}</td>
                   <td>{money(state.grossNetProgress, state.currency)}</td>
                   <td>{money(state.grossHighWaterMark, state.currency)}</td>
                   <td>{money(state.userCreditedAmount, state.currency)}</td>
@@ -940,14 +933,23 @@ export default function InternalTradingAdminClient() {
                 <dt>Principal</dt>
                 <dd>{money(selected.principalAmount, selected.currency)}</dd>
               </div>
-              <div>
-                <dt>Multiplier</dt>
-                <dd>{selected.grossMultiplier}x</dd>
-              </div>
-              <div>
-                <dt>Gross target</dt>
-                <dd>{money(selected.grossTarget, selected.currency)}</dd>
-              </div>
+              {selected.financialModelVersion === 'V1' ? (
+                <>
+                  <div>
+                    <dt>Multiplier (legacy V1)</dt>
+                    <dd>{selected.grossMultiplier}x</dd>
+                  </div>
+                  <div>
+                    <dt>Gross target (legacy V1)</dt>
+                    <dd>{money(selected.grossTarget, selected.currency)}</dd>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <dt>Trading model</dt>
+                  <dd>V2 — independent daily NET / manual profit claim</dd>
+                </div>
+              )}
               <div>
                 <dt>Gross progress</dt>
                 <dd>{money(selected.grossNetProgress, selected.currency)}</dd>

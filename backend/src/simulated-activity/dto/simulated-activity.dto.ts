@@ -49,6 +49,20 @@ export class SimulatedActivityPageQueryDto {
   @Min(1)
   @Max(100)
   limit = 25;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn([1, 2, 7, 30])
+  days?: number;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  fromDate?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  toDate?: string;
 }
 
 export class AdminSimulatedActivityEventQueryDto extends SimulatedActivityPageQueryDto {

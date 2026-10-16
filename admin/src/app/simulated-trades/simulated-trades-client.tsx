@@ -397,15 +397,9 @@ export default function SimulatedTradesClient() {
             expectedRevision: draft.revision,
             reason: form.reason.trim(),
             enabled: form.enabled,
-            activitiesPerDay: Number(form.activitiesPerDay),
+            activitiesPerDay: 5,
             minimumGapMinutes: Number(form.minimumGapMinutes),
             assetSymbols: parseAssets(form.assetSymbols),
-            winWeight: Number(form.winWeight),
-            lossWeight: Number(form.lossWeight),
-            winMinimumPercent: form.winMinimumPercent.trim(),
-            winMaximumPercent: form.winMaximumPercent.trim(),
-            lossMinimumPercent: form.lossMinimumPercent.trim(),
-            lossMaximumPercent: form.lossMaximumPercent.trim(),
             timingWindows,
           }),
         },
@@ -657,17 +651,8 @@ export default function SimulatedTradesClient() {
                 <label htmlFor="activitiesPerDay">
                   Trades / day / ACTIVE subscription
                 </label>
-                <input
-                  id="activitiesPerDay"
-                  type="number"
-                  min="1"
-                  max="50"
-                  value={form.activitiesPerDay}
-                  onChange={(event) =>
-                    updateForm("activitiesPerDay", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
+                <input id="activitiesPerDay" type="number" value={5} readOnly />
+                <small className={styles.muted}>V2 uses exactly five canonical trades per day.</small>
               </div>
               <div className={styles.field}>
                 <label htmlFor="minimumGapMinutes">Minimum gap (minutes)</label>
@@ -692,76 +677,6 @@ export default function SimulatedTradesClient() {
                   value={form.assetSymbols}
                   onChange={(event) =>
                     updateForm("assetSymbols", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="winWeight">WIN weight</label>
-                <input
-                  id="winWeight"
-                  type="number"
-                  min="0"
-                  value={form.winWeight}
-                  onChange={(event) =>
-                    updateForm("winWeight", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="lossWeight">LOSS weight</label>
-                <input
-                  id="lossWeight"
-                  type="number"
-                  min="0"
-                  value={form.lossWeight}
-                  onChange={(event) =>
-                    updateForm("lossWeight", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="winMin">WIN min %</label>
-                <input
-                  id="winMin"
-                  value={form.winMinimumPercent}
-                  onChange={(event) =>
-                    updateForm("winMinimumPercent", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="winMax">WIN max %</label>
-                <input
-                  id="winMax"
-                  value={form.winMaximumPercent}
-                  onChange={(event) =>
-                    updateForm("winMaximumPercent", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="lossMin">LOSS magnitude min %</label>
-                <input
-                  id="lossMin"
-                  value={form.lossMinimumPercent}
-                  onChange={(event) =>
-                    updateForm("lossMinimumPercent", event.target.value)
-                  }
-                  disabled={!isSuperAdmin || saving}
-                />
-              </div>
-              <div className={styles.field}>
-                <label htmlFor="lossMax">LOSS magnitude max %</label>
-                <input
-                  id="lossMax"
-                  value={form.lossMaximumPercent}
-                  onChange={(event) =>
-                    updateForm("lossMaximumPercent", event.target.value)
                   }
                   disabled={!isSuperAdmin || saving}
                 />
@@ -835,26 +750,6 @@ export default function SimulatedTradesClient() {
                   <dt>Assets</dt>
                   <dd>
                     {formatAssetSymbols(latestPublished.assetSymbols).join(", ")}
-                  </dd>
-                </div>
-                <div>
-                  <dt>WIN / LOSS weight</dt>
-                  <dd>
-                    {latestPublished.winWeight} / {latestPublished.lossWeight}
-                  </dd>
-                </div>
-                <div>
-                  <dt>WIN range</dt>
-                  <dd>
-                    {latestPublished.winMinimumPercent}% –{" "}
-                    {latestPublished.winMaximumPercent}%
-                  </dd>
-                </div>
-                <div>
-                  <dt>LOSS magnitude range</dt>
-                  <dd>
-                    {latestPublished.lossMinimumPercent}% –{" "}
-                    {latestPublished.lossMaximumPercent}%
                   </dd>
                 </div>
                 <div>

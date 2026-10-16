@@ -11,6 +11,8 @@ import { SUPER_ADMIN_ROLE_NAME } from '../auth/auth.constants';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
+import { v2DailyTradePlan } from '../internal-trading/internal-trading-v2-plan';
+import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type {
   AdminSimulatedActivityEventQueryDto,
@@ -21,6 +23,7 @@ import type {
 } from './dto/simulated-activity.dto';
 import {
   deterministicSimulatedSlot,
+  deterministicV2SlotIdentity,
   localDateForInstant,
   localDateStartAtOrAfterUtc,
   nextLocalDateStartUtc,
@@ -78,6 +81,12 @@ interface PolicyRow {
 
 interface SubscriptionRow {
   id: string;
+  financialModelVersion: 'V1' | 'V2' | null;
+  finalTradeLocalDate: Date | string | null;
+  rewardRateMode: 'FIXED' | 'RANDOM_RANGE' | 'MANUAL' | 'RULE_BASED';
+  fixedRewardRate: DecimalValue | null;
+  minimumRewardRate: DecimalValue | null;
+  maximumRewardRate: DecimalValue | null;
   userId: string;
   packagePlanVersionId: string;
   packagePlanItemId: string;
@@ -567,11 +576,13 @@ export class SimulatedActivityService {
 
   async getMyActivity(userId: string, query: SimulatedActivityPageQueryDto) {
     const skip = (query.page - 1) * query.limit;
+    const dateFilter = historyDateFilter(Prisma.sql`localActivityDate`, query);
     const rows = await this.prisma.$queryRaw<EventRow[]>(Prisma.sql`
       SELECT *
       FROM simulated_trade_activity_events
       WHERE userId = ${userId}
         AND scheduledAt <= UTC_TIMESTAMP(3)
+        ${dateFilter}
       ORDER BY scheduledAt DESC, id DESC
       LIMIT ${query.limit} OFFSET ${skip}
     `);
@@ -580,6 +591,7 @@ export class SimulatedActivityService {
       FROM simulated_trade_activity_events
       WHERE userId = ${userId}
         AND scheduledAt <= UTC_TIMESTAMP(3)
+        ${dateFilter}
     `);
     const activeRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
@@ -669,10 +681,17 @@ export class SimulatedActivityService {
     );
     const eligibleRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
-      FROM user_package_subscriptions
-      WHERE status = 'ACTIVE'
-        AND activatedAt <= ${asOf}
-        AND scheduledEndAt > ${asOf}
+      FROM user_package_subscriptions ups
+      LEFT JOIN internal_trade_subscription_states its
+        ON its.subscriptionId = ups.id
+      WHERE ups.status = 'ACTIVE'
+        AND ups.activatedAt <= ${asOf}
+        AND (
+          ups.scheduledEndAt > ${asOf}
+          OR (its.financialModelVersion = 'V2'
+            AND its.status = 'ACTIVE'
+            AND its.finalLocalDate >= ${localActivityDate})
+        )
     `);
     const eventRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
@@ -737,13 +756,20 @@ export class SimulatedActivityService {
       Prisma.sql`
         SELECT ups.id
         FROM user_package_subscriptions ups
+        LEFT JOIN internal_trade_subscription_states its
+          ON its.subscriptionId = ups.id
         LEFT JOIN simulated_trade_activity_events e
           ON e.subscriptionId = ups.id
           AND e.policyVersionId = ${policy.id}
           AND e.localActivityDate = ${localActivityDate}
         WHERE ups.status = 'ACTIVE'
           AND ups.activatedAt <= ${asOf}
-          AND ups.scheduledEndAt > ${asOf}
+          AND (
+            ups.scheduledEndAt > ${asOf}
+            OR (its.financialModelVersion = 'V2'
+              AND its.status = 'ACTIVE'
+              AND its.finalLocalDate >= ${localActivityDate})
+          )
         GROUP BY ups.id, ups.activatedAt
         ORDER BY COUNT(e.id) ASC, MAX(e.scheduledAt) ASC, ups.activatedAt ASC, ups.id ASC
         LIMIT ${SIMULATED_ACTIVITY_BATCH_LIMIT}
@@ -933,7 +959,13 @@ export class SimulatedActivityService {
       if (
         subscription.status !== 'ACTIVE' ||
         activityStartAt > asOf ||
-        subscription.scheduledEndAt <= asOf
+        (subscription.scheduledEndAt <= asOf &&
+          !(
+            subscription.financialModelVersion === 'V2' &&
+            subscription.finalTradeLocalDate !== null &&
+            localDateForInstant(asOf, subscription.settlementTimezone) <=
+              this.localDateString(subscription.finalTradeLocalDate)
+          ))
       ) {
         return {
           createdEvents: 0,
@@ -955,6 +987,31 @@ export class SimulatedActivityService {
           ? activityStartAt
           : policy.effectiveFrom;
 
+      if (
+        subscription.financialModelVersion === 'V2' &&
+        (config.activitiesPerDay !== 5 ||
+          policy.timezoneSnapshot !== subscription.settlementTimezone)
+      ) {
+        throw new ServiceUnavailableException(
+          'V2 requires exactly five canonical slots in the subscription timezone.',
+        );
+      }
+
+      const v2Plan =
+        subscription.financialModelVersion === 'V2'
+          ? v2DailyTradePlan({
+              subscriptionId: subscription.id,
+              localTradeDate: localActivityDate,
+              terms: {
+                rewardRateMode: subscription.rewardRateMode,
+                fixedRewardRate: subscription.fixedRewardRate,
+                minimumRewardRate: subscription.minimumRewardRate,
+                maximumRewardRate: subscription.maximumRewardRate,
+              },
+              activitiesPerDay: config.activitiesPerDay,
+            })
+          : null;
+
       let createdEvents = 0;
       let alreadyPresent = 0;
       let skippedNotDue = 0;
@@ -971,22 +1028,38 @@ export class SimulatedActivityService {
           localActivityDate,
           slotNumber,
         );
-        const slot = deterministicSimulatedSlot({
-          sourceKey,
-          localActivityDate,
-          slotNumber,
-          activitiesPerDay: config.activitiesPerDay,
-          minimumGapMinutes: config.minimumGapMinutes,
-          assetSymbols: config.assetSymbols,
-          winWeight: config.winWeight,
-          lossWeight: config.lossWeight,
-          winMinimumPercent: config.winMinimumPercent,
-          winMaximumPercent: config.winMaximumPercent,
-          lossMinimumPercent: config.lossMinimumPercent,
-          lossMaximumPercent: config.lossMaximumPercent,
-          timingWindows: config.timingWindows,
-          timezoneSnapshot: policy.timezoneSnapshot,
-        });
+        const v2Slot = v2Plan?.slots[slotNumber - 1];
+        const slot = v2Slot
+          ? {
+              ...deterministicV2SlotIdentity({
+                sourceKey,
+                localActivityDate,
+                slotNumber,
+                activitiesPerDay: 5,
+                minimumGapMinutes: config.minimumGapMinutes,
+                assetSymbols: config.assetSymbols,
+                timingWindows: config.timingWindows,
+                timezoneSnapshot: policy.timezoneSnapshot,
+              }),
+              outcome: v2Slot.outcome,
+              resultPercent: v2Slot.resultPercent,
+            }
+          : deterministicSimulatedSlot({
+              sourceKey,
+              localActivityDate,
+              slotNumber,
+              activitiesPerDay: config.activitiesPerDay,
+              minimumGapMinutes: config.minimumGapMinutes,
+              assetSymbols: config.assetSymbols,
+              winWeight: config.winWeight,
+              lossWeight: config.lossWeight,
+              winMinimumPercent: config.winMinimumPercent,
+              winMaximumPercent: config.winMaximumPercent,
+              lossMinimumPercent: config.lossMinimumPercent,
+              lossMaximumPercent: config.lossMaximumPercent,
+              timingWindows: config.timingWindows,
+              timezoneSnapshot: policy.timezoneSnapshot,
+            });
 
         if (slot.scheduledAt < anchor || slot.scheduledAt > asOf) {
           skippedNotDue += 1;
@@ -1109,11 +1182,18 @@ export class SimulatedActivityService {
     const lock = forUpdate ? Prisma.sql`FOR UPDATE` : Prisma.empty;
     const rows = await client.$queryRaw<SubscriptionRow[]>(Prisma.sql`
       SELECT
-        id, userId, packagePlanVersionId, packagePlanItemId,
-        packageCode, packageDisplayName, status, activatedAt, scheduledEndAt,
-        settlementTimezone, rewardStartMode
-      FROM user_package_subscriptions
-      WHERE id = ${subscriptionId}
+        ups.id, ups.userId, ups.packagePlanVersionId, ups.packagePlanItemId,
+        ups.packageCode, ups.packageDisplayName,
+        ups.status, ups.activatedAt, ups.scheduledEndAt,
+        ups.settlementTimezone, ups.rewardStartMode,
+        ups.rewardRateMode, ups.fixedRewardRate,
+        ups.minimumRewardRate, ups.maximumRewardRate,
+        its.financialModelVersion,
+        its.finalLocalDate AS finalTradeLocalDate
+      FROM user_package_subscriptions ups
+      LEFT JOIN internal_trade_subscription_states its
+        ON its.subscriptionId = ups.id
+      WHERE ups.id = ${subscriptionId}
       LIMIT 1
       ${lock}
     `);
@@ -1343,6 +1423,12 @@ export class SimulatedActivityService {
     if (!actor.roles.includes(SUPER_ADMIN_ROLE_NAME)) {
       throw new ForbiddenException('SUPER_ADMIN access is required.');
     }
+  }
+
+  private localDateString(value: Date | string): string {
+    return value instanceof Date
+      ? value.toISOString().slice(0, 10)
+      : String(value).slice(0, 10);
   }
 
   private async runSerializable<T>(

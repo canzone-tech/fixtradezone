@@ -47,6 +47,7 @@ interface OperationsConfigRow {
 
 interface EffectiveInternalTradePolicyRow {
   id: string;
+  financialModelVersion: 'V1' | 'V2';
   userSharePercent: DecimalValue;
   adminSharePercent: DecimalValue;
 }
@@ -611,6 +612,7 @@ export class SubscriptionsService {
         Prisma.sql`
             SELECT
               id,
+              financialModelVersion,
               userSharePercent,
               adminSharePercent
             FROM internal_trade_policy_versions
@@ -628,6 +630,24 @@ export class SubscriptionsService {
       );
 
       const internalTradePolicy = internalTradePolicyRows[0] ?? null;
+      if (internalTradePolicy?.financialModelVersion === 'V2') {
+        // Fail before activation is committed (including wallet funding).
+        // An emergency OFF must never silently issue a V1 financial contract
+        // under a SUPER_ADMIN-published V2 policy.
+        if (process.env.FTZ_INTERNAL_TRADING_V2_ENABLED !== 'true') {
+          throw new ServiceUnavailableException(
+            'New V2 subscriptions are paused by the backend safety gate.',
+          );
+        }
+        if (
+          planItem.rewardRateMode !== 'FIXED' &&
+          planItem.rewardRateMode !== 'RANDOM_RANGE'
+        ) {
+          throw new ConflictException(
+            'V2 packages require FIXED or RANDOM_RANGE package daily rates.',
+          );
+        }
+      }
       const earningAuthority = internalTradePolicy
         ? ('INTERNAL_TRADING' as const)
         : ('LEGACY_REWARD' as const);
@@ -772,6 +792,8 @@ export class SubscriptionsService {
             timezoneSource: 'SYSTEM_OPERATIONS_CONFIG',
             earningAuthority,
             internalTradeSplitPolicyVersionId: internalTradePolicy?.id ?? null,
+            internalTradeFinancialModelVersion:
+              internalTradePolicy?.financialModelVersion ?? null,
             internalTradeUserSharePercent: internalTradePolicy
               ? new Prisma.Decimal(
                   internalTradePolicy.userSharePercent,

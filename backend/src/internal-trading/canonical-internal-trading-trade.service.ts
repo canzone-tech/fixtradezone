@@ -20,6 +20,8 @@ import {
   packageUserNetRateForDate,
 } from './internal-trading-package-earnings';
 import { InternalTradingTradeService } from './internal-trading-trade.service';
+import { InternalTradingV2TradeService } from './internal-trading-v2-trade.service';
+import { localDateForInstant } from '../simulated-activity/simulated-activity.calculation';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
 const MAX_RECONCILE_DAYS = 1500;
@@ -34,6 +36,7 @@ interface LegacyProbeRow {
 
 interface StateRow {
   subscriptionId: string;
+  financialModelVersion: 'V1' | 'V2';
   userId: string;
   splitPolicyVersionId: string;
   packagePlanVersionId: string;
@@ -97,6 +100,7 @@ interface CanonicalDailyTradeRow {
   outcome: 'WIN' | 'LOSS';
   resultPercent: DecimalValue;
   activitiesPerDay: number;
+  policyTimezoneSnapshot: string | null;
 }
 
 interface AccountRow {
@@ -129,7 +133,10 @@ interface BalanceSideRow {
 export class CanonicalInternalTradingTradeService {
   private readonly legacyTradeService: InternalTradingTradeService;
 
-  constructor(private readonly canonicalPrisma: PrismaService) {
+  constructor(
+    private readonly canonicalPrisma: PrismaService,
+    private readonly v2TradeService: InternalTradingV2TradeService,
+  ) {
     this.legacyTradeService = new InternalTradingTradeService(canonicalPrisma);
   }
 
@@ -181,6 +188,22 @@ export class CanonicalInternalTradingTradeService {
     context: RequestContext = {},
     generationSource: 'WORKER' | 'RECONCILIATION' = 'RECONCILIATION',
   ) {
+    const versions = await this.canonicalPrisma.$queryRaw<
+      Array<{
+        financialModelVersion: 'V1' | 'V2';
+      }>
+    >(Prisma.sql`
+      SELECT financialModelVersion FROM internal_trade_subscription_states
+      WHERE subscriptionId = ${subscriptionId} LIMIT 1
+    `);
+    if (versions[0]?.financialModelVersion === 'V2') {
+      return this.v2TradeService.reconcileSubscription(
+        subscriptionId,
+        actor,
+        context,
+        generationSource,
+      );
+    }
     if (await this.requiresLegacyContinuation(subscriptionId)) {
       return this.legacyTradeService.reconcileSubscription(
         subscriptionId,
@@ -359,7 +382,8 @@ export class CanonicalInternalTradingTradeService {
               e.assetSymbol,
               e.outcome,
               e.resultPercent,
-              p.activitiesPerDay
+              p.activitiesPerDay,
+              p.timezoneSnapshot AS policyTimezoneSnapshot
             FROM simulated_trade_activity_events e
             INNER JOIN simulated_activity_policy_versions p
               ON p.id = e.policyVersionId
@@ -755,6 +779,26 @@ export class CanonicalInternalTradingTradeService {
     state: StateRow,
     localTradeDate: string,
   ) {
+    // V1 packages can retain the original UTC subscription snapshot while
+    // historic canonical Daily Trades were generated in the independently
+    // published platform activity timezone (e.g. Asia/Kolkata). Rewriting
+    // either immutable snapshot would change the historical earning contract.
+    //
+    // Require canonical source integrity AND the event's exact local day.
+    // This deliberately does not reinterpret the trade's scheduled instant
+    // using the package timezone or broaden V2's strict timezone rule.
+    let eventLocalDate: string | null = null;
+    try {
+      if (event.policyTimezoneSnapshot === event.timezoneSnapshot) {
+        eventLocalDate = localDateForInstant(
+          event.scheduledAt,
+          event.timezoneSnapshot,
+        );
+      }
+    } catch {
+      // Reject invalid historical timezone identifiers instead of defaulting.
+    }
+
     if (
       event.subscriptionId !== state.subscriptionId ||
       event.userId !== state.userId ||
@@ -762,7 +806,10 @@ export class CanonicalInternalTradingTradeService {
       event.packagePlanItemId !== state.packagePlanItemId ||
       event.packageCode !== state.packageCode ||
       this.localDateString(event.localActivityDate) !== localTradeDate ||
-      event.timezoneSnapshot !== state.timezoneSnapshot
+      eventLocalDate !== localTradeDate ||
+      event.policyTimezoneSnapshot !== event.timezoneSnapshot ||
+      (state.financialModelVersion !== 'V1' &&
+        event.timezoneSnapshot !== state.timezoneSnapshot)
     ) {
       throw new ServiceUnavailableException(
         'Canonical Daily Trade snapshot does not match the internal trading package snapshot.',

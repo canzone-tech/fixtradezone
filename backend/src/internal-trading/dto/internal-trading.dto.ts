@@ -5,6 +5,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -70,6 +71,10 @@ export class UpdateInternalTradingPolicyDto extends AuditedInternalTradingRevisi
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsIn(['V1', 'V2'])
+  financialModelVersion?: 'V1' | 'V2';
 
   @IsOptional()
   @Type(() => Number)

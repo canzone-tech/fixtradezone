@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { historyDateFilter } from '../common/history-date-filters';
 import { Prisma } from '../generated/prisma/client';
 import type { SimulatedActivityPageQueryDto } from './dto/simulated-activity.dto';
 import { SimulatedActivityService } from './simulated-activity.service';
@@ -59,6 +60,10 @@ export class SimulatedActivityUserViewService {
       );
     });
 
+    const hiddenDateFilter = historyDateFilter(
+      Prisma.sql`e.localActivityDate`,
+      query,
+    );
     const hiddenRows = await this.prisma.$queryRaw<CountRow[]>(Prisma.sql`
       SELECT COUNT(*) AS total
       FROM simulated_trade_activity_events e
@@ -70,6 +75,7 @@ export class SimulatedActivityUserViewService {
         AND ups.rewardStartMode = 'NEXT_CALENDAR_DAY'
         AND e.scheduledAt <= UTC_TIMESTAMP(3)
         AND e.localActivityDate <= s.activationLocalDate
+        ${hiddenDateFilter}
     `);
 
     return {

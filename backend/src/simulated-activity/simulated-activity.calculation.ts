@@ -56,6 +56,50 @@ export function localDateStartAtOrAfterUtc(date: Date, timeZone: string): Date {
     : nextLocalDateStartUtc(date, timeZone);
 }
 
+/**
+ * V2 slot identity + timing only. V2 outcome and signed percent come entirely
+ * from the independent package/day plan, never legacy WIN/LOSS policy weights.
+ */
+export function deterministicV2SlotIdentity(input: {
+  sourceKey: string;
+  localActivityDate: string;
+  slotNumber: number;
+  activitiesPerDay: number;
+  minimumGapMinutes?: number | null;
+  assetSymbols: string[];
+  timingWindows: SimulatedTimingWindow[];
+  timezoneSnapshot: string;
+}): { scheduledAt: Date; assetSymbol: string } {
+  if (
+    input.activitiesPerDay !== 5 ||
+    input.slotNumber < 1 ||
+    input.slotNumber > 5
+  ) {
+    throw new BadRequestException('V2 needs exactly five scheduled slots.');
+  }
+  if (input.assetSymbols.length === 0) {
+    throw new BadRequestException('V2 requires an asset.');
+  }
+  return {
+    scheduledAt: deterministicScheduledAt({
+      sourceKey: input.sourceKey,
+      localActivityDate: input.localActivityDate,
+      slotNumber: input.slotNumber,
+      activitiesPerDay: input.activitiesPerDay,
+      minimumGapMinutes: input.minimumGapMinutes,
+      timingWindows: input.timingWindows,
+      timezoneSnapshot: input.timezoneSnapshot,
+    }),
+    assetSymbol:
+      input.assetSymbols[
+        deterministicIndex(
+          `${input.sourceKey}:asset`,
+          input.assetSymbols.length,
+        )
+      ],
+  };
+}
+
 export function deterministicSimulatedSlot(input: {
   sourceKey: string;
   localActivityDate: string;

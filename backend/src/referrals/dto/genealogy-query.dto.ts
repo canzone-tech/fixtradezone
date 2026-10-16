@@ -31,6 +31,16 @@ export class GenealogyPageQueryDto {
   limit = 25;
 }
 
+export class GenealogyLevelQueryDto extends GenealogyPageQueryDto {
+  @Transform(({ value }: { value: unknown }) =>
+    value === undefined ? 1 : Number(value),
+  )
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  level = 1;
+}
+
 export class AdminGenealogyPageQueryDto extends GenealogyPageQueryDto {
   @IsOptional()
   @IsUUID('4')

@@ -34,6 +34,10 @@ interface DirectReferralsResponse {
   };
 }
 
+interface GenealogyLevelSummary {
+  teamCount: number;
+}
+
 interface SubscriptionSummaryResponse {
   active?: Array<{ id: string }>;
   history?: Array<{ id: string }>;
@@ -106,6 +110,7 @@ export default function UserDashboardClient() {
   const [directReferralTotal, setDirectReferralTotal] = useState<number | null>(
     null,
   );
+  const [teamMemberTotal, setTeamMemberTotal] = useState<number | null>(null);
   const [activePackageTotal, setActivePackageTotal] = useState<number | null>(
     null,
   );
@@ -160,6 +165,7 @@ export default function UserDashboardClient() {
         const [
           profileResult,
           directResult,
+          teamResult,
           subscriptionsResult,
           depositsResult,
           payoutsResult,
@@ -168,6 +174,9 @@ export default function UserDashboardClient() {
           optionalRequest<ReferralProfile>("/api/user/referrals"),
           optionalRequest<DirectReferralsResponse>(
             "/api/user/referrals/direct?page=1&limit=20",
+          ),
+          optionalRequest<GenealogyLevelSummary>(
+            "/api/user/referrals/genealogy/levels?level=1&page=1&limit=1",
           ),
           optionalRequest<SubscriptionSummaryResponse>(
             "/api/user/subscriptions?limit=100",
@@ -181,6 +190,7 @@ export default function UserDashboardClient() {
           [
             profileResult,
             directResult,
+            teamResult,
             subscriptionsResult,
             depositsResult,
             payoutsResult,
@@ -203,6 +213,10 @@ export default function UserDashboardClient() {
           typeof directResult.payload?.pagination?.total === "number"
         ) {
           setDirectReferralTotal(directResult.payload.pagination.total);
+        }
+
+        if (teamResult.ok && typeof teamResult.payload?.teamCount === "number") {
+          setTeamMemberTotal(teamResult.payload.teamCount);
         }
 
         if (subscriptionsResult.ok && subscriptionsResult.payload) {
@@ -364,7 +378,7 @@ export default function UserDashboardClient() {
               <div className="ftz-hero-art" aria-hidden="true" />
             </section>
 
-            <section className="ftz-metric-grid">
+            <section className={`ftz-metric-grid ${styles.metricGrid}`}>
               <article className="ftz-metric-card is-cyan">
                 <div className="ftz-metric-icon">
                   <i className="iconoir-crown" />
@@ -422,6 +436,18 @@ export default function UserDashboardClient() {
                   <small>Direct Referrals</small>
                   <strong>{directReferralTotal ?? "—"}</strong>
                   <span>Live referral network</span>
+                </div>
+              </article>
+
+              <article className="ftz-metric-card is-cyan">
+                <div className="ftz-metric-icon">
+                  <i className="iconoir-community" />
+                </div>
+
+                <div className="ftz-metric-copy">
+                  <small>Total Team Members</small>
+                  <strong>{teamMemberTotal ?? "—"}</strong>
+                  <span>All downline levels · includes direct referrals</span>
                 </div>
               </article>
             </section>
@@ -595,7 +621,7 @@ export default function UserDashboardClient() {
                   <span>
                     {directReferralTotal === null
                       ? "Referral data unavailable"
-                      : "Live referral API"}
+                      : `Live referral API · Team: ${teamMemberTotal ?? "—"}`}
                   </span>
                 </div>
               </div>

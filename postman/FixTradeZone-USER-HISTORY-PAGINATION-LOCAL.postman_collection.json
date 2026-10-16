@@ -1,0 +1,463 @@
+{
+  "info": {
+    "_postman_id": "a021cce9-87db-4d6d-b792-73ff702cec01",
+    "name": "FixTradeZone User History Pagination — LOCAL",
+    "description": "LOCAL ONLY. Read-only tests. Requires working backend migration state and one USER account with trade history. Do not run against production. Dates are UTC calendar days; all-history reproduces legacy behavior.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "historyUserPackageSubscriptionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01 User Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identifier\": \"{{userIdentifier}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+        },
+        "url": "{{baseUrl}}/auth/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User login succeeds', () => pm.response.to.have.status(200));",
+              "const body = pm.response.json();",
+              "pm.expect(body.accessToken).to.be.a('string');",
+              "pm.environment.set('userAccessToken', body.accessToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Select package",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User packages 200', () => pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.expect(b.packages).to.be.an('array');",
+              "if (b.packages.length) pm.collectionVariables.set('historyUserPackageSubscriptionId', b.packages[0].subscriptionId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Wallet Last 2 Days",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/wallet/me?page=1&limit=10&days=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.activity).to.be.an('array').with.length.at.most(10);pm.expect(b.totalActivity).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});",
+              "pm.test('10 rows max and recent UTC date', () => { const floor = new Date(); floor.setUTCHours(0,0,0,0); floor.setUTCDate(floor.getUTCDate()-1); pm.expect(b.activity.every(x => new Date(x.postedAt || x.scheduledAt).getTime() >= floor.getTime())).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Wallet All History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/wallet/me?page=1&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.activity).to.be.an('array').with.length.at.most(10);pm.expect(b.totalActivity).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});",
+              "pm.environment.set('historyWalletTotal', String(b.totalActivity));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Wallet Page 2",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/wallet/me?page=2&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History page 2 succeeds',()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.expect(b.page).to.eql(2);pm.expect(b.activity.length).to.be.at.most(10);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Wallet Date Bounds",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/wallet/me?page=1&limit=10&fromDate=2026-10-12&toDate=2026-10-14"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.activity).to.be.an('array').with.length.at.most(10);pm.expect(b.totalActivity).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Wallet Bad mixed filters",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/wallet/me?days=2&fromDate=2026-10-12"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Reject ambiguous mixed date params',()=>pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Daily Trades Last 2 Days",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/simulated-activity/me?page=1&limit=10&days=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});",
+              "pm.test('10 rows max and recent UTC date', () => { const floor = new Date(); floor.setUTCHours(0,0,0,0); floor.setUTCDate(floor.getUTCDate()-1); pm.expect(b.events.every(x => new Date(x.postedAt || x.scheduledAt).getTime() >= floor.getTime())).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Daily Trades All History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/simulated-activity/me?page=1&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});",
+              "pm.environment.set('historyDailyTradesTotal', String(b.total));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Daily Trades Page 2",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/simulated-activity/me?page=2&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History page 2 succeeds',()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.expect(b.page).to.eql(2);pm.expect(b.events.length).to.be.at.most(10);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Daily Trades Date Bounds",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/simulated-activity/me?page=1&limit=10&fromDate=2026-10-12&toDate=2026-10-14"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Daily Trades Bad mixed filters",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/simulated-activity/me?days=2&fromDate=2026-10-12"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Reject ambiguous mixed date params',()=>pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Trading Last 2 Days",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{historyUserPackageSubscriptionId}}/events?page=1&limit=10&days=2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Trading All History",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{historyUserPackageSubscriptionId}}/events?page=1&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});",
+              "pm.environment.set('historyTradingTotal', String(b.total));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Trading Page 2",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{historyUserPackageSubscriptionId}}/events?page=2&limit=10"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History page 2 succeeds',()=>pm.response.to.have.status(200));",
+              "const b=pm.response.json();",
+              "pm.expect(b.page).to.eql(2);pm.expect(b.events.length).to.be.at.most(10);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Trading Date Bounds",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{historyUserPackageSubscriptionId}}/events?page=1&limit=10&fromDate=2026-10-12&toDate=2026-10-14"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('History API 200', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('Pagination contract', () => {pm.expect(b.events).to.be.an('array').with.length.at.most(10);pm.expect(b.total).to.be.a('number');pm.expect(b.page).to.eql(1);pm.expect(b.limit).to.eql(10);});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Trading Bad mixed filters",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userAccessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/internal-trading/me/packages/{{historyUserPackageSubscriptionId}}/events?days=2&fromDate=2026-10-12"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Reject ambiguous mixed date params',()=>pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
