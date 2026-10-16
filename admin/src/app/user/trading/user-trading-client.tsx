@@ -328,9 +328,12 @@ export default function UserTradingClient() {
 
   useEffect(() => {
     if (!selectedId) return;
-    void loadClaims(selectedId).catch((caught) =>
-      setError(caught instanceof Error ? caught.message : 'Cannot load profit claims.'),
-    );
+    const timer = window.setTimeout(() => {
+      void loadClaims(selectedId).catch((caught) =>
+        setError(caught instanceof Error ? caught.message : 'Cannot load profit claims.'),
+      );
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [selectedId, loadClaims]);
 
   async function claimProfit(claim: DailyClaim) {
