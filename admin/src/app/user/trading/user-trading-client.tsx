@@ -173,6 +173,16 @@ export default function UserTradingClient() {
     [packages],
   );
 
+  const dailyClaimsByDate = useMemo(
+    () =>
+      new Map(
+        claims
+          .filter((claim) => claim.subscriptionId === selectedId)
+          .map((claim) => [claim.localTradeDate, claim] as const),
+      ),
+    [claims, selectedId],
+  );
+
   const loadClaims = useCallback(async (subscriptionId: string) => {
     const response = await fetch(
       `/api/user/internal-trading/claims?page=1&limit=100&subscriptionId=${encodeURIComponent(subscriptionId)}`,
@@ -642,7 +652,7 @@ export default function UserTradingClient() {
               <h3>Trade History</h3>
               <p className={styles.muted}>
                 {selected?.financialModelVersion === 'V2'
-                  ? 'Algorithm-generated signed trade P&L is recorded here. No per-trade wallet credit occurs; daily profit is credited only on Claim Profit.'
+                  ? 'Algorithm-generated signed trade P&L is recorded here. Wallet credit appears on the fifth trade row only after the daily Claim Profit is completed; no individual trade credits the wallet.'
                   : 'Historical V1 trade results and prior wallet settlements are shown unchanged.'}
               </p>
             </div>
@@ -669,13 +679,16 @@ export default function UserTradingClient() {
                   <th>%</th>
                   <th>Gross result</th>
                   <th>Progress</th>
-                  <th>{selected?.financialModelVersion === 'V2' ? 'Wallet credit (claim-based)' : 'Package Earnings credit'}</th>
+                  <th>{selected?.financialModelVersion === 'V2' ? 'Daily claim wallet credit' : 'Package Earnings credit'}</th>
                 </tr>
               </thead>
 
               <tbody>
                 {events.map((event) => {
                   const hasAdditionalCredit = Number(event.userShareAmount) > 0;
+                  const dailyClaim = event.slotNumber === 5
+                    ? dailyClaimsByDate.get(event.localTradeDate)
+                    : undefined;
 
                   return (
                     <tr key={event.id}>
@@ -699,14 +712,33 @@ export default function UserTradingClient() {
                       <td>{event.resultPercent}%</td>
                       <td>{event.grossResultAmount}</td>
                       <td>{event.grossProgressAfter}</td>
-                      <td className={styles.moneyPositive}>
-                        {event.userShareAmount}
-                        {selected?.financialModelVersion !== 'V2' && !hasAdditionalCredit && Number(event.grossResultAmount) > 0 ? (
+                      <td>
+                        {selected?.financialModelVersion === 'V2' ? (
+                          dailyClaim?.status === 'CLAIMED' ? (
+                            <>
+                              <span className={styles.moneyPositive}>
+                                +{dailyClaim.userAmount} {dailyClaim.currency}
+                              </span>
+                              <span className={styles.claimCreditDetail}>
+                                Daily claim credited
+                              </span>
+                            </>
+                          ) : dailyClaim?.status === 'PENDING' ? (
+                            <span className={styles.muted}>Pending daily claim</span>
+                          ) : (
+                            <span className={styles.muted}>—</span>
+                          )
+                        ) : (
                           <>
-                            <br />
-                            <span className={styles.muted}>No additional credit</span>
+                            <span className={styles.moneyPositive}>{event.userShareAmount}</span>
+                            {!hasAdditionalCredit && Number(event.grossResultAmount) > 0 ? (
+                              <>
+                                <br />
+                                <span className={styles.muted}>No additional credit</span>
+                              </>
+                            ) : null}
                           </>
-                        ) : null}
+                        )}
                       </td>
                     </tr>
                   );
