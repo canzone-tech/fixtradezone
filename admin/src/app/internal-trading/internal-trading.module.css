@@ -352,6 +352,13 @@
   color: var(--ftz-success);
 }
 
+.claimCreditDetail {
+  display: block;
+  margin-top: 4px;
+  color: var(--ftz-copy-muted);
+  font-size: 11px;
+}
+
 .progressTrack {
   height: 8px;
   overflow: hidden;
