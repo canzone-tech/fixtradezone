@@ -195,6 +195,25 @@
 
 .button,
 .buttonSecondary,
+.buttonWarning {
+  border-radius: var(--ftz-radius-control);
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.button {
+  border: 1px solid rgba(31, 255, 240, 0.45);
+  color: var(--ftz-primary-strong);
+  background: rgba(7, 74, 84, 0.68);
+}
+
+.buttonSecondary {
+  color: #dbeafe;
+  background: rgba(7, 25, 52, 0.85);
+  border: 1px solid var(--ftz-border);
+}
 
 /* Only pending V2 profit claims use this attention state. */
 .claimProfitButton {
@@ -237,26 +256,6 @@
     animation: none;
     transition: none;
   }
-}
-
-.buttonWarning {
-  border-radius: var(--ftz-radius-control);
-  padding: 10px 14px;
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.button {
-  border: 1px solid rgba(31, 255, 240, 0.45);
-  color: var(--ftz-primary-strong);
-  background: rgba(7, 74, 84, 0.68);
-}
-
-.buttonSecondary {
-  color: #dbeafe;
-  background: rgba(7, 25, 52, 0.85);
-  border: 1px solid var(--ftz-border);
 }
 
 .buttonWarning {
