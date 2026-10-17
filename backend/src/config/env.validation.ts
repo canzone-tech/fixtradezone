@@ -132,6 +132,20 @@ export const envValidationSchema = Joi.object({
     .max(3600)
     .default(60),
 
+  WEB_PUSH_ENABLED: boolean.default(false),
+
+  WEB_PUSH_VAPID_PUBLIC_KEY: Joi.string().allow('').default(''),
+
+  WEB_PUSH_VAPID_PRIVATE_KEY: Joi.string().allow('').default(''),
+
+  WEB_PUSH_VAPID_SUBJECT: Joi.string().allow('').default(''),
+
+  WEB_PUSH_WORKER_INTERVAL_MS: Joi.number()
+    .integer()
+    .min(10_000)
+    .max(3_600_000)
+    .default(30_000),
+
   REWARD_WORKER_ENABLED: boolean.default(false),
 
   REWARD_WORKER_INTERVAL_MS: Joi.number()

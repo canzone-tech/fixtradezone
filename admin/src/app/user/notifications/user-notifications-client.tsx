@@ -7,6 +7,7 @@ import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
 import { formatPlatformDateTime } from "@/lib/platform-time";
 import type { UserDirectSession } from "@/lib/user-session";
+import TradePushControls from "@/components/pwa/trade-push-controls";
 
 interface NotificationRecord {
   id: string;
@@ -210,6 +211,8 @@ export default function UserNotificationsClient() {
             Notification delivery history cannot be deleted from the user portal.
           </p>
         </section>
+
+        <TradePushControls />
 
         <section className={styles.card}>
           <div className={styles.notificationHeader}>

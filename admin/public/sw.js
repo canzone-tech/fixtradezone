@@ -53,3 +53,49 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cached) => cached ?? fetch(request)),
   );
 });
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+
+  const title =
+    typeof payload.title === "string" ? payload.title : "FixTradeZone";
+  const body =
+    typeof payload.body === "string"
+      ? payload.body
+      : "A Daily Trade result is available.";
+  const tag = typeof payload.id === "string" ? payload.id : undefined;
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+      badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+      data: { url: "/user/trading" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const destination = new URL("/user/trading", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(
+      async (windows) => {
+        for (const client of windows) {
+          if (client.url.startsWith(self.location.origin)) {
+            await client.navigate(destination);
+            return client.focus();
+          }
+        }
+        return self.clients.openWindow(destination);
+      },
+    ),
+  );
+});
