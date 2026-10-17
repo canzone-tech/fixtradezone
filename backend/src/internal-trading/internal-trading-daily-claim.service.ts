@@ -9,6 +9,7 @@ import type { AuthenticatedUser } from '../auth/auth-user';
 import type { RequestContext } from '../auth/auth.types';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
+import { recordClaimProfitCompletedNotification } from '../notifications/trade-result-notification';
 
 const toMoney = (value: Prisma.Decimal | number | string): string =>
   new Prisma.Decimal(value)
@@ -290,6 +291,14 @@ export class InternalTradingDailyClaimService {
         WHERE subscriptionId = ${claim.subscriptionId}
           AND financialModelVersion = 'V2'
       `);
+
+        await recordClaimProfitCompletedNotification(transaction, {
+          userId,
+          claimId: claim.id,
+          localTradeDate: this.dateString(claim.localTradeDate),
+          userAmount: toMoney(user),
+          currency,
+        });
 
         await transaction.auditLog.create({
           data: {
