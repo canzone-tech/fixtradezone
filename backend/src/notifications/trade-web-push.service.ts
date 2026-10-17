@@ -181,6 +181,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       if (lock !== 'OK') return;
       acquired = true;
       await this.queueNewTradeAlerts();
+      await this.closeSettledClaimReadyDeliveries();
       for (let batch = 0; batch < 1; batch += 1) {
         const deliveries = await this.claimDeliveries();
         if (!deliveries.length) break;
@@ -217,11 +218,39 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
         AND n.createdAt >= s.createdAt
       LEFT JOIN user_notification_push_deliveries d
         ON d.notificationId = n.id AND d.subscriptionId = s.id
-      WHERE n.sourceType = 'INTERNAL_TRADE_EVENT'
+      LEFT JOIN internal_trade_daily_claims c
+        ON c.id = n.sourceId
+        AND n.sourceType = 'INTERNAL_TRADE_DAILY_CLAIM_READY'
+      WHERE n.sourceType IN (
+        'INTERNAL_TRADE_EVENT',
+        'INTERNAL_TRADE_DAILY_CLAIM_READY',
+        'INTERNAL_TRADE_DAILY_CLAIMED'
+      )
+        AND (n.sourceType <> 'INTERNAL_TRADE_DAILY_CLAIM_READY'
+          OR c.status = 'PENDING')
         AND n.createdAt >= DATE_SUB(CURRENT_TIMESTAMP(3), INTERVAL 2 DAY)
         AND d.id IS NULL
       ORDER BY n.createdAt ASC
       LIMIT ${DELIVERY_LIMIT * 10}
+    `);
+  }
+
+
+  private async closeSettledClaimReadyDeliveries(): Promise<void> {
+    // A claim may be completed before its 'Ready' push is dispatched.
+    // Keep the inbox history, but never show an outdated call to claim.
+    await this.prisma.$executeRaw(Prisma.sql`
+      UPDATE user_notification_push_deliveries d
+      INNER JOIN user_notifications n ON n.id = d.notificationId
+      INNER JOIN internal_trade_daily_claims c ON c.id = n.sourceId
+      SET d.status = 'FAILED',
+          d.lastError = 'Claim completed before push delivery',
+          d.claimToken = NULL,
+          d.lockedUntil = NULL,
+          d.updatedAt = CURRENT_TIMESTAMP(3)
+      WHERE n.sourceType = 'INTERNAL_TRADE_DAILY_CLAIM_READY'
+        AND c.status = 'CLAIMED'
+        AND d.status IN ('PENDING', 'RETRY')
     `);
   }
 
@@ -233,7 +262,12 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
         FROM user_notification_push_deliveries d
         JOIN user_web_push_subscriptions s ON s.id = d.subscriptionId
         JOIN user_notifications n ON n.id = d.notificationId AND n.userId = s.userId
+        LEFT JOIN internal_trade_daily_claims c
+          ON c.id = n.sourceId
+          AND n.sourceType = 'INTERNAL_TRADE_DAILY_CLAIM_READY'
         WHERE s.active = TRUE
+          AND (n.sourceType <> 'INTERNAL_TRADE_DAILY_CLAIM_READY'
+            OR c.status = 'PENDING')
           AND d.nextAttemptAt <= CURRENT_TIMESTAMP(3)
           AND (d.status IN ('PENDING', 'RETRY')
             OR (d.status = 'SENDING' AND d.lockedUntil < CURRENT_TIMESTAMP(3)))

@@ -323,3 +323,29 @@
   background: rgba(239, 68, 68, 0.14);
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
+
+.notification:has(.notificationOverlayLink) {
+  position: relative;
+  cursor: pointer;
+}
+
+.notificationOverlayLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.notificationOverlayLink:hover {
+  background: rgba(96, 165, 250, 0.055);
+}
+
+.notificationOverlayLink:focus-visible {
+  outline: 2px solid #5cd7ed;
+  outline-offset: 3px;
+}
+
+.notification:has(.notificationOverlayLink) .actions {
+  position: relative;
+  z-index: 2;
+}

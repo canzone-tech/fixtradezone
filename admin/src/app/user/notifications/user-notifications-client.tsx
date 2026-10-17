@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
@@ -11,6 +12,7 @@ import type { UserDirectSession } from "@/lib/user-session";
 interface NotificationRecord {
   id: string;
   category: string;
+  sourceType: string | null;
   title: string;
   message: string;
   readAt: string | null;
@@ -249,6 +251,17 @@ export default function UserNotificationsClient() {
                   data-unread={!row.readAt}
                   key={row.id}
                 >
+                  {[
+                    "INTERNAL_TRADE_EVENT",
+                    "INTERNAL_TRADE_DAILY_CLAIM_READY",
+                    "INTERNAL_TRADE_DAILY_CLAIMED",
+                  ].includes(row.sourceType ?? "") ? (
+                    <Link
+                      href="/user/trading"
+                      className={styles.notificationOverlayLink}
+                      aria-label={`${row.title}. Open Trading page.`}
+                    />
+                  ) : null}
                   <div className={styles.notificationHeader}>
                     <div className={styles.notificationTitle}>
                       {row.title.startsWith("Daily Trade WIN —") ||
