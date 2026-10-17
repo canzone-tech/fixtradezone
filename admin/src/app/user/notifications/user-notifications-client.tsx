@@ -254,7 +254,55 @@ export default function UserNotificationsClient() {
                 >
                   <div className={styles.notificationHeader}>
                     <div className={styles.notificationTitle}>
-                      <span className={styles.badge}>{row.category}</span>
+                      {row.title.startsWith("Daily Trade WIN —") ||
+                      row.title.startsWith("Daily Trade LOSS —") ? (
+                        <span
+                          className={styles.tradeResultIcon}
+                          data-outcome={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN"
+                              : "LOSS"
+                          }
+                          role="img"
+                          aria-label={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN trade"
+                              : "LOSS trade"
+                          }
+                          title={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN trade"
+                              : "LOSS trade"
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            {row.title.startsWith("Daily Trade WIN —") ? (
+                              <>
+                                <path d="m3 17 6-6 4 4 8-8" />
+                                <path d="M15 7h6v6" />
+                              </>
+                            ) : (
+                              <>
+                                <path d="m3 7 6 6 4-4 8 8" />
+                                <path d="M15 17h6v-6" />
+                              </>
+                            )}
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className={styles.badge}>{row.category}</span>
+                      )}
                       <strong>{row.title}</strong>
                     </div>
                     <span className={styles.meta}>
