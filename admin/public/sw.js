@@ -89,6 +89,9 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(title, {
         body,
         tag,
+        // Ask supporting desktop browsers to keep the popup visible until
+        // the user dismisses or opens it. OS notification policies may override.
+        requireInteraction: true,
         icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
         badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
         data: { url: "/user/trading" },
