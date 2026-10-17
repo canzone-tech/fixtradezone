@@ -1,6 +1,6 @@
 # PWA WIN/LOSS Web Push — local QA only (Phase 2)
 
-Current status: **implementation draft; local QA is pending**. Do not merge this branch or deploy to production until explicitly verified. Phase 1 (V1/V2 committed trade event → in-app FINANCE notification) was visually verified for 18 Oct 2026 on local MD TAJ, with 5 V1 + 5 V2 trades.
+Current status: **backend/frontend static checks were green locally before onboarding changes; installed-PWA onboarding and end-to-end trade-event push delivery still require fresh local QA**. Do not merge this branch or deploy to production until explicitly verified. Phase 1 (V1/V2 committed trade event → in-app FINANCE notification) was visually verified for 18 Oct 2026 on local MD TAJ, with 5 V1 + 5 V2 trades.
 
 ## Design boundaries
 
@@ -60,12 +60,20 @@ Current status: **implementation draft; local QA is pending**. Do not merge this
 
 ## Local user acceptance (Postman optional)
 
-1. Start NestJS with **normal clock**, then Next.js. Browse `http://localhost:3001/user/notifications` (localhost is a trustworthy origin).
-2. Press **Enable on this device** and grant browser notifications. The UI should confirm registration. Check subscription endpoint belongs to a supported push provider. iOS Web Push requires an installed Home Screen PWA on compatible versions.
-3. With a local V1/V2 package and **next due new trades**, run safe local QA as previously tested. The *new* WIN/LOSS inbox alerts should appear; OS/browser pop-up delivery should appear even while PWA is backgrounded or closed, depending on browser/OS permission and active USER session.
-4. Verify WIN and LOSS each deep-link to `/user/trading`. Refresh the inbox and replay reconciliation with **no new event**, confirming it creates no duplicate inbox notification or new push delivery.
-5. Press **Disable on this device**; new WIN/LOSS events should continue appearing **in-app** but not be sent to the disabled browser. Test re-enable and browser reload.
-6. Confirm an absent, expired or different USER session does **not** display someone else's sensitive trade notifications. Validate permission denial shows a useful UI message.
-7. Check the local subscription/delivery status if push isn't delivered; provider acceptance does not guarantee OS display.
+1. Start NestJS with **normal clock**, then Next.js. On desktop Chrome install the PWA (Chrome menu > Install page as app, or equivalent); on iOS use Add to Home Screen. Open the **installed app**, sign in as a normal USER (not admin impersonation).
+2. After authenticated login, the installed PWA must show **Enable Daily Trade Alerts** if push permission is not yet granted. Tap **Enable Notifications**, then explicitly allow the browser/OS permission. Browsers cannot be forced to grant permission programmatically. If blocked/unavailable, there must be a safe recovery path without trapping users. `http://localhost:3001` is a trustworthy origin for local testing. **Notifications inbox must NOT show the old Enable/Disable controls.**
+3. Reload the installed PWA and navigate between pages; a valid already-granted subscription must be silently synchronized without showing the onboarding again, clearing delivery records, or resending prior notifications. A regular browser tab (not standalone) must not show the login-gated PWA onboarding. iOS Web Push requires an installed Home Screen PWA on compatible versions.
+4. With a local V1/V2 package and **next due new trades**, run safe local QA as previously tested. The *new* WIN/LOSS inbox alerts should appear; OS/browser pop-up delivery should appear even while PWA is backgrounded or closed, depending on browser/OS permission and active USER session.
+5. Verify WIN and LOSS each deep-link to `/user/trading`. Refresh the inbox and replay reconciliation with **no new event**, confirming it creates no duplicate inbox notification or new push delivery.
+6. Verify the same signed-in user can re-open the installed PWA without another prompt. Test blocked permission behavior and OS notification settings. A user should never lose access to their in-app inbox because an OS denied notifications.
+7. Confirm an absent, expired or different USER session does **not** display someone else's sensitive trade notifications. Validate permission denial shows a useful UI message.
+8. Check the local subscription/delivery status if push isn't delivered; provider acceptance does not guarantee OS display.
 
 Only after both backend and frontend checks + actual local browser/PWA push delivery are GREEN should this feature branch receive a PR to main. The compiled production artifact build must include the npm dependency lockfile changes. Do not use `git add .`: preserve `backups/` and `backend/@C9`.
+
+## Verified so far / caveats
+
+- The local DB migration was confirmed applied (51 migrations), backend/Next.js checks were green before the post-login onboarding change, and an explicit Chrome standard Web Push test returned HTTP 201 and displayed a GNOME desktop notification.
+- These checks **do not** prove the automatic worker sends a new V1/V2 trade alert or that the latest installed PWA onboarding passes. Re-run static checks and end-to-end acceptance after changes.
+- Notifications use `requireInteraction: true`; GNOME/Chrome can still auto-hide heads-up popups. They cannot be made universally permanent by application code.
+- Dependency updates from local `npm install` must be committed to `backend/package.json` and `backend/package-lock.json` along with formatted changes before any PR. Never commit local `.env` or VAPID private keys.

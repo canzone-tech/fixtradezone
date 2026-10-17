@@ -257,7 +257,13 @@ export default function TradePushControls({ userId }: { userId: string }) {
           type="button"
           autoFocus
           disabled={status === "working"}
-          onClick={() => void enableNotifications()}
+          onClick={() => {
+            if (status === "error" && !config) {
+              window.location.reload();
+              return;
+            }
+            void enableNotifications();
+          }}
           style={{
             width: "100%",
             minHeight: 50,
@@ -269,7 +275,11 @@ export default function TradePushControls({ userId }: { userId: string }) {
             cursor: "pointer",
           }}
         >
-          {status === "working" ? "Enabling…" : "Enable Notifications"}
+          {status === "working"
+            ? "Enabling…"
+            : status === "error" && !config
+              ? "Retry setup"
+              : "Enable Notifications"}
         </button>
 
         {status === "blocked" || status === "error" ? (
