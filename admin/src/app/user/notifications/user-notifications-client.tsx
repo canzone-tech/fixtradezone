@@ -209,7 +209,7 @@ export default function UserNotificationsClient() {
           <h1>Notifications</h1>
           <p>
             Read operational, finance, security, and general platform messages.
-            Notification delivery history cannot be deleted from the user portal.
+            Daily Trade and Claim Profit alerts expire automatically after five days. Other notification records follow their existing retention rules.
           </p>
         </section>
 

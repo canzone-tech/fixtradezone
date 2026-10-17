@@ -81,3 +81,21 @@ Only after both backend and frontend checks + actual local browser/PWA push deli
 ## Final promotion criteria
 
 The branch is **not production-ready solely because a manual standalone Web Push popup delivered HTTP 201**. Re-run formatting/lint/tests/build after the current claim/inbox code changes; verify the installed-PWA login onboarding, automatic worker sends, Ready/Claimed idempotency, click navigation, blocked permissions, cross-user isolation and replay; commit the local `web-push` and `@types/web-push` dependency+lockfile changes; review `npm audit` without blind upgrades; then PR to main, review and deploy built artifacts with production VAPID variables and migration 0051. Do not force production browser permissions or promise OS-level persistent banners.
+
+## Five-day notification retention
+
+Only the ephemeral alerts with `sourceType` in:
+- `INTERNAL_TRADE_EVENT` (V1/V2 WIN/LOSS)
+- `INTERNAL_TRADE_DAILY_CLAIM_READY` (V2 five trades completed)
+- `INTERNAL_TRADE_DAILY_CLAIMED` (V2 claim completed)
+
+are retained for **5 × 24 hours** after their `createdAt` time in MySQL UTC. The `TradeNotificationRetentionService` runs once at NestJS startup and every 10 minutes, under a Redis instance lock; each transaction deletes at most 500 expired alerts, with at most 20 batches per run. The worker first removes `user_notification_push_deliveries` referencing those alerts, then the `user_notifications` rows. It does not delete or alter `internal_trade_events`, canonical Daily Trades, `internal_trade_daily_claims`, package state, wallet ledger, `audit_log`, other categories of notifications, or active Web Push subscriptions. Trade claim eligibility remains in Trading regardless of alert expiry.
+
+Production migration `0052_trade_notification_retention_index` adds a composite source/time index for retention queries. Deploy migration before backend code and only after backup / normal schema-change review.
+
+Local QA:
+1. On local MySQL only, run `npx prisma migrate deploy` (expect **52** migrations). No direct production DB manipulation.
+2. Create or use local alerts older than five days and newer than five days for all three source types, plus a non-trading SYSTEM/SECURITY alert. **Do not modify the host clock.**
+3. Start backend with normal time; verify logs show retention completion, and old trade/claim alerts + their push deliveries disappear while fresh alerts and unrelated notifications remain.
+4. Verify MySQL foreign key consistency, no deletion of claim/ledger/trade records, and that a pending V2 claim still appears on Trading after its alert expires.
+5. Confirm a second sweep is idempotent and multiple backend workers honor the Redis lock.
