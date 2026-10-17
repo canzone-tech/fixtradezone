@@ -5,6 +5,7 @@ import {
   OnApplicationShutdown,
   OnModuleInit,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -39,9 +40,12 @@ export class TradeNotificationRetentionService
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit(): void {
+    if (this.config.get<string>('NODE_ENV') === 'test') return;
+
     this.timer = setInterval(() => {
       void this.pruneExpired();
     }, SWEEP_INTERVAL_MS);

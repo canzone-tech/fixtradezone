@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { RedisService } from '../redis/redis.service';
@@ -28,7 +29,11 @@ describe('Five-day Internal Trading notification retention', () => {
       }),
     } as unknown as RedisService;
     return {
-      worker: new TradeNotificationRetentionService(prisma, redis),
+      worker: new TradeNotificationRetentionService(
+        prisma,
+        redis,
+        { get: jest.fn().mockReturnValue('development') } as unknown as ConfigService,
+      ),
       tx,
       sql,
     };
