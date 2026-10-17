@@ -301,3 +301,57 @@
     width: 100% !important;
   }
 }
+
+.tradeResultIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.tradeResultIcon[data-outcome="WIN"] {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.tradeResultIcon[data-outcome="LOSS"] {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.notification:has(.notificationOverlayLink) {
+  position: relative;
+  cursor: pointer;
+}
+
+.notificationOverlayLink {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.notificationOverlayLink:hover {
+  background: rgba(96, 165, 250, 0.055);
+}
+
+.notificationOverlayLink:focus-visible {
+  outline: 2px solid #5cd7ed;
+  outline-offset: 3px;
+}
+
+.notification:has(.notificationOverlayLink) .actions {
+  position: relative;
+  z-index: 2;
+}
+
+.tradeResultIcon[data-outcome="CLAIM"] {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}

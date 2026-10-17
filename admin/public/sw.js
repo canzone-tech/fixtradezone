@@ -53,3 +53,97 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cached) => cached ?? fetch(request)),
   );
 });
+
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = {};
+  }
+
+  const title =
+    typeof payload.title === "string" ? payload.title : "FixTradeZone";
+  const body =
+    typeof payload.body === "string"
+      ? payload.body
+      : "A Daily Trade result is available.";
+  const tag = typeof payload.id === "string" ? payload.id : undefined;
+
+  event.waitUntil(
+    (async () => {
+      // Never show USER A's trading result to USER B.
+      const response = await fetch("/api/user/session", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (!response.ok) return;
+
+      const session = await response.json();
+      if (
+        !session.user ||
+        typeof payload.userId !== "string" ||
+        session.user.id !== payload.userId
+      ) return;
+
+      await self.registration.showNotification(title, {
+        body,
+        tag,
+        requireInteraction: true,
+        icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+        badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+        data: { url: "/user/trading" },
+      });
+    })().catch(() => {
+      // Do not disclose account data if verification fails.
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const destination = new URL("/user/trading", self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      // Prefer an already-open Trading page.
+      for (const client of windows) {
+        try {
+          if (new URL(client.url).href === destination) {
+            await client.focus();
+            return;
+          }
+        } catch {
+          // Try another window.
+        }
+      }
+
+      // Reuse an existing same-origin application window when possible.
+      for (const client of windows) {
+        try {
+          if (new URL(client.url).origin !== self.location.origin) {
+            continue;
+          }
+
+          const navigated = await client.navigate(destination);
+          if (navigated) {
+            await navigated.focus();
+            return;
+          }
+        } catch {
+          // Navigation or focus failed; try another window.
+        }
+      }
+
+      // Fallback when no existing window can be navigated.
+      await self.clients.openWindow(destination);
+    })(),
+  );
+});

@@ -12,6 +12,7 @@ import {
   isImpersonationSession,
   type UserPortalSession,
 } from "@/lib/user-session";
+import TradePushControls from "@/components/pwa/trade-push-controls";
 import UserSetupGuide from "./user-setup-guide";
 import UserSidebar from "./user-sidebar";
 import UserTopbar from "./user-topbar";
@@ -108,6 +109,13 @@ export default function UserShell({
           scopeKey={lockScope}
           activityMirrorScopeKey={adminActivityMirrorScope}
           identityLabel={session.user.email}
+        />
+      ) : null}
+
+      {deviceObservationUserId ? (
+        <TradePushControls
+          key={deviceObservationUserId}
+          userId={deviceObservationUserId}
         />
       ) : null}
 

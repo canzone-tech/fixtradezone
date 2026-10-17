@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import FlashMessage from "@/components/ui/flash-message";
 import UserShell from "@/components/user/user-shell";
 import styles from "@/components/closeout/closeout.module.css";
@@ -11,6 +12,7 @@ import type { UserDirectSession } from "@/lib/user-session";
 interface NotificationRecord {
   id: string;
   category: string;
+  sourceType: string | null;
   title: string;
   message: string;
   readAt: string | null;
@@ -207,7 +209,7 @@ export default function UserNotificationsClient() {
           <h1>Notifications</h1>
           <p>
             Read operational, finance, security, and general platform messages.
-            Notification delivery history cannot be deleted from the user portal.
+            Daily Trade and Claim Profit alerts expire automatically after five days. Other notification records follow their existing retention rules.
           </p>
         </section>
 
@@ -249,9 +251,97 @@ export default function UserNotificationsClient() {
                   data-unread={!row.readAt}
                   key={row.id}
                 >
+                  {[
+                    "INTERNAL_TRADE_EVENT",
+                    "INTERNAL_TRADE_DAILY_CLAIM_READY",
+                    "INTERNAL_TRADE_DAILY_CLAIMED",
+                  ].includes(row.sourceType ?? "") ? (
+                    <Link
+                      href="/user/trading"
+                      className={styles.notificationOverlayLink}
+                      aria-label={`${row.title}. Open Trading page.`}
+                    />
+                  ) : null}
                   <div className={styles.notificationHeader}>
                     <div className={styles.notificationTitle}>
-                      <span className={styles.badge}>{row.category}</span>
+                      {row.title.startsWith("Daily Trade WIN —") ||
+                      row.title.startsWith("Daily Trade LOSS —") ? (
+                        <span
+                          className={styles.tradeResultIcon}
+                          data-outcome={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN"
+                              : "LOSS"
+                          }
+                          role="img"
+                          aria-label={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN trade"
+                              : "LOSS trade"
+                          }
+                          title={
+                            row.title.startsWith("Daily Trade WIN —")
+                              ? "WIN trade"
+                              : "LOSS trade"
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            {row.title.startsWith("Daily Trade WIN —") ? (
+                              <>
+                                <path d="m3 17 6-6 4 4 8-8" />
+                                <path d="M15 7h6v6" />
+                              </>
+                            ) : (
+                              <>
+                                <path d="m3 7 6 6 4-4 8 8" />
+                                <path d="M15 17h6v-6" />
+                              </>
+                            )}
+                          </svg>
+                        </span>
+                      ) : row.sourceType === "INTERNAL_TRADE_DAILY_CLAIM_READY" ||
+                        row.sourceType === "INTERNAL_TRADE_DAILY_CLAIMED" ? (
+                        <span
+                          className={styles.tradeResultIcon}
+                          data-outcome="CLAIM"
+                          role="img"
+                          aria-label={
+                            row.sourceType === "INTERNAL_TRADE_DAILY_CLAIM_READY"
+                              ? "Profit ready to claim"
+                              : "Profit claimed successfully"
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="3" y="5" width="18" height="14" rx="2" />
+                            <path d="M16 12h5" />
+                            <circle cx="16" cy="12" r="1" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <span className={styles.badge}>{row.category}</span>
+                      )}
                       <strong>{row.title}</strong>
                     </div>
                     <span className={styles.meta}>

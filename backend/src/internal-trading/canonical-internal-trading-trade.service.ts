@@ -21,6 +21,7 @@ import {
 } from './internal-trading-package-earnings';
 import { InternalTradingTradeService } from './internal-trading-trade.service';
 import { InternalTradingV2TradeService } from './internal-trading-v2-trade.service';
+import { recordTradeResultNotification } from '../notifications/trade-result-notification';
 import { localDateForInstant } from '../simulated-activity/simulated-activity.calculation';
 
 const MAX_SERIALIZABLE_ATTEMPTS = 3;
@@ -641,6 +642,14 @@ export class CanonicalInternalTradingTradeService {
               CURRENT_TIMESTAMP(3)
             )
           `);
+
+          await recordTradeResultNotification(transaction, {
+            userId: state.userId,
+            eventId,
+            assetSymbol: canonical.assetSymbol,
+            outcome: canonical.outcome,
+            slotNumber,
+          });
 
           const completing =
             localTradeDate === finalLocalDate &&
