@@ -7,8 +7,16 @@ import { TradeWebPushService } from './trade-web-push.service';
 import { TradeNotificationRetentionService } from './trade-notification-retention.service';
 
 @Module({
-  controllers: [NotificationsController, AdminNotificationsController, TradeWebPushController],
-  providers: [NotificationsService, TradeWebPushService, TradeNotificationRetentionService],
+  controllers: [
+    NotificationsController,
+    AdminNotificationsController,
+    TradeWebPushController,
+  ],
+  providers: [
+    NotificationsService,
+    TradeWebPushService,
+    TradeNotificationRetentionService,
+  ],
   exports: [NotificationsService],
 })
 export class NotificationsModule {}

@@ -1,5 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, Logger, OnApplicationShutdown, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as webPush from 'web-push';
 import { Prisma } from '../generated/prisma/client';
@@ -58,7 +65,9 @@ export function validatedPushEndpoint(raw: string): string {
 }
 
 @Injectable()
-export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown {
+export class TradeWebPushService
+  implements OnModuleInit, OnApplicationShutdown
+{
   private readonly logger = new Logger(TradeWebPushService.name);
   private readonly enabled: boolean;
   private readonly publicKey: string;
@@ -71,25 +80,39 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
     private readonly config: ConfigService,
     private readonly redis: RedisService,
   ) {
-    this.publicKey = this.config.get<string>('WEB_PUSH_VAPID_PUBLIC_KEY')?.trim() ?? '';
-    const privateKey = this.config.get<string>('WEB_PUSH_VAPID_PRIVATE_KEY')?.trim() ?? '';
-    const subject = this.config.get<string>('WEB_PUSH_VAPID_SUBJECT')?.trim() ?? '';
+    this.publicKey =
+      this.config.get<string>('WEB_PUSH_VAPID_PUBLIC_KEY')?.trim() ?? '';
+    const privateKey =
+      this.config.get<string>('WEB_PUSH_VAPID_PRIVATE_KEY')?.trim() ?? '';
+    const subject =
+      this.config.get<string>('WEB_PUSH_VAPID_SUBJECT')?.trim() ?? '';
     const switchedOn = this.config.get<string | boolean>('WEB_PUSH_ENABLED');
-    this.enabled = (switchedOn === true || switchedOn === 'true') &&
+    this.enabled =
+      (switchedOn === true || switchedOn === 'true') &&
       Boolean(this.publicKey && privateKey && subject);
-    const interval = Number(this.config.get<string | number>('WEB_PUSH_WORKER_INTERVAL_MS') ?? 30000);
-    this.intervalMs = Number.isFinite(interval) && interval >= 10000 && interval <= 3600000
-      ? Math.floor(interval) : 30000;
-    if (this.enabled) webPush.setVapidDetails(subject, this.publicKey, privateKey);
+    const interval = Number(
+      this.config.get<string | number>('WEB_PUSH_WORKER_INTERVAL_MS') ?? 30000,
+    );
+    this.intervalMs =
+      Number.isFinite(interval) && interval >= 10000 && interval <= 3600000
+        ? Math.floor(interval)
+        : 30000;
+    if (this.enabled)
+      webPush.setVapidDetails(subject, this.publicKey, privateKey);
   }
 
   getPublicConfig() {
-    return { enabled: this.enabled, publicKey: this.enabled ? this.publicKey : null };
+    return {
+      enabled: this.enabled,
+      publicKey: this.enabled ? this.publicKey : null,
+    };
   }
 
   onModuleInit() {
     if (!this.enabled || this.config.get<string>('NODE_ENV') === 'test') return;
-    this.timer = setInterval(() => { void this.dispatchDue(); }, this.intervalMs);
+    this.timer = setInterval(() => {
+      void this.dispatchDue();
+    }, this.intervalMs);
     this.timer.unref();
     this.logger.log('Web Push WIN/LOSS dispatcher enabled.');
   }
@@ -103,7 +126,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
     this.ensureEnabled();
     const endpoint = validatedPushEndpoint(input.endpoint);
     const endpointHash = createHash('sha256').update(endpoint).digest('hex');
-    return this.prisma.$transaction(async tx => {
+    return this.prisma.$transaction(async (tx) => {
       const found = await tx.$queryRaw<SubscriptionRow[]>(Prisma.sql`
         SELECT id, userId FROM user_web_push_subscriptions
         WHERE endpointHash = ${endpointHash} LIMIT 1 FOR UPDATE
@@ -113,17 +136,20 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
         // Repeated login may sync the same browser subscription. Keep the
         // original subscription timestamp and already-sent delivery history
         // instead of resetting the queue on every page navigation.
-        const current = await tx.$queryRaw<Array<{
-          active: number | boolean;
-          endpoint: string;
-          p256dh: string;
-          auth: string;
-        }>>(Prisma.sql`
+        const current = await tx.$queryRaw<
+          Array<{
+            active: number | boolean;
+            endpoint: string;
+            p256dh: string;
+            auth: string;
+          }>
+        >(Prisma.sql`
           SELECT active, endpoint, p256dh, auth
           FROM user_web_push_subscriptions
           WHERE id = ${existing.id} LIMIT 1
         `);
-        const unchanged = existing.userId === userId &&
+        const unchanged =
+          existing.userId === userId &&
           Boolean(current[0]?.active) &&
           current[0]?.endpoint === endpoint &&
           current[0]?.p256dh === input.p256dh &&
@@ -158,7 +184,8 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
   async unsubscribe(userId: string, rawEndpoint: string) {
     this.ensureEnabled();
     const hash = createHash('sha256')
-      .update(validatedPushEndpoint(rawEndpoint)).digest('hex');
+      .update(validatedPushEndpoint(rawEndpoint))
+      .digest('hex');
     await this.prisma.$executeRaw(Prisma.sql`
       UPDATE user_web_push_subscriptions SET active = FALSE, updatedAt = CURRENT_TIMESTAMP(3)
       WHERE userId = ${userId} AND endpointHash = ${hash}
@@ -167,7 +194,8 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
   }
 
   private ensureEnabled() {
-    if (!this.enabled) throw new ServiceUnavailableException('Browser push is not configured.');
+    if (!this.enabled)
+      throw new ServiceUnavailableException('Browser push is not configured.');
   }
 
   private async dispatchDue() {
@@ -188,16 +216,26 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
         for (const delivery of deliveries) await this.sendDelivery(delivery);
       }
     } catch (error) {
-      this.logger.error(error instanceof Error ? error.message : 'Web Push dispatcher failed.');
+      this.logger.error(
+        error instanceof Error ? error.message : 'Web Push dispatcher failed.',
+      );
     } finally {
       if (acquired) {
         try {
-          await this.redis.getClient().eval(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-            1, WORKER_LOCK_KEY, token,
-          );
+          await this.redis
+            .getClient()
+            .eval(
+              "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+              1,
+              WORKER_LOCK_KEY,
+              token,
+            );
         } catch (error) {
-          this.logger.warn(error instanceof Error ? error.message : 'Web Push lock cleanup failed.');
+          this.logger.warn(
+            error instanceof Error
+              ? error.message
+              : 'Web Push lock cleanup failed.',
+          );
         }
       }
       this.running = false;
@@ -235,7 +273,6 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
     `);
   }
 
-
   private async closeSettledClaimReadyDeliveries(): Promise<void> {
     // A claim may be completed before its 'Ready' push is dispatched.
     // Keep the inbox history, but never show an outdated call to claim.
@@ -255,7 +292,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
   }
 
   private claimDeliveries(): Promise<PushDeliveryRow[]> {
-    return this.prisma.$transaction(async tx => {
+    return this.prisma.$transaction(async (tx) => {
       const rows = await tx.$queryRaw<PushDeliveryRow[]>(Prisma.sql`
         SELECT d.id, d.notificationId, d.subscriptionId, n.userId, s.endpoint, s.p256dh, s.auth,
           n.title, n.message, d.attempts
@@ -298,23 +335,36 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       url: '/user/trading',
     });
     try {
-      await webPush.sendNotification({
-        endpoint: validatedPushEndpoint(row.endpoint),
-        keys: { p256dh: row.p256dh, auth: row.auth },
-      }, payload, { TTL: 3600, urgency: 'normal' });
+      await webPush.sendNotification(
+        {
+          endpoint: validatedPushEndpoint(row.endpoint),
+          keys: { p256dh: row.p256dh, auth: row.auth },
+        },
+        payload,
+        { TTL: 3600, urgency: 'normal' },
+      );
       await this.prisma.$executeRaw(Prisma.sql`
         UPDATE user_notification_push_deliveries
         SET status = 'SENT', sentAt = CURRENT_TIMESTAMP(3),
+          lastError = NULL,
           claimToken = NULL, lockedUntil = NULL, updatedAt = CURRENT_TIMESTAMP(3)
         WHERE id = ${row.id} AND status = 'SENDING' AND claimToken = ${row.id}
       `);
     } catch (error) {
-      const code = typeof error === 'object' && error !== null && 'statusCode' in error
-        ? Number((error as { statusCode?: unknown }).statusCode)
-        : 0;
+      const code =
+        typeof error === 'object' && error !== null && 'statusCode' in error
+          ? Number((error as { statusCode?: unknown }).statusCode)
+          : 0;
       const expired = code === 404 || code === 410;
-      const permanent = expired || code === 400 || code === 403 || Number(row.attempts) + 1 >= MAX_ATTEMPTS;
-      const delaySeconds = Math.min(3600, 30 * (2 ** Math.min(Number(row.attempts), 6)));
+      const permanent =
+        expired ||
+        code === 400 ||
+        code === 403 ||
+        Number(row.attempts) + 1 >= MAX_ATTEMPTS;
+      const delaySeconds = Math.min(
+        3600,
+        30 * 2 ** Math.min(Number(row.attempts), 6),
+      );
       if (expired) {
         await this.prisma.$executeRaw(Prisma.sql`
           UPDATE user_web_push_subscriptions SET active = FALSE,

@@ -23,8 +23,8 @@ describe('Five-day Internal Trading notification retention', () => {
       $executeRaw: execute,
     };
     const prisma = {
-      $transaction: jest.fn(
-        (fn: (client: typeof tx) => Promise<unknown>) => fn(tx),
+      $transaction: jest.fn((fn: (client: typeof tx) => Promise<unknown>) =>
+        fn(tx),
       ),
     } as unknown as PrismaService;
     const redis = {
@@ -34,11 +34,9 @@ describe('Five-day Internal Trading notification retention', () => {
       }),
     } as unknown as RedisService;
     return {
-      worker: new TradeNotificationRetentionService(
-        prisma,
-        redis,
-        { get: jest.fn().mockReturnValue('development') } as unknown as ConfigService,
-      ),
+      worker: new TradeNotificationRetentionService(prisma, redis, {
+        get: jest.fn().mockReturnValue('development'),
+      } as unknown as ConfigService),
       tx,
       sql,
     };
@@ -47,7 +45,9 @@ describe('Five-day Internal Trading notification retention', () => {
   it('deletes dependent push deliveries first, then trade-related notifications', async () => {
     const { worker, tx, sql } = mockService([OLD_ID]);
     // The second sweep query returns no candidates.
-    tx.$queryRaw.mockResolvedValueOnce([{ id: OLD_ID }]).mockResolvedValueOnce([]);
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: OLD_ID }])
+      .mockResolvedValueOnce([]);
     const deleted = await worker.pruneExpired();
 
     expect(deleted).toBe(1);
@@ -55,7 +55,9 @@ describe('Five-day Internal Trading notification retention', () => {
     expect(sql[0].strings.join(' ')).toContain(
       'DELETE FROM user_notification_push_deliveries',
     );
-    expect(sql[1].strings.join(' ')).toContain('DELETE FROM user_notifications');
+    expect(sql[1].strings.join(' ')).toContain(
+      'DELETE FROM user_notifications',
+    );
     expect(sql[1].strings.join(' ')).toContain('INTERNAL_TRADE_DAILY_CLAIMED');
     expect(sql[1].strings.join(' ')).not.toContain('internal_trade_events');
     expect(sql[1].values).toContain(5);
@@ -67,7 +69,7 @@ describe('Five-day Internal Trading notification retention', () => {
     expect(await worker.pruneExpired()).toBe(0);
     expect(sql).toHaveLength(0);
     expect(tx.$queryRaw.mock.calls[0][0].strings.join(' ')).toContain(
-      "WHERE sourceType IN",
+      'WHERE sourceType IN',
     );
   });
 

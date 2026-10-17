@@ -113,7 +113,10 @@ export default function UserShell({
       ) : null}
 
       {deviceObservationUserId ? (
-        <TradePushControls key={deviceObservationUserId} userId={deviceObservationUserId} />
+        <TradePushControls
+          key={deviceObservationUserId}
+          userId={deviceObservationUserId}
+        />
       ) : null}
 
       <UserTopbar

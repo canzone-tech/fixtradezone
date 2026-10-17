@@ -9,12 +9,7 @@ interface PushConfig {
 }
 
 type OnboardingState =
-  | "checking"
-  | "hidden"
-  | "prompt"
-  | "blocked"
-  | "error"
-  | "working";
+  "checking" | "hidden" | "prompt" | "blocked" | "error" | "working";
 
 function decodeVapidKey(encoded: string): ArrayBuffer {
   const raw = atob(
@@ -108,10 +103,13 @@ export default function TradePushControls({ userId }: { userId: string }) {
         }
 
         if (Notification.permission === "granted") {
-          const registration = await navigator.serviceWorker.register("/sw.js", {
-            scope: "/",
-            updateViaCache: "none",
-          });
+          const registration = await navigator.serviceWorker.register(
+            "/sw.js",
+            {
+              scope: "/",
+              updateViaCache: "none",
+            },
+          );
           const subscription = await registration.pushManager.getSubscription();
           if (subscription) {
             await syncSubscription(subscription);
@@ -236,8 +234,8 @@ export default function TradePushControls({ userId }: { userId: string }) {
         </h2>
         <p style={{ color: "#b1c3de", lineHeight: 1.55, marginBottom: 18 }}>
           Allow FixTradeZone to notify you when your V1 or V2
-          algorithm-generated Daily Trades finish with WIN or LOSS results.
-          Your in-app Notifications inbox remains available.
+          algorithm-generated Daily Trades finish with WIN or LOSS results. Your
+          in-app Notifications inbox remains available.
         </p>
 
         {status === "blocked" ? (

@@ -54,6 +54,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -72,13 +73,13 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     (async () => {
-      // Push subscriptions are tied to the USER who opted in. A shared
-      // browser must not display USER A's trading result after USER B logs in.
+      // Never show USER A's trading result to USER B.
       const response = await fetch("/api/user/session", {
         cache: "no-store",
         credentials: "include",
       });
       if (!response.ok) return;
+
       const session = await response.json();
       if (
         !session.user ||
@@ -89,34 +90,60 @@ self.addEventListener("push", (event) => {
       await self.registration.showNotification(title, {
         body,
         tag,
-        // Ask supporting desktop browsers to keep the popup visible until
-        // the user dismisses or opens it. OS notification policies may override.
         requireInteraction: true,
         icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
         badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
         data: { url: "/user/trading" },
       });
     })().catch(() => {
-      // Never disclose account-specific results without session verification.
+      // Do not disclose account data if verification fails.
     }),
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
   const destination = new URL("/user/trading", self.location.origin).href;
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(
-      async (windows) => {
-        for (const client of windows) {
-          if (client.url.startsWith(self.location.origin)) {
-            await client.navigate(destination);
-            return client.focus();
+    (async () => {
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      // Prefer an already-open Trading page.
+      for (const client of windows) {
+        try {
+          if (new URL(client.url).href === destination) {
+            await client.focus();
+            return;
           }
+        } catch {
+          // Try another window.
         }
-        return self.clients.openWindow(destination);
-      },
-    ),
+      }
+
+      // Reuse an existing same-origin application window when possible.
+      for (const client of windows) {
+        try {
+          if (new URL(client.url).origin !== self.location.origin) {
+            continue;
+          }
+
+          const navigated = await client.navigate(destination);
+          if (navigated) {
+            await navigated.focus();
+            return;
+          }
+        } catch {
+          // Navigation or focus failed; try another window.
+        }
+      }
+
+      // Fallback when no existing window can be navigated.
+      await self.clients.openWindow(destination);
+    })(),
   );
 });

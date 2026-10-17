@@ -1,7 +1,10 @@
 import { Body, Controller, Delete, Get, Header, Post } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { WebPushSubscriptionDto, WebPushUnsubscribeDto } from './dto/web-push-subscription.dto';
+import {
+  WebPushSubscriptionDto,
+  WebPushUnsubscribeDto,
+} from './dto/web-push-subscription.dto';
 import { TradeWebPushService } from './trade-web-push.service';
 
 @Controller('notifications/push')
@@ -16,13 +19,19 @@ export class TradeWebPushController {
 
   @Post()
   @Header('Cache-Control', 'no-store')
-  register(@CurrentUser() actor: AuthenticatedUser, @Body() dto: WebPushSubscriptionDto) {
+  register(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: WebPushSubscriptionDto,
+  ) {
     return this.webPush.register(actor.id, dto);
   }
 
   @Delete()
   @Header('Cache-Control', 'no-store')
-  unsubscribe(@CurrentUser() actor: AuthenticatedUser, @Body() dto: WebPushUnsubscribeDto) {
+  unsubscribe(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: WebPushUnsubscribeDto,
+  ) {
     return this.webPush.unsubscribe(actor.id, dto.endpoint);
   }
 }

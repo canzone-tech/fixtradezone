@@ -96,12 +96,14 @@ export class TradeNotificationRetentionService
     } finally {
       if (acquired) {
         try {
-          await this.redis.getClient().eval(
-            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
-            1,
-            LOCK_KEY,
-            token,
-          );
+          await this.redis
+            .getClient()
+            .eval(
+              "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+              1,
+              LOCK_KEY,
+              token,
+            );
         } catch (error) {
           this.logger.warn(
             error instanceof Error

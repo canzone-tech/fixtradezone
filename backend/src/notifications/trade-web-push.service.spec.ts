@@ -7,7 +7,7 @@ describe('Web Push endpoint validation / SSRF protection', () => {
     'https://updates.push.services.mozilla.com/wpush/v2/abc',
     'https://web.push.apple.com/abc',
     'https://wns2-by3p.notify.windows.com/?token=abc',
-  ])('accepts known browser push origins: %s', endpoint => {
+  ])('accepts known browser push origins: %s', (endpoint) => {
     expect(validatedPushEndpoint(endpoint)).toBe(endpoint);
   });
 
@@ -19,7 +19,7 @@ describe('Web Push endpoint validation / SSRF protection', () => {
     'https://fcm.googleapis.com.attacker.test/abc',
     'https://fcm.googleapis.com:8443/send',
     'https://evil.example.com/abc',
-  ])('rejects untrusted push destinations: %s', endpoint => {
+  ])('rejects untrusted push destinations: %s', (endpoint) => {
     expect(() => validatedPushEndpoint(endpoint)).toThrow(BadRequestException);
   });
 });

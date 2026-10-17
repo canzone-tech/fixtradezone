@@ -86,11 +86,17 @@ describe('V2 Claim Profit inbox notification', () => {
       localTradeDate: '2026-10-18',
     });
     expect(execute).toHaveBeenCalledTimes(1);
-    const query = execute.mock.calls[0][0] as Prisma.Sql;
-    expect(query.strings.join(' ')).toContain('FROM internal_trade_daily_claims c');
+    const query = execute.mock.calls[0][0];
+    expect(query.strings.join(' ')).toContain(
+      'FROM internal_trade_daily_claims c',
+    );
     expect(query.strings.join(' ')).toContain("c.status = 'PENDING'");
     expect(query.values).toEqual(
-      expect.arrayContaining([claimId, userId, 'Claim Profit Ready — Daily Trade']),
+      expect.arrayContaining([
+        claimId,
+        userId,
+        'Claim Profit Ready — Daily Trade',
+      ]),
     );
     expect(query.values).toContain(
       'Your V2 algorithm-generated Daily Trades for 2026-10-18 are complete (5/5). Claim Profit is now available on the Trading page.',
@@ -110,10 +116,14 @@ describe('V2 Claim Profit inbox notification', () => {
       userAmount: '0.70175868',
       currency: 'USDT',
     });
-    const query = execute.mock.calls[0][0] as Prisma.Sql;
+    const query = execute.mock.calls[0][0];
     expect(query.strings.join(' ')).toContain("c.status = 'CLAIMED'");
     expect(query.values).toEqual(
-      expect.arrayContaining([claimId, userId, 'Claim Profit Successful — Daily Trade']),
+      expect.arrayContaining([
+        claimId,
+        userId,
+        'Claim Profit Successful — Daily Trade',
+      ]),
     );
     expect(query.values).toContain(
       'Your V2 Daily Trade profit for 2026-10-18 was claimed successfully. 0.70175868 USDT was credited to Package Earnings. View Trading History.',
@@ -127,7 +137,11 @@ describe('V2 Claim Profit inbox notification', () => {
     } as unknown as Prisma.TransactionClient;
 
     await expect(
-      recordClaimProfitReadyNotification(tx, { userId, claimId, localTradeDate: '2026-10-18' }),
+      recordClaimProfitReadyNotification(tx, {
+        userId,
+        claimId,
+        localTradeDate: '2026-10-18',
+      }),
     ).rejects.toBe(error);
   });
 });
