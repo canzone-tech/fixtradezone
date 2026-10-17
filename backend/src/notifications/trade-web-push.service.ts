@@ -112,12 +112,12 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       if (existing) {
         // Moving a browser endpoint between USERs must drop previous delivery
         // attempts so account A's alerts never go to account B's session.
-        if (existing.userId !== userId) {
-          await tx.$executeRaw(Prisma.sql`
-            DELETE FROM user_notification_push_deliveries
-            WHERE subscriptionId = ${existing.id}
-          `);
-        }
+        // Opting in again is a fresh delivery boundary. Cancel stale
+        // pending retries whether the browser stayed on one USER or switched.
+        await tx.$executeRaw(Prisma.sql`
+          DELETE FROM user_notification_push_deliveries
+          WHERE subscriptionId = ${existing.id}
+        `);
         await tx.$executeRaw(Prisma.sql`
           UPDATE user_web_push_subscriptions
           SET userId = ${userId}, endpoint = ${endpoint}, p256dh = ${input.p256dh},
