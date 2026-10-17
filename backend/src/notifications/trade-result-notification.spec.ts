@@ -75,7 +75,9 @@ describe('V2 Claim Profit inbox notification', () => {
   const claimId = '00000000-0000-4000-8000-000000000007';
 
   it('only emits a ready notification when the newly inserted PENDING claim ID exists', async () => {
-    const execute = jest.fn().mockResolvedValue(1);
+    const execute = jest
+      .fn<Promise<number>, [Prisma.Sql]>()
+      .mockResolvedValue(1);
     const tx = { $executeRaw: execute } as unknown as Prisma.TransactionClient;
 
     await recordClaimProfitReadyNotification(tx, {
@@ -96,7 +98,9 @@ describe('V2 Claim Profit inbox notification', () => {
   });
 
   it('emits a success notification for the claimed amount only after a CLAIMED row exists', async () => {
-    const execute = jest.fn().mockResolvedValue(1);
+    const execute = jest
+      .fn<Promise<number>, [Prisma.Sql]>()
+      .mockResolvedValue(1);
     const tx = { $executeRaw: execute } as unknown as Prisma.TransactionClient;
 
     await recordClaimProfitCompletedNotification(tx, {

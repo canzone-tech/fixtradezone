@@ -9,12 +9,17 @@ const OLD_ID = '00000000-0000-4000-8000-000000000123';
 describe('Five-day Internal Trading notification retention', () => {
   function mockService(ids: string[]) {
     const sql: Prisma.Sql[] = [];
-    const execute = jest.fn(async (query: Prisma.Sql) => {
-      sql.push(query);
-      return ids.length;
-    });
+    const execute = jest
+      .fn<Promise<number>, [Prisma.Sql]>()
+      .mockImplementation((query) => {
+        sql.push(query);
+        return Promise.resolve(ids.length);
+      });
+    const query = jest
+      .fn<Promise<Array<{ id: string }>>, [Prisma.Sql]>()
+      .mockResolvedValue(ids.map((id) => ({ id })));
     const tx = {
-      $queryRaw: jest.fn().mockResolvedValue(ids.map((id) => ({ id }))),
+      $queryRaw: query,
       $executeRaw: execute,
     };
     const prisma = {
