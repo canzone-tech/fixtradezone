@@ -1,17 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isStandaloneApp } from "@/lib/entry-experience";
 
 interface PushConfig {
   enabled: boolean;
   publicKey: string | null;
 }
 
+type OnboardingState =
+  | "checking"
+  | "hidden"
+  | "prompt"
+  | "blocked"
+  | "error"
+  | "working";
+
 function decodeVapidKey(encoded: string): ArrayBuffer {
-  const raw = atob(encoded.replace(/-/g, "+").replace(/_/g, "/").padEnd(
-    Math.ceil(encoded.length / 4) * 4,
-    "=",
-  ));
+  const raw = atob(
+    encoded
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(encoded.length / 4) * 4, "="),
+  );
   const bytes = new Uint8Array(raw.length);
   for (let index = 0; index < raw.length; index += 1) {
     bytes[index] = raw.charCodeAt(index);
@@ -19,7 +30,7 @@ function decodeVapidKey(encoded: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-function supportedBrowser(): boolean {
+function browserSupportsPush(): boolean {
   return (
     window.isSecureContext &&
     "serviceWorker" in navigator &&
@@ -28,145 +39,259 @@ function supportedBrowser(): boolean {
   );
 }
 
-export default function TradePushControls() {
+async function syncSubscription(subscription: PushSubscription): Promise<void> {
+  const payload = subscription.toJSON();
+  if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
+    throw new Error("Browser did not provide valid push credentials.");
+  }
+
+  const response = await fetch("/api/user/notifications/push", {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      endpoint: payload.endpoint,
+      p256dh: payload.keys.p256dh,
+      auth: payload.keys.auth,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not register notifications for this account.");
+  }
+}
+
+/**
+ * Displayed only inside an installed, authenticated USER PWA.
+ * The browser requires an explicit gesture to request notification permission.
+ */
+export default function TradePushControls({ userId }: { userId: string }) {
+  const [status, setStatus] = useState<OnboardingState>("checking");
   const [config, setConfig] = useState<PushConfig | null>(null);
-  const [supported, setSupported] = useState<boolean | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const browserReady = supportedBrowser();
-    setSupported(browserReady);
-    if (!browserReady) return;
+    let cancelled = false;
 
-    void fetch("/api/user/notifications/push", { cache: "no-store" })
-      .then(async response => {
-        if (!response.ok) throw new Error("Push configuration unavailable.");
-        return (await response.json()) as PushConfig;
-      })
-      .then(setConfig)
-      .catch(() => setMessage("Push configuration could not be loaded."));
-  }, []);
+    async function checkPush() {
+      // Avoid a synchronous state update directly from an effect.
+      await Promise.resolve();
 
-  async function enable() {
-    if (!config?.enabled || !config.publicKey || !supported) return;
-    setBusy(true);
-    setMessage("");
-    try {
-      const permission =
-        Notification.permission === "default"
-          ? await Notification.requestPermission()
-          : Notification.permission;
-      if (permission !== "granted") {
-        setMessage("Browser notifications are blocked. Enable them in your browser settings.");
+      if (!isStandaloneApp() || !browserSupportsPush()) {
+        if (!cancelled) setStatus("hidden");
         return;
       }
 
+      try {
+        const response = await fetch("/api/user/notifications/push", {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Push settings are unavailable.");
+
+        const nextConfig = (await response.json()) as PushConfig;
+        if (cancelled) return;
+
+        if (!nextConfig.enabled || !nextConfig.publicKey) {
+          // A deployment missing VAPID configuration must never block login.
+          setStatus("hidden");
+          return;
+        }
+
+        setConfig(nextConfig);
+
+        if (Notification.permission === "denied") {
+          const skipped = sessionStorage.getItem(
+            `ftz:push-permission-blocked:${userId}`,
+          );
+          setStatus(skipped === "1" ? "hidden" : "blocked");
+          return;
+        }
+
+        if (Notification.permission === "granted") {
+          const registration = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
+            updateViaCache: "none",
+          });
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            await syncSubscription(subscription);
+            if (!cancelled) setStatus("hidden");
+            return;
+          }
+        }
+
+        if (!cancelled) setStatus("prompt");
+      } catch (caught) {
+        if (!cancelled) {
+          setError(
+            caught instanceof Error ? caught.message : "Push setup failed.",
+          );
+          setStatus("error");
+        }
+      }
+    }
+
+    void checkPush();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function enableNotifications() {
+    if (!config?.enabled || !config.publicKey) return;
+
+    setError(null);
+
+    // Must be invoked directly by the user's click, not in an effect.
+    const permission =
+      Notification.permission === "default"
+        ? await Notification.requestPermission()
+        : Notification.permission;
+
+    if (permission !== "granted") {
+      setStatus("blocked");
+      return;
+    }
+
+    setStatus("working");
+    let created: PushSubscription | null = null;
+    try {
       const registration = await navigator.serviceWorker.register("/sw.js", {
         scope: "/",
         updateViaCache: "none",
       });
-      await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
-      const newSubscription = !subscription;
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: decodeVapidKey(config.publicKey),
         });
+        created = subscription;
       }
 
-      const payload = subscription.toJSON();
-      if (!payload.endpoint || !payload.keys?.p256dh || !payload.keys?.auth) {
-        throw new Error("Browser did not return valid push credentials.");
+      await syncSubscription(subscription);
+      setStatus("hidden");
+    } catch (caught) {
+      if (created) {
+        await created.unsubscribe().catch(() => false);
       }
-      const response = await fetch("/api/user/notifications/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: payload.endpoint,
-          p256dh: payload.keys.p256dh,
-          auth: payload.keys.auth,
-        }),
-      });
-      if (!response.ok) {
-        if (newSubscription) await subscription.unsubscribe();
-        throw new Error("Cannot save push subscription. Please try again.");
-      }
-      setMessage("Daily Trade WIN/LOSS push alerts enabled for this browser.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to enable notifications.");
-    } finally {
-      setBusy(false);
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to enable notifications.",
+      );
+      setStatus("error");
     }
   }
 
-  async function disable() {
-    if (!supported) return;
-    setBusy(true);
-    setMessage("");
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
-      if (!subscription) {
-        setMessage("No active browser subscription found.");
-        return;
+  function continueWithoutPush() {
+    // Only allow a fallback when the browser denied permission or setup failed.
+    // Missing external push functionality must not permanently block users.
+    if (status === "blocked") {
+      try {
+        sessionStorage.setItem(`ftz:push-permission-blocked:${userId}`, "1");
+      } catch {
+        // Storage may be disabled.
       }
-      const response = await fetch("/api/user/notifications/push", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: subscription.endpoint }),
-      });
-      if (!response.ok) throw new Error("Could not disable this browser subscription.");
-      await subscription.unsubscribe();
-      setMessage("WIN/LOSS browser push alerts disabled on this device.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to disable notifications.");
-    } finally {
-      setBusy(false);
     }
+    setStatus("hidden");
   }
+
+  if (status === "hidden" || status === "checking") return null;
 
   return (
-    <section
-      aria-label="Daily Trade browser notifications"
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ftz-push-onboarding-title"
       style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2147483646,
+        display: "grid",
+        placeItems: "center",
         padding: 20,
-        border: "1px solid rgba(64, 199, 218, .3)",
-        borderRadius: 14,
-        background: "rgba(8, 26, 55, .75)",
-        marginBottom: 20,
+        background: "rgba(1, 9, 24, .95)",
+        color: "#f1fbff",
       }}
     >
-      <h2 style={{ fontSize: 18, margin: "0 0 8px" }}>
-        Daily Trade WIN/LOSS Push Notifications
-      </h2>
-      <p style={{ margin: "0 0 14px", opacity: .85 }}>
-        Get browser or installed PWA alerts for new V1 and V2 Daily Trade results.
-        Permission is optional; your Notifications inbox still works without it.
-      </p>
-      {supported === false ? (
-        <p role="status">
-          Push requires a supported browser and HTTPS (localhost is supported).
-          On iPhone, install the PWA to your Home Screen first.
-        </p>
-      ) : config?.enabled ? (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-          <button type="button" disabled={busy} onClick={() => void enable()}
-            style={{ padding: "10px 16px", borderRadius: 8, cursor: "pointer" }}>
-            {busy ? "Working…" : "Enable on this device"}
-          </button>
-          <button type="button" disabled={busy} onClick={() => void disable()}
-            style={{ padding: "10px 16px", borderRadius: 8, cursor: "pointer" }}>
-            Disable on this device
-          </button>
+      <section
+        style={{
+          width: "min(100%, 430px)",
+          padding: 28,
+          borderRadius: 22,
+          border: "1px solid rgba(70, 226, 255, .36)",
+          background: "#071a35",
+          boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+        }}
+      >
+        <div style={{ fontSize: 32, marginBottom: 12 }} aria-hidden="true">
+          🔔
         </div>
-      ) : (
-        <p role="status">
-          Browser push is not configured for this environment yet.
+        <h2
+          id="ftz-push-onboarding-title"
+          style={{ fontSize: 24, margin: "0 0 12px" }}
+        >
+          Enable Daily Trade Alerts
+        </h2>
+        <p style={{ color: "#b1c3de", lineHeight: 1.55, marginBottom: 18 }}>
+          Allow FixTradeZone to notify you when your V1 or V2
+          algorithm-generated Daily Trades finish with WIN or LOSS results.
+          Your in-app Notifications inbox remains available.
         </p>
-      )}
-      {message ? <p role="status" style={{ marginTop: 12 }}>{message}</p> : null}
-    </section>
+
+        {status === "blocked" ? (
+          <p role="alert" style={{ color: "#ffcc8b", lineHeight: 1.5 }}>
+            Notifications were blocked by your browser. Open the app or site
+            notification settings and allow notifications, then try again.
+          </p>
+        ) : null}
+
+        {error ? (
+          <p role="alert" style={{ color: "#ffb4b4", lineHeight: 1.5 }}>
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          autoFocus
+          disabled={status === "working"}
+          onClick={() => void enableNotifications()}
+          style={{
+            width: "100%",
+            minHeight: 50,
+            border: 0,
+            borderRadius: 12,
+            background: "#20d6c8",
+            color: "#032029",
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          {status === "working" ? "Enabling…" : "Enable Notifications"}
+        </button>
+
+        {status === "blocked" || status === "error" ? (
+          <button
+            type="button"
+            onClick={continueWithoutPush}
+            style={{
+              display: "block",
+              width: "100%",
+              padding: 12,
+              marginTop: 12,
+              border: "1px solid rgba(148,163,184,.4)",
+              borderRadius: 12,
+              background: "transparent",
+              color: "#c8d9ec",
+              cursor: "pointer",
+            }}
+          >
+            Continue without push
+          </button>
+        ) : null}
+      </section>
+    </div>
   );
 }

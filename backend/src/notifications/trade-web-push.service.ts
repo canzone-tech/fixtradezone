@@ -110,10 +110,28 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       `);
       const existing = found[0];
       if (existing) {
-        // Moving a browser endpoint between USERs must drop previous delivery
-        // attempts so account A's alerts never go to account B's session.
-        // Opting in again is a fresh delivery boundary. Cancel stale
-        // pending retries whether the browser stayed on one USER or switched.
+        // Repeated login may sync the same browser subscription. Keep the
+        // original subscription timestamp and already-sent delivery history
+        // instead of resetting the queue on every page navigation.
+        const current = await tx.$queryRaw<Array<{
+          active: number | boolean;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+        }>>(Prisma.sql`
+          SELECT active, endpoint, p256dh, auth
+          FROM user_web_push_subscriptions
+          WHERE id = ${existing.id} LIMIT 1
+        `);
+        const unchanged = existing.userId === userId &&
+          Boolean(current[0]?.active) &&
+          current[0]?.endpoint === endpoint &&
+          current[0]?.p256dh === input.p256dh &&
+          current[0]?.auth === input.auth;
+        if (unchanged) return { subscribed: true };
+
+        // Browser switched account or keys: cancel stale deliveries before
+        // ownership changes, preventing USER A's alerts going to USER B.
         await tx.$executeRaw(Prisma.sql`
           DELETE FROM user_notification_push_deliveries
           WHERE subscriptionId = ${existing.id}
@@ -166,7 +184,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       for (let batch = 0; batch < 1; batch += 1) {
         const deliveries = await this.claimDeliveries();
         if (!deliveries.length) break;
-        for (const delivery of deliveries) await this.sendDelivery(delivery, token);
+        for (const delivery of deliveries) await this.sendDelivery(delivery);
       }
     } catch (error) {
       this.logger.error(error instanceof Error ? error.message : 'Web Push dispatcher failed.');
@@ -237,7 +255,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
     });
   }
 
-  private async sendDelivery(row: PushDeliveryRow, _workerToken: string) {
+  private async sendDelivery(row: PushDeliveryRow) {
     const payload = JSON.stringify({
       id: row.notificationId,
       userId: row.userId,
