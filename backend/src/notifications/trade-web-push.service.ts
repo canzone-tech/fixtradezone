@@ -13,6 +13,7 @@ interface SubscriptionRow {
 }
 interface PushDeliveryRow {
   id: string;
+  userId: string;
   notificationId: string;
   subscriptionId: string;
   endpoint: string;
@@ -162,7 +163,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
       if (lock !== 'OK') return;
       acquired = true;
       await this.queueNewTradeAlerts();
-      for (let batch = 0; batch < 5; batch += 1) {
+      for (let batch = 0; batch < 1; batch += 1) {
         const deliveries = await this.claimDeliveries();
         if (!deliveries.length) break;
         for (const delivery of deliveries) await this.sendDelivery(delivery, token);
@@ -209,7 +210,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
   private claimDeliveries(): Promise<PushDeliveryRow[]> {
     return this.prisma.$transaction(async tx => {
       const rows = await tx.$queryRaw<PushDeliveryRow[]>(Prisma.sql`
-        SELECT d.id, d.notificationId, d.subscriptionId, s.endpoint, s.p256dh, s.auth,
+        SELECT d.id, d.notificationId, d.subscriptionId, n.userId, s.endpoint, s.p256dh, s.auth,
           n.title, n.message, d.attempts
         FROM user_notification_push_deliveries d
         JOIN user_web_push_subscriptions s ON s.id = d.subscriptionId
@@ -239,6 +240,7 @@ export class TradeWebPushService implements OnModuleInit, OnApplicationShutdown 
   private async sendDelivery(row: PushDeliveryRow, _workerToken: string) {
     const payload = JSON.stringify({
       id: row.notificationId,
+      userId: row.userId,
       title: row.title,
       body: row.message,
       url: '/user/trading',

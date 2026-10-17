@@ -71,12 +71,30 @@ self.addEventListener("push", (event) => {
   const tag = typeof payload.id === "string" ? payload.id : undefined;
 
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      tag,
-      icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
-      badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
-      data: { url: "/user/trading" },
+    (async () => {
+      // Push subscriptions are tied to the USER who opted in. A shared
+      // browser must not display USER A's trading result after USER B logs in.
+      const response = await fetch("/api/user/session", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (!response.ok) return;
+      const session = await response.json();
+      if (
+        !session.user ||
+        typeof payload.userId !== "string" ||
+        session.user.id !== payload.userId
+      ) return;
+
+      await self.registration.showNotification(title, {
+        body,
+        tag,
+        icon: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+        badge: "/assets/fixtradezone/svg/fixtradezone-pwa-icon.svg",
+        data: { url: "/user/trading" },
+      });
+    })().catch(() => {
+      // Never disclose account-specific results without session verification.
     }),
   );
 });
