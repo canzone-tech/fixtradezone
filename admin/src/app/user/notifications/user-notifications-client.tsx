@@ -310,6 +310,35 @@ export default function UserNotificationsClient() {
                             )}
                           </svg>
                         </span>
+                      ) : row.sourceType === "INTERNAL_TRADE_DAILY_CLAIM_READY" ||
+                        row.sourceType === "INTERNAL_TRADE_DAILY_CLAIMED" ? (
+                        <span
+                          className={styles.tradeResultIcon}
+                          data-outcome="CLAIM"
+                          role="img"
+                          aria-label={
+                            row.sourceType === "INTERNAL_TRADE_DAILY_CLAIM_READY"
+                              ? "Profit ready to claim"
+                              : "Profit claimed successfully"
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="19"
+                            height="19"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <rect x="3" y="5" width="18" height="14" rx="2" />
+                            <path d="M16 12h5" />
+                            <circle cx="16" cy="12" r="1" />
+                          </svg>
+                        </span>
                       ) : (
                         <span className={styles.badge}>{row.category}</span>
                       )}
