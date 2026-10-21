@@ -202,6 +202,65 @@ describe('PackageDepositFlowService', () => {
     expect(transaction.auditLog.create).not.toHaveBeenCalled();
   });
 
+  it('releases the current user session and its wallet reservation when switching packages', async () => {
+    const previousIntent = {
+      ...paymentIntent,
+      packagePlanVersionId: '99999999-9999-4999-8999-999999999991',
+      packagePlanItemId: '99999999-9999-4999-8999-999999999992',
+      packageDefinitionId: '99999999-9999-4999-8999-999999999993',
+    };
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([previousIntent])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const result = await service.getPackageDepositContext(ITEM_ID, actor);
+
+    expect(result.paymentIntent).not.toBeNull();
+    expect(result.paymentIntent?.id).not.toBe(INTENT_ID);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(3);
+    expect(transaction.auditLog.create).toHaveBeenCalledTimes(2);
+    expect(transaction.auditLog.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          entityType: 'DepositPaymentIntent',
+          entityId: INTENT_ID,
+          description: expect.stringContaining('switched to a different package'),
+          metadata: expect.objectContaining({
+            releaseReason: 'PACKAGE_SWITCH',
+            previousPackagePlanItemId: previousIntent.packagePlanItemId,
+            nextPackagePlanItemId: ITEM_ID,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('does not create a new session if the previous session could not be released atomically', async () => {
+    const previousIntent = {
+      ...paymentIntent,
+      packagePlanItemId: '99999999-9999-4999-8999-999999999992',
+      packageDefinitionId: '99999999-9999-4999-8999-999999999993',
+    };
+    transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
+    transaction.deposit.findUnique.mockResolvedValue(null);
+    transaction.$queryRaw
+      .mockResolvedValueOnce([route])
+      .mockResolvedValueOnce([previousIntent]);
+    transaction.$executeRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+    await expect(
+      service.getPackageDepositContext(ITEM_ID, actor),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(transaction.auditLog.create).not.toHaveBeenCalled();
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(2);
+  });
+
   it('blocks context when the configured wallet is reserved by another payment session', async () => {
     transaction.packagePlanVersion.findMany.mockResolvedValue(publishedPlan());
     transaction.deposit.findUnique.mockResolvedValue(null);
