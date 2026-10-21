@@ -601,7 +601,8 @@ export class PackageDepositFlowService {
           action: 'UPDATE',
           entityType: 'DepositPaymentIntent',
           entityId: existing.id,
-          description: 'User switched to a different package; the previous payment session reservation was released.',
+          description:
+            'User switched to a different package; the previous payment session reservation was released.',
           metadata: {
             source: 'USER_DEPOSIT_PAYMENT_INTENT',
             releaseReason: 'PACKAGE_SWITCH',
