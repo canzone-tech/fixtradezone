@@ -572,9 +572,49 @@ export class PackageDepositFlowService {
         return existing;
       }
 
-      throw new ConflictException(
-        'Another payment session is already active for this user. Complete it or wait for it to expire before opening another package deposit.',
-      );
+      // Opening a different package explicitly switches this user's active,
+      // unsubmitted payment session. Submitted deposits consume the intent and
+      // are protected by the open-deposit check before this method is called.
+      const released = await transaction.$executeRaw(Prisma.sql`
+        UPDATE deposit_payment_intents
+        SET
+          activeUserKey = NULL,
+          activeWalletKey = NULL,
+          releasedAt = COALESCE(releasedAt, ${now}),
+          releaseReason = 'PACKAGE_SWITCH',
+          updatedAt = ${now}
+        WHERE id = ${existing.id}
+          AND userId = ${actor.id}
+          AND activeUserKey = ${actor.id}
+          AND activeWalletKey IS NOT NULL
+          AND expiresAt > ${now}
+      `);
+      if (released !== 1) {
+        throw new ConflictException(
+          'Payment session changed concurrently; reload the package deposit page.',
+        );
+      }
+
+      await transaction.auditLog.create({
+        data: {
+          actorUserId: actor.id,
+          action: 'UPDATE',
+          entityType: 'DepositPaymentIntent',
+          entityId: existing.id,
+          description: 'User switched to a different package; the previous payment session reservation was released.',
+          metadata: {
+            source: 'USER_DEPOSIT_PAYMENT_INTENT',
+            releaseReason: 'PACKAGE_SWITCH',
+            previousPackagePlanVersionId: existing.packagePlanVersionId,
+            previousPackagePlanItemId: existing.packagePlanItemId,
+            previousPackageDefinitionId: existing.packageDefinitionId,
+            nextPackagePlanVersionId: input.planId,
+            nextPackagePlanItemId: input.itemId,
+            nextPackageDefinitionId: input.packageDefinitionId,
+            releasedAt: now.toISOString(),
+          },
+        },
+      });
     }
 
     const reservedDepositRows = await transaction.$queryRaw<
