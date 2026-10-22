@@ -1,0 +1,104 @@
+name: Backend Runtime Artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/win-loss-user-notification-events'
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-runtime-artifact.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-runtime-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-runtime:
+    name: Backend compiled runtime only
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      NODE_ENV: production
+      DATABASE_URL: mysql://artifact_user:artifact_password@127.0.0.1:3306/fixtradezone_artifact
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact build dependencies
+        run: npm ci --include=dev
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Verify compiled production entrypoints
+        run: |
+          test -f dist/src/main.js
+          test -f dist/scripts/bootstrap-super-admin.js
+          grep -q "127.0.0.1" dist/src/main.js
+
+      - name: Remove development dependencies
+        run: npm prune --omit=dev
+
+      - name: Package compiled runtime only
+        shell: bash
+        run: |
+          set -euo pipefail
+          RELEASE_DIR="$RUNNER_TEMP/fixtradezone-backend"
+          ARCHIVE="$RUNNER_TEMP/fixtradezone-backend-${GITHUB_SHA}.tar.gz"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR"
+
+          find dist -type f \( -name '*.map' -o -name '*.d.ts' \) -delete
+          cp -a dist node_modules package.json package-lock.json "$RELEASE_DIR/"
+
+          cat > "$RELEASE_DIR/RELEASE.json" <<EOF
+          {
+            "component": "backend",
+            "commit": "${GITHUB_SHA}",
+            "ref": "${GITHUB_REF_NAME}",
+            "node": "24",
+            "sourceIncluded": false
+          }
+          EOF
+
+          test -f "$RELEASE_DIR/dist/src/main.js"
+          test -f "$RELEASE_DIR/dist/scripts/bootstrap-super-admin.js"
+          test ! -d "$RELEASE_DIR/src"
+          test ! -d "$RELEASE_DIR/.git"
+
+          if find "$RELEASE_DIR/dist" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.map' \) -print | grep -q .; then
+            echo "Source-like backend build files detected in runtime artifact."
+            exit 1
+          fi
+
+          tar -C "$RELEASE_DIR" -czf "$ARCHIVE" .
+          HASH="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          printf '%s  %s\n' "$HASH" "$(basename "$ARCHIVE")" > "${ARCHIVE}.sha256"
+
+      - name: Upload backend runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixtradezone-backend-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz
+            ${{ runner.temp }}/fixtradezone-backend-${{ github.sha }}.tar.gz.sha256
+          retention-days: 7
+          if-no-files-found: error
