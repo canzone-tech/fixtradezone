@@ -45,7 +45,7 @@ const withdrawalRow = {
   validationProfile: 'EVM',
   destinationAddress: '0x1111111111111111111111111111111111111111',
   savedAt: new Date('2026-09-20T00:00:00.000Z'),
-  lockedUntil: new Date('2026-10-20T00:00:00.000Z'),
+  lockedUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
   revision: 1,
   createdAt: new Date('2026-09-20T00:00:00.000Z'),
   updatedAt: new Date('2026-09-20T00:00:00.000Z'),
