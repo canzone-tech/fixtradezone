@@ -223,20 +223,29 @@ describe('PackageDepositFlowService', () => {
     expect(result.paymentIntent?.id).not.toBe(INTENT_ID);
     expect(transaction.$executeRaw).toHaveBeenCalledTimes(3);
     expect(transaction.auditLog.create).toHaveBeenCalledTimes(2);
-    expect(transaction.auditLog.create).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          entityType: 'DepositPaymentIntent',
-          entityId: INTENT_ID,
-          description: expect.stringContaining('switched to a different package'),
-          metadata: expect.objectContaining({
-            releaseReason: 'PACKAGE_SWITCH',
-            previousPackagePlanItemId: previousIntent.packagePlanItemId,
-            nextPackagePlanItemId: ITEM_ID,
-          }),
-        }),
-      }),
+    const auditCreateCalls = (
+      transaction.auditLog.create as unknown as {
+        mock: { calls: unknown[][] };
+      }
+    ).mock.calls;
+    const firstAuditCreateArg = auditCreateCalls[0]?.[0];
+    expect(firstAuditCreateArg).toMatchObject({
+      data: {
+        entityType: 'DepositPaymentIntent',
+        entityId: INTENT_ID,
+        metadata: {
+          releaseReason: 'PACKAGE_SWITCH',
+          previousPackagePlanItemId: previousIntent.packagePlanItemId,
+          nextPackagePlanItemId: ITEM_ID,
+        },
+      },
+    });
+    const firstAuditData =
+      typeof firstAuditCreateArg === 'object' && firstAuditCreateArg !== null
+        ? (firstAuditCreateArg as { data?: Record<string, unknown> }).data
+        : undefined;
+    expect(firstAuditData?.description).toEqual(
+      expect.stringContaining('switched to a different package'),
     );
   });
 
